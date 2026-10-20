@@ -324,10 +324,26 @@ bool Engine::processClipEffects(const Project& source, const Clip& clip, int fra
     for (int offset = first; offset < last;)
     {
         const int64_t sample = (int64_t) std::llround(at * sr) + offset;
-        const int count = std::min(last - offset, 32 - (int) (sample % 32 + 32) % 32);
-        const double time = (sample - (sample % 32 + 32) % 32) / sr;
+        int count = std::min(last - offset, 32 - (int) (sample % 32 + 32) % 32);
+        const auto gridSample = sample - (sample % 32 + 32) % 32;
+        // An EQ swap changes at its exact sample, even inside a coefficient block.
+        for (const auto& pair : transition.pairs) for (int band = 1; band < 4; ++band)
+            if (pair[(size_t) band].instant)
+            {
+                const auto edge = (int64_t) std::ceil(pair[(size_t) band].begin * sr - 1e-9);
+                if (edge > sample && edge < sample + count) count = (int) (edge - sample);
+            }
         std::array<float, 3> eq;
-        for (int band = 0; band < 3; ++band) eq[(size_t) band] = value((AutomationTarget) (band + 1), time);
+        for (int band = 0; band < 3; ++band)
+        {
+            auto atSample = gridSample;
+            for (const auto& pair : transition.pairs) if (pair[(size_t) band + 1].instant)
+            {
+                const auto edge = (int64_t) std::ceil(pair[(size_t) band + 1].begin * sr - 1e-9);
+                if (edge > gridSample && edge <= sample) atSample = std::max(atSample, edge);
+            }
+            eq[(size_t) band] = value((AutomationTarget) (band + 1), atSample / sr);
+        }
         clipProcessors[clip.effects].eq.process(clipBuffer, offset, count, sr, eq); offset += count;
     }
     clipProcessors[clip.effects].filter.process(clipBuffer, first, last, sr, at, transition.filters);

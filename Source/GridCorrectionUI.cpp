@@ -192,7 +192,7 @@ void GridCorrectionEditor::resized()
     r.removeFromTop(7); auto monitor = r.removeFromTop(32); play.setBounds(monitor.removeFromLeft(125)); click.setBounds(monitor.removeFromLeft(125)); sourceAudio.setBounds(monitor.removeFromLeft(140)); level.setBounds(monitor);
     status.setBounds(r.removeFromTop(43)); auto footer = r.removeFromBottom(32); cancel.setBounds(footer.removeFromRight(110)); footer.removeFromRight(8); save.setBounds(footer.removeFromRight(180));
 }
-GridCorrectionWindow::GridCorrectionWindow(GridCorrectionEditor* editor) : juce::DialogWindow("Source beat grid / corrections", colour::background, true)
+GridCorrectionWindow::GridCorrectionWindow(GridCorrectionEditor* editor) : AlloyPopupWindow("Source beat grid / corrections", colour::background, true)
 {
     setUsingNativeTitleBar(true); setContentOwned(editor, true); setResizable(false, false);
     centreWithSize(editor->getWidth(), editor->getHeight());

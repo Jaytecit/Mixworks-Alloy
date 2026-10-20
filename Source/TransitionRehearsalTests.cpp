@@ -25,7 +25,8 @@ void runTransitionRehearsalTests(const std::function<void(bool, const juce::Stri
     Project project = base; TransitionStyle plain, bass, composed;
     check(project.captureTransitionStyle(id, plain).wasOk() && plain.volume == std::array<double, 4> {0, 0, 1, 1}, "capture existing frame without copying manual automation");
     check(project.storeTransitionAlternative(id, 0).wasOk(), "store A from the actual transition owner");
-    check(project.applyTransitionPreset(id, TransitionPreset::bassSwap).wasOk() && project.captureTransitionStyle(id, bass).wasOk() && bass.bassPositions.has_value(), "capture legacy paired bass and its exact endpoint values");
+    project.transitionLinks[0].bassSwap = initialiseTransition(project.clips[0], project.clips[1], 4, TransitionPreset::bassSwap, project.transitionRange(project.transitionLinks[0]));
+    check(project.transitionLinks[0].bassSwap.has_value() && project.captureTransitionStyle(id, bass).wasOk() && bass.bassPositions.has_value(), "capture legacy paired bass and its exact endpoint values");
     check(project.storeTransitionAlternative(id, 1).wasOk(), "store legacy bass treatment in B");
     check(project.setTransitionBand(id, 0, {TransitionBandMode::crossfade, .8, 0, .5}).wasOk()
         && project.setTransitionBand(id, 1, {TransitionBandMode::swapFade, .7, 1, .5}).wasOk()

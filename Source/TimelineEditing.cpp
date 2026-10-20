@@ -62,7 +62,9 @@ void Workstation::addTimelineAutomation(AutomationTarget target, double time, in
     if (addUndo) remember();
     engine.project.automationEdited(address);
     curve->enabled = true; if (curve->points.empty() && time > 0) curve->setPoint(0, manual);
-    curve->setPoint(time, value); refresh(); setStatus("Marker added at " + timeText(time) + ". Drag it to adjust, or double-click for an exact value.");
+    const int point = curve->setPoint(time, value);
+    timeline.selectAutomationPoint(address, point);
+    refresh(); setStatus("Marker added at " + timeText(time) + ". Drag it to adjust, or double-click for an exact value.");
 }
 void Workstation::performTimelineAction(TimelineAction action, double time, int track)
 {

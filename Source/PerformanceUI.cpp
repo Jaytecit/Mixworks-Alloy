@@ -4,11 +4,11 @@ namespace mixworks
 {
 namespace
 {
-class ToolPanelWindow final : public juce::DocumentWindow
+class ToolPanelWindow final : public AlloyPopupWindow<juce::DocumentWindow>
 {
 public:
     std::function<void()> dock;
-    ToolPanelWindow(ToolPanel& panel, const juce::String& name) : DocumentWindow("Alloy / " + name, colour::background, allButtons)
+    ToolPanelWindow(ToolPanel& panel, const juce::String& name) : AlloyPopupWindow("Alloy / " + name, colour::background, allButtons)
     {
         setUsingNativeTitleBar(true); setResizable(true, false); setResizeLimits(640, 360, 7680, 2160);
         setContentNonOwned(&panel, false);

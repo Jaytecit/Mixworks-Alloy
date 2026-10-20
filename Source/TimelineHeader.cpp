@@ -8,7 +8,7 @@ TimelineHeader::TimelineHeader(Workstation& w, bool isOverview) : owner(w), over
     setWantsKeyboardFocus(true);
     setTitle(overview ? "Mix navigator" : "Timeline ruler and labels");
     setTooltip(overview ? "Drag the preview window to pan the timeline. Click to centre it; double-click fits the whole mix. Arrow keys pan; + and - zoom."
-                        : "Click the ruler to seek. Drag a label to move it; double-click the label row to add or edit a label.");
+                        : "Click the ruler to seek; double-click to play from that position. Drag a label to move it; double-click the label row to add or edit a label.");
 }
 double TimelineHeader::overviewWidth() const { return std::max(1., (double) owner.timeline.getWidth()); }
 juce::Rectangle<float> TimelineHeader::previewBounds() const
@@ -75,6 +75,7 @@ juce::MouseEvent TimelineHeader::timelineEvent(const juce::MouseEvent& e) const
 { return e.withNewPosition(juce::Point<float>{e.position.x + owner.viewport.getViewPositionX(), e.position.y - Timeline::rulerHeight}); }
 void TimelineHeader::pan(float x)
 {
+    owner.setFollowPlayhead(false);
     const auto preview = previewBounds();
     const double fraction = juce::jlimit(0., 1., (double) (x - grabOffset) / std::max(1.f, getWidth() - preview.getWidth()));
     owner.viewport.setViewPosition((int) std::lround(fraction * std::max(0., overviewWidth() - owner.viewport.getViewWidth())), owner.viewport.getViewPositionY());
@@ -82,12 +83,28 @@ void TimelineHeader::pan(float x)
 void TimelineHeader::mouseDown(const juce::MouseEvent& e)
 {
     grabKeyboardFocus();
-    if (!overview) { owner.timeline.mouseDown(timelineEvent(e)); return; }
+    if (!overview)
+    {
+        if (owner.engine.exporting || (e.y < Timeline::timeRulerHeight && e.getNumberOfClicks() > 1)) return;
+        owner.timeline.mouseDown(timelineEvent(e)); return;
+    }
     const auto bounds = previewBounds(); grabOffset = bounds.contains(e.position) ? e.position.x - bounds.getX() : bounds.getWidth() * .5f; pan(e.position.x);
 }
 void TimelineHeader::mouseDrag(const juce::MouseEvent& e) { if (overview) pan(e.position.x); else owner.timeline.mouseDrag(timelineEvent(e)); }
 void TimelineHeader::mouseUp(const juce::MouseEvent& e) { if (!overview) owner.timeline.mouseUp(timelineEvent(e)); }
-void TimelineHeader::mouseDoubleClick(const juce::MouseEvent& e) { if (overview) owner.menuItemSelected(22, 4); else owner.timeline.mouseDoubleClick(timelineEvent(e)); }
+void TimelineHeader::mouseDoubleClick(const juce::MouseEvent& e)
+{
+    if (overview) { owner.menuItemSelected(22, 4); return; }
+    if (owner.busy || owner.engine.exporting) return;
+    if (e.y >= 0 && e.y < Timeline::timeRulerHeight)
+    {
+        if (!e.mods.isLeftButtonDown() || e.mods.isPopupMenu()) return;
+        owner.engine.flushMidiControls();
+        owner.engine.seek(std::max(0., (e.position.x + owner.viewport.getViewPositionX()) / owner.timeline.pixelsPerSecond));
+        owner.engine.setPlaying(true); owner.refresh(); return;
+    }
+    owner.timeline.mouseDoubleClick(timelineEvent(e));
+}
 void TimelineHeader::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 { owner.timeline.mouseWheelMove(e.withNewPosition(juce::Point<float>{(float) owner.viewport.getViewPositionX() + (overview ? owner.viewport.getViewWidth() * .5f : e.position.x), 0}), wheel); }
 bool TimelineHeader::keyPressed(const juce::KeyPress& key)
@@ -95,9 +112,9 @@ bool TimelineHeader::keyPressed(const juce::KeyPress& key)
     if (key.getModifiers().isCommandDown() || key.getModifiers().isCtrlDown() || key.getModifiers().isAltDown()) return owner.keyPressed(key);
     const int code = key.getKeyCode(), x = owner.viewport.getViewPositionX(), y = owner.viewport.getViewPositionY();
     if (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey)
-    { owner.viewport.setViewPosition(x + (code == juce::KeyPress::leftKey ? -1 : 1) * std::max(1, owner.viewport.getViewWidth() / 4), y); return true; }
+    { owner.setFollowPlayhead(false); owner.viewport.setViewPosition(x + (code == juce::KeyPress::leftKey ? -1 : 1) * std::max(1, owner.viewport.getViewWidth() / 4), y); return true; }
     if (code == juce::KeyPress::homeKey || code == juce::KeyPress::endKey)
-    { owner.viewport.setViewPosition(code == juce::KeyPress::homeKey ? 0 : owner.timeline.getWidth(), y); return true; }
+    { owner.setFollowPlayhead(false); owner.viewport.setViewPosition(code == juce::KeyPress::homeKey ? 0 : owner.timeline.getWidth(), y); return true; }
     if (key.getTextCharacter() == '+' || key.getTextCharacter() == '-')
     { owner.timeline.zoomAt(key.getTextCharacter() == '+' ? 2 : .5, x + owner.viewport.getViewWidth() * .5); return true; }
     return owner.keyPressed(key);

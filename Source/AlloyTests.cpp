@@ -80,6 +80,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
     const auto root = report.getParentDirectory().getChildFile("alloy-fixture-" + juce::Uuid().toString()); root.createDirectory();
     const auto preference = root.getChildFile("workspace.json"); WorkspaceLayout settings;
     check(trackCount == 4, "the mixer exposes exactly four real lanes");
+    check(!settings.followPlayhead, "Follow playhead defaults off for an existing workspace");
     const auto evenLanes = [](const WorkspaceLayout& layout)
     {
         int low = layout.laneSize(0), high = low;
@@ -138,6 +139,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
     if (asio) asio->scanForDevices();
     check(asio && asio->getTypeName() == "ASIO", "Windows build includes the native ASIO backend; installed drivers: " + (asio ? asio->getDeviceNames().joinIntoString(", ") : juce::String("unavailable")));
    #endif
+    settings.followPlayhead = true;
     settings.preferredLibraryWidth = 380; settings.preferredInspectorWidth = 290;
     check(writeWorkspacePreferences(preference, settings).wasOk(), "workspace preferences write an identified local record");
     auto doc = juce::JSON::parse(preference); doc.getDynamicObject()->setProperty("futureSetting", "keep me"); preference.replaceWithText(juce::JSON::toString(doc));
@@ -146,7 +148,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
           && juce::JSON::parse(preference)["futureSetting"].toString() == "keep me", "width changes preserve unknown settings and create a backup");
     const auto modified = preference.getLastModificationTime();
     check(writeWorkspacePreferences(preference, settings).wasOk() && preference.getLastModificationTime() == modified, "unchanged workspace preferences are idempotent");
-    WorkspaceLayout reopened; check(readWorkspacePreferences(preference, reopened).wasOk() && reopened.preferredLibraryWidth == 420 && reopened.preferredInspectorWidth == 290, "panel widths reopen independently of a musical session");
+    WorkspaceLayout reopened; check(readWorkspacePreferences(preference, reopened).wasOk() && reopened.preferredLibraryWidth == 420 && reopened.preferredInspectorWidth == 290 && reopened.followPlayhead, "panel widths and Follow playhead reopen independently of a musical session");
     for (const auto& text : {juce::String("broken json"), juce::String("{\"format\":\"mixworks-workspace\",\"version\":1,\"libraryWidth\":320,\"inspectorWidth\":270,\"monitorMuted\":\"yes\"}"), juce::String("{\"format\":\"mixworks-workspace\",\"version\":2,\"libraryWidth\":320,\"inspectorWidth\":270}"), juce::String("{\"format\":\"mixworks-workspace\",\"version\":1,\"libraryWidth\":\"320\",\"inspectorWidth\":270}")})
     {
         const auto invalid = root.getChildFile("invalid.json"); invalid.replaceWithText(text); WorkspaceLayout defaults;
@@ -318,6 +320,129 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         auto out = report.getSiblingFile(name).createOutputStream(); if (out) { out->setPosition(0); out->truncate(); }
         juce::PNGImageFormat png; return out && png.writeImageToStream(snapshot, *out);
     };
+    {
+        Workstation nav(false); nav.stopTimer(); nav.workspacePreference = root.getChildFile("follow-workspace.json");
+        nav.engine.project = ui.engine.project;
+        nav.engine.project.labels.push_back({juce::Uuid().toString(), 10800, "Long mix end"});
+        nav.timeline.pixelsPerSecond = 40; nav.refresh();
+        const auto state = juce::JSON::toString(projectToJson(nav.engine.project));
+        const auto selected = nav.selectedClip; const auto undo = nav.undoHistory.size();
+        auto visible = [&] { const int x = Clip::gridPixel(nav.engine.position.load(), nav.timeline.pixelsPerSecond); return x >= nav.viewport.getViewPositionX() && x < nav.viewport.getViewPositionX() + nav.viewport.getViewWidth(); };
+        const juce::Point<float> point {123, 10};
+        nav.viewport.setViewPosition(400, 0);
+        nav.timelineRuler.mouseDown(event(nav.timelineRuler, point, point, false));
+        const double expected = 523. / 40;
+        check(!nav.engine.playing && std::abs(nav.engine.position.load() - expected) < 1e-9, "ruler single-click retains exact seeking through a scrolled viewport");
+        nav.timelineRuler.mouseDoubleClick(event(nav.timelineRuler, point, point, false));
+        check(nav.engine.playing && std::abs(nav.engine.position.load() - expected) < 1e-9, "ruler double-click starts playback at its visible time");
+        nav.timelineRuler.mouseDoubleClick(event(nav.timelineRuler, point, point, false));
+        check(nav.engine.playing, "double-click during playback remains a start action rather than toggling pause");
+        nav.engine.setPlaying(false); nav.setBusy(true);
+        nav.timelineRuler.mouseDoubleClick(event(nav.timelineRuler, {210, 10}, point, false));
+        check(!nav.engine.playing && nav.engine.position.load() == expected, "busy ruler double-click leaves transport unchanged");
+        nav.setBusy(false); nav.engine.exporting = true;
+        nav.timelineRuler.mouseDown(event(nav.timelineRuler, {210, 10}, point, false));
+        nav.timelineRuler.mouseDoubleClick(event(nav.timelineRuler, {210, 10}, point, false));
+        check(!nav.engine.playing && nav.engine.position.load() == expected, "export blocks ruler seeking and double-click playback"); nav.engine.exporting = false;
+        nav.engine.project.clips.front().pendingPlacement = PendingPlacement::drop;
+        nav.timelineRuler.mouseDoubleClick(event(nav.timelineRuler, point, point, false));
+        check(!nav.engine.playing, "ruler start retains the engine's pending-audio playback guard");
+        nav.engine.project.clips = ui.engine.project.clips;
+        check(!nav.layout.followPlayhead && !nav.followButton.getToggleState(), "Follow starts off and the visible toggle agrees");
+        nav.engine.seek(7200); nav.timerCallback();
+        check(nav.viewport.getViewPositionX() == 400, "disabled Follow permits inspecting an earlier window while seeking");
+        nav.followButton.setToggleState(true, juce::dontSendNotification); nav.followButton.onClick();
+        check(nav.layout.followPlayhead && visible(), "enabling Follow immediately reveals an offscreen playhead");
+        const int firstView = nav.viewport.getViewPositionX();
+        const juce::Point<float> edge {1, 10};
+        nav.timelineRuler.mouseDown(event(nav.timelineRuler, edge, edge, false));
+        nav.timelineRuler.mouseUp(event(nav.timelineRuler, edge, edge, false));
+        const auto secondDown = juce::MouseEvent(source, edge, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1, 0, 0, 0, 0,
+            &nav.timelineRuler, &nav.timelineRuler, juce::Time::getCurrentTime(), edge, juce::Time::getCurrentTime(), 2, false);
+        nav.timelineRuler.mouseDown(secondDown); nav.timelineRuler.mouseDoubleClick(secondDown); nav.timelineRuler.mouseUp(secondDown);
+        check(nav.engine.playing && nav.viewport.getViewPositionX() == firstView
+            && std::abs(nav.engine.position.load() - (firstView + 1.) / nav.timeline.pixelsPerSecond) < 1e-9,
+            "a complete ruler double-click near the view edge preserves its clicked time with Follow enabled");
+        nav.engine.setPlaying(false);
+        const int held = nav.viewport.getViewPositionX(); nav.timerCallback();
+        check(nav.viewport.getViewPositionX() == held, "Follow holds the viewport while the playhead is already visible");
+        nav.engine.setPlaying(true); nav.engine.position = 9000; nav.timerCallback();
+        check(visible() && nav.layout.followPlayhead, "playing Follow pans a three-hour timeline without disabling itself");
+        nav.engine.setPlaying(false); nav.engine.seek(200); nav.timerCallback();
+        check(visible() && nav.layout.followPlayhead, "backward seek while paused follows the canonical transport position");
+        nav.engine.project.tempo.setPoint(0, 120); nav.engine.project.tempo.setPoint(300, 150);
+        nav.engine.seek(nav.engine.project.tempo.timeAtBeat(1600)); nav.timerCallback();
+        check(visible(), "Follow uses seconds from the shared clock across tempo changes");
+        nav.engine.project.tempo = ui.engine.project.tempo;
+        nav.timeline.zoomAt(2, nav.viewport.getViewPositionX() + 20);
+        check(nav.layout.followPlayhead && visible(), "zoom retains Follow and brings its playhead into the magnified view");
+        nav.menuItemSelected(22, 4);
+        check(nav.layout.followPlayhead && visible(), "Fit whole mix preserves Follow rather than treating its zoom as manual panning");
+        nav.timeline.zoomAt(400, 0);
+        for (const auto size : {juce::Point<int>{1250, 800}, juce::Point<int>{1920, 1080}})
+        {
+            nav.setSize(size.x, size.y); nav.timerCallback();
+            check(visible() && nav.layout.followPlayhead && nav.followButton.isVisible()
+                && nav.followButton.getWidth() >= 100 && nav.followButton.getBottom() <= nav.viewport.getY()
+                && capture(nav, "follow-playhead-" + juce::String(size.x) + ".png"), "Follow remains readable and visible through resize at " + juce::String(size.x));
+        }
+        nav.performancePanel.dock.onClick(); nav.transitionPanel.dock.onClick();
+        check(nav.layout.followPlayhead && visible(), "detaching the lower consoles retains Follow and its position");
+        nav.performancePanel.dock.onClick(); nav.transitionPanel.dock.onClick();
+        nav.saveWorkspacePreferences(); WorkspaceLayout saved;
+        check(readWorkspacePreferences(nav.workspacePreference, saved).wasOk() && saved.followPlayhead, "Follow is saved in workspace preferences");
+        nav.engine.seek(12000); nav.timerCallback();
+        check(visible() && nav.layout.followPlayhead, "explicit seek past the current content extends only the timeline's view bounds");
+        nav.viewport.getHorizontalScrollBar().setCurrentRangeStart(nav.viewport.getViewPositionX() + 80, juce::sendNotificationSync);
+        check(!nav.layout.followPlayhead && !nav.followButton.getToggleState(), "manual scrollbar panning turns Follow off and updates the toggle");
+        nav.setFollowPlayhead(true); nav.timelineOverview.keyPressed(juce::KeyPress(juce::KeyPress::leftKey));
+        check(!nav.layout.followPlayhead, "keyboard overview panning disables Follow");
+        nav.setFollowPlayhead(true); const auto preview = nav.timelineOverview.previewBounds(); const auto grab = preview.getCentre();
+        nav.timelineOverview.mouseDown(event(nav.timelineOverview, grab, grab, false));
+        check(!nav.layout.followPlayhead, "manual overview dragging disables Follow even at a view boundary");
+        nav.setFollowPlayhead(true); juce::MouseWheelDetails wheel; wheel.deltaX = .3f;
+        nav.timeline.mouseWheelMove(event(nav.timeline, point, point, false), wheel);
+        check(!nav.layout.followPlayhead, "horizontal wheel panning disables Follow");
+        nav.saveWorkspacePreferences();
+        check(readWorkspacePreferences(nav.workspacePreference, saved).wasOk() && !saved.followPlayhead,
+            "manual panning's Follow-off state persists");
+        check(!nav.dirty && nav.undoHistory.size() == undo && nav.selectedClip == selected
+            && juce::JSON::toString(projectToJson(nav.engine.project)) == state, "transport navigation and Follow preserve selection, musical state and Undo");
+        const auto malformed = root.getChildFile("invalid-follow.json"); auto followDoc = juce::JSON::parse(nav.workspacePreference);
+        followDoc.getDynamicObject()->setProperty("followPlayhead", "yes"); malformed.replaceWithText(juce::JSON::toString(followDoc));
+        check(readWorkspacePreferences(malformed, saved).failed() && writeWorkspacePreferences(malformed, saved).failed(), "wrongly typed Follow preferences are retained without replacement");
+    }
+    {
+        AlloyLookAndFeel look;
+        for (const int width : {240, 800})
+        {
+            juce::Image image(juce::Image::RGB, width, 180, true);
+            { juce::Graphics g(image); look.drawPopupMenuBackground(g, width, 180); }
+            check(image.getPixelAt(0, 80) == colour::moltenOrange && image.getPixelAt(width - 1, 80) == colour::moltenOrange
+                && image.getPixelAt(8, 8) == colour::panel, "popup menus draw orange edges around the unchanged graphite surface");
+            { juce::Graphics g(image);
+            look.drawPopupMenuItem(g, {2, 4, width - 4, 28}, false, true, true, false, false, "Open mix...", "Ctrl+O", nullptr, nullptr);
+            look.drawPopupMenuItem(g, {2, 32, width - 4, 28}, false, true, false, true, false, "Follow playhead", {}, nullptr, nullptr);
+            look.drawPopupMenuItem(g, {2, 60, width - 4, 28}, false, false, false, false, false, "Export mix as WAV...", {}, nullptr, nullptr);
+            look.drawPopupMenuItem(g, {2, 88, width - 4, 28}, false, true, false, false, true, "Display", {}, nullptr, nullptr); }
+            auto out = report.getSiblingFile("orange-menu-" + juce::String(width) + ".png").createOutputStream(); juce::PNGImageFormat png;
+            check(out && png.writeImageToStream(image, *out), "capture compact and wide popup edge rendering");
+            juce::AlertWindow alert("Mixworks", "Your mix is ready. Existing analysis and edits are kept.", juce::MessageBoxIconType::InfoIcon);
+            alert.setLookAndFeel(&look); alert.addButton("OK", 1); alert.setSize(width + 120, 180);
+            const auto rendered = alert.createComponentSnapshot(alert.getLocalBounds());
+            check(rendered.getPixelAt(0, 80) == colour::moltenOrange && capture(alert, "orange-alert-" + juce::String(width) + ".png"), "real Alloy alerts keep orange edges and readable content");
+            alert.setLookAndFeel(nullptr);
+        }
+        juce::FileBrowserComponent browser(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, root, nullptr, nullptr);
+        juce::FileChooserDialogBox picker("Open mix", "Choose a saved mix", browser, false, colour::panel);
+        picker.setLookAndFeel(&look);
+        for (const int width : {420, 900})
+        {
+            picker.setSize(width, 480); const auto rendered = picker.createComponentSnapshot(picker.getLocalBounds());
+            check(rendered.getPixelAt(0, 200) == colour::moltenOrange && capture(picker, "orange-picker-" + juce::String(width) + ".png"), "app file pickers retain their orange edge at compact and wide sizes");
+        }
+        picker.setLookAndFeel(nullptr);
+    }
     for (const auto size : {juce::Point<int>{1440, 940}, juce::Point<int>{1250, 800}, juce::Point<int>{1920, 1080}, juce::Point<int>{2560, 1440}})
     {
         ui.setSize(size.x, size.y); ui.refresh();
@@ -797,6 +922,17 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
     check(ui.transitionWindow && ui.transitionWindow->getContentComponent() == &ui.transitionPanel
         && ui.toolPage == 0 && ui.performancePanel.isVisible(), "detaching Transitions reveals the docked controller");
     ui.transitionWindow->setSize(1100, 620);
+    {
+        bool edges = true;
+        for (const int width : {640, 1100})
+        {
+            ui.transitionWindow->setSize(width, 620);
+            const auto image = ui.transitionWindow->createComponentSnapshot(ui.transitionWindow->getLocalBounds());
+            edges &= image.getPixelAt(0, 200) == colour::moltenOrange
+                && capture(*ui.transitionWindow, "orange-detached-" + juce::String(width) + ".png");
+        }
+        check(edges, "detached panel client edges remain orange at compact and wide native window sizes");
+    }
     check(ui.transitionBody.getWidth() >= 1000 && ui.transitionPanel.dock.getTitle() == "Attach Transitions"
         && capture(ui.transitionPanel, "tool-transitions-detached.png"), "detached Transitions lays out in columns and offers an attach icon");
     ui.performancePanel.dock.onClick();

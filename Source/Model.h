@@ -221,6 +221,7 @@ struct TransitionBandEnvelope
     float strength = 0;
     bool rising = false;
     bool constantPower = false;
+    bool instant = false;
     float gainAt(double time) const;
 };
 struct TransitionFilterEnvelope

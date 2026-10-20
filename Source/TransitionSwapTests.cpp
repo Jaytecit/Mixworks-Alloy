@@ -106,7 +106,8 @@ void runTransitionSwapTests(const std::function<void(bool, const juce::String&)>
         check(json(pairUi.engine.project) == kept && pairUi.undoHistory.size() == undos, "failed native pairing keeps all data without adding Undo");
     }
     auto legacy = base; legacy.clips[0].controls.automation[1].enabled = true; legacy.clips[0].controls.automation[1].setPoint(0, -3);
-    check(legacy.applyTransitionPreset(id, TransitionPreset::bassSwap).wasOk(), "prepare explicitly owned legacy bass pair");
+    legacy.transitionLinks[0].bassSwap = initialiseTransition(legacy.clips[0], legacy.clips[1], 16, TransitionPreset::bassSwap, legacy.transitionRange(legacy.transitionLinks[0]));
+    check(legacy.transitionLinks[0].bassSwap.has_value(), "prepare explicitly owned historical bass pair");
     const auto oldPositions = *legacy.transitionFor(id)->bassSwap; const auto oldTimes = *legacy.transitionSwapTimes(*legacy.transitionFor(id), 1);
     for (bool side : {false, true})
     {

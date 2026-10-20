@@ -111,7 +111,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         auto rising = planAutoArrangement({quiet, loud}, styled, random);
         check(rising.error.isEmpty() && rising.project.transitionLinks.size() == 1
             && rising.project.transitionLinks[0].filter.mode == TransitionFilterMode::lowToHigh
-            && rising.project.transitionLinks[0].bands[1] && rising.project.transitionLinks[0].bands[1]->mode == TransitionBandMode::swapFade,
+            && rising.project.transitionLinks[0].bands[1] && rising.project.transitionLinks[0].bands[1]->mode == TransitionBandMode::swap,
             "Balanced uses a gentle opening filter and bass handover for measured energy increase");
         const auto noDefaultFade = [](const Project& project)
         {
@@ -244,7 +244,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     options.startingId = a->id; options.trackCount = 2; options.sectionTransitions = false; options.overlapBeats = 16; options.preset = TransitionPreset::bassSwap;
     options.transitions = AutoTransitionStyle::current;
     plan = planAutoArrangement({a, b}, options, random);
-    check(plan.error.isEmpty() && plan.project.transitionLinks.size() == 1 && plan.project.transitionLinks[0].bassSwap.has_value(),
+    check(plan.error.isEmpty() && plan.project.transitionLinks.size() == 1 && plan.project.transitionLinks[0].bands[1] && plan.project.transitionLinks[0].bands[1]->mode == TransitionBandMode::swap,
         "auto arrangement reuses selected fixed-length Bass swap rather than imposing Crossfade");
 
     a->samples.setSize(1, a->frames()); a->samples.clear(); b->samples.setSize(1, b->frames()); b->samples.clear();

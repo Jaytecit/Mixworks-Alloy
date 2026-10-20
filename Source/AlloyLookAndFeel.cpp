@@ -154,10 +154,10 @@ AlloyLookAndFeel::AlloyLookAndFeel()
     setUsingNativeAlertWindows(false);
     setColour(juce::AlertWindow::backgroundColourId, colour::panel);
     setColour(juce::AlertWindow::textColourId, colour::text);
-    setColour(juce::AlertWindow::outlineColourId, colour::border);
+    setColour(juce::AlertWindow::outlineColourId, colour::moltenOrange);
     setColour(juce::TooltipWindow::backgroundColourId, colour::raised);
     setColour(juce::TooltipWindow::textColourId, colour::text);
-    setColour(juce::TooltipWindow::outlineColourId, colour::border);
+    setColour(juce::TooltipWindow::outlineColourId, colour::moltenOrange);
     setColour(juce::DirectoryContentsDisplayComponent::textColourId, colour::text);
     setColour(juce::DirectoryContentsDisplayComponent::highlightColourId, colour::raised);
     setColour(juce::DirectoryContentsDisplayComponent::highlightedTextColourId, colour::orange);
@@ -195,13 +195,26 @@ juce::Font AlloyLookAndFeel::getAlertWindowFont() { return juce::Font(juce::Font
 void AlloyLookAndFeel::drawAlertBox(juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>&, juce::TextLayout& text)
 {
     g.fillAll(colour::panel);
-    g.setColour(colour::border); g.drawRect(alert.getLocalBounds());
+    g.setColour(colour::moltenOrange); g.drawRect(alert.getLocalBounds());
     g.setColour(colour::text);
     text.draw(g, juce::Rectangle<float>(20, 30, (float) alert.getWidth() - 40, text.getHeight()));
 }
 void AlloyLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width, int height)
 {
-    g.fillAll(colour::panel); g.setColour(colour::border); g.drawRect(0, 0, width, height);
+    g.fillAll(colour::panel); g.setColour(colour::moltenOrange); g.drawRect(0, 0, width, height);
+}
+void AlloyLookAndFeel::drawResizableWindowBorder(juce::Graphics& g, int width, int height,
+    const juce::BorderSize<int>& border, juce::ResizableWindow& window)
+{
+    if (dynamic_cast<juce::FileChooserDialogBox*>(&window))
+    { g.setColour(colour::moltenOrange); g.drawRect(0, 0, width, height); }
+    else juce::LookAndFeel_V4::drawResizableWindowBorder(g, width, height, border, window);
+}
+void AlloyLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g, const juce::Path& path, juce::Image& cached)
+{
+    juce::LookAndFeel_V4::drawCallOutBoxBackground(box, g, path, cached);
+    g.setColour(colour::panel); g.fillPath(path);
+    g.setColour(colour::moltenOrange); g.strokePath(path, juce::PathStrokeType(1.f));
 }
 void AlloyLookAndFeel::drawFileBrowserRow(juce::Graphics& g, int width, int height, const juce::File&, const juce::String& name,
     juce::Image* icon, const juce::String& size, const juce::String& date, bool directory, bool selected, int,

@@ -2,9 +2,9 @@
 
 **Work-in-progress beta.** Official project: [Jaytecit/Mixworks-Alloy](https://github.com/Jaytecit/Mixworks-Alloy). Free for personal, non-commercial testing under the [Personal Beta Licence](LICENSE); commercial use, redistribution and rebranding require written permission. Original application rights are reserved; third-party licences remain applicable. **Public binary distribution is pending dependency clearance** described in [licensing](docs/LICENSING.md).
 
-A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Local release: 0.55.1 beta. Analysis revision: 9. Session format: 26.** Four real mixer lanes support audio, inserts, automation, pan, low-pass, mute/solo and MIDI. Formats 1–23 and 25 open normally. Format 24 opens when lanes 5–8 are unused; mixes with work there remain intact and can be reorganised using retained 0.54.1.
+A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Local release: 0.55.2 beta. Analysis revision: 9. Session format: 26.** Four real mixer lanes support audio, inserts, automation, pan, low-pass, mute/solo and MIDI. Formats 1–23 and 25 open normally. Format 24 opens when lanes 5–8 are unused; mixes with work there remain intact and can be reorganised using retained 0.54.1.
 
-Run **Mixworks.cmd**. The launcher selects `out/releases/0.55.1-caed2539b07a/Mixworks.exe`. Keep the adjacent runtime, model, notices and licences with the application. Previous releases remain available for rollback; newer sessions may require the newer app.
+Run **Mixworks.cmd**. The launcher selects `out/releases/0.55.2-9166219e0087/Mixworks.exe`. Keep the adjacent runtime, model, notices and licences with the application. Previous releases remain available for rollback; newer sessions may require the newer app.
 
 ## Making a mix
 

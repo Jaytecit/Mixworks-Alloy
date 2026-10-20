@@ -498,7 +498,12 @@ static MatchResult buildTempoMap(Project p, bool align, double overlapBeats, int
         const double overlap = juce::jlimit(0.0, std::min(previous.length, c.length), previous.end() - c.start);
         const auto bass = initialiseTransition(previous, c, overlap, preset);
         const auto linked = project.linkClips(previous.id, c.id); if (linked.failed()) { result.error = linked.getErrorMessage(); return result; }
-        for (auto& link : project.transitionLinks) if (link.outgoing == previous.id && link.incoming == c.id) link.bassSwap = bass;
+        for (auto& link : project.transitionLinks) if (link.outgoing == previous.id && link.incoming == c.id)
+        {
+            link.bassSwap = bass;
+            if (preset == TransitionPreset::bassSwap && bass)
+            { project.clearTransitionBass(link); link.bands[1] = TransitionBandSettings {TransitionBandMode::swap, 1, 0, .5}; previous.automaticBass = c.automaticBass = false; }
+        }
     }
     for (const auto& pair : placedTransitions)
     {
@@ -518,7 +523,12 @@ static MatchResult buildTempoMap(Project p, bool align, double overlapBeats, int
         {
             const auto linked = project.linkClips(previous.id, incoming.id);
             if (linked.failed()) { result.error = linked.getErrorMessage(); return result; }
-            for (auto& link : project.transitionLinks) if (link.outgoing == previous.id && link.incoming == incoming.id) link.bassSwap = bass;
+            for (auto& link : project.transitionLinks) if (link.outgoing == previous.id && link.incoming == incoming.id)
+            {
+                link.bassSwap = bass;
+                if (selectedPreset == TransitionPreset::bassSwap && bass)
+                { project.clearTransitionBass(link); link.bands[1] = TransitionBandSettings {TransitionBandMode::swap, 1, 0, .5}; previous.automaticBass = incoming.automaticBass = false; }
+            }
         }
     }
     project.ensureTransitionLinks();

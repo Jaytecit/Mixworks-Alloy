@@ -138,7 +138,7 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
         {
             
             const auto& placed = ui.engine.project.clips.back();
-            check(placed.beatmatched && placed.start >= 0 && placed.track == 0 && placed.fadeIn == 0 && placed.controls.automation[1].active() && originalKept(),
+            check(placed.beatmatched && placed.start >= 0 && placed.track == 0 && placed.fadeIn == 0 && (ui.engine.project.transitionPlaybackFor(placed).pairs[0][1].instant || ui.engine.project.transitionPlaybackFor(placed).pairs[1][1].instant) && originalKept(),
                   "an occupied-lane drop uses the selected bass swap without volume fades: " + ui.status);
             ui.viewport.setViewPosition(0, 0);
             const auto point = ui.getLocalPoint(&timeline, juce::Point<int>(237, ui.timeline.laneTop(3) + 40));
@@ -180,7 +180,7 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
         else if (phase == 5)
         {
             const auto& clips = ui.engine.project.clips;
-            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && clips[0].controls.automation[1].active() && clips[1].controls.automation[1].active(),
+            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && ui.engine.project.transitionPlaybackFor(clips[0]).pairs[1][1].instant && ui.engine.project.transitionPlaybackFor(clips[1]).pairs[0][1].instant,
                   "default append creates an overlapping transition at the first track's tempo");
             const auto before = juce::JSON::toString(projectToJson(ui.engine.project)); ui.menuItemSelected(41, 3);
             check(ui.transitionIndex == 1 && juce::JSON::toString(projectToJson(ui.engine.project)) == before,
@@ -190,7 +190,7 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
         else if (phase == 6)
         {
             const auto& clips = ui.engine.project.clips;
-            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && clips[0].controls.automation[1].active() && clips[1].controls.automation[1].active(),
+            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && ui.engine.project.transitionPlaybackFor(clips[0]).pairs[1][1].instant && ui.engine.project.transitionPlaybackFor(clips[1]).pairs[0][1].instant,
                   "Beatmatch menu explicitly rebuilds the requested overlapping transition");
             ui.menuItemSelected(40, 3); ui.menuItemSelected(13, 3); phase = 7;
         }

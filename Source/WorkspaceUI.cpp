@@ -101,7 +101,7 @@ void Workstation::menuItemSelected(int id, int)
         case 6: undo(false); break; case 7: undo(true); break; case 8: splitClip(); break; case 9: duplicateClip(); break; case 10: removeClip(); break;
         case 11: reverseButton.triggerClick(); break; case 12: configureLoop(); break; case 13: syncMix(true); break; case 14: editTempoPoint(-1, engine.position); break;
         case 15: snapButton.triggerClick(); break; case 16: playButton.triggerClick(); break; case 17: stopButton.triggerClick(); break; case 18: homeButton.triggerClick(); break;
-        case 19: showInspectorPage(0); break; case 20: showInspectorPage(1); break; case 21: showInspectorPage(2); break; case 22: timeline.zoomAt(std::max(0.1, (viewport.getWidth() - 24.0) / std::max(30.0, engine.project.audibleEnd() + 2)) / timeline.pixelsPerSecond, viewport.getViewPositionX() + viewport.getViewWidth() * 0.5); viewport.setViewPosition(0, viewport.getViewPositionY()); break;
+        case 19: showInspectorPage(0); break; case 20: showInspectorPage(1); break; case 21: showInspectorPage(2); break; case 22: { const juce::ScopedValueSetter<bool> viewGuard(programmaticTimelineView, true); timeline.zoomAt(std::max(0.1, (viewport.getWidth() - 24.0) / std::max(30.0, engine.project.audibleEnd() + 2)) / timeline.pixelsPerSecond, viewport.getViewPositionX() + viewport.getViewWidth() * 0.5); viewport.setViewPosition(0, viewport.getViewPositionY()); followPlayheadIntoView(); break; }
         case 23: timeline.zoomAt(1.5, viewport.getViewPositionX() + viewport.getViewWidth() * 0.5); break; case 24: timeline.zoomAt(1 / 1.5, viewport.getViewPositionX() + viewport.getViewWidth() * 0.5); break; case 25: editAnalysis(); break; case 26: settings(); break;
         case 27: showInspectorPage(1); choosePlugin(); break; case 28: showInspectorPage(1); configurePluginControls(); break;
         case 29: choosePlaylistImport(); break; case 30: choosePlaylistExport(false); break; case 31: choosePlaylistExport(true); break;
@@ -201,6 +201,7 @@ void Workstation::paint(juce::Graphics& g)
 }
 void Workstation::resized()
 {
+    const juce::ScopedValueSetter<bool> viewGuard(programmaticTimelineView, true);
     const auto laneShares = layout.laneScale;
     layout.update(getWidth(), getHeight(), !performanceWindow || !transitionWindow); menuBar.setBounds(layout.menu);
     if (laneShares != layout.laneScale) { workspaceDirty = true; workspaceChangedAt = juce::Time::getMillisecondCounterHiRes(); }
@@ -262,7 +263,9 @@ void Workstation::resized()
     timelineRuler.setBounds(layout.ruler.withWidth(viewport.getViewWidth())); timelineOverview.setBounds(layout.overview);
     const auto laneControls = layout.headers.withY(layout.ruler.getY()).withHeight(Timeline::rulerHeight);
     if (masterPanelButton) masterPanelButton->setBounds(laneControls.withSize(34, 34).translated(4, 5));
-    laneAmount.setBounds(laneControls.withTrimmedLeft(42).reduced(4, 7));
+    auto laneTools = laneControls.withTrimmedLeft(42).reduced(2, 0);
+    laneAmount.setBounds(laneTools.removeFromTop(18));
+    followButton.setBounds(laneTools.reduced(0, 1));
     auto master = layout.master.reduced(12, 8); masterLabel.setText("MASTER OUTPUT", juce::dontSendNotification); masterLabel.setBounds(master.removeFromTop(22)); master.removeFromTop(4); auto masterRow = master.removeFromTop(28); monitorMute.setBounds(masterRow.removeFromRight(66)); masterSlider.setBounds(masterRow);
     peakReset.setBounds(layout.peakPanel.reduced(10, 0).withY(layout.peakPanel.getY() + 9).withHeight(23));
     const bool tallMeter = layout.peakPanel.getHeight() >= 240;
@@ -286,6 +289,29 @@ void Workstation::resized()
     attractLights.setBounds(getLocalBounds());
     attractLights.setPanels({layout.brand.toFloat(), layout.library.toFloat(), layout.master.toFloat(), layout.detail.toFloat(), layout.timeline.toFloat(), layout.tempo.toFloat(), layout.headers.toFloat()});
     attractLights.toFront(false);
+    followPlayheadIntoView();
+}
+void Workstation::setFollowPlayhead(bool enabled)
+{
+    if (layout.followPlayhead != enabled)
+    {
+        layout.followPlayhead = enabled;
+        workspaceDirty = true; workspaceChangedAt = juce::Time::getMillisecondCounterHiRes();
+    }
+    followButton.setToggleState(enabled, juce::dontSendNotification);
+    if (enabled) followPlayheadIntoView();
+}
+void Workstation::followPlayheadIntoView()
+{
+    if (!layout.followPlayhead || engine.exporting) return;
+    const int width = viewport.getViewWidth();
+    if (width <= 0) return;
+    const int x = Clip::gridPixel(engine.position.load(), timeline.pixelsPerSecond);
+    if (x >= timeline.getWidth()) timeline.updateSize();
+    const int left = viewport.getViewPositionX();
+    if (x >= left && x < left + width) return;
+    const juce::ScopedValueSetter<bool> viewGuard(programmaticTimelineView, true);
+    viewport.setViewPosition(std::max(0, x - width / 5), viewport.getViewPositionY());
 }
 void Workstation::initialiseAttract()
 {

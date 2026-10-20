@@ -33,12 +33,15 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
           "insertion never introduces volume fades");
     check(near(first.start + first.transitionTime(false), next.start + next.transitionTime(true)), "default IN and OUT handles coincide at the overlap start");
     const auto& outgoingBass = first.controls.automation[1]; const auto& incomingBass = next.controls.automation[1];
-    check(outgoingBass.active() && incomingBass.active() && outgoingBass.points.back().value == -60 && incomingBass.points.front().value == -60 && incomingBass.points.back().value == 0,
-          "default transition swaps the bass between independent source-owned EQ curves");
+    const auto firstSwap = ready.project.transitionPlaybackFor(first).pairs[1][1];
+    const auto nextSwap = ready.project.transitionPlaybackFor(next).pairs[0][1];
+    check(!outgoingBass.active() && !incomingBass.active() && firstSwap.instant && nextSwap.instant
+        && firstSwap.gainAt(firstSwap.begin) == 0 && nextSwap.gainAt(nextSwap.begin) == 1,
+          "default transition swaps bass vertically without adding another source automation curve");
     Clip third = b; third.id = juce::Uuid().toString(); third.effects = makeClipEffects(); third.pendingPlacement = PendingPlacement::append;
     auto chain = ready.project; chain.clips.push_back(third); auto three = prepareTempoMap(chain, false, 32);
-    check(three.error.isEmpty() && three.project.clips[1].controls.automation[1].points.front().value == -60
-          && three.project.clips[1].controls.automation[1].points.back().value == -60,
+    check(three.error.isEmpty() && three.project.transitionPlaybackFor(three.project.clips[1]).pairs[0][1].instant
+          && three.project.transitionPlaybackFor(three.project.clips[1]).pairs[1][1].instant,
           "the middle track keeps both its incoming and outgoing bass swaps");
     auto cutMix = prepareTempoMap(three.project, true, 0);
     check(cutMix.error.isEmpty() && std::all_of(cutMix.project.clips.begin(), cutMix.project.clips.end(), [](const auto& c) { return c.controls.automation[1].points.empty(); }),
@@ -46,8 +49,8 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     auto staged = ready.project; staged.clips[1].start += 11; staged.clips[1].pendingPlacement = PendingPlacement::drop;
     staged.clips[1].moveTo(173.123456);
     const auto explicitlyMoved = prepareTempoMap(staged, false, 32);
-    check(explicitlyMoved.error.isEmpty() && near(explicitlyMoved.project.clips[1].start, 173.123456),
-          "source preparation preserves a move made while insertion was still pending: " + explicitlyMoved.error);
+    check(explicitlyMoved.error.isNotEmpty() && near(staged.clips[1].start, 173.123456),
+          "a pending disjoint move cannot move the song back silently or place a generated handoff outside either song: " + explicitlyMoved.error);
     auto free = staged.clips[1]; free.moveTo(4.123456);
     check(near(free.start, 4.123456), "freehand moves preserve an exact requested time");
     auto snapped = next; snapped.moveTo(ready.project.snappedClipStart(snapped, 33.721, true));

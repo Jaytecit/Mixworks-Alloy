@@ -62,7 +62,7 @@ juce::Result styleAutoTransition(Project& project, AutoTransitionStyle choice)
             const double change = db((*power)[2] + (*power)[3], (*power)[0] + (*power)[1]);
             const double rise = db((*power)[3], (*power)[2]), fall = db((*power)[1], (*power)[0]);
             // Hand the low end over once; tighter ramps suit a busier, bolder mix.
-            style.bands[1] = TransitionBandSettings {bold ? TransitionBandMode::swap : TransitionBandMode::swapFade, 1, 0, .5};
+            style.bands[1] = TransitionBandSettings {TransitionBandMode::swap, 1, 0, .5};
             if (change >= threshold || rise >= threshold)
                 style.filter = {TransitionFilterMode::lowToHigh, bold ? .65 : .35};
             else if (change <= -threshold || fall <= -threshold)

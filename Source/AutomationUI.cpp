@@ -140,7 +140,8 @@ void Workstation::editAutomationPoint(int track, int point)
     const auto range = automationRange(address.target); const bool percent = address.target == AutomationTarget::pan || address.target == AutomationTarget::plugin;
     const double scale = percent ? 100 : 1;
     const double time = point >= 0 ? engine.project.automationSessionTime(address, curve->points[(size_t) point].time) : engine.position.load();
-    const float value = point >= 0 ? curve->points[(size_t) point].value : curve->interpolatedValue(engine.project.automationTime(address, time), engine.project.manualValue(address));
+    const float manual = point >= 0 ? curve->points[(size_t) point].value : curve->interpolatedValue(engine.project.automationTime(address, time), engine.project.manualValue(address));
+    const float value = timeline.automationDisplayValue(address, time, manual);
     auto* dialog = new juce::AlertWindow("Automation point", displayedAutomationName(), juce::MessageBoxIconType::NoIcon, this);
     dialog->addTextEditor("time", juce::String(time, 6), "Session seconds (precise entry bypasses beat snap)");
     dialog->addTextEditor("value", juce::String(value * scale, 3), "Value: " + juce::String(range.getStart() * scale) + " to " + juce::String(range.getEnd() * scale) + (address.target == AutomationTarget::lowPass ? " Hz" : percent ? " %" : " dB"));
@@ -156,6 +157,7 @@ void Workstation::editAutomationPoint(int track, int point)
         double timeValue = 0, value = 0;
         if (!number(dialog->getTextEditorContents("time"), timeValue) || !number(dialog->getTextEditorContents("value"), value) || timeValue < 0 || timeValue > 1.0e9 || value / scale < range.getStart() || value / scale > range.getEnd())
         { safe->fail("Enter a valid session time and a value inside the displayed range. The curve was kept."); return; }
+        value = safe->timeline.automationManualValue(address, timeValue, (float) (value / scale));
         timeValue = safe->engine.project.automationTime(address, timeValue);
         if (timeValue < 0) { safe->fail("Place the marker inside its audio track."); return; }
         const juce::ScopedLock guard(safe->engine.lock); auto* envelope = safe->engine.project.curve(address); if (!envelope) return;
@@ -165,14 +167,14 @@ void Workstation::editAutomationPoint(int track, int point)
         safe->remember();
         if (point >= 0)
         {
-            const auto moved = safe->engine.project.moveAutomationPoint(address, point, safe->engine.project.automationSessionTime(address, timeValue), (float) (value / scale));
+            const auto moved = safe->engine.project.moveAutomationPoint(address, point, safe->engine.project.automationSessionTime(address, timeValue), (float) value);
             if (moved.failed()) { safe->fail(moved.getErrorMessage()); return; }
         }
         else
         {
             safe->engine.project.automationEdited(address);
             if (envelope->points.empty()) { envelope->enabled = true; if (timeValue > 0) envelope->setPoint(0, safe->engine.project.manualValue(address)); }
-            envelope->setPoint(timeValue, (float) (value / scale));
+            envelope->setPoint(timeValue, (float) value);
         }
         const auto* updated = safe->engine.project.curve(address);
         if (updated)

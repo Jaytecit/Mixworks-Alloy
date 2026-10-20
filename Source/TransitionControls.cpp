@@ -141,6 +141,8 @@ juce::Result Project::applyTransitionPreset(const juce::String& incoming, Transi
     link.bassSwap = initialiseTransition(*out, *in, range.getLength(), preset, range);
     // Local ownership is the explicit link, not permission to rewrite an entire manual curve.
     out->automaticBass = outAutomatic; in->automaticBass = inAutomatic;
+    if (preset == TransitionPreset::bassSwap)
+    { candidate.clearTransitionBass(link); link.bands[1] = TransitionBandSettings {TransitionBandMode::swap, 1, 0, .5}; }
     const auto checked = candidate.validateTransitionLinks(); if (checked.failed()) return checked;
     const auto protection = validateTransitionLocks(candidate); if (protection.failed()) return protection;
     *this = std::move(candidate); return juce::Result::ok();

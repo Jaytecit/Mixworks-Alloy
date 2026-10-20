@@ -16,6 +16,20 @@ void runBarNavigationTests(const std::function<void(bool, const juce::String&)>&
 void runTransitionRehearsalTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runTimelineEditingTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    // Keep historical endpoint-pair editing covered independently of new sharp presets.
+    auto legacyBassFixture = [](const Project& source)
+    {
+        auto result = prepareTempoMap(source, true, 16, 0, 0, {}, TransitionPreset::bassSwap);
+        if (result.error.isEmpty()) for (auto& link : result.project.transitionLinks)
+        {
+            link.bands[1].reset();
+            auto* out = result.project.clipFor(link.outgoing); auto* in = result.project.clipFor(link.incoming);
+            const auto range = result.project.transitionRange(link);
+            link.bassSwap = initialiseTransition(*out, *in, range.getLength(), TransitionPreset::bassSwap, range);
+        }
+        return result;
+    };
+
     Project input;
     for (int n = 0; n < 3; ++n)
     {
@@ -42,8 +56,8 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
             && local.clips[i].prepared == before.clips[i].prepared && local.clips[i].tempoMap == before.clips[i].tempoMap;
         check(placementKept && local.clips[2].fadeIn == before.clips[2].fadeIn, "local length preserves every placement, prepared PCM, clock identity and neighbouring pair");
         local.clips[0].controls.automation[2].enabled = true; local.clips[0].controls.automation[2].setPoint(2, -3);
-        check(local.applyTransitionPreset(first.incoming, TransitionPreset::bassSwap).wasOk() && local.transitionFor(first.incoming)->bassSwap.has_value(),
-            "selected Bass swap creates explicit paired source endpoints");
+        check(local.applyTransitionPreset(first.incoming, TransitionPreset::bassSwap).wasOk() && local.transitionFor(first.incoming)->bands[1] && local.transitionPlaybackFor(local.clips[0]).pairs[1][1].instant,
+            "selected Bass swap creates a vertical paired handoff");
         check(local.clips[0].fadeOut == 0 && local.clips[1].fadeIn == 0 && local.clips[0].controls.automation[2].points[0].value == -3,
             "local Bass swap retains the bass-only contract and unrelated manual mid automation");
         check(local.applyTransitionPreset(first.incoming, TransitionPreset::crossfade).wasOk() && !local.transitionFor(first.incoming)->bassSwap
@@ -90,7 +104,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
         check(local.setTransitionLocked(first.incoming, false).wasOk() && local.setTransitionLength(first.incoming, 4).wasOk(), "explicit unlock restores local editing");
     }
     {
-        const auto swapped = prepareTempoMap(input, true, 16, 0, 0, {}, TransitionPreset::bassSwap);
+        const auto swapped = legacyBassFixture(input);
         for (const auto edit : {Project::TransitionEdit::moveWindow, Project::TransitionEdit::resizeStart, Project::TransitionEdit::resizeEnd,
              Project::TransitionEdit::moveIncoming, Project::TransitionEdit::moveOutgoing})
         {
@@ -121,7 +135,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
             && snapshot == juce::JSON::toString(projectToJson(rejected)), "an inverted transition box rejects the entire edit atomically");
     }
     {
-        const auto swapped = prepareTempoMap(input, true, 16, 0, 0, {}, TransitionPreset::bassSwap);
+        const auto swapped = legacyBassFixture(input);
         check(swapped.error.isEmpty() && swapped.project.transitionLinks.size() == 2 && swapped.project.transitionLinks[0].bassSwap.has_value(),
             "bass-swap preset owns both source-clock endpoint pairs");
         if (swapped.error.isEmpty() && !swapped.project.transitionLinks.empty() && swapped.project.transitionLinks[0].bassSwap)
@@ -412,7 +426,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
     auto event = [&](juce::Point<float> position, juce::Point<float> down, bool drag, int modifiers = 0)
     { return juce::MouseEvent(mouse, position, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | modifiers), 1, 0, 0, 0, 0, &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag); };
     {
-        const auto preset = prepareTempoMap(input, true, 16, 0, 0, {}, TransitionPreset::bassSwap);
+        const auto preset = legacyBassFixture(input);
         for (const auto edit : {Project::TransitionEdit::moveWindow, Project::TransitionEdit::resizeStart, Project::TransitionEdit::resizeEnd,
              Project::TransitionEdit::moveOutgoing, Project::TransitionEdit::moveIncoming})
         {
@@ -444,7 +458,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
         ui.timeline.pixelsPerSecond = 12; ui.viewport.setViewPosition(0, 0); ui.engine.project = original; ui.refresh();
     }
     {
-        auto preset = prepareTempoMap(input, true, 16, 0, 0, {}, TransitionPreset::bassSwap);
+        auto preset = legacyBassFixture(input);
         ui.engine.project = preset.project; ui.engine.project.snap = false; ui.selectedClip = preset.project.clips[1].id;
         ui.selectAutomationTarget((int) AutomationTarget::bass); ui.refresh();
         const auto& link = ui.engine.project.transitionLinks[0]; const auto* in = ui.engine.project.clipFor(link.incoming);
@@ -601,6 +615,16 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
     for (int band = 0; band < 4; ++band)
     { const auto& curve = ui.engine.project.clips[0].controls.automation[(size_t) band]; automation = automation && curve.active() && std::any_of(curve.points.begin(), curve.points.end(), [&](const auto& p) { return close(ui.engine.project.clips[0].start + ui.engine.project.clips[0].localTimeForSource(p.time), ui.engine.project.snappedTime(8.12, true)); }); }
     check(automation, "volume and all three EQ context actions add functional snapped automation points");
+    {
+        const auto before = ui.automationAddresses(0).size();
+        for (const auto action : {TimelineAction::volume, TimelineAction::treble, TimelineAction::mid, TimelineAction::bass})
+        { ui.performTimelineAction(action, 9.12, 0); ui.performTimelineAction(action, 9.12, 0); }
+        bool reused = ui.automationAddresses(0).size() == before;
+        for (int band = 0; band < 4; ++band)
+            reused &= ui.engine.project.clips[0].controls.automation[(size_t) band].points.size() == 3
+                && ui.engine.project.tracks[0].automation[(size_t) band].points.empty();
+        check(reused, "repeating each timeline marker action adds nodes to one source-owned curve and reuses a node at the same time");
+    }
     ui.selectAutomationTarget(-1); ui.selectedClip = a.id;
     ui.engine.project.snap = false;
     ui.performTimelineAction(TimelineAction::loopStart, a.start + 4, 0); ui.performTimelineAction(TimelineAction::loopEnd, a.start + 6, 0);
@@ -618,7 +642,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
         ui.undo(false); check(juce::JSON::toString(projectToJson(ui.engine.project)) == juce::JSON::toString(projectToJson(controlBase)), "Undo restores the complete local length edit");
         ui.undo(true); check(juce::JSON::toString(projectToJson(ui.engine.project)) == edited, "Redo restores the local frame and fades");
         ui.transitionPresetForSelection.setSelectedId(2, juce::sendNotificationSync);
-        check(ui.engine.project.transitionFor(id)->bassSwap.has_value() && ui.undoHistory.size() == 2, "native preset selector applies only the selected pair with one Undo");
+        check(ui.engine.project.transitionFor(id)->bands[1] && ui.engine.project.transitionFor(id)->bands[1]->mode == TransitionBandMode::swap && ui.undoHistory.size() == 2, "native preset selector applies only the selected pair with one Undo");
         ui.transitionLock.onClick();
         check(ui.engine.project.transitionFor(id)->locked && !ui.selectedTransitionLength.isEnabled() && !ui.transitionPresetForSelection.isEnabled(),
             "native lock control disables local edits and retains an accessible unlock command");

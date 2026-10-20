@@ -159,10 +159,10 @@ private:
         meters.setColour(juce::Label::textColourId, engine.masterClipped ? juce::Colours::orangered : colour::text);
     }
 };
-class MasterWindow final : public juce::DocumentWindow
+class MasterWindow final : public AlloyPopupWindow<juce::DocumentWindow>
 {
 public:
-    MasterWindow(juce::Component& owner, std::unique_ptr<juce::Component> content) : DocumentWindow("Alloy / Master output and spectrum", colour::background, allButtons)
+    MasterWindow(juce::Component& owner, std::unique_ptr<juce::Component> content) : AlloyPopupWindow("Alloy / Master output and spectrum", colour::background, allButtons)
     { setUsingNativeTitleBar(true); setContentOwned(content.release(), true); setResizable(true, false); setResizeLimits(760, 580, 3840, 2160); centreAroundComponent(&owner, 980, 640); }
     void closeButtonPressed() override { if (auto* panel = dynamic_cast<MasterPanel*>(getContentComponent())) panel->suspendMonitoring(); setVisible(false); }
     bool keyPressed(const juce::KeyPress& key) override { if (key == juce::KeyPress::escapeKey) { closeButtonPressed(); return true; } return DocumentWindow::keyPressed(key); }

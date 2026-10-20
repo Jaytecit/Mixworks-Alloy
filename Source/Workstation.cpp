@@ -157,6 +157,26 @@ int Timeline::dividerAt(float y) const
 }
 float Timeline::automationY(int track, float value, int target) const { target = std::max(0, target < 0 ? owner.automationLane() : target); const auto range = automationRange((AutomationTarget) target); return laneY(track, 10.0f + target * 5.0f + (range.getEnd() - value) / range.getLength() * 70); }
 float Timeline::automationDb(int track, float y, AutomationTarget target) const { const auto range = automationRange(target); return range.clipValue(range.getEnd() - ((y - laneTop(track)) * laneHeight / laneSize(track) - 10 - (int) target * 5) / 70 * range.getLength()); }
+bool Timeline::hasGeneratedAutomation(const AutomationAddress& address) const
+{
+    const int band = (int) address.target;
+    const auto* clip = owner.engine.project.clipFor(address.clipId);
+    if (!clip || band < 0 || band >= 4) return false;
+    const auto playback = owner.engine.project.transitionPlaybackFor(*clip);
+    return playback.pairs[0][(size_t) band].strength > 0 || playback.pairs[1][(size_t) band].strength > 0;
+}
+float Timeline::automationDisplayValue(const AutomationAddress& address, double time, float manual, const TransitionPlayback* compiled) const
+{
+    const int band = (int) address.target;
+    const auto* clip = owner.engine.project.clipFor(address.clipId);
+    if (!clip || band < 0 || band >= 4) return manual;
+    const float gain = compiled ? compiled->gainAt(band, time) : owner.engine.project.transitionPlaybackFor(*clip).gainAt(band, time);
+    return automationRange(address.target).clipValue(manual + juce::Decibels::gainToDecibels(gain, -60.f));
+}
+float Timeline::automationManualValue(const AutomationAddress& address, double time, float displayed) const
+{
+    return automationRange(address.target).clipValue(displayed - automationDisplayValue(address, time, 0));
+}
 void Timeline::selectAutomationPoint(const AutomationAddress& address, int point)
 {
     const auto* curve = owner.engine.project.curve(address);
@@ -171,7 +191,8 @@ juce::String Timeline::automationPointLabel(const AutomationAddress& address, in
     const int track = address.target == AutomationTarget::master ? 0 : address.track;
     if (!curve || point < 0 || point >= (int) curve->points.size() || owner.automationLane() != (int) address.target
         || !(owner.displayedAddress(track) == address)) return {};
-    return owner.automationText(address.target, curve->points[(size_t) point].value);
+    const auto& node = curve->points[(size_t) point];
+    return owner.automationText(address.target, automationDisplayValue(address, owner.engine.project.automationSessionTime(address, node.time), node.value));
 }
 std::optional<std::pair<AutomationAddress, int>> Timeline::automationPointAt(juce::Point<float> position) const
 {
@@ -181,11 +202,13 @@ std::optional<std::pair<AutomationAddress, int>> Timeline::automationPointAt(juc
     float nearest = 8;
     for (const auto& address : owner.automationAddresses(track))
     {
+        if (hasGeneratedAutomation(address) && !owner.transitionCurveVisible((int) address.target)) continue;
         const auto* curve = owner.engine.project.curve(address); if (laneSize(track) < 30 || !curve) continue;
         for (int index = 0; index < (int) curve->points.size(); ++index)
         {
             const auto& point = curve->points[(size_t) index];
-            const float distance = position.getDistanceFrom({(float) (owner.engine.project.automationSessionTime(address, point.time) * pixelsPerSecond), automationY(track, point.value, (int) address.target)});
+            const double time = owner.engine.project.automationSessionTime(address, point.time);
+            const float distance = position.getDistanceFrom({(float) (time * pixelsPerSecond), automationY(track, automationDisplayValue(address, time, point.value), (int) address.target)});
             if (distance < nearest) { nearest = distance; found = {{address, index}}; }
         }
     }
@@ -234,7 +257,9 @@ juce::Rectangle<float> Timeline::clipBounds(const Clip& c) const
 }
 void Timeline::updateSize()
 {
+    const juce::ScopedValueSetter<bool> viewGuard(owner.programmaticTimelineView, true);
     double end = owner.engine.project.audibleEnd();
+    if (owner.layout.followPlayhead) end = std::max(end, owner.engine.position.load());
     if (!owner.engine.project.tempo.points.empty()) end = std::max(end, owner.engine.project.tempo.points.back().time);
     if (!owner.engine.project.labels.empty()) end = std::max(end, owner.engine.project.labels.back().time);
     for (const auto& track : owner.engine.project.tracks) for (const auto& curve : track.automation) if (!curve.points.empty()) end = std::max(end, curve.points.back().time);
@@ -248,12 +273,14 @@ void Timeline::updateSize()
 }
 void Timeline::zoomAt(double factor, double timelineX)
 {
+    const juce::ScopedValueSetter<bool> viewGuard(owner.programmaticTimelineView, true);
     const double time = timelineX / pixelsPerSecond;
     const double screenX = timelineX - owner.viewport.getViewPositionX();
     pixelsPerSecond = juce::jlimit(0.1, 400.0, pixelsPerSecond * factor);
     const int y = owner.viewport.getViewPositionY();
     updateSize();
     owner.viewport.setViewPosition((int) std::round(time * pixelsPerSecond - screenX), y);
+    owner.followPlayheadIntoView();
 }
 void Timeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
@@ -264,7 +291,7 @@ void Timeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelD
         return;
     }
     if (std::abs(wheel.deltaX) > std::abs(wheel.deltaY))
-    { owner.viewport.setViewPosition((int) std::round(owner.viewport.getViewPositionX() - wheel.deltaX * 280), owner.viewport.getViewPositionY()); return; }
+    { owner.setFollowPlayhead(false); owner.viewport.setViewPosition((int) std::round(owner.viewport.getViewPositionX() - wheel.deltaX * 280), owner.viewport.getViewPositionY()); return; }
     if (wheel.deltaY != 0 && !e.mods.isAnyMouseButtonDown())
         zoomAt(std::exp2(juce::jlimit(-1.0f, 1.0f, wheel.deltaY) * 2), e.position.x);
 }
@@ -477,22 +504,47 @@ void Timeline::paint(juce::Graphics& g)
             const double end = std::min(clip ? clip->end() : visible.getRight() / pixelsPerSecond, visible.getRight() / pixelsPerSecond);
             if (end <= begin) continue;
             const float manual = p.manualValue(address); const int target = (int) address.target;
-            auto y = [&](float value) { return automationY(track, value, target); };
-            juce::Path line; line.startNewSubPath((float) (begin * pixelsPerSecond), y(curve.interpolatedValue(p.automationTime(address, begin), manual)));
-            for (const auto& point : curve.points)
+            const bool combined = hasGeneratedAutomation(address);
+            if (combined && !owner.transitionCurveVisible(target)) continue;
+            const auto playback = clip ? p.transitionPlaybackFor(*clip) : TransitionPlayback {};
+            auto y = [&](double time, float value) { return automationY(track, automationDisplayValue(address, time, value, &playback), target); };
+            auto valueAt = [&](double time) { return combined ? curve.valueAt(p.automationTime(address, time), manual) : curve.interpolatedValue(p.automationTime(address, time), manual); };
+            juce::Path line; line.startNewSubPath((float) (begin * pixelsPerSecond), y(begin, valueAt(begin)));
+            if (combined)
+            {
+                double previous = begin;
+                auto append = [&](double time)
+                {
+                    for (const auto& pair : playback.pairs)
+                    {
+                        const auto& envelope = pair[(size_t) target];
+                        if (envelope.instant && envelope.begin > previous && envelope.begin <= time)
+                        {
+                            const double before = std::nextafter(envelope.begin, -std::numeric_limits<double>::infinity());
+                            const float x = (float) (envelope.begin * pixelsPerSecond);
+                            line.lineTo(x, y(before, valueAt(before))); line.lineTo(x, y(envelope.begin, valueAt(envelope.begin)));
+                        }
+                    }
+                    line.lineTo((float) (time * pixelsPerSecond), y(time, valueAt(time))); previous = time;
+                };
+                for (int x = (int) std::ceil(begin * pixelsPerSecond); x < end * pixelsPerSecond; ++x) append(x / pixelsPerSecond);
+                append(end);
+            }
+            else for (const auto& point : curve.points)
             {
                 const double time = p.automationSessionTime(address, point.time);
-                if (time >= begin && time <= end) line.lineTo((float) (time * pixelsPerSecond), y(point.value));
+                if (time >= begin && time <= end) line.lineTo((float) (time * pixelsPerSecond), y(time, point.value));
             }
-            line.lineTo((float) (end * pixelsPerSecond), y(curve.interpolatedValue(p.automationTime(address, end), manual)));
-            const auto accent = juce::Colour::fromHSV(0.08f + target * 0.115f, 0.65f, 0.95f, 1.0f);
-            g.setColour(accent.withAlpha(curve.active() ? 0.85f : 0.4f)); g.strokePath(line, juce::PathStrokeType(1.5f));
+            line.lineTo((float) (end * pixelsPerSecond), y(end, valueAt(end)));
+            const std::array<juce::Colour, 4> bands {juce::Colour(0xffffad70), juce::Colour(0xffe4d15b), juce::Colour(0xff76c7ef), juce::Colour(0xffd3a3ef)};
+            const auto accent = target < 4 ? bands[(size_t) target] : juce::Colour::fromHSV(0.08f + target * 0.115f, 0.65f, 0.95f, 1.0f);
+            g.setColour(accent.withAlpha(curve.active() || combined ? 0.85f : 0.4f)); g.strokePath(line, juce::PathStrokeType(1.7f));
             for (size_t pointIndex = 0; pointIndex < curve.points.size(); ++pointIndex)
             {
                 const auto& point = curve.points[pointIndex];
                 const double time = p.automationSessionTime(address, point.time);
                 if (time < begin || time > end) continue;
-                const float x = (float) (time * pixelsPerSecond), py = y(point.value);
+                const float x = (float) (time * pixelsPerSecond), py = y(time, point.value);
                 g.fillEllipse(x - 4, py - 4, 8, 8);
                 const auto caption = automationPointLabel(address, (int) pointIndex);
                 if (caption.isNotEmpty())
@@ -621,16 +673,32 @@ void Timeline::paintTransitions(juce::Graphics& g)
             {
                 const auto playback = p.transitionPlaybackFor(*clip);
                 if (laneSize(clip->track) < 55) continue;
-                const float top = laneY(clip->track, 48), height = laneSize(clip->track) * (50.f / laneHeight);
+                const AutomationAddress address {clip->track, AutomationTarget::volume, {}, {}, clip->id};
                 const int begin = std::max(visible.getX(), (int) std::floor(range.getStart() * pixelsPerSecond));
                 const int end = std::min(visible.getRight(), (int) std::ceil(range.getEnd() * pixelsPerSecond));
-                for (size_t band = 0; band < 4; ++band) if (owner.transitionCurveVisible((int) band) && link.bands[band] && link.bands[band]->generated())
+                for (size_t band = 0; band < 4; ++band) if (owner.transitionCurveVisible((int) band) && link.bands[band] && link.bands[band]->generated() && clip->controls.automation[band].points.empty())
                 {
                     juce::Path curve;
+                    auto bandAddress = address; bandAddress.target = (AutomationTarget) band;
+                    auto y = [&](double time) { return automationY(clip->track, automationDisplayValue(bandAddress, time, p.manualValue(bandAddress), &playback), (int) band); };
                     for (int x = begin; x <= end; ++x)
                     {
-                        const float y = top + (1 - playback.gainAt((int) band, x / pixelsPerSecond)) * height;
-                        if (x == begin) curve.startNewSubPath((float) x, y); else curve.lineTo((float) x, y);
+                        const double time = x / pixelsPerSecond;
+                        if (x == begin) curve.startNewSubPath((float) x, y(time));
+                        else
+                        {
+                            for (const auto& pair : playback.pairs)
+                            {
+                                const auto& envelope = pair[band];
+                                if (envelope.instant && envelope.begin > (x - 1) / pixelsPerSecond && envelope.begin <= time)
+                                {
+                                    const float edge = (float) (envelope.begin * pixelsPerSecond);
+                                    curve.lineTo(edge, y(std::nextafter(envelope.begin, -std::numeric_limits<double>::infinity())));
+                                    curve.lineTo(edge, y(envelope.begin));
+                                }
+                            }
+                            curve.lineTo((float) x, y(time));
+                        }
                     }
                     g.setColour(colours[band].withAlpha(.88f)); g.strokePath(curve, juce::PathStrokeType(1.7f));
                 }
@@ -791,10 +859,10 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         const juce::ScopedLock guard(owner.engine.lock);
         auto* displayed = owner.engine.project.curve(address); if (!displayed || draggingPoint >= (int) displayed->points.size()) return;
         const double time = owner.engine.project.snappedTime(e.x / pixelsPerSecond, owner.engine.project.snap && !e.mods.isAltDown());
-        const auto result = owner.engine.project.moveAutomationPoint(address, draggingPoint, time, automationDb(automationTrack, e.position.y, address.target));
+        const auto result = owner.engine.project.moveAutomationPoint(address, draggingPoint, time, automationManualValue(address, time, automationDb(automationTrack, e.position.y, address.target)));
         if (result.failed()) { owner.setStatus(result.getErrorMessage()); return; }
         displayed = owner.engine.project.curve(address); if (!displayed || draggingPoint >= (int) displayed->points.size()) return;
-        const auto& point = displayed->points[(size_t) draggingPoint]; owner.setStatus(timeText(point.time) + " / " + owner.automationText(address.target, point.value)); repaint(); return;
+        const auto& point = displayed->points[(size_t) draggingPoint]; owner.setStatus(timeText(point.time) + " / " + owner.automationText(address.target, automationDisplayValue(address, owner.engine.project.automationSessionTime(address, point.time), point.value))); repaint(); return;
     }
     if (dragging.isEmpty() || !dragClip || owner.busy || !e.mouseWasDraggedSinceMouseDown()) return;
     owner.engine.finishAutomation();
@@ -1153,6 +1221,10 @@ Workstation::Workstation(bool openAudioDevice) : timeline(*this), timelineRuler(
     transitionBody.addAndMakeVisible(transitionPreset); transitionBody.addAndMakeVisible(transitionLength);
     beatmatchButton.setTooltip("Apply the selected transition preset and length while rebuilding beat-aligned placement.");
     beatmatchButton.onClick = [this] { syncMix(true); };
+    addAndMakeVisible(followButton); followButton.setClickingTogglesState(true);
+    followButton.setTitle("Follow playhead");
+    followButton.setTooltip("Keep the playhead in view during playback and seeking. Pan the timeline manually to turn Follow off. Saved for this workspace.");
+    followButton.onClick = [this] { setFollowPlayhead(followButton.getToggleState()); };
     laneAmount.setText("4 LANES", juce::dontSendNotification);
     laneAmount.setJustificationType(juce::Justification::centred);
     laneAmount.setTooltip("All four mixer lanes stay visible. Drag the timeline's bottom grip to resize them together.");
@@ -1256,9 +1328,16 @@ Workstation::Workstation(bool openAudioDevice) : timeline(*this), timelineRuler(
         if (!recoveryStore) status = "Recovery unavailable: " + recoveryError;
         nextRecovery = juce::Time::getMillisecondCounterHiRes() + 30000;
     }
+    followButton.setToggleState(layout.followPlayhead, juce::dontSendNotification);
     engine.monitorMuted = layout.monitorMuted; monitorMute.setToggleState(layout.monitorMuted, juce::dontSendNotification);
     if (performance) performance->setForgeEffects(forgeMotionAllowed());
-    viewport.onViewChanged = [this] { layoutTrackHeaders(); timelineRuler.repaint(); timelineOverview.repaint(); };
+    viewport.onViewChanged = [this]
+    {
+        const int x = viewport.getViewPositionX();
+        if (x != lastTimelineViewX && !programmaticTimelineView) setFollowPlayhead(false);
+        lastTimelineViewX = x;
+        layoutTrackHeaders(); timelineRuler.repaint(); timelineOverview.repaint();
+    };
     nextMusicScan = juce::Time::getMillisecondCounterHiRes() + 2000;
     initialiseAttract();
     setSize(1440, 940); showBrowserPage(0); showInspectorPage(0); refresh(); tickLibraryCatalogue(); startTimerHz(25);
@@ -1314,6 +1393,7 @@ void Workstation::timerCallback()
     {
         tempoSlider.setValue(displayedTempo(), juce::dontSendNotification);
     }
+    followPlayheadIntoView();
     timeLabel.setText(timeText(engine.position), juce::dontSendNotification); playButton.setButtonText(engine.playing ? "Pause" : "Play");
     playButton.getProperties().set("alloyActive", engine.playing.load()); playButton.repaint();
     timeline.repaint(); timelineRuler.repaint(); timelineOverview.repaint(); tempoStrip.repaint(); for (auto& s : strips) s->repaint(); refreshAttractLights(); repaint();
@@ -1452,6 +1532,7 @@ void Workstation::refresh()
     playButton.getProperties().set("alloyActive", engine.playing.load()); refreshing = false;
     if (performance) performance->refresh(!busy && !engine.exporting);
     timeline.updateSize();
+    followPlayheadIntoView();
     repaint();
 }
 void Workstation::selectTrack(int track)
@@ -2038,9 +2119,11 @@ void Workstation::settings()
 {
     if (busy) return;
     if (settingsWindow) { settingsWindow->setVisible(true); settingsWindow->toFront(true); return; }
-    juce::DialogWindow::LaunchOptions options; options.dialogTitle = "Audio, MIDI and FLkey 49"; options.dialogBackgroundColour = colour::panel;
-    options.content.setOwned(new MidiSettings(engine)); options.useNativeTitleBar = true; options.resizable = false; options.escapeKeyTriggersCloseButton = true;
-    settingsWindow.reset(options.create()); settingsWindow->setVisible(true); settingsWindow->toFront(true);
+    auto* window = new AlloyPopupWindow<juce::DialogWindow>("Audio, MIDI and FLkey 49", colour::panel, true);
+    settingsWindow.reset(window); window->setUsingNativeTitleBar(true);
+    window->setContentOwned(new MidiSettings(engine), true); window->setResizable(false, false);
+    window->centreAroundComponent(this, window->getWidth(), window->getHeight());
+    window->setVisible(true); window->toFront(true);
     AlloyLookAndFeel::styleNativeTitleBar(*settingsWindow);
 }
 bool Workstation::keyPressed(const juce::KeyPress& k)

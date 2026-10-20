@@ -25,7 +25,7 @@ void Workstation::initialiseTransitionUI()
     transitionDefaultsLabel.setText("New tracks", juce::dontSendNotification);
     transitionBody.addAndMakeVisible(transitionDefaultsLabel);
     const std::array<const char*, 4> names {"Volume", "Bass", "Mid", "High"};
-    const std::array<const char*, 7> modes {"None", "Crossfade", "Fade in", "Fade out", "Swap", "Manual", "Swap fade"};
+    const std::array<const char*, 7> modes {"None", "Crossfade", "Fade in", "Fade out", "Swap", "Manual", "Bass fade handover"};
     const std::array<juce::Colour, 4> colours {juce::Colour(0xffffad70), juce::Colour(0xffe4d15b), juce::Colour(0xff76c7ef), juce::Colour(0xffd3a3ef)};
     for (size_t band = 0; band < 4; ++band)
     {

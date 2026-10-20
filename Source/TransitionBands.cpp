@@ -6,7 +6,7 @@ namespace mixworks
 namespace
 {
 const juce::StringArray modeIds {"none", "crossfade", "fade-in", "fade-out", "swap", "manual", "swap-fade", "constant-power"};
-TransitionBandEnvelope compileBand(const TransitionBandSettings& setting, juce::Range<double> range, const TempoMap& clock, bool incoming)
+TransitionBandEnvelope compileBand(const TransitionBandSettings& setting, juce::Range<double> range, const TempoMap& clock, bool incoming, int band)
 {
     if (!setting.generated() || (setting.mode == TransitionBandMode::fadeIn && !incoming)
         || (setting.mode == TransitionBandMode::fadeOut && incoming)) return {};
@@ -16,11 +16,11 @@ TransitionBandEnvelope compileBand(const TransitionBandSettings& setting, juce::
         const double first = clock.beatsAt(begin), span = clock.beatsAt(end) - first;
         const double middle = first + span * setting.position + (incoming ? 1 : -1) * setting.gapBeats / 2;
         // Swap has a short anti-click ramp; Bass Swap fade uses one musical beat.
-        const double width = setting.mode == TransitionBandMode::swapFade ? std::min(1.0, span / 8)
+        const double width = setting.mode == TransitionBandMode::swap && band > 0 ? 0 : setting.mode == TransitionBandMode::swapFade ? std::min(1.0, span / 8)
             : std::min(clock.bpmAt(clock.timeAtBeat(middle)) / 60 * 0.004, span / 8);
         begin = clock.timeAtBeat(middle - width / 2); end = clock.timeAtBeat(middle + width / 2);
     }
-    return {begin, end, (float) setting.strength, incoming, setting.mode == TransitionBandMode::constantPower};
+    return {begin, end, (float) setting.strength, incoming, setting.mode == TransitionBandMode::constantPower, setting.mode == TransitionBandMode::swap && band > 0};
 }
 }
 juce::Result TransitionBandSettings::validate(int band) const
@@ -36,7 +36,9 @@ juce::Result TransitionBandSettings::validate(int band) const
 }
 float TransitionBandEnvelope::gainAt(double time) const
 {
-    if (strength == 0 || end <= begin) return 1;
+    if (strength == 0) return 1;
+    if (instant) return time < begin ? (rising ? 1 - strength : 1) : (rising ? 1 : 1 - strength);
+    if (end <= begin) return 1;
     const double progress = juce::jlimit(0.0, 1.0, (time - begin) / (end - begin));
     const double linear = rising ? progress : 1 - progress;
     const double gain = constantPower ? std::sin(linear * juce::MathConstants<double>::halfPi) : linear;
@@ -64,7 +66,7 @@ juce::Result Project::validateTransitionBands(const TransitionLink& link) const
             return juce::Result::fail("Keep this transition inside both songs before applying band controls.");
         if (setting.swapping()) for (bool incoming : {false, true})
         {
-            const auto curve = compileBand(setting, range, clock, incoming);
+            const auto curve = compileBand(setting, range, clock, incoming, band);
             if (curve.begin < range.getStart() - 1e-7 || curve.end > range.getEnd() + 1e-7)
                 return juce::Result::fail("This swap gap cannot fit at that position. Use a smaller gap, move the swap or lengthen the transition.");
         }
@@ -87,7 +89,7 @@ TransitionPlayback Project::transitionPlaybackFor(const Clip& clip) const
         const auto range = transitionRange(link);
         if (incoming) result.startCut = range.getStart(); else result.endCut = range.getEnd();
         result.filters[incoming ? 0 : 1] = {range.getStart(), range.getEnd(), link.filter, incoming};
-        for (size_t band = 0; band < 4; ++band) if (link.bands[band]) pair[band] = compileBand(*link.bands[band], range, clock, incoming);
+        for (size_t band = 0; band < 4; ++band) if (link.bands[band]) pair[band] = compileBand(*link.bands[band], range, clock, incoming, (int) band);
     }
     return result;
 }

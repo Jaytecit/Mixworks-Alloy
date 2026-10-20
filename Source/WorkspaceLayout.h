@@ -18,6 +18,7 @@ struct WorkspaceLayout
     int laneSize(int track) const { return fittedLanes[(size_t) track]; }
     int laneTop(int track) const { int y = 0; for (int i = 0; i < track; ++i) y += laneSize(i); return y; }
     bool monitorMuted = false;
+    bool followPlayhead = false;
     bool forgeEffects = false;
     int forgeMotion = 0; // 0 follows Windows, 1 explicit animation, 2 steady.
     juce::Rectangle<int> brand, menu, windowControls, toolbar, transport, overview, ruler, library, playlist, headers, timeline, tempo, peakPanel, performance, master, detail, status, leftDivider, rightDivider, timelineDivider;

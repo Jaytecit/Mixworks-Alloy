@@ -33,6 +33,8 @@ public:
     int getAlertWindowButtonHeight() override { return 28; }
     void drawAlertBox(juce::Graphics&, juce::AlertWindow&, const juce::Rectangle<int>&, juce::TextLayout&) override;
     void drawPopupMenuBackground(juce::Graphics&, int, int) override;
+    void drawResizableWindowBorder(juce::Graphics&, int, int, const juce::BorderSize<int>&, juce::ResizableWindow&) override;
+    void drawCallOutBoxBackground(juce::CallOutBox&, juce::Graphics&, const juce::Path&, juce::Image&) override;
     void drawFileBrowserRow(juce::Graphics&, int, int, const juce::File&, const juce::String&, juce::Image*,
         const juce::String&, const juce::String&, bool, bool, int, juce::DirectoryContentsDisplayComponent&) override;
     void drawScrollbar(juce::Graphics&, juce::ScrollBar&, int, int, int, int, bool, int, int, bool, bool) override;
@@ -42,6 +44,18 @@ public:
     static bool motionAllowed();
     static void drawEmblem(juce::Graphics&, juce::Rectangle<float>);
     static bool styleNativeTitleBar(juce::Component&);
+};
+
+// App-owned detached panels keep their client edge inside the native caption.
+// Drawing after children also covers native windows with a zero content inset.
+template <typename Window>
+class AlloyPopupWindow : public Window
+{
+public:
+    using Window::Window;
+    void closeButtonPressed() override { this->setVisible(false); }
+    void paintOverChildren(juce::Graphics& g) override
+    { g.setColour(colour::moltenOrange); g.drawRect(this->getLocalBounds()); }
 };
 
 // Keeps JUCE's value/accessibility/text-entry and drag notifications. Only the

@@ -106,6 +106,7 @@ juce::Result readDocument(const juce::File& file, juce::var& doc)
     if (parsed.failed() || !doc.isObject() || !doc["format"].isString() || doc["format"].toString() != "mixworks-workspace" || !doc["version"].isInt() || (int) doc["version"] != 1
         || !doc["libraryWidth"].isInt() || !doc["inspectorWidth"].isInt() || (int) doc["libraryWidth"] < WorkspaceLayout::minimumPanelWidth || (int) doc["inspectorWidth"] < WorkspaceLayout::minimumPanelWidth
         || (doc.hasProperty("monitorMuted") && !doc["monitorMuted"].isBool())
+        || (doc.hasProperty("followPlayhead") && !doc["followPlayhead"].isBool())
         || (doc.hasProperty("forgeEffects") && !doc["forgeEffects"].isBool())
         || (doc.hasProperty("forgeMotion") && (!doc["forgeMotion"].isInt() || (int) doc["forgeMotion"] < 0 || (int) doc["forgeMotion"] > 2))
         || (doc.hasProperty("visibleLanes") && (!doc["visibleLanes"].isInt() || (int) doc["visibleLanes"] < 1 || (int) doc["visibleLanes"] > 8))
@@ -128,6 +129,7 @@ juce::Result readWorkspacePreferences(const juce::File& file, WorkspaceLayout& l
     juce::var doc; auto result = readDocument(file, doc); if (result.failed()) return result;
     layout.preferredLibraryWidth = (int) doc["libraryWidth"]; layout.preferredInspectorWidth = (int) doc["inspectorWidth"];
     layout.monitorMuted = doc.hasProperty("monitorMuted") && (bool) doc["monitorMuted"];
+    layout.followPlayhead = doc.hasProperty("followPlayhead") && (bool) doc["followPlayhead"];
     layout.forgeEffects = doc.hasProperty("forgeEffects") && (bool) doc["forgeEffects"];
     layout.forgeMotion = doc.hasProperty("forgeMotion") ? (int) doc["forgeMotion"] : 0;
     layout.laneScale.fill(1);
@@ -144,8 +146,8 @@ juce::Result writeWorkspacePreferences(const juce::File& file, const WorkspaceLa
     if (file.exists() || file.isSymbolicLink()) { auto result = readDocument(file, doc); if (result.failed()) return result; }
     else { auto* object = new juce::DynamicObject(); object->setProperty("format", "mixworks-workspace"); object->setProperty("version", 1); doc = juce::var(object); }
     juce::Array<juce::var> sizes; for (const double scale : layout.laneScale) sizes.add(scale); const juce::var laneSizes(sizes);
-    if (doc["forgeMotion"] == juce::var(layout.forgeMotion) && doc["forgeEffects"] == juce::var(layout.forgeEffects) && doc["timelineHeight"] == juce::var(layout.preferredTimelineHeight) && doc["laneScales"] == laneSizes && doc["libraryWidth"] == juce::var(layout.preferredLibraryWidth) && doc["inspectorWidth"] == juce::var(layout.preferredInspectorWidth) && doc["visibleLanes"] == juce::var(layout.visibleLaneCount) && doc["monitorMuted"] == juce::var(layout.monitorMuted)) return juce::Result::ok();
-    auto* object = doc.getDynamicObject(); object->setProperty("forgeMotion", layout.forgeMotion); object->setProperty("forgeEffects", layout.forgeEffects); object->setProperty("libraryWidth", layout.preferredLibraryWidth); object->setProperty("inspectorWidth", layout.preferredInspectorWidth); object->setProperty("visibleLanes", layout.visibleLaneCount); object->setProperty("monitorMuted", layout.monitorMuted); object->setProperty("laneScales", laneSizes); object->setProperty("timelineHeight", layout.preferredTimelineHeight);
+    if (doc["followPlayhead"] == juce::var(layout.followPlayhead) && doc["forgeMotion"] == juce::var(layout.forgeMotion) && doc["forgeEffects"] == juce::var(layout.forgeEffects) && doc["timelineHeight"] == juce::var(layout.preferredTimelineHeight) && doc["laneScales"] == laneSizes && doc["libraryWidth"] == juce::var(layout.preferredLibraryWidth) && doc["inspectorWidth"] == juce::var(layout.preferredInspectorWidth) && doc["visibleLanes"] == juce::var(layout.visibleLaneCount) && doc["monitorMuted"] == juce::var(layout.monitorMuted)) return juce::Result::ok();
+    auto* object = doc.getDynamicObject(); object->setProperty("followPlayhead", layout.followPlayhead); object->setProperty("forgeMotion", layout.forgeMotion); object->setProperty("forgeEffects", layout.forgeEffects); object->setProperty("libraryWidth", layout.preferredLibraryWidth); object->setProperty("inspectorWidth", layout.preferredInspectorWidth); object->setProperty("visibleLanes", layout.visibleLaneCount); object->setProperty("monitorMuted", layout.monitorMuted); object->setProperty("laneScales", laneSizes); object->setProperty("timelineHeight", layout.preferredTimelineHeight);
     const auto text = juce::JSON::toString(doc);
     if (text.getNumBytesAsUTF8() > 16384) return juce::Result::fail("Workspace preferences exceed the 16 KiB budget; the file was kept.");
     auto result = file.getParentDirectory().createDirectory(); if (result.failed()) return result;

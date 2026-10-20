@@ -43,7 +43,7 @@ private:
     void dismiss();
     friend void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 };
-class GridCorrectionWindow final : public juce::DialogWindow
+class GridCorrectionWindow final : public AlloyPopupWindow<juce::DialogWindow>
 {
 public:
     explicit GridCorrectionWindow(GridCorrectionEditor*);

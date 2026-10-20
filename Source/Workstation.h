@@ -200,6 +200,9 @@ private:
     friend void runFusionWorkflowTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     float automationY(int track, float db, int target = -1) const;
     float automationDb(int track, float y, AutomationTarget) const;
+    bool hasGeneratedAutomation(const AutomationAddress&) const;
+    float automationDisplayValue(const AutomationAddress&, double sessionTime, float manual, const TransitionPlayback* = nullptr) const;
+    float automationManualValue(const AutomationAddress&, double sessionTime, float displayed) const;
     juce::Rectangle<float> clipBounds(const Clip&) const;
 };
 class LibraryTable final : public juce::TableListBoxModel
@@ -425,6 +428,11 @@ private:
     juce::Label clipDetail, sidebarHelp;
     int inspectorPage = 0;
     TimelineViewport viewport;
+    bool programmaticTimelineView = false;
+    int lastTimelineViewX = 0;
+    juce::TextButton followButton { "Follow playhead" };
+    void setFollowPlayhead(bool);
+    void followPlayheadIntoView();
     juce::TextButton newButton { "New" }, openButton { "Open" }, saveButton { "Save" }, importButton { "+ Import audio" }, exportButton { "Export WAV" }, settingsButton { "Audio / MIDI" };
     juce::TextButton playButton { "Play" }, stopButton { "Stop" }, homeButton { "|<" }, undoButton { "Undo" }, redoButton { "Redo" }, splitButton { "Split" }, duplicateButton { "Duplicate" }, removeButton { "Remove" };
     juce::Slider zoomSlider;

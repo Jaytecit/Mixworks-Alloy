@@ -2,6 +2,16 @@
 
 ## Current accepted release and source recovery
 
+The local launcher selects **0.55.2-9166219e0087**, SHA-256 `9166219e00877f695b6e9494557851b37508a49ddd18153f030ab1a4181fd816`. Receipt `.local/finishing-p02-0552/receipt.json` binds `.local/f552-g/summary.json`: **2,297 checks / all 22 suites / zero failures/errors**. VerifyOnly and local deployment accepted the frozen bundle. All **153** Source/CMake inputs match `candidate-source.json/zip`.
+
+P02 orange popup edges, P03 ruler double-click playback and P44 Follow pass native compact/wide/transport/workspace checks. Combined generated/manual curves reuse source nodes and agree across drawing, hits, captions, dragging and precise entry. Production PCM checks verify each EQ Swap at a non-block-aligned sample. New Bass swap insertion/presets and Balanced/Bold handovers are vertical; explicit fade handovers and historical paired ramps retain their saved shapes. Native captures were inspected; Impeccable reports no findings. No fresh musical listening or physical FLkey/ASIO acceptance is claimed.
+
+Analysis **9** and session **26** remain. Production 0.55.1 PID 161652 stayed open; no agent reset/restart or original-music change occurred. Retention: **1,067 → 1,066 files**, 19 missing/18 added PCM cache files and changes to current/previous recovery only. Baseline analysis/correction/library/workspace/MIDI-profile documents remain unchanged. Exact evidence and intermediate failed/incomplete fixture attempts remain in `.local/finishing-p02-0552/`; only the accepted receipt establishes release readiness. Independent full checkpoint: `.local/source-baselines/20261020-finishing-navigation-swaps-0552-verified/`.
+
+Optional arrangement mastering (P16/P36), WAV/MP3/FLAC choices (P36) and the grid dimmer (P45) are **planned only**. Public binary distribution remains subject to [licensing prerequisites](docs/LICENSING.md).
+
+### Previous 0.55.1 evidence
+
 The current local launcher selects **0.55.1-caed2539b07a**, SHA-256 `caed2539b07a593c790ef75bc1dda85dccde50f70b49c711f03ce30d5b5f7443`. Receipt `.local/finishing-p01-0551/receipt.json` binds the final `.local/f551-g/summary.json`: **2244 checks / all 22 suites / zero failures/errors**. All 153 source/CMake inputs match `candidate-source.json/zip`; VerifyOnly and local deployment accepted the unchanged frozen bundle. Public binary distribution remains subject to [licensing prerequisites](docs/LICENSING.md).
 
 P01 covers all compact keys, unknown/manual/uncertainty semantics, search and native display-mode sorting. Five red Auto Arrange assertions reproduced mandatory crossfade stacking. New energy choices, Constant power/Hard cuts, fallback, shortfall and native dialog/worker paths pass in Alloy (544 checks); timeline-editing (595 checks) includes actual mixer power/cut behaviour and format-25 compatibility. Native key/dialog captures were inspected. These are fixture results, not fresh perceptual loudness, musical taste, listening or physical hardware acceptance.

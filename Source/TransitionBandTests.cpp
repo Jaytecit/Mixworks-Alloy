@@ -25,6 +25,66 @@ void runTransitionBandTests(const std::function<void(bool, const juce::String&)>
     const auto id = base.clips[1].id;
     const auto stableJson = [](const Project& p) { return juce::JSON::toString(projectToJson(p)); };
     const auto near = [](double a, double b) { return std::abs(a - b) < 1e-6; };
+    for (int band = 1; band < 4; ++band)
+    {
+        auto sharp = base; sharp.setTransitionBand(id, band, {TransitionBandMode::swap, 1, 0, .50013});
+        const auto outgoing = sharp.transitionPlaybackFor(sharp.clips[0]).pairs[1][(size_t) band];
+        const auto incoming = sharp.transitionPlaybackFor(sharp.clips[1]).pairs[0][(size_t) band];
+        check(outgoing.instant && outgoing.begin == outgoing.end && incoming.begin == incoming.end
+            && outgoing.gainAt(std::nextafter(outgoing.begin, -INFINITY)) == 1 && outgoing.gainAt(outgoing.begin) == 0
+            && incoming.gainAt(std::nextafter(incoming.begin, -INFINITY)) == 0 && incoming.gainAt(incoming.begin) == 1,
+            "EQ swap " + juce::String(band) + " is a true vertical step without a ramp");
+        Engine actual, reference; actual.sampleRate = reference.sampleRate = 8000;
+        actual.project = reference.project = sharp;
+        reference.project.transitionLinks[0].bands[(size_t) band].reset();
+        reference.project.clips[1].controls.eqDb[(size_t) band - 1] = -60;
+        const auto edge = (int64_t) std::ceil(outgoing.begin * 8000 - 1e-9);
+        const double start = (edge - 37) / 8000.;
+        juce::AudioBuffer<float> whole(2, 128), first(2, 37), last(2, 91); juce::MidiBuffer midi;
+        actual.render(whole, 128, start, midi); reference.render(first, 37, start, midi);
+        reference.project.clips[0].controls.eqDb[(size_t) band - 1] = -60;
+        reference.project.clips[1].controls.eqDb[(size_t) band - 1] = 0;
+        reference.render(last, 91, edge / 8000., midi);
+        bool exact = true;
+        for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 128; ++i)
+            exact &= std::abs(whole.getSample(ch, i) - (i < 37 ? first.getSample(ch, i) : last.getSample(ch, i - 37))) < 1e-5;
+        check(exact, "production EQ swap " + juce::String(band) + " changes at its exact sample inside a 32-sample processing block");
+    }
+    {
+        Workstation marker(false); marker.stopTimer(); marker.setSize(1920, 1080);
+        marker.engine.project = base; marker.engine.project.snap = false;
+        marker.engine.project.setTransitionBand(id, 1, {TransitionBandMode::swap, 1, 0, .5});
+        marker.selectedTransition = id;
+        marker.selectedClip = base.clips[0].id; marker.selectAutomationTarget(1); marker.timeline.pixelsPerSecond = 12; marker.refresh();
+        const AutomationAddress address {0, AutomationTarget::bass, {}, {}, base.clips[0].id};
+        const auto before = marker.engine.project.transitionLinks;
+        marker.performTimelineAction(TimelineAction::bass, 8, 0);
+        marker.performTimelineAction(TimelineAction::bass, 12, 0);
+        const auto* curve = marker.engine.project.curve(address);
+        check(curve && curve->points.size() == 3 && marker.automationAddresses(0).size() == 1
+            && marker.engine.project.transitionLinks == before && marker.selectedAutomationTarget == 1,
+            "adding bass markers elsewhere in a swapped song reuses one source curve and retains the existing swap");
+        check(marker.timeline.hasGeneratedAutomation(address)
+            && marker.timeline.automationDisplayValue(address, 35, 0) == 0
+            && marker.timeline.automationDisplayValue(address, 41, 0) == -60,
+            "the one editable bass line combines its nodes with the existing swap rather than drawing a separate flat curve");
+        const auto point = marker.timeline.editingAutomationPoint;
+        const juce::Point<float> hit {144, marker.timeline.automationY(0, 0, 1)};
+        check(point && point->second == 2 && marker.timeline.automationPointAt(hit)
+            && marker.timeline.automationPointLabel(address, 2) == "100%", "new markers select the same displayed bass curve with a matching hit target and caption");
+        const auto withNodes = stableJson(marker.engine.project); marker.undo(false);
+        check(marker.engine.project.curve(address)->points.size() == 2 && marker.engine.project.transitionLinks == before, "Undo removes only the added bass node and retains the swap");
+        marker.undo(true); check(stableJson(marker.engine.project) == withNodes, "Redo restores the node and existing swap exactly");
+        const auto reopened = parseProject(withNodes);
+        check(reopened.error.isEmpty() && reopened.project.transitionLinks == before, "combined bass display retains separate saved treatment identities without rewriting the project");
+        const auto image = marker.createComponentSnapshot(marker.getLocalBounds());
+        auto out = report.getSiblingFile("bass-swap-with-added-nodes.png").createOutputStream(); juce::PNGImageFormat png;
+        check(out && png.writeImageToStream(image, *out), "capture the vertical bass swap and its added nodes on one line");
+        marker.engine.project.setTransitionBand(id, 1, {TransitionBandMode::swap, .5, 0, .5});
+        const float manual = marker.timeline.automationManualValue(address, 41, -12);
+        check(std::abs(marker.timeline.automationDisplayValue(address, 41, manual) + 12) < 1e-5,
+            "drag and precise entry invert the generated contribution so a node edits the displayed effective bass value");
+    }
     check(base.validateTransitionLinks().wasOk(), "independent-band fixture has valid source-owned frames");
     Project project = base;
     project.clips[0].controls.automation[2].enabled = true; project.clips[0].controls.automation[2].setPoint(4, -3);
@@ -87,7 +147,9 @@ void runTransitionBandTests(const std::function<void(bool, const juce::String&)>
     project.setTransitionLocked(id, false);
     check(project.applyTransitionPreset(id, TransitionPreset::alignOnly).wasOk()
         && std::none_of(project.transitionLinks[0].bands.begin(), project.transitionLinks[0].bands.end(), [](const auto& b) { return b.has_value(); }), "whole-pair preset resets the composed treatment intentionally");
-    auto oldBass = base; check(oldBass.applyTransitionPreset(id, TransitionPreset::bassSwap).wasOk(), "legacy bass producer remains available");
+    auto oldBass = base;
+    oldBass.transitionLinks[0].bassSwap = initialiseTransition(oldBass.clips[0], oldBass.clips[1], 16, TransitionPreset::bassSwap, oldBass.transitionRange(oldBass.transitionLinks[0]));
+    check(oldBass.transitionLinks[0].bassSwap.has_value(), "construct an explicitly historical bass-pair fixture");
     check(oldBass.setTransitionBand(id, 0, {TransitionBandMode::crossfade, .75, 0, .5}).wasOk()
         && oldBass.transitionLinks[0].bassSwap.has_value(), "independent Volume leaves an existing paired bass handoff intact");
     auto contradictory = oldBass; contradictory.transitionLinks[0].bands[1] = TransitionBandSettings {};

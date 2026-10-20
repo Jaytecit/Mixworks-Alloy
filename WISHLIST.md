@@ -1,12 +1,12 @@
 # Alloy feature wishlist
 
-Current status reconciled on **20 October 2026 / accepted 0.55.1**, analysis revision **9**, session format **26**. Delivered foundations include transition presets/locks, V/B/M/H, filters, curve visibility/isolation, selected-node percentages, A/B/C rehearsal, named/portable presets, paired swaps, bar navigation/linked moves, recovery snapshots, mastering/monitor mute, WAV tails, **four real lanes with even resizing**, MIDI status/profile reload, section-based placement, Auto Arrange and shared Alloy menus/dialogs. Physical controls were sampled successfully; broader device/listening acceptance remains. Private cue, full plugin delay compensation and continuous recovery remain open. Dancer, Synesthesia integration and broader controller notification/mapping invitation remain wishlist only.
+Current status reconciled on **20 October 2026 / accepted 0.55.2**, analysis revision **9**, session format **26**. Delivered foundations include transition presets/locks, V/B/M/H, filters, curve visibility/isolation, selected-node percentages, A/B/C rehearsal, named/portable presets, paired swaps, bar navigation/linked moves, recovery snapshots, mastering/monitor mute, WAV tails, **four real lanes with even resizing**, MIDI status/profile reload, section-based placement, Auto Arrange, orange popup edges, ruler double-click playback, Follow playhead, combined automation curves and sharp EQ swaps. Physical controls were sampled successfully; broader device/listening acceptance remains. Private cue, full plugin delay compensation and continuous recovery remain open. Dancer, Synesthesia integration and broader controller notification/mapping invitation remain wishlist only.
 
 This wishlist owns the request inventory; [the implementation plan](FINISHING-PLAN.md) owns the current build order and acceptance gates. Its ten stages supersede the older ordering below. Original requests and dated discoveries are retained. The user authorised beginning implementation on 20 October after the planning-only consolidation.
 
 ## Auto Arrange follow-up — 20 October 2026
 
-The user reported that automatic treatments were layered over a default volume crossfade and requested selectable energy direction, no-loss blends, hard cuts and other useful options. The current increment fixes replacement of that provisional fade and adds **Unrestricted / Keep pace / Build energy / Wind down**, independently of **Balanced / Smooth / Bold / Use my settings / Constant power / Hard cuts only**. Keep pace compares source RMS in both halves of the placed overlap and prevents BPM drops; Build/Wind down additionally require a measured change of at least 1 dB. Unknown energy stays unknown and can shorten a constrained mix. Constant power addresses the normal halfway power dip between similarly loud unrelated recordings; it is not perceptual loudness normalisation. These are requested P22 increments, not completion of the broader Smart DJ/energy-curve/listening goals. Verification and delivery status are owned by the handover and finishing plan.
+The user reported that automatic treatments were layered over a default volume crossfade and requested selectable energy direction, no-loss blends, hard cuts and other useful options. The 0.55.1 increment fixes replacement of that provisional fade and adds **Unrestricted / Keep pace / Build energy / Wind down**, independently of **Balanced / Smooth / Bold / Use my settings / Constant power / Hard cuts only**. Keep pace compares source RMS in both halves of the placed overlap and prevents BPM drops; Build/Wind down additionally require a measured change of at least 1 dB. Unknown energy stays unknown and can shorten a constrained mix. Constant power addresses the normal halfway power dip between similarly loud unrelated recordings; it is not perceptual loudness normalisation. These are requested P22 increments, not completion of the broader Smart DJ/energy-curve/listening goals. Verification and delivery status are owned by the handover and finishing plan.
 
 Recorded from the user's requests on 2026-10-17 and 2026-10-18. Proposed additions are distinguished from existing features. Reliable beats, downbeats and tempo matching remain prerequisites for unattended mixing.
 
@@ -34,9 +34,9 @@ Source: the user's `C:/Users/jayte/Desktop/To Do.txt`, preserved unchanged, with
 
 ## Existing wishlist coverage in the current plan
 
-**Additional planned requirement — 20 October 2026:** a **Follow playhead** toggle
-that keeps the current timeline position in view. Scheduled as **Stage 1, P44**,
-after ruler double-click playback; not implemented in 0.55.1.
+**Delivered requirement — 20 October 2026:** **Follow playhead** keeps the current timeline position in view. Delivered as **Stage 1, P44 in 0.55.2**, with ruler double-click playback (P03). The default-off toggle and manual-panning behaviour persist in workspace preferences.
+
+**Additional planned requirement — 20 October 2026 (P45):** make the timeline background grid more subtle. Replace the zoom slider beside Snap with a grid-brightness dimmer; retain wheel/menu zoom and overview navigation. Persist brightness in workspace preferences outside musical Undo. This is queued in Stage 1 after Follow playhead.
 
 **Idea only, outside the implementation plan:** the user's broader
 [musical-map-based arranger concept](docs/ideas/MUSICAL-MAP-ARRANGER.md), with the
@@ -152,7 +152,8 @@ Then expand preparation and performance:
 - **Range and ripple editing** — select parts of clips directly; make insertion, replacement and gap closing explicit.
 - **Audio key shifting** — transpose audio independently of BPM; existing key overrides only change analysis metadata.
 - **Linked overlays and sample launching** — keep samples with a parent song and make reusable snippets readily available.
-- **More render choices** — compressed output, audio division at labels, and optional CD production.
+- **More render choices (P36)** — selectable **WAV, MP3 and FLAC** export, with additional lossless/raw formats to assess; audio division at labels and optional CD production. The explicit format choices were requested on 20 October 2026 as a planning-only addition.
+- **Optional arrangement mastering before export (P16, linked from P36)** — build on the existing master chain with presets, manual adjustment, level/headroom/clipping feedback and a processed/bypass comparison. Keep direct export available. Requested on 20 October 2026 as planned work only.
 - **Library categories and metadata editing** — complement the existing search, sorting and key display; recommendations remain part of the ordering/Smart DJ wishes above.
 - **Live next-track controls** — immediate transitions and fade/pause/cue-next actions, extending the live-controller wish.
 - **Master effects and more independent mixer lanes** — historical eight-lane work was superseded by the user's four-lane design in 0.54.2. The current app has **four** independently mixed lanes and shared built-in master processing. A general master VST plugin chain remains P16; extra lanes are not newly requested by retaining this historical discovery.
