@@ -1,0 +1,16 @@
+{
+  "beatThisCpp": {
+    "repository": "https://github.com/mosynthkey/beat_this_cpp.git",
+    "commit": "07ab790a9ec2eda8093d52d249e3ec4f0510ee72",
+    "model": "onnx/beat_this.onnx",
+    "modelSha256": "c5c1466e08abdb03fdeb50668a06f244b787d564c212490482231a9cfbe9ccbd",
+    "pocketfftCommit": "0fa0ef591e38c2758e3184c6c23e497b9f732ffa",
+    "r8brainCommit": "e71c31bf320f84210bb4bdcb57e296c39ce940f9"
+  },
+  "onnxRuntime": {
+    "version": "1.24.4",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip",
+    "archiveSha256": "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357",
+    "dllSha256": "b95efb2113b603bbbf3f191061c5516a871ed546893c820e4f3b7b6c358dbf2a"
+  }
+}

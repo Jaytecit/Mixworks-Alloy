@@ -1,0 +1,29 @@
+# Long recordings and sessions
+
+These capacity improvements were introduced in accepted0.37.0-268ef72f4c12, after1,498 checks across22 suites and the separate60/90-minute workflows. Subsequent releases retain them; see FINISHING-PLAN.md for the current launcher. Previous releases and the launcher backup are retained.
+
+Long source recordings can decode into a temporary, read-only PCM mapping instead of allocating the entire decoded recording on the heap. The existing 1 GiB limit still applies to ordinary in-memory decoding and individual persistent PCM cache entries. Larger recordings use session-owned temporary files, subject to available disk space and the supported frame range. Reopening them decodes them again; they do not gain a persistent warm cache. The persistent cache remains limited to 8 GiB.
+
+The decoder retains at most 256 KiB of its own float scratch data. Codec libraries and analysis have additional memory requirements. Mapped file pages can also remain resident: low private allocation does not mean low total working set. Temporary PCM stays alive while playback or Undo retains it and is removed after the final owner releases it.
+
+The rhythm analyser retains its separate 512 MiB signal/feature budget. A recording that exceeds that budget remains importable and playable, with the analysis limitation reported explicitly. This does not establish a reliable automatic beat grid for an entire changing-tempo mix. Treat unknown or variable timing as requiring manual handling.
+
+Stop and window close propagate cancellation into streaming decode and the neural source, feature and inference stages. Completed library entries and manual corrections are retained. Cancellation is cooperative and can wait for an in-flight codec or inference operation to return. No instant shutdown guarantee is implied.
+
+Device playback now derives transport time from an integer frame count anchored at the selected source time. This prevents accumulated block-duration rounding over long mixes while preserving fractional seeks, pause/resume and sample-rate changes. Offline rendering retains its existing integer output-frame clock.
+
+## Retained acceptance evidence
+
+The owned 90-minute stereo 44.1 kHz PCM24 fixture contains 238,140,000 frames. Every decoded channel sample matched its construction. It decoded in 22.5 seconds in the first focused run, with a 148,488,192-byte peak private commit and a 2,084,831,232-byte peak working set. Those are observations from this machine, not universal resource promises. The source SHA256 was unchanged, and the mapped file was removed after its final owner released it.
+
+Focused tests cover malformed/failed reads, non-finite PCM, early and mid-source cancellation, active and queued neural cancellation, cleanup, and explicit short-input errors. Three generated numerical cases produced exactly the same raw neural logits, events and meter scores before and after the reflected-padding allocation was removed. The model and detector thresholds were unchanged; this is bounded numerical evidence rather than general detector equivalence.
+
+An initial real-source 60-minute workflow exposed accumulated device-clock drift of 0.00125429 samples and a measurable device/offline PCM difference. Its source files were unchanged and every sample of the reimported WAV matched its encoded PCM. The corrected clock passes 90-minute callback tests at both 44.1 and 48 kHz, plus fractional seek, variable block, pause/resume, direct-position and rate-change checks. The corrected 60-minute workflow passed all 30 checks. Its 158,782,050-frame device and offline WAVs are byte-for-byte identical, every reimported sample matches, and all seven source files are unchanged. Cold reopen took 213.7 seconds; warm reopen took 6.84 seconds with all seven analyses and PCM entries reused. The 90-minute workflow also passed all 30 checks: all 238,162,050 stereo frames, including the tail, are byte-for-byte identical between device and offline WAVs; every reimported sample matches, and all seven source files are unchanged. Its output reimport took 67.1 seconds and explicitly reported that whole-recording neural rhythm analysis exceeds the independent 512 MiB budget. Playback and PCM validation remain available. The exact 0.37 candidate passed 1,498 checks across 22 release suites. Long workflow bundle07 and final09 have identical production audio/analysis/clock files; only version and optional test hooks differ, as recorded in the source correspondence artifact.
+
+The long workflow uses only the seven previously evaluated development recordings, repeated in a manual arrangement with overlaps, automation, real test VST3 effects, master processing, labels and a locked pair. It checks save, separate-process cold/warm reopen, edit/Undo/Redo, full callback and offline WAV rendering, every output sample and reimport. It does not establish automatic beatmatching, musical quality, listening acceptance, physical driver latency or real-time underrun performance. The eight reserved musical holdouts remain untouched.
+
+The optional native-picker acceptance fixture uses a separate owned window and Unicode paths, with no audio device or user preference writes. Actual Save cancellation and Import were exercised. Further picker automation currently fails with “failed to activate captured window”; Save/Open/Export through the OS dialogs remain unverified. Production controller and renderer tests are separate evidence.
+
+Reproduce the automated long workflow with `python scripts/verify-long-session.py --exe <frozen Mixworks.exe> --development-paths <seven-source JSON> --output <new directory> --minutes 60 90`. The runner hashes the original sources, executable bundle and real plugin bundles before and after the run and writes a complete result summary.
+
+Additional current-source random-seek and live-insertion acceptance is recorded in [long navigation](LONG-NAVIGATION.md).

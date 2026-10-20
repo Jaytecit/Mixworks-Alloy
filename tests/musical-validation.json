@@ -1,0 +1,1547 @@
+{
+  "format": "mixworks-musical-validation",
+  "version": 1,
+  "purpose": "Independent musical review queue. Detector/commercial observations are not annotations or correctness labels. No audio was examined to construct this queue.",
+  "comparisonEvidence": {
+    "file": ".local/detection-v032/comparison-final-03.json",
+    "sha256": "297a157144341cde3968ee1bad48e6901b10f1525ef400ccb8f1a408b090380e",
+    "executableSha256": "6245f51715715a1dc08428255d3e18a00123f91c997cac8a32400d4370426bd1"
+  },
+  "development": [
+    {
+      "sha256": "e99932193e05c84476ca517cae259d3f444df07c59144739b3b1fd9e4dca5848",
+      "name": "08. Buchla\u2019s Dreaming (Agents Of Time Remix).mp3",
+      "durationSeconds": 464.0130612244898,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 125.9987,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.256171296841931,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 19.15083516234774,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "afda2af207ad1aa2083b4f28e8fc7ac4396a822e9d6485abb688f9ac66b1a2f3",
+      "name": "04. Alita (Original Mix).mp3",
+      "durationSeconds": 344.189387755102,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.9987,
+        "detectorKey": "4B",
+        "predictedDownbeatSeconds": 0.113498502601545,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 31.417465740585182,
+        "djStudioKey": "1A",
+        "storedMixedInKey": "1A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "44773eba6d3866bdc5d7a48b7d02b44e48230b7f591d1f47e612a98c742caa5d",
+      "name": "04. Arc Mode (Mark Broom Remix).mp3",
+      "durationSeconds": 298.9714285714286,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 129.0027,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.150916554162393,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 18.73855417811838,
+        "djStudioKey": "9B",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "876d82272bf1958109f1636248de2c4b3aacea8ca3083005caa3bac8e398082a",
+      "name": "06 Crazibiza, Jazzy X & Dj Julz.Azura Girl.flac",
+      "durationSeconds": 213.60036281179137,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 126.9964,
+        "detectorKey": "4A",
+        "predictedDownbeatSeconds": 0.070820756560415,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 33.83960268732071,
+        "djStudioKey": "4A",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "785f3cb1fb75885b27242527483b2b20b62a0555afe908918f2ad8c8503d18db",
+      "name": "07. ARTBAT - Take Off.mp3",
+      "durationSeconds": 237.4530612244898,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 127.0016,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 0.259501706810697,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 6.079255763125539,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "e27c060c1c1ef9fa050bcf8484fb875cbf980c7080884edb12636410fce81ab0",
+      "name": "06. Bel Canto (Paul Anthonee Redition).mp3",
+      "durationSeconds": 441.3387755102041,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 123.9992,
+        "detectorKey": "7A",
+        "predictedDownbeatSeconds": 0.053006138818538,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 30.405857043583545,
+        "djStudioKey": "7A",
+        "storedMixedInKey": "7A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "bd957f1dd9135b4ad92ccb4961bb9e3869a1cd3ccd8355c59ab77bb4757beb8b",
+      "name": "10. Disclose Yours (Dub).mp3",
+      "durationSeconds": 353.9330612244898,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.0,
+        "detectorKey": "2B",
+        "predictedDownbeatSeconds": 0.107492676949192,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 28.337348151035254,
+        "djStudioKey": "11A",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "acb1eaa854ba79c8c77686fa27f95e1fec98a061a8ee13fa913e98bc86a2d119",
+      "name": "03. Loofy - Last Night (Anyma x Layton Giordani Remix).mp3",
+      "durationSeconds": 256.78367346938774,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 129.004,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 1.908554793978088,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 23.06657165452615,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "5a6281fe81c0680d82ceb9d030587e2d282bd896ba67a192969c7133e9be5db6",
+      "name": "08. Nude (Solomun Remix).mp3",
+      "durationSeconds": 484.33632653061227,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable"
+      ],
+      "observations": {
+        "detectorBpm": 125.0007,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "2d7b5aefc88dc67c55a52387f525314219235b680b4cdc7884f0ebfab70d2d23",
+      "name": "11. Dj Nejtrino - Das Boot (Radio Edit).mp3",
+      "durationSeconds": 185.80897959183673,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 124.9949,
+        "detectorKey": "8B",
+        "predictedDownbeatSeconds": 0.273095197308125,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 26.797649749613694,
+        "djStudioKey": "8B",
+        "storedMixedInKey": "8B",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "4d55b7d5b9380f7c4cf4b3d0865874ada2da8816dbe36a0f7621a501343e7f1d",
+      "name": "08. Airsand - Emergency Exit (Extended Mix).mp3",
+      "durationSeconds": 409.2081632653061,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 121.9992,
+        "detectorKey": "7B",
+        "predictedDownbeatSeconds": 31.545311011739855,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 49.67415704517435,
+        "djStudioKey": "4A",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "f20764f9bb2d420458897556677802311d0e8b50a7ee6c277ff7af2410de6b27",
+      "name": "04. CamelPhat - Home (Vintage Culture Remix).mp3",
+      "durationSeconds": 213.36816326530612,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 125.987,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 3.852968125743287,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 38.76157126435253,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "60b6aec18ef54e1c417cd99b95dd095cb5b8f53f79c022a3c898c60285f3e0ed",
+      "name": "02. Mercury (Original Mix).mp3",
+      "durationSeconds": 524.3820408163265,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 120.0,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 0.151173458211446,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 25.94103190762098,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "398c0813400b3a2a9023adf0e77de9c6524f74754043b74aaf835bde01a355b6",
+      "name": "09. Airsand - Miracle (Savin Remix).mp3",
+      "durationSeconds": 434.05061224489793,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 119.9995,
+        "detectorKey": "?",
+        "predictedDownbeatSeconds": 0.051228256531261,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 28.06707818580993,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "97747db610ce99e004af46ecbcc40205062752126fc58675a941146898521191",
+      "name": "08. Baby, Make Your Move - Nari (Original Mix) 126.mp3",
+      "durationSeconds": 289.56734693877553,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 126.0033,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.115671028827957,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 52.05970833619568,
+        "djStudioKey": "9B",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "933d577fc2e14facc62fe106ba323204629b7a0582f89d08e954476281b0ac5c",
+      "name": "07. Biohazard (Original Mix).mp3",
+      "durationSeconds": 397.63591836734696,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 130.9994,
+        "detectorKey": "?",
+        "predictedDownbeatSeconds": 0.653017312523924,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 494.7287374007257,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "3338095ac95a2f3637b24f0b375d62ce5ba65a148c3e2901777a28c9c85ec9ee",
+      "name": "01. Is This Trance (Original Mix).mp3",
+      "durationSeconds": 469.10693877551023,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.0043,
+        "detectorKey": "4A",
+        "predictedDownbeatSeconds": 15.774705683546669,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 31.578131843709215,
+        "djStudioKey": "4B",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "d19ecf6f1ad553ec127d82d531bdc88b8f185604cbbfbaa0b8509027ce02af04",
+      "name": "05. All Eyes On Us - Dj Cucky, Benny Di Gioia (Original Mix) 127.mp3",
+      "durationSeconds": 216.32,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 126.9978,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 0.087768799889803,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 25.329898350336787,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "064bd276430c699dbde4641efda61ff1eb5894d2b871ca28510a674948febd03",
+      "name": "11. Bee Dancin - Jackers Revenge (Original Mix) 125.mp3",
+      "durationSeconds": 264.04571428571427,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.9945,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 0.09357487280564,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 52.569883552136524,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "85f6faf4c8a4b30fd9fa46ac9d5112c818417e5e1749f35a26a6419217024ab1",
+      "name": "08. Anyma - Now Or Never.mp3",
+      "durationSeconds": 239.51673469387754,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9994,
+        "detectorKey": "11A",
+        "predictedDownbeatSeconds": 1.024897366548621,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 934.2500221134745,
+        "djStudioKey": "11A",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "258034c0a40855590c9ba198b318480c508bd73afd4ab817ec566e6b029ff087",
+      "name": "02. Emmit Fenn - The Chase (Reb\u016bke Remix).mp3",
+      "durationSeconds": 188.55183673469386,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 126.9952,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 0.046418741947956,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 27.93053286265025,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "45d6b1499205b5c89aeaf8ff4c11a9973c7c9827ed8f0497d0a7ef831a0d989b",
+      "name": "03. Ain't Nobody - Sean Finn (Funkera Extended Remix) 125.mp3",
+      "durationSeconds": 301.60979591836735,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.0035,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 0.844418429351319,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 505.16392464978264,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "52f2d3f52de89883471dd2d3ddda96d7337db5b88db2d008e68eb8c1acace3cc",
+      "name": "07. Nude (Rampa Remix).mp3",
+      "durationSeconds": 472.42448979591836,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 122.9997,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 0.241795608436678,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 18.708417753332597,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "713521b1537c7c07417e6c47a777c62c971b000b4781810bf30c3ca5c1e67e97",
+      "name": "09. Ode To Omar (Original Mix).mp3",
+      "durationSeconds": 355.7877551020408,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 127.0009,
+        "detectorKey": "12A",
+        "predictedDownbeatSeconds": 0.052189995189821,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 27.860546235369945,
+        "djStudioKey": "12A",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "aeefa6d3fd1473f44a360f0999acd69dd8628a3cd18a7e073a58cf11c0100a6c",
+      "name": "05. Sharam - PATT (Party All The Time) (Adam Beyer, Layton Giordani & Green Velvet Remix).mp3",
+      "durationSeconds": 183.19673469387754,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable"
+      ],
+      "observations": {
+        "detectorBpm": 132.9976,
+        "detectorKey": "12A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "12A",
+        "storedMixedInKey": "12A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "552540c36e63f162bfd4380602a6492c09a8ade355238a1df6bc324456326778",
+      "name": "06. TuraniQa - Lonely (VIP Mix).mp3",
+      "durationSeconds": 262.0342857142857,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 119.9948,
+        "detectorKey": "5A",
+        "predictedDownbeatSeconds": 2.055721792750796,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 48.292667629004534,
+        "djStudioKey": "7B",
+        "storedMixedInKey": "8B",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "a806d9a56f0fd74dcdba67127fc6700baf47e334eca5d1cf0a58f38471732ef9",
+      "name": "02. Ain't Nobody - Nari, Steve Tosi, Nabuk (Original Mix) 126.mp3",
+      "durationSeconds": 262.9224489795918,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9976,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 0.100561895976406,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 56.62638380449164,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "086b5310e3b6c3e27ca928bdee85b68182bff1eefd95ff0e0b7ed268f2fa778a",
+      "name": "05. TuraniQa - Lonely (Radio Edit).mp3",
+      "durationSeconds": 272.2481632653061,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.0111,
+        "detectorKey": "5A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "7B",
+        "storedMixedInKey": "8B",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "356668b99a07816fc376ac282104dd04892332f1b5006995e9fd8b08f9936987",
+      "name": "06. Ben Ben (Original Mix).mp3",
+      "durationSeconds": 353.6457142857143,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 131.0031,
+        "detectorKey": "10B",
+        "predictedDownbeatSeconds": 14.853404075431053,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 107.5401025439182,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "3d2c903e0824a1b15f9bf7e1f1fd85dfa35ad2a049d02077fe20d89ffe1e461a",
+      "name": "02 Black Blood & Crazibiza.Chain Chain.flac",
+      "durationSeconds": 313.9802267573696,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.9923,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 0.078324313785367,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 51.1822060151271,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "2b6b89e6f62bf57c1a20dd667d16973932ce1aafe91afe3125a4c061c0e4931a",
+      "name": "03. Alien (Original Mix).mp3",
+      "durationSeconds": 371.4089795918367,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.9987,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.087582196453907,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 39.92055539577121,
+        "djStudioKey": "8B",
+        "storedMixedInKey": "5A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "b4768e9e27c5231a2010797f037d4ba9841a18d6407984578c637f7f2ce14bb0",
+      "name": "04. Ain't Nobody 2024 - Christian (It) (Original Mix) 120.mp3",
+      "durationSeconds": 291.63102040816324,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 119.9985,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 0.094795327114869,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 26.605173434092528,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "6ae57fd11c47d3f7582884bb0b007584ee52976a635ffa12dd44d13aa2a354af",
+      "name": "09. Counterfeit (Original Mix).mp3",
+      "durationSeconds": 462.3673469387755,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9991,
+        "detectorKey": "5A",
+        "predictedDownbeatSeconds": 0.123203055470071,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 98.65749931375102,
+        "djStudioKey": "5A",
+        "storedMixedInKey": "5A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "3b1785748588ec21d2bfdde5b64bfb807de6b60d4a13e2545f37f1cb06ea6fc4",
+      "name": "11. John Summit - Shiver (Cassian Remix).mp3",
+      "durationSeconds": 245.7077551020408,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 126.9986,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 1.931685640379286,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 19.89110401875138,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "47be0ce7b64f69b2babb0bd7a179115f8317680ce9b7c67ad83bed335156ca8f",
+      "name": "07. Airsand - Lazy (Extended Mix).mp3",
+      "durationSeconds": 414.0408163265306,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 121.9992,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.037489664830635,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 15.567592853589296,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "38cc06ec0c1ce387076f10228eebab563df4ca030cba102bb5d460ac7283fc29",
+      "name": "06. All Night - House Of Prayers, Maxim & Matte (Crazibiza Remix) 126.mp3",
+      "durationSeconds": 369.5804081632653,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9985,
+        "detectorKey": "10B",
+        "predictedDownbeatSeconds": 0.098725187338175,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 34.07273225454256,
+        "djStudioKey": "11B",
+        "storedMixedInKey": "11B",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "a449f3dba44f0d9202d735584a269495aa1bc3bed0499b2d128e15bc3e3b4421",
+      "name": "07. American Boy - Sandro Puddu (Original Mix) 126.mp3",
+      "durationSeconds": 255.29469387755103,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9787,
+        "detectorKey": "8A",
+        "predictedDownbeatSeconds": 0.073439599275205,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 53.11917183540518,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "d5bd809bd56666dc659d5412ffec208c248d9b830e6d8a8b061994585350c44b",
+      "name": "11. Chilli (Original Mix).mp3",
+      "durationSeconds": 405.39428571428573,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 129.9977,
+        "detectorKey": "4B",
+        "predictedDownbeatSeconds": 0.221388780053894,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 22.35215135571542,
+        "djStudioKey": "4B",
+        "storedMixedInKey": "1A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "a4c271f7d4f105daca7f8e66538f92727eac2963fa384b0247ab005a7246be37",
+      "name": "04. Naked (Frankey & Sandrino Remix).mp3",
+      "durationSeconds": 448.6269387755102,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.0025,
+        "detectorKey": "9B",
+        "predictedDownbeatSeconds": 0.088893054557731,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 33.6272017598812,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "d848d4933dbd04ad884cd6c1e40768eb15d542c5e464c119afdda6c82def55a6",
+      "name": "05. Atlantico (Original Mix).mp3",
+      "durationSeconds": 446.43265306122447,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.9903,
+        "detectorKey": "5A",
+        "predictedDownbeatSeconds": 0.04883669229074,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 56.21807854300407,
+        "djStudioKey": "5A",
+        "storedMixedInKey": "5A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "c8c87f49dd26192798627fa48ba7bf6f57e07d80ab237b27be51ebb8feaff556",
+      "name": "03 House of Prayers.Disco Stepper (Mixed).flac",
+      "durationSeconds": 122.04408163265306,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9997,
+        "detectorKey": "10A",
+        "predictedDownbeatSeconds": 0.12653982679101,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 26.002816280877614,
+        "djStudioKey": "11B",
+        "storedMixedInKey": "10A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "6e34bd8dd9753d54b391ca47cecb0fe91ddb02797f2ecb3163ffa3bce3eeb365",
+      "name": "09 Babes on the Run.Dancin.flac",
+      "durationSeconds": 297.19219954648526,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 125.9948,
+        "detectorKey": "6A",
+        "predictedDownbeatSeconds": 0.067987935286848,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 42.259723648727764,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "68697dbd55065c86087a8c6ef48990c41d36b4c044c76a51a7168c3d72ac0faf",
+      "name": "06. Argy - Sierra.mp3",
+      "durationSeconds": 201.534693877551,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable"
+      ],
+      "observations": {
+        "detectorBpm": 124.0001,
+        "detectorKey": "5A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "5A",
+        "storedMixedInKey": "5A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "976bf1bd29915d6e456c46f64430a5e77bd95bf0150f2bf1e20b135cb2895f62",
+      "name": "11. Play It As It Lays (Original Mix).mp3",
+      "durationSeconds": 485.2244897959184,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 130.0051,
+        "detectorKey": "9B",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "9B",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "c1733a98930a0182f481ba06ddca8bf3a2b32da99ebf6ccb2c1c06c0d1e5640d",
+      "name": "11 Realcyclers & Crazibiza.King of My Castle (Extended Mix).flac",
+      "durationSeconds": 278.15183673469386,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 125.997,
+        "detectorKey": "5A",
+        "predictedDownbeatSeconds": 0.076783012442036,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 41.127304479914415,
+        "djStudioKey": "5A",
+        "storedMixedInKey": "5A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "2854675a8f3134f36a5851fe37dbb71073ae1552f192cfb4545105e3d3147825",
+      "name": "05. Attention (Original Mix).mp3",
+      "durationSeconds": 449.56734693877553,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9997,
+        "detectorKey": "1A",
+        "predictedDownbeatSeconds": 0.048502955831803,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 32.87401395714823,
+        "djStudioKey": "3A",
+        "storedMixedInKey": "3A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "144ddc8b6ba3c8e266e63ebdd73eff0c9446c9521b7e2f19741d79e0b5990794",
+      "name": "02. Deecross - Rock It (Extended Mix).mp3",
+      "durationSeconds": 354.92571428571426,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 120.0051,
+        "detectorKey": "8A",
+        "predictedDownbeatSeconds": 1.479613272294474,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 984.2674034910524,
+        "djStudioKey": "8A",
+        "storedMixedInKey": "8A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "0c74258de63a041b764cda2d0b29158ba65d618ac2fdf1206bf44f09e2231205",
+      "name": "04 Crazibiza & Effendi.Play Right.flac",
+      "durationSeconds": 314.9322448979592,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.9995,
+        "detectorKey": "11A",
+        "predictedDownbeatSeconds": 0.072417815185815,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 33.10627100088701,
+        "djStudioKey": "1B",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "2fe297c73aa2e83f8bd9fcc7aa538a67f150a0a06c28993ad8b9d8b37fcd4b4a",
+      "name": "04. Gaidukova - Dance To The Beat (Extended Mix).mp3",
+      "durationSeconds": 411.1934693877551,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 122.0003,
+        "detectorKey": "4A",
+        "predictedDownbeatSeconds": 0.049600545545193,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 24.66583284050618,
+        "djStudioKey": "4A",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "5321694cb6c68c39e84ce720d61f12c649f6b0236ce532a913dc879f83a159b0",
+      "name": "10 Crazibiza & Balearix.Sea Line.flac",
+      "durationSeconds": 251.49532879818594,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9951,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.089990521291726,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 53.10375572542578,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "6edb84535d04c03725e22fe671670c5bebd03c1cc9be07ae6341747a6daad330",
+      "name": "10. Alessa Khin - Dori Me (Radio Edit).mp3",
+      "durationSeconds": 219.03673469387755,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 124.0003,
+        "detectorKey": "1A",
+        "predictedDownbeatSeconds": 0.355000930299789,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 9.438495242179773,
+        "djStudioKey": "1A",
+        "storedMixedInKey": "1A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "c2cd275cc329089ced86b9a9e0e33bbd735c66b42e1e07d4ef27ae860e5db178",
+      "name": "01 Crazibiza.Dance & Shout (JackinGod Remix).flac",
+      "durationSeconds": 249.5912925170068,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 126.0001,
+        "detectorKey": "9B",
+        "predictedDownbeatSeconds": 0.074002488439263,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 26.16921995418697,
+        "djStudioKey": "8B",
+        "storedMixedInKey": "6A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "69518620db0c87ad38f2a7e5ceef09d0fe8ee0f07922d1e1c81785b3fe095bd5",
+      "name": "09. Brethren (Original Mix).mp3",
+      "durationSeconds": 454.0604081632653,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 127.9982,
+        "detectorKey": "?",
+        "predictedDownbeatSeconds": 0.153417961466841,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 22.19182696242837,
+        "djStudioKey": "1A",
+        "storedMixedInKey": "1A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "8171df6c147e3d5a3494f037a4826eb5505ddadbfbec9ac371f2ee8c2acada08",
+      "name": "01. Affektion (Original Mix).mp3",
+      "durationSeconds": 499.72244897959183,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 122.0,
+        "detectorKey": "7A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "10B",
+        "storedMixedInKey": "7A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "8c3a344288d359f37cf74eb41d0423ded9dabe84d62540d2afd254618c7d5234",
+      "name": "08. Bottle (Len Faki Deepspace Mix).mp3",
+      "durationSeconds": 301.60979591836735,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable",
+        "tempo-review",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 128.003,
+        "detectorKey": "?",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "2B",
+        "storedMixedInKey": "3A",
+        "variableTempo": true
+      }
+    },
+    {
+      "sha256": "3b19f9435d1e4a4a4ffd9bf6c6d907b536ed204b289b5a375c393c70719494f2",
+      "name": "10. Bamboleo - Steve Tosi (Original Mix) 124.mp3",
+      "durationSeconds": 252.26448979591837,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.9791,
+        "detectorKey": "2B",
+        "predictedDownbeatSeconds": 0.567605562908091,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 538.1203507948392,
+        "djStudioKey": "11A",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "e1e67c6844e78c3eb7d403d455bfad797adf581110377e0de1942f0dc1d70e9c",
+      "name": "01. 2 One 2 - Blade Runnerz (Extended Mix) 124.mp3",
+      "durationSeconds": 302.0016326530612,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 124.0125,
+        "detectorKey": "11A",
+        "predictedDownbeatSeconds": 0.141269564506672,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 80.29083080978495,
+        "djStudioKey": "1B",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "824457eda93d23bc125df9ab5e279dd0773b64b0945d129567f6bb8eecc4183e",
+      "name": "03. Mystery (Tale Of Us & Mathame Remix).mp3",
+      "durationSeconds": 424.46367346938774,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.9996,
+        "detectorKey": "4A",
+        "predictedDownbeatSeconds": 0.261847897268823,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 20.624955733292744,
+        "djStudioKey": "4B",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "4c0d367fa281a4196669369f9a1da98429d8f87982901389962ab8b5c04bbfdb",
+      "name": "03. Airsand - Miracle (Extended Mix).mp3",
+      "durationSeconds": 428.0424489795918,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 124.0011,
+        "detectorKey": "2A",
+        "predictedDownbeatSeconds": 0.075556711729888,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 33.61929614837126,
+        "djStudioKey": "2A",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "968f629e6497d4c05f8c06d42a9df6d0787b33068b839ee684b04529a4a96977",
+      "name": "10. AVALAN ROKSTON - Why Does My Heart Feel So Bad_.mp3",
+      "durationSeconds": 194.16816326530613,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable"
+      ],
+      "observations": {
+        "detectorBpm": 125.0054,
+        "detectorKey": "8A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "8A",
+        "storedMixedInKey": "8A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "c35ad088fc59282c38fc43d4d7030cd647a23844bfc6520b532256389d132e0a",
+      "name": "02. Albanian Summer (Original Mix).mp3",
+      "durationSeconds": 316.00326530612244,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 122.9934,
+        "detectorKey": "9B",
+        "predictedDownbeatSeconds": 11.743008722463118,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 25.75850312994527,
+        "djStudioKey": "9B",
+        "storedMixedInKey": "7A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "31b9d3a500af145aa2be2efeeeaa89f629951c097b21f713e512c9059be2dafb",
+      "name": "05 Slideback.Summerize.flac",
+      "durationSeconds": 312.099410430839,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 126.9999,
+        "detectorKey": "5B",
+        "predictedDownbeatSeconds": 0.30008949517789,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 21.35955324045038,
+        "djStudioKey": "6A",
+        "storedMixedInKey": "5A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "f1261d6a7f10575b280872e68d6047ad53895cd7427dc293faf35fa68f583ac3",
+      "name": "10. Cerebral Mass (Original Mix).mp3",
+      "durationSeconds": 422.08653061224487,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 128.0015,
+        "detectorKey": "11B",
+        "predictedDownbeatSeconds": 0.303234848470416,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 20.809422333428753,
+        "djStudioKey": "11B",
+        "storedMixedInKey": "8A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "fa4e9615d06d3f17c02462f4533587f3a60925af7ac220549776bb2f713e2285",
+      "name": "08 Crazibiza.My Lips (House of Prayers Pride Edit).flac",
+      "durationSeconds": 314.2124263038549,
+      "split": "development",
+      "reviewReasons": [],
+      "observations": {
+        "detectorBpm": 123.0,
+        "detectorKey": "4A",
+        "predictedDownbeatSeconds": 0.076756503475139,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 38.303292922650165,
+        "djStudioKey": "4A",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "92c782fd096918c0cec27372c2e4cb56181fe0686eeaf03db141558005a3a3fd",
+      "name": "01. 13 Guns (Original Mix).mp3",
+      "durationSeconds": 418.06367346938777,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 130.0009,
+        "detectorKey": "1A",
+        "predictedDownbeatSeconds": 0.297812519385303,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 57.09506248680006,
+        "djStudioKey": "12A",
+        "storedMixedInKey": "1A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "37da97c802479d8760e6429e82818fc85c5aea2e18e8fcaeeade0af63a481ee3",
+      "name": "02. 90s Hammer (DJ Boss Remix).mp3",
+      "durationSeconds": 294.08653061224487,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 133.0104,
+        "detectorKey": "10A",
+        "predictedDownbeatSeconds": 0.118545349060355,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 78.67007083036187,
+        "djStudioKey": "11B",
+        "storedMixedInKey": "7A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "8b20b999f4164a7f02c0b2cf7720a1222486f7b6ae5ff528b5431e87277ca154",
+      "name": "06. Night Of The Jaguar (Extended Mix).mp3",
+      "durationSeconds": 400.6922448979592,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.9983,
+        "detectorKey": "10B",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "7A",
+        "storedMixedInKey": "7A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "690485b7fc14bd5963c23c703b00190a95a399ac9c83cd32f75256f46438a834",
+      "name": "01. Airsand - Better Off Alone (Radio Edit).mp3",
+      "durationSeconds": 283.11510204081634,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.9991,
+        "detectorKey": "1A",
+        "predictedDownbeatSeconds": 0.537327646652547,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 513.7086480902728,
+        "djStudioKey": "1B",
+        "storedMixedInKey": "1A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "93c99741887f3a4860b5958a9c0f75061f3b9957469a577afc6d17d936007a88",
+      "name": "09. Ian Asher - Touch Me.mp3",
+      "durationSeconds": 169.40408163265306,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 127.0007,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 1.246898119720743,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 925.3154673489097,
+        "djStudioKey": "9A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "fcfca4fb53dd088f006b0f21bd21db855c75e12aed041bc82198cd5b87c086b3",
+      "name": "09. Bambalam - Mike Newman, Cheesecake Boys (Crazibiza Remix) 126.mp3",
+      "durationSeconds": 295.3142857142857,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 125.9972,
+        "detectorKey": "10A",
+        "predictedDownbeatSeconds": 0.100033741060291,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 33.850808247332274,
+        "djStudioKey": "11A",
+        "storedMixedInKey": "10A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "ba6345705643b9934ffbef47d88433448d39542fd1534a116d31c98ac08b442e",
+      "name": "10. Plastic Head TV (Original Mix).mp3",
+      "durationSeconds": 408.9208163265306,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 122.9982,
+        "detectorKey": "5B",
+        "predictedDownbeatSeconds": 0.182453230268892,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 30.76357824294195,
+        "djStudioKey": "5B",
+        "storedMixedInKey": "2A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "ba72d37ed3e4270fc8206ecd5d2f6538ec7de9786ffe136f22b5a3dcbd5c0ba9",
+      "name": "03. Angel Of Death (Original Mix).mp3",
+      "durationSeconds": 343.4318367346939,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 136.9992,
+        "detectorKey": "7A",
+        "predictedDownbeatSeconds": 0.090771724311428,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 67.67195440045913,
+        "djStudioKey": "8A",
+        "storedMixedInKey": "7A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "178439cc65837c00e2e44e39b377ff985ba7970449e29750a6834f1570edb239",
+      "name": "07. Black Hole (Extended Mix).mp3",
+      "durationSeconds": 351.21632653061226,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable"
+      ],
+      "observations": {
+        "detectorBpm": 122.0015,
+        "detectorKey": "11A",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "11A",
+        "storedMixedInKey": "11A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "d63ac493016d4ef2d603a3b050a7c673561e2b0578cfe7139817c79753211c64",
+      "name": "01. Anyma - Pictures Of You.mp3",
+      "durationSeconds": 175.36,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 128.0057,
+        "detectorKey": "9A",
+        "predictedDownbeatSeconds": 0.994385428880262,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 912.3360108149503,
+        "djStudioKey": "9B",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "715e2853fe99989e39a58d06aa7583473c1ae995f61c6b768a0bf02e590ff009",
+      "name": "11. Dort (Original Mix).mp3",
+      "durationSeconds": 466.25959183673467,
+      "split": "development",
+      "reviewReasons": [
+        "downbeat-unavailable",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 123.0006,
+        "detectorKey": "8B",
+        "predictedDownbeatSeconds": -1.0,
+        "barComparison": "Mixworks downbeat unknown",
+        "barPhaseP95Ms": null,
+        "djStudioKey": "8B",
+        "storedMixedInKey": "8A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "ed2606b9db4354b5fdd8da2d787653d6ec82f6b29854746154ba42cc50243127",
+      "name": "05. Never Enough (Jiggler Remix).mp3",
+      "durationSeconds": 412.00326530612244,
+      "split": "development",
+      "reviewReasons": [
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 122.9905,
+        "detectorKey": "7B",
+        "predictedDownbeatSeconds": 0.052792429574788,
+        "barComparison": "agrees within 50 ms at p95",
+        "barPhaseP95Ms": 42.407736885505315,
+        "djStudioKey": "7B",
+        "storedMixedInKey": "4A",
+        "variableTempo": false
+      }
+    },
+    {
+      "sha256": "55d6c0fec61c0fc26af4efac5e13fe6445f14d71744e9b4f7bf74ae6c53fdb40",
+      "name": "07 Charles J.Riders on the Storm.flac",
+      "durationSeconds": 301.04671201814057,
+      "split": "development",
+      "reviewReasons": [
+        "bar-phase-disagreement",
+        "key-disagreement"
+      ],
+      "observations": {
+        "detectorBpm": 121.997,
+        "detectorKey": "9B",
+        "predictedDownbeatSeconds": 0.555373337388192,
+        "barComparison": "disagrees",
+        "barPhaseP95Ms": 523.8321559724102,
+        "djStudioKey": "10A",
+        "storedMixedInKey": "9A",
+        "variableTempo": false
+      }
+    }
+  ],
+  "evaluatedHoldouts": [
+    {
+      "sha256": "35095f8230c7ef126f427b3d397491ccea20bbdb32a9df14d65edf329efe0e89",
+      "name": "31. Louisville Lip (Abaze Edit).mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "aa3c87a4b5063df34c52795432f3c5081eb18cb1893e8ce3be32cdea5a62746c",
+      "name": "14. Miss Monique - Bloom At Night.mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "387da325a7ba1a5919ad50d051497e5ad1b262693d286956db90e0ab18aa6aa9",
+      "name": "20. Costa - Sg Lewis, Chlo\u00e9 Caillet (Extended Mix) 125.mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "b095426fc160a1d23536620daea4f0b3c27e665442dce31b35576db0107409a0",
+      "name": "41. Alok - Allein Allein.mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "5c26a1244aa8fb39fffb4c2f8926fb17c98880e045f7ac8d3910fe113e4cd6b2",
+      "name": "41. Rural Woman (Original Mix).mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "ee805154df64add7d9ce59bd627073d233739f0af4b2ae970eb672b45dbc002e",
+      "name": "137. What A Bam - Sean Finn, No Hopes (Block & Crown Dope Demand Extended Remix) 125.mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "45f6e5916cba72d401f9091bc71f2756706ea37f52b27f9a58be84c43722ccdc",
+      "name": "25. Kollera (Original Mix).mp3",
+      "split": "evaluated-holdout"
+    },
+    {
+      "sha256": "8248e8bd4f5fc8ddc75b9062ff1a28a5bfd541b1a190e1639f0f7d7cf99646b3",
+      "name": "31. Layton Giordani - Paranoid.mp3",
+      "split": "evaluated-holdout"
+    }
+  ],
+  "protectedHoldouts": [
+    {
+      "name": "141. You Make Me Feel - Jackers Revenge (Original Mix) 126.mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "12. Rain Dance (Super Flu's ACJ Remix).mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "34. CamelPhat - Running Man.mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "13. Andrey EXX - Paris Latino (Extended Mix).mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "12. Eli (Matchy Remix).mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "19. Terra Luna (Original Mix).mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "130. Upside - Eugenio Fico (Original Mix) 125.mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    },
+    {
+      "name": "135. Wanna Be - Lissat, Ghostbusterz (Original Mix) 124.mp3",
+      "sha256": null,
+      "identityStatus": "unverified-reserved-path",
+      "split": "protected-unexamined"
+    }
+  ],
+  "annotations": []
+}

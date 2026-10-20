@@ -1,0 +1,22 @@
+.local/
+build/
+out/
+*.user
+*.mixworks
+*.mixworks.bak
+__pycache__/
+.impeccable/
+# User audio, exports, recovered libraries and transport credentials.
+*.wav
+*.mp3
+*.flac
+*.aiff
+*.ogg
+*.pcm
+*.onnx
+*.dll
+*.exe
+*.pdb
+*.obj
+.env
+.env.*

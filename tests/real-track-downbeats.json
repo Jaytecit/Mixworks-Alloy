@@ -1,0 +1,25 @@
+{
+  "scope": "Historical MixMeister MXM profile marker comparison for these exact MP3s, corroborated by decoded waveform and phrase-change inspection. Not a fresh MixMeister run or human musical annotation. Source/profile association is by existing filename; proprietary source identity is not authenticated.",
+  "references": [
+    {
+      "name": "Sean Finn - Ain't Nobody (Funkera Extended Remix)",
+      "sha256": "45d6b1499205b5c89aeaf8ff4c11a9973c7c9827ed8f0497d0a7ef831a0d989b",
+      "basis": "historical MixMeister first profile marker",
+      "profileFrame": 37032,
+      "profileSampleRate": 44100,
+      "firstDownbeatSeconds": 0.8397278911564626,
+      "toleranceSeconds": 0.025,
+      "profileSha256": "22d58a20b01a9a7136ddf1b8aa9aacb8ce2520f513c762c19d58b052b7bbb31e"
+    },
+    {
+      "name": "Airsand - Miracle (Extended Mix)",
+      "sha256": "4c0d367fa281a4196669369f9a1da98429d8f87982901389962ab8b5c04bbfdb",
+      "basis": "historical MixMeister first profile marker",
+      "profileFrame": 2899,
+      "profileSampleRate": 44100,
+      "firstDownbeatSeconds": 0.06573696145124716,
+      "toleranceSeconds": 0.025,
+      "profileSha256": "ae36d7fb36bac82419684b939ae4a707916f420246f37149ef99040876f355e8"
+    }
+  ]
+}

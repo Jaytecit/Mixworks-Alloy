@@ -1,0 +1,89 @@
+Mixworks Alloy Personal Beta Licence
+Version 1.0 - 20 October 2026
+
+Copyright (c) 2026 Jaytecit and other identified copyright holders.
+All rights reserved except as expressly granted below.
+
+1. Scope and ownership
+
+This licence covers the original Mixworks Alloy application code, documentation
+and artwork owned by Jaytecit (the Licensor), unless a file states otherwise.
+It does not transfer ownership or grant any trade mark rights. Third-party
+components, including Source/ThirdParty/, retain their own licences; see
+THIRD-PARTY-NOTICES.md and licenses/. Those licences take precedence for those
+components. This licence does not restrict rights already granted under a
+third-party licence or rights that applicable law does not allow us to restrict.
+
+2. Free personal beta testing
+
+An individual may download, install, run and make reasonable private backup
+copies of lawfully supplied Mixworks Alloy beta versions, free of charge, solely
+for personal, non-commercial testing, evaluation and learning. Private hobby
+mixes for that testing are permitted. You may read the original source and make
+private changes and private builds for the same purpose, subject to each
+dependency's licence. You may report bugs and share your own screenshots,
+demonstrations and test feedback without including source code or third-party
+music you are not entitled to share. No payment, activation service or automatic
+expiry is imposed by this licence on a lawfully supplied beta version.
+
+3. Reserved uses
+
+Without the Licensor's prior written permission, you may not:
+- use the covered software for paid DJ work, client work, business operations,
+  monetised broadcasts/content, revenue-generating services or other commercial
+  purposes (including testing on behalf of a business);
+- sell, rent, sublicense, mirror, redistribute or publicly supply the covered
+  software, modified versions, source code or compiled builds;
+- incorporate covered code or artwork into another distributed product, rebrand
+  it, remove ownership/licence notices, or claim authorship of someone else's
+  work.
+
+Share the official repository/download link instead of copies. Where the source
+is public on GitHub, the viewing and forking rights required by GitHub's Terms of
+Service remain available; they do not grant additional commercial use or general
+redistribution rights. Activities expressly permitted by law or a controlling
+third-party licence remain permitted, including reverse engineering necessary
+to debug modifications to an LGPL-covered library. Independently created work
+that does not copy protected material is outside this licence's scope.
+
+4. Your material and feedback
+
+You retain all rights in your audio, sessions and independently created output.
+The Licensor claims no ownership of them. You are responsible for obtaining any
+music, plugin and other permissions needed for your use. Feedback you knowingly
+submit may be used to improve Mixworks Alloy without payment or a duty to adopt
+it; this does not transfer your unrelated intellectual property. Code
+contributions require a separate written agreement before incorporation.
+
+5. Beta status and warranty
+
+The software is unfinished and may contain defects, lose work or change between
+versions. Keep backups and use copies of important projects when testing.
+Support, future updates and a final release are not promised. To the extent
+permitted by applicable law, the software is supplied "as is", without any
+warranty of merchantability, fitness for a particular purpose or
+non-infringement. To that same extent, the Licensor is not liable for losses
+arising from its use. Nothing excludes liability or consumer rights that cannot
+lawfully be excluded, including liability for fraud or death or personal injury
+caused by negligence where applicable.
+
+6. Breach and future versions
+
+Permission under this licence ends if you materially breach its conditions and
+do not remedy a remediable breach within 30 days after written notice. On
+termination, stop using and delete covered copies, except copies lawfully
+retained under another licence or a mandatory legal right. Keep your own music
+and sessions. A later licence applies to later versions supplied under it; it
+does not retroactively revoke the permission for a compliant copy already
+supplied under this version. Any invalid provision is limited to the minimum
+extent necessary; the remaining provisions continue to apply.
+
+7. Permissions and distribution readiness
+
+Request commercial or redistribution permission from Jaytecit through
+https://github.com/Jaytecit/Mixworks-Alloy. Silence is not permission.
+
+This is a proprietary personal-testing licence, not an open-source licence.
+It does not authorise distribution in breach of dependency terms. The current
+local prototype is not cleared for public binary distribution: see
+docs/LICENSING.md for the JUCE, ASIO and SoundTouch release prerequisites.

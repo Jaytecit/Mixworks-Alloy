@@ -1,0 +1,114 @@
+1. Store a musical map of each track
+
+Your analysis should describe what changes throughout the recording, alongside BPM and key.
+Information to store	What Auto Arrange can use it for
+Beats, downbeats and local timing confidence	Synchronisation and deciding whether rhythmic tricks are safe
+Phrase boundaries and likely phrase lengths	Beginning and ending actions at musically sensible points
+Section boundaries and likely roles	Recognising intros, breakdowns, builds, main sections and outros
+Vocal activity over time	Avoiding competing vocals and placing samples in gaps
+Bass activity and low-frequency energy	Planning bass handovers
+Percussive activity and rhythmic density	Finding usable drum passages and avoiding overcrowding
+Tonal content over time	Assessing the actual overlapping passages
+Loudness, brightness and energy changes	Controlling balance and preserving the intended build and release
+Repeated passages and distinctive events	Finding loop candidates and moments worth protecting
+
+
+Keep measurements separate from interpretations. “Bass energy drops sharply here” is an observation. “This is a breakdown” is an interpretation that could be wrong.
+
+Store confidence and allow an unknown label. Otherwise, a mistaken section label can trigger an entire chain of inappropriate actions.
+
+Also, don’t manufacture phrases by marking every eighth or sixteenth bar from the beginning. Those lengths can guide detection, but the recording must provide evidence for the boundaries.
+
+2. Analyse tracks once; assess combinations when arranging
+
+There is one important adjustment to your idea:
+
+You can cache what a track contains. You cannot decide every good mixing action independently of its neighbours.
+
+A passage might be excellent for blending into one track and terrible for another.
+
+When arranging, Alloy should generate several candidates with different:
+- Incoming and outgoing cue points.
+- Overlap lengths.
+- Transition techniques.
+- EQ, filter and effect automation.
+It should then assess the actual passages being combined, including their timing, vocals, bass, tonal content and energy progression.
+
+For example, matching whole-track keys should not automatically approve a long melodic overlap. Conversely, different track keys needn’t prevent a transition between mostly percussive passages.
+
+Track selection and transition selection should therefore influence each other. A promising next track with no suitable transition may deserve to move elsewhere in the set.
+
+3. Turn your presets into techniques with eligibility rules
+
+Your existing presets are useful building blocks. Give each one conditions under which it is allowed, parameters it can adapt, and a fallback.
+Technique	Example eligibility rules
+Long EQ blend	Reliable timing; compatible overlapping material; manageable vocal and bass overlap
+Bass handover	Suitable phrase boundary; incoming bass established; outgoing bass reduced appropriately
+Echo exit	Suitable outgoing material; controlled feedback; tail clears important incoming content
+Loop-assisted transition	Verified loop continuity; stable rhythm; no chopped vocal phrase
+Filter movement within a track	Suitable phrase ending; limited intensity; preserves the intended return
+Sample insertion	Available space; rhythmic and tonal compatibility; appropriate sample duration
+Double drop	Strong confidence in both structures; compatible material; explicitly enabled style
+
+
+“Do nothing” must be a valid candidate for every optional embellishment. Extra processing should need a reason to beat that baseline.
+
+That is how you stop “intelligent mixing” becoming an effects demonstration.
+
+4. Give the whole set a performance policy
+
+Avoiding clashes locally won’t prevent an exhausting hour of constant tricks.
+
+I would give Alloy a few understandable controls:
+- Activity: restrained → expressive.
+- Transition preference: smooth blends → decisive changes.
+- Track preservation: play substantial sections → allow rearrangement.
+- Energy direction: steady, rising, peaks and rests.
+- Samples: off, occasional, frequent.
+Internally, these should control action budgets, cooldowns and preferences. For example, a restrained starting profile might permit one optional flourish every few minutes, with no requirement to use that allowance. That is a tuning starting point, not a universal DJ rule.
+
+Also distinguish between adding energy and removing musical space. A breakdown may be doing exactly what the track needs. Filling it with drums or samples can spoil the eventual drop.
+
+For continuous playback, plan several tracks ahead, prepare the next transition early, and keep a simple fallback ready if analysis or loading fails.
+
+5. Make complex transitions purposeful
+
+Imagine Alloy finds:
+- Track A has a sparse instrumental phrase approaching its outro.
+- Track B has a compatible 16-bar introduction before its main section.
+- Their timing is reliable and the overlap has no competing vocals.
+It could then:
+1. Start B at the beginning of A’s suitable phrase.
+2. Introduce B’s percussion while controlling its low end.
+3. Transfer bass emphasis at an appropriate downbeat.
+4. Remove A before B’s main section arrives.
+5. Add a brief echo only if A’s remaining material suits it.
+Those actions form one coordinated transition.
+
+Likewise, an intervention halfway through a track should have a specific purpose: a short percussion loop might maintain momentum through a deliberately shortened break; a restrained filter movement might emphasise a phrase ending. Neither should happen simply because the effects have been idle.
+
+Samples need particularly conservative rules. Start with a small, tagged collection of percussion and nonverbal effects. Arbitrary vocal samples and melodic overlays introduce substantially more ways to clash. Stem separation could expand the possibilities later, but I would make it an optional enhancement after the basic planner sounds good.
+
+6. Build the evidence and listening workflow first
+
+My recommended implementation order is:
+1. Show the analysis: section markers, activity curves and confidence, with manual corrections.
+2. Improve transitions: choose cue points and techniques from the actual overlapping passages.
+3. Add restrained effects: filter movements and controlled echo exits.
+4. Add loops and samples: after the earlier stages demonstrate reliable results.
+5. Learn preferences: record which suggestions users keep, edit or reject.
+Every generated action should appear as editable automation. Selecting it should explain its reason, such as:
+“Bass handover here: phrase boundary, incoming bass begins, no vocal overlap.”
+
+For testing, ask Codex to generate loudness-matched listening comparisons between your current preset system and the new planner, using a fixed collection of tracks. Include difficult cases: misleading intros, vocal-heavy tracks, irregular phrases, weak grids and abrupt endings.
+
+Automatic checks can detect clipping, discontinuities, timing errors and excessive effect levels. They cannot establish that a transition is tasteful. Listening comparisons are essential.
+
+There are useful existing analysis components to investigate:
+- All-In-One Music Structure Analyzer predicts beats, downbeats, section boundaries and functional labels. It is a candidate to benchmark against your own music, rather than assume its labels will suit acid techno. Its documented installation also includes compiled dependencies, which makes Windows packaging something to prove early. GitHub
+- Essentia provides rhythm, tonal, spectral and other analysis features. Its library, models and dependencies have separate licensing considerations that Codex should check before adopting them for Alloy. Essentia 2.1-beta6-dev documentation
+One implementation detail deserves attention: analysis and playback must share a consistent decoded-audio timeline. All-In-One’s documentation specifically notes possible timing offsets between MP3 decoders—relevant whenever accurate beat placement matters. GitHub
+
+The first instruction I would give Codex is to implement and validate the musical map before adding more tricks. Have it inspect your existing analysers, cache format, timing model, transition presets and automation system, then extend those foundations. Require versioned analysis caches, preserved manual corrections, confidence-based fallbacks and editable results.
+
+You can use pretrained models for perception and explicit rules for decisions; you don’t need a language model making live audio decisions. Start with a narrow musical range you know well—your acid techno collection would make a sensible test bed—and earn more adventurous behaviour through listening evidence.

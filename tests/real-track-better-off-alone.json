@@ -1,0 +1,22 @@
+{
+  "scope": "Better Off Alone is compared with its existing historical MixMeister MXM first profile marker, associated by filename; original decoder equivalence and source association are not authenticated. Ode To Omar protects its previous automatic anchor against regression, not against independent musical ground truth.",
+  "references": [
+    {
+      "name": "Airsand - Better Off Alone (Radio Edit)",
+      "sha256": "690485b7fc14bd5963c23c703b00190a95a399ac9c83cd32f75256f46438a834",
+      "basis": "historical MixMeister first profile marker (not fresh execution)",
+      "profileFrame": 23266,
+      "profileSampleRate": 44100,
+      "firstDownbeatSeconds": 0.5275736961451247,
+      "toleranceSeconds": 0.025,
+      "profileSha256": "b9424d1d54bce5e95f41358624040eec23fd294c721d39b1fe393c1c20600807"
+    },
+    {
+      "name": "Be Like Butter & Enzo Siffredi - Ode To Omar (Original Mix)",
+      "sha256": "c9834bfc87cf3e55143308b2ecb0d7107d7527871693a321ede371e8c5a93dc1",
+      "basis": "v0.20.0 regression anchor (not independent downbeat annotation)",
+      "firstDownbeatSeconds": 0.053061704211674,
+      "toleranceSeconds": 0.001
+    }
+  ]
+}

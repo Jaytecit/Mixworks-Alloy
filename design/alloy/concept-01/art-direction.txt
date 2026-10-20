@@ -1,0 +1,170 @@
+MIXWORKS ALLOY
+Art direction 01 — Precision, with warmth
+17 October 2026
+
+STATUS
+Proposed identity and interface direction for discussion. The user confirmed
+“Subtle studio hardware — graphite, brushed metal and copper details”. The
+specific logo construction, colors, typography and component rules below are
+design proposals. No application redesign has been implemented in this session.
+The accompanying generated board illustrates the direction; this specification
+owns exact values and interaction behavior where an illustration differs.
+
+CENTRAL IDEA
+A carefully made audio instrument: cool, precise working surfaces with copper
+details that give the software warmth and identity. “Alloy” expresses different
+tracks coming together, and the meeting of technical precision with musical
+judgment. The timeline and the sound remain the focus of the working interface.
+
+REFERENCE TRANSLATION
+1. Rounded silver hexagon: source of the emblem silhouette and signature dial.
+   Keep satin metal, the softened corners and a copper signal detail. Simplify
+   the engraving for small sizes. Remove molten edges from the everyday UI.
+2. Waveform interface: source of the copper/blue signal relationship and tactile
+   detail. Preserve Mixworks’ existing workspace arrangement rather than copying
+   the generated reference’s layout. A precise playhead replaces the fire seam.
+3. Joined waveform ribbon: secondary expressive graphic for splash artwork,
+   backgrounds and promotional imagery. It must not compete with the main mark.
+4. Metal title: retain confident uppercase lettering and a horizontal copper
+   accent. Reduce extrusion, distress and extreme condensation for readability.
+
+IDENTITY SYSTEM
+Primary lockup: rounded hexagon containing a simplified continuous audio-wave
+stroke, followed by MIXWORKS ALLOY on one baseline. MIXWORKS is semibold;
+ALLOY is regular, with slightly more letter spacing. Keep both words legible.
+Use a plain single-color version in the working application header.
+
+Prepare three deliberate versions of the same mark:
+  • Presentation: satin silver face with restrained copper engraving and depth.
+  • Standard: flat silver/white hexagon and clean copper signal stroke.
+  • Micro: optically simplified silhouette/stroke at 16, 24 and 32 pixels;
+    remove engraving, grain and shadows when they do not survive rasterization.
+The identity must work in one color, without lighting or metal effects. Start
+with a 24-pixel minimum for the detailed emblem and review actual-size exports.
+Clear space: at least one quarter of the emblem’s width around the lockup.
+Do not reproduce the reference images’ corner sparkles or generator marks.
+
+MATERIAL HIERARCHY
+Working canvas: smooth matte graphite. Waveforms, tables and text receive no
+texture. Panel surfaces are separated by value and fine structural rules.
+Controls: restrained bevels, shallow inset tracks and small edge highlights.
+Brushed metal belongs mainly on rotary caps and the larger brand emblem.
+Brand artwork may use richer material depth and a controlled warm rim light.
+Avoid scratches, grime, animated reflections and large orange surface fills.
+
+PROPOSED PALETTE — sRGB
+Canvas          #15191D   Main workspace and waveform background
+Panel           #20262B   Library, playlist and inspector surfaces
+Raised          #2A3239   Button faces and controls
+Divider         #3B454E   Quiet structural separation; not focus indication
+Primary text    #E7EBEE   Names, values and active labels
+Secondary text  #ABB5BE   Metadata and secondary labels
+Copper          #D49A72   Primary action, selected control and brand accent
+Copper shade    #8F5F45   Decorative shading only, not small text
+Signal blue     #80B2CF   Second track family
+Signal sage     #9EB8A1   Third track family
+Signal mauve    #B5A3C5   Fourth track family
+Focus           #D5E9F5   Keyboard focus outline
+Warning         #E2BE70   Uncertain analysis and warnings, with icon/text
+Error           #EB8280   Clipping/errors, with icon/text
+
+Copper identifies interaction and the first track family. Track identity also
+uses lane number/name; selection uses a visible outline and selected state.
+Do not recolor a whole waveform when the playhead crosses it. Copper and blue
+identify sources, not playback progress or successful synchronization. Keep
+uncertain BPM/downbeat analysis visibly uncertain. Do not rely on hue alone.
+Verify final text pairs to at least 4.5:1, and meaningful controls/focus to 3:1
+against adjacent surfaces. These are acceptance targets, not certified results.
+
+TYPE AND ICONOGRAPHY
+Use Segoe UI Variable for the Windows interface, falling back to Segoe UI.
+Use a semibold upright sans serif for the wordmark; draw the final lockup as
+vectors once its proportions are approved. Avoid metallic gradients in UI text.
+Body/table text: proposed 13–14 logical pixels; secondary labels 11–12; transport
+readouts 20–24. Numeric values use tabular figures where available. Keep units
+visible: dB, Hz/kHz, BPM and seconds. Preserve source names and full tooltips.
+Use one consistent 1.5–2-pixel icon stroke; reserve uppercase for short group
+labels. Avoid making every command or table cell uppercase.
+
+THE ALLOY DIAL
+The hexagon is an excellent grip shape, but its six sides are not the value
+scale. Use a rounded hexagonal cap inside a fixed circular scale. A single
+radial notch near the cap edge is the pointer; the cap and pointer rotate
+together. The surrounding tick marks and label remain stationary. No waveform
+emblem on the cap: it adds an ambiguous orientation cue.
+
+Use a 270-degree sweep, from lower left through top to lower right. The body
+can rotate smoothly; never snap to its six faces. Show a numeric value beneath
+every dial. A copper arc gives secondary feedback; bipolar controls use a
+center reference and an arc from center toward the current value. Pan has a
+clear center detent; EQ has a 0 dB reference. Taper/range belong to the existing
+parameter, not to the decorative geometry. Do not change audio behavior while
+reskinning a control.
+
+Suggested sizes: 40–48 logical pixels for an inspector/EQ cap, at least a
+44-pixel interaction area, and a 64-pixel cap for a spacious master section.
+At 32 pixels and below, prefer the existing slider or a simplified flat dial.
+Use dials for pan, EQ and selected effect parameters. Keep sliders for precise
+long-travel level work and crossfading. BPM retains its exact numeric editor.
+
+Interaction proposal:
+  • Vertical drag changes value, independent of the pointer’s starting angle.
+  • Shift-drag provides fine adjustment.
+  • Double-click or an explicit reset command restores the parameter default.
+  • Clicking the numeric readout opens exact entry with its current unit.
+  • Focused arrow keys adjust; Home resets; retain appropriate parameter steps.
+  • Mouse wheel affects only a focused dial, avoiding edits during scrolling.
+  • Expose name, value, range and changes through the native accessibility API.
+  • MIDI gestures, automation playback and mouse edits share one value source.
+
+States: idle satin cap; hover brighter edge; active copper arc; keyboard focus
+separate pale outline; disabled muted but readable; automation state explicit
+through a small labeled indicator. Do not encode armed/write state through
+copper alone. Distinct recording/error states remain easy to distinguish.
+
+WORKSPACE APPLICATION
+Keep the established task order: library and playlist above, transport and
+automation immediately above the timeline, lane controls beside their waveforms,
+and a slim Clip/Effects/MIDI inspector at right with master output visible.
+Give the timeline the strongest contrast and most visual space. Apply a common
+4-pixel spacing rhythm, with 8/12/16-pixel gaps, restrained 4–6-pixel control
+corners and no unnecessary surrounding boxes. The hexagon is a signature
+control, not a general container shape for every button and panel.
+
+Waveforms use clean filled geometry with a stable baseline. Make bar-one lines
+stronger than beat lines. Keep automation curves readable over the waveform
+through deliberate contrast and point handles. Use a thin near-white playhead
+with a small copper head marker, without glow obscuring transients. Hover and
+selection states must remain distinct. Keep track names/BPM/grid status visible.
+
+MOTION
+Use short 100–160 ms hover/press transitions where useful. The dial follows
+input immediately; do not add inertia, bounce or delayed value animation.
+Optional splash artwork can show two signals joining with a restrained copper
+highlight. No continuous decorative animation in the working interface. Honor
+reduced-motion preferences. Meter and waveform motion represents actual audio.
+
+IMPLEMENTATION AND APPROVAL
+First review the board’s material balance and the emblem/wordmark relationship.
+Then build a small native JUCE sample: dial states, buttons, text fields, one
+library row and a real timeline crop. Centralize semantic colors and drawing
+rules in the owning LookAndFeel; use vector paths for marks and caps. Cache any
+subtle texture rather than rendering a 3D asset per control. The supplied GLB
+could support rendered branding artwork after visual inspection; it is not
+needed for interactive dials. Do not introduce a 3D runtime solely for branding.
+
+Before application rollout: inspect at 100%, 150% and 200% Windows scaling and
+at the current minimum window size; check contrast and keyboard focus; verify
+exact entry, reset, fine movement, MIDI and automation synchronization. Preserve
+the existing workflow and parameter semantics. The generated concept board is
+not evidence of native accessibility, production typography, or working controls.
+
+SOURCE RECORD
+Four user-supplied Generated Image references dated 17 October 2026, at 3:04PM,
+2:58PM, 2:50PM and 3:22PM, stored in C:/Users/jayte/Downloads/.
+GLB: 3d_6ab5cec88f1840bfaf726475_1792246389891.glb. Header/JSON inspection only:
+glTF 2, 18,715,504 bytes, one mesh, one material, no animations. Its appearance
+has not been visually verified and it was not used to render this concept.
+Current native layout reference: .local/verify-v012/beats/beat-grid-transition.png.
+Method: local Impeccable design guidance and built-in image generation; consulted
+skills.sh to confirm the design-skill approach. No dependencies or subagents.
