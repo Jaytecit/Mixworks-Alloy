@@ -1,5 +1,9 @@
 # Mixworks documentation
 
+[Canonical release-audit framework](release-audit/README.md): repository/control coverage,
+concrete rules, execution runbook, initial blockers and a reusable audit prompt.
+Framework discovery does not establish application release acceptance.
+
 [Local stem separation](STEM-SEPARATION.md): Split track, offline runtime setup,
 aligned assets, cache/failure behaviour and measured quality limitations.
 

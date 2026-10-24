@@ -1,0 +1,309 @@
+option,site,subsystem,role,rules,status
+--layer,Source/AlloyLookAndFeel.cpp:63,ui,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--audit-interactive,Source/AlloyTests.cpp:246,ui,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--audit-commands-only,Source/AlloyTests.cpp:265,ui,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--cutoff-route-only,Source/AlloyTests.cpp:330,ui,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--hint-probe,Source/AlloyTests.cpp:1717,ui,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--layer,Source/AttractLights.cpp:107,ui,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--i,Source/AutoArrangement.cpp:89,arrange,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--control,Source/Automation.cpp:48,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--grid-attack-only,Source/BeatGridTests.cpp:11,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--grid-example,Source/BeatGridTests.cpp:132,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--grid-pcm,Source/BeatGridTests.cpp:132,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--catalogue,Source/ImportRecovery.cpp:9,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recover-imports,Source/ImportRecovery.cpp:9,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/ImportRecovery.cpp:9,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--source,Source/ImportScanTests.cpp:27,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--catalogue-reopen,Source/LibraryAssetTests.cpp:133,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--library-assets-only,Source/LibraryAssetTests.cpp:133,library,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--playback-cache-root,Source/LibraryAssetTests.cpp:133,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/LibraryAssetTests.cpp:133,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,Source/LibraryAssetTests.cpp:133,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--catalogue-reopen,Source/LibraryAssetTests.cpp:140,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/LibraryAssetTests.cpp:141,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--catalogue-reopen,Source/LibraryAssetTests.cpp:149,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/LibraryAssetTests.cpp:150,library,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--minutes,Source/LongSessionTests.cpp:14,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--session,Source/LongSessionTests.cpp:77,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--expect-warm,Source/LongSessionTests.cpp:91,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--development-paths,Source/LongSessionTests.cpp:104,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--delay-plugin,Source/LongSessionTests.cpp:105,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,Source/LongSessionTests.cpp:105,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--long-open-only,Source/LongSessionTests.cpp:179,audio,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--minutes,Source/LongSessionTests.cpp:179,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--playback-cache-root,Source/LongSessionTests.cpp:179,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/LongSessionTests.cpp:179,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,Source/LongSessionTests.cpp:179,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--session,Source/LongSessionTests.cpp:179,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--expect-warm,Source/LongSessionTests.cpp:180,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--reference,Source/LongSessionTests.cpp:232,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--session,Source/LongSessionTests.cpp:232,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--migrate-analysis,Source/Main.cpp:13,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/Main.cpp:13,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--prepare-library,Source/Main.cpp:34,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/Main.cpp:47,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analyse,Source/Main.cpp:63,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/Main.cpp:64,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--rhythm-research,Source/Main.cpp:106,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,Source/Main.cpp:107,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analyse,Source/Main.cpp:108,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recover-imports,Source/Main.cpp:109,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--migrate-analysis,Source/Main.cpp:110,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--prepare-library,Source/Main.cpp:111,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--dev-control,Source/Main.cpp:112,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--promo-control,Source/Main.cpp:112,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--dev-control,Source/Main.cpp:114,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--dev-control,Source/Main.cpp:115,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--promo-control,Source/Main.cpp:115,app,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,Source/PerformanceTakeTests.cpp:163,performance,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--cache-reopen-only,Source/PlaybackCacheTests.cpp:136,audio,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--expected-pcm,Source/PlaybackCacheTests.cpp:136,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--playback-cache-root,Source/PlaybackCacheTests.cpp:136,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/PlaybackCacheTests.cpp:136,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,Source/PlaybackCacheTests.cpp:136,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--session,Source/PlaybackCacheTests.cpp:136,audio,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--downbeat-reference,Source/RealTrackTests.cpp:54,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--transition-bands-only,Source/RealTrackTests.cpp:65,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--track-a,Source/RealTrackTests.cpp:68,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--track-b,Source/RealTrackTests.cpp:68,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analysis-only,Source/RealTrackTests.cpp:138,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--replacement-grid-only,Source/RealTrackTests.cpp:166,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--transition-rehearsal-only,Source/RealTrackTests.cpp:241,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--transition-rehearsal-only,Source/RealTrackTests.cpp:275,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--transition-controls-only,Source/RealTrackTests.cpp:297,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--transition-box-only,Source/RealTrackTests.cpp:333,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--anchors-only,Source/RealTrackTests.cpp:375,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--moves-only,Source/RealTrackTests.cpp:375,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--analysis-only,Source/RealTrackTests.cpp:376,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--workflow-only,Source/RealTrackTests.cpp:376,analysis,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,Source/RecoveryTests.cpp:16,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/RecoveryTests.cpp:17,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-folder,Source/RecoveryTests.cpp:22,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-lease-probe,Source/RecoveryTests.cpp:22,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-crash-fixture,Source/RecoveryTests.cpp:25,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-folder,Source/RecoveryTests.cpp:25,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--expect-available,Source/RecoveryTests.cpp:27,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-folder,Source/RecoveryTests.cpp:27,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-lease-probe,Source/RecoveryTests.cpp:27,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--safe-,Source/RecoveryUI.cpp:17,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--safe-,Source/RecoveryUI.cpp:47,data,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--end,Source/RhythmDecoder.cpp:90,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--winner,Source/RhythmDecoder.cpp:192,analysis,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--auftakt-model,Source/RhythmResearch.cpp:13,research,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/RhythmResearch.cpp:13,research,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--rhythm-research,Source/RhythmResearch.cpp:13,research,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--automatic-control,Source/RhythmResearch.cpp:14,research,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--feature-values,Source/RhythmResearch.cpp:14,research,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,Source/SelfTest.cpp:67,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--playback-cache-root,Source/SelfTest.cpp:69,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--performance-take-only,Source/SelfTest.cpp:77,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--targeted-analysis-only,Source/SelfTest.cpp:77,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--performance-take-only,Source/SelfTest.cpp:79,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--import-scan-only,Source/SelfTest.cpp:83,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--grid-attack-only,Source/SelfTest.cpp:89,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--cache-settings-only,Source/SelfTest.cpp:95,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--independent-timeline-only,Source/SelfTest.cpp:101,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--unlink-only,Source/SelfTest.cpp:107,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--edit-selection-only,Source/SelfTest.cpp:113,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--library-preview-only,Source/SelfTest.cpp:119,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--transition-swaps-only,Source/SelfTest.cpp:119,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--zoom-handles-only,Source/SelfTest.cpp:119,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--library-preview-only,Source/SelfTest.cpp:121,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--zoom-handles-only,Source/SelfTest.cpp:122,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--audio-ui-only,Source/SelfTest.cpp:127,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--markers-only,Source/SelfTest.cpp:133,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--stems-only,Source/SelfTest.cpp:139,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--live-hotcues-only,Source/SelfTest.cpp:145,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--promo-control-only,Source/SelfTest.cpp:151,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-crash-fixture,Source/SelfTest.cpp:157,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-lease-probe,Source/SelfTest.cpp:157,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-folder,Source/SelfTest.cpp:159,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--recovery-crash-fixture,Source/SelfTest.cpp:161,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--expect-available,Source/SelfTest.cpp:169,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--musical-energy-only,Source/SelfTest.cpp:172,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--auto-arrange-catalogue,Source/SelfTest.cpp:178,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--auto-arrange-only,Source/SelfTest.cpp:178,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--auto-arrange-catalogue,Source/SelfTest.cpp:180,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--probe-tracks,Source/SelfTest.cpp:180,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--start-id,Source/SelfTest.cpp:180,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--energy-sample,Source/SelfTest.cpp:182,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--native-picker-only,Source/SelfTest.cpp:187,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--long-navigation-only,Source/SelfTest.cpp:192,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--long-open-only,Source/SelfTest.cpp:197,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--long-session-only,Source/SelfTest.cpp:197,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--long-open-only,Source/SelfTest.cpp:199,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--source-streaming-only,Source/SelfTest.cpp:202,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--capacity-fixture,Source/SelfTest.cpp:204,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--latency-only,Source/SelfTest.cpp:209,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--latency-plugin,Source/SelfTest.cpp:211,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--export-only,Source/SelfTest.cpp:216,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--delay-plugin,Source/SelfTest.cpp:218,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--mastering-only,Source/SelfTest.cpp:223,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--rhythm-decoder-only,Source/SelfTest.cpp:228,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--grid-correction-only,Source/SelfTest.cpp:233,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--neural-unavailable-only,Source/SelfTest.cpp:238,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--analysis-refresh-only,Source/SelfTest.cpp:243,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--focused-retry-probe,Source/SelfTest.cpp:248,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--focused-retry-probe,Source/SelfTest.cpp:250,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analysis-cache-only,Source/SelfTest.cpp:255,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--real-tracks-only,Source/SelfTest.cpp:260,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--constant-four-four-only,Source/SelfTest.cpp:265,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--rhythm-reliability-only,Source/SelfTest.cpp:270,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--tempo-only,Source/SelfTest.cpp:275,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--placement-only,Source/SelfTest.cpp:280,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--tempo-browser-only,Source/SelfTest.cpp:285,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--split-effects-only,Source/SelfTest.cpp:290,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--track-ownership-only,Source/SelfTest.cpp:290,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,Source/SelfTest.cpp:292,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--preset-nodes-only,Source/SelfTest.cpp:296,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--timeline-editing-only,Source/SelfTest.cpp:302,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--window-only,Source/SelfTest.cpp:307,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--alloy-only,Source/SelfTest.cpp:312,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--cache-reopen-only,Source/SelfTest.cpp:317,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--expected-pcm,Source/SelfTest.cpp:319,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--session,Source/SelfTest.cpp:319,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--library-assets-only,Source/SelfTest.cpp:331,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--catalogue-reopen,Source/SelfTest.cpp:335,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--catalogue-reopen,Source/SelfTest.cpp:337,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--fixture-encoder,Source/SelfTest.cpp:337,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--fusion-workflows-only,Source/SelfTest.cpp:340,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--playback-cache-only,Source/SelfTest.cpp:340,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--playback-cache-only,Source/SelfTest.cpp:342,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--beat-grid-only,Source/SelfTest.cpp:346,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--waveform-reference,Source/SelfTest.cpp:348,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,Source/SelfTest.cpp:390,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--instrument,Source/SelfTest.cpp:421,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--i,Source/SourceSectionUI.cpp:107,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--job,Source/StemJobs.cpp:95,stems,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--stem-runtime,Source/StemTests.cpp:317,stems,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--stem-source,Source/StemTests.cpp:317,stems,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--i,Source/TempoStrip.cpp:20,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--group,Source/TempoStrip.cpp:103,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--i,Source/TempoStrip.cpp:116,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--first,Source/TimelineAutomation.cpp:999,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--split-effects-only,Source/TrackOwnershipTests.cpp:10,time,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,Source/TransitionRehearsalTests.cpp:130,arrange,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--e,Source/Transitions.cpp:414,time,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--layer,Source/Workstation.cpp:969,ui,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--i,Source/Workstation.cpp:1021,ui,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--dev-control,scripts/alloy_bridge.py:126,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--dev-control,scripts/alloy_bridge.py:155,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/alloy_bridge.py:180,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--args,scripts/alloy_bridge.py:183,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--args-file,scripts/alloy_bridge.py:183,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--args-file,scripts/alloy_bridge.py:184,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--timeout,scripts/alloy_bridge.py:185,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/assess-recovered-tracks.py:16,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--model,scripts/assess-recovered-tracks.py:17,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--paths,scripts/assess-recovered-tracks.py:18,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/assess-recovered-tracks.py:19,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--auftakt-model,scripts/assess-recovered-tracks.py:58,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--rhythm-research,scripts/assess-recovered-tracks.py:58,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--compare-automatic,scripts/assess-recovered-tracks.py:59,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,scripts/assess-recovered-tracks.py:59,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--model,scripts/auftakt-network-reference.py:46,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--job,scripts/benchmark-stems.py:62,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--config,scripts/benchmark-stems.py:79,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/benchmark-stems.py:79,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--source,scripts/benchmark-stems.py:80,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--branch,scripts/build.ps1:10,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--depth,scripts/build.ps1:10,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--branch,scripts/build.ps1:18,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--depth,scripts/build.ps1:18,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--build,scripts/build.ps1:27,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--config,scripts/build.ps1:27,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--parallel,scripts/build.ps1:27,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--target,scripts/build.ps1:27,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--folder,scripts/capacity_fixture.py:59,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--scope,scripts/change_verification.py:114,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/change_verification.py:115,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--baseline-receipt,scripts/change_verification.py:116,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--baseline-source,scripts/change_verification.py:117,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--baseline-archive,scripts/change_verification.py:118,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--visual-proof,scripts/change_verification.py:119,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--note,scripts/change_verification.py:120,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--suite,scripts/change_verification.py:121,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/change_verification.py:122,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/compare-djstudio.py:172,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analyses,scripts/compare-djstudio.py:173,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/create-engine-fixtures.py:81,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/deploy.ps1:10,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--receipt,scripts/deploy.ps1:10,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analysis-dir,scripts/downbeat-references.py:89,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--include-uncorrected,scripts/downbeat-references.py:90,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--reference-dir,scripts/downbeat-references.py:91,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--csv,scripts/downbeat-references.py:92,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--depth,scripts/fetch-analysis.ps1:13,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--detach,scripts/fetch-analysis.ps1:15,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--quiet,scripts/fetch-analysis.ps1:19,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--quiet,scripts/fetch-analysis.ps1:25,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--init,scripts/fetch-analysis.ps1:29,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--quiet,scripts/fetch-analysis.ps1:34,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--paths,scripts/inspect-musical-evidence.py:13,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/inspect-musical-evidence.py:14,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--real-tracks-only,scripts/measure-rhythm.py:12,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,scripts/measure-rhythm.py:12,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--evidence,scripts/recover-auftakt-filterbank.py:62,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/recover-auftakt-filterbank.py:63,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--model-output,scripts/recover-auftakt-filterbank.py:64,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/run-real-benchmark.py:59,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--paths,scripts/run-real-benchmark.py:60,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/run-real-benchmark.py:61,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--workflow,scripts/run-real-benchmark.py:62,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--analysis-only,scripts/run-real-benchmark.py:84,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--real-tracks-only,scripts/run-real-benchmark.py:84,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--workflow-only,scripts/run-real-benchmark.py:84,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--track-a,scripts/run-real-benchmark.py:85,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--track-b,scripts/run-real-benchmark.py:85,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--manifest,scripts/score-engine-probes.py:48,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--probes,scripts/score-engine-probes.py:49,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/score-engine-probes.py:50,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--tolerance-ms,scripts/score-engine-probes.py:51,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--configure-only,scripts/setup-stems.py:4,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--root,scripts/setup-stems.py:29,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--config,scripts/setup-stems.py:30,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--configure-only,scripts/setup-stems.py:31,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--index-url,scripts/setup-stems.py:38,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--no-deps,scripts/setup-stems.py:39,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--job,scripts/stem_worker.py:226,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--chroma,scripts/tonal-dictionary-research.py:80,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/tonal-dictionary-research.py:81,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--report,scripts/verification.py:106,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--self-test,scripts/verification.py:106,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--neural-unavailable-only,scripts/verification.py:149,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--receipt,scripts/verification.py:199,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/verification.py:200,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/verify-analysis.py:14,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/verify-analysis.py:15,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--receipt,scripts/verify-analysis.py:16,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--include-stress,scripts/verify-analysis.py:17,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--include-stress,scripts/verify-analysis.py:20,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--receipt,scripts/verify-analysis.py:20,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--delay-plugin,scripts/verify-analysis.py:41,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--latency-plugin,scripts/verify-analysis.py:41,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,scripts/verify-analysis.py:41,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--neural-unavailable-only,scripts/verify-analysis.py:50,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--capacity-fixture,scripts/verify-analysis.py:52,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--source-streaming-only,scripts/verify-analysis.py:52,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--instrument,scripts/verify-analysis.py:54,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--probe,scripts/verify-auftakt-demo.py:20,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--reference,scripts/verify-auftakt-demo.py:21,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/verify-auftakt-demo.py:22,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--tolerance-ms,scripts/verify-auftakt-demo.py:23,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--probe,scripts/verify-auftakt-probe.py:43,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--evidence,scripts/verify-auftakt-probe.py:44,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--model,scripts/verify-auftakt-probe.py:45,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/verify-auftakt-probe.py:46,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/verify-bridge.py:146,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/verify-bridge.py:147,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--promo-control-only,scripts/verify-bridge.py:153,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--dev-control,scripts/verify-bridge.py:154,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--exe,scripts/verify-long-session.py:10,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--development-paths,scripts/verify-long-session.py:11,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--output,scripts/verify-long-session.py:12,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--minutes,scripts/verify-long-session.py:13,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--development-paths,scripts/verify-long-session.py:35,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--long-session-only,scripts/verify-long-session.py:35,tooling,self-test selector,MW-R02 MW-R06 MW-R09,NOT RUN
+--minutes,scripts/verify-long-session.py:35,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--delay-plugin,scripts/verify-long-session.py:36,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
+--plugin,scripts/verify-long-session.py:36,tooling,entry/tool/test/research; inspect producer before use,MW-R02 MW-R06 MW-R09,NOT RUN
