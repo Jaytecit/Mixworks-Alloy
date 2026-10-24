@@ -35,7 +35,7 @@ void Engine::restoreManualPluginValues()
     const juce::ScopedLock guard(lock);
     for (int track = 0; track < trackCount; ++track) for (const auto& lane : project.tracks[(size_t) track].pluginAutomation)
         if (!lane.curve.active()) if (auto* parameter = parameterFor({track, AutomationTarget::plugin, lane.slotId, lane.parameterId})) parameter->setValueNotifyingHost(lane.manualValue);
-    for (const auto& c : project.clips) for (const auto& lane : c.controls.pluginAutomation)
+    for (const auto& c : project.clips) if (project.effectOwner(c) == &c) for (const auto& lane : project.effectSettings(c).pluginAutomation)
         if (!lane.curve.active()) if (auto* parameter = parameterFor({c.track, AutomationTarget::plugin, lane.slotId, lane.parameterId, c.id})) parameter->setValueNotifyingHost(lane.manualValue);
 }
 void Engine::removePlugin(int track, int insert)
@@ -43,7 +43,7 @@ void Engine::removePlugin(int track, int insert)
     const juce::ScopedLock guard(lock);
     if (track < 0 || track >= trackCount || insert < 0 || insert >= (int) pluginChain(track).size()) return;
     endTransitionRehearsal(); finishAutomation(); const auto id = pluginChain(track)[(size_t) insert]->id;
-    auto& settings = controlSettings(track);
+    auto& settings = controlEffectSettings(track);
     settings.pluginAutomation.erase(std::remove_if(settings.pluginAutomation.begin(), settings.pluginAutomation.end(), [&](const auto& lane) { return lane.slotId == id; }), settings.pluginAutomation.end());
     for (auto& control : settings.pluginControls) { if (control.insert == insert) control = {}; else if (control.insert > insert) --control.insert; }
     pluginChain(track).erase(pluginChain(track).begin() + insert);
@@ -54,8 +54,20 @@ float Engine::automationValue(const AutomationAddress& address, double time) con
 }
 float Engine::automationValueIn(const Project& source, const AutomationAddress& address, double time) const
 {
+    // A paused take advances its performance/DSP clock while programme control
+    // curves hold the source cursor. Replayed pauses use the same rule.
+    if (time>=0 && ((capturingPerformance() && !playing) || (replayTake && !replayRunning))) time=replayTake ? replaySource : position.load();
     if (&source == &project && time >= 0 && !exporting)
-        for (const auto& write : activeWrites) if (write.address == address) return write.value;
+        for (const auto& write : activeWrites)
+        {
+            if (write.address == address) return write.value;
+            if (write.address.target == address.target
+                && write.address.slotId == address.slotId && write.address.parameterId == address.parameterId)
+            {
+                const auto* a = source.clipFor(write.address.clipId); const auto* b = source.clipFor(address.clipId);
+                if (a && b && a->effects == b->effects) return write.value;
+            }
+        }
     const auto* curve = source.curve(address); const float manual = source.manualValue(address);
     return curve ? curve->valueAt(time < 0 ? time : std::max(0.0, source.automationTime(address, time)), manual) : manual;
 }
@@ -86,12 +98,26 @@ void Engine::finishWrite(ActiveWrite& write, double time, bool returnToCurve)
 void Engine::finishAutomation()
 {
     const juce::ScopedLock guard(lock);
+    if (capturingPerformance()) return;
     for (auto& write : activeWrites) finishWrite(write, position.load(), true);
     activeWrites.clear(); automationTake = false;
 }
 void Engine::setAutomationRecordMode(AutomationRecordMode mode)
 {
-    const juce::ScopedLock guard(lock); finishAutomation(); automationRecordMode = mode;
+    const juce::ScopedLock guard(lock); finishAutomation();
+    // Discrete cue execution is not yet captured in automation takes. Do not
+    // snap live voices back to the arrangement implicitly when Record is pressed.
+    if (!capturingPerformance())
+    {
+        if (mode != AutomationRecordMode::read && hasLiveHotcueVoices()) return;
+        if (mode != AutomationRecordMode::read) cancelLiveHotcues(ScheduledPauseReason::unavailable);
+    }
+    else if (mode==AutomationRecordMode::read)
+    {
+        std::vector<AutomationAddress> owners; for (const auto& write:activeWrites) owners.push_back(write.address);
+        for (const auto& owner:owners) returnToAutomation(owner);
+    }
+    automationRecordMode = mode;
 }
 void Engine::armAutomation(int track, bool armed)
 {
@@ -99,15 +125,27 @@ void Engine::armAutomation(int track, bool armed)
     if (!armed)
         for (auto it = activeWrites.begin(); it != activeWrites.end();)
         {
-            if (it->address.track == track) { finishWrite(*it, position.load(), true); it = activeWrites.erase(it); } else ++it;
+            if (it->address.track == track) { if (!capturingPerformance()) finishWrite(*it, position.load(), true); it = activeWrites.erase(it); } else ++it;
         }
     if (track == -1) masterAutomationArmed = armed;
     else if (track >= 0 && track < trackCount) automationArmed[(size_t) track] = armed;
 }
 void Engine::setPlaying(bool running)
 {
-    const juce::ScopedLock guard(lock); if (running && !playbackReady()) return; if (!running) finishAutomation();
+    const juce::ScopedLock guard(lock);
+    if (running) endTakeAudition();
+    libraryPreviewSource = nullptr; ++libraryPreviewGeneration;
+    serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged);
+    if (!running) cancelLiveHotcues(ScheduledPauseReason::transportChanged);
+    if (running && !playbackReady()) return; if (!running) finishAutomation();
     if (running && pluginLatencyError().isNotEmpty()) { playing = false; latencyBlocked = true; return; }
+    if (running && !playing && workMode==WorkMode::recordPerform && !applyingPerformanceEvent)
+    { const auto result=beginPerformance(); if (result.failed()) { performanceError=result.getErrorMessage(); return; } performanceError.clear(); }
+    if (capturingPerformance())
+    {
+        TakeEvent event; event.kind=TakeEventKind::transport; event.value=running ? 1 : 0; event.sourcePosition=position.load(); appendTakeEvent(std::move(event));
+        project.performanceTakes[(size_t)activeTake].state=running ? TakeState::recording : TakeState::paused;
+    }
     if (running) latencyBlocked = false;
     if (running) gridAudition.stop(); playing = running;
 }
@@ -122,6 +160,8 @@ bool Engine::sourceAudioReady() const
 void Engine::advanceAutomation(double time)
 {
     const juce::ScopedLock guard(lock);
+    if (capturingPerformance()) return;
+    serviceScheduledPause();
     if (!playing || exporting) { if (!activeWrites.empty()) finishAutomation(); return; }
     for (auto it = activeWrites.begin(); it != activeWrites.end();)
     {
@@ -150,14 +190,24 @@ bool Engine::setControlValueAt(const AutomationAddress& input, float value, doub
     value = automationRange(address.target).clipValue(value);
     const bool armed = address.target == AutomationTarget::master ? masterAutomationArmed : automationArmed[(size_t) address.track];
     const auto* owned = project.clipFor(address.clipId);
-    const bool inside = !owned || (time >= owned->start && time < owned->end());
-    const bool record = inside && running && playing && armed && automationRecordMode != AutomationRecordMode::read && time >= 0 && time <= 1.0e9;
+    const auto bounds = project.automationBounds(address);
+    const bool inside = !owned || (time >= bounds.getStart() && time < bounds.getEnd());
+    const bool record = !capturingPerformance() && inside && running && playing && armed && automationRecordMode != AutomationRecordMode::read && time >= 0 && time <= 1.0e9;
+    if (capturingPerformance() && armed)
+    {
+        TakeEvent event; event.lane=address.track; event.control=(int)address.target; event.slot=address.slotId; event.parameter=address.parameterId;
+        event.stem=address.stem; event.value=value; event.sourcePosition=std::max(0.,time);
+        if (owned) event.owner=effectsIdentity(owned->effects); appendTakeEvent(std::move(event));
+        auto found=std::find_if(activeWrites.begin(),activeWrites.end(),[&](const auto& write) { return write.address==address; });
+        if (found==activeWrites.end()) { ActiveWrite write; write.address=address; write.manualBefore=project.manualValue(address); if (const auto* original=project.curve(address)) write.original=*original; activeWrites.push_back(std::move(write)); found=std::prev(activeWrites.end()); }
+        found->value=value; found->lastInput=found->lastTime=performanceFrames.load()/sampleRate.load();
+    }
     if (record && !automationTake)
     {
         // Materialize mapped targets and their real manual values before taking
         // the undo snapshot, including parameters first recorded later in this pass.
         for (int track = 0; track < trackCount; ++track) if (automationArmed[(size_t) track])
-            for (const auto& control : controlSettings(track).pluginControls)
+            for (const auto& control : controlEffectSettings(track).pluginControls)
             {
                 if (control.parameterId.isEmpty() || control.insert < 0 || control.insert >= (int) pluginChain(track).size()) continue;
                 AutomationAddress target {track, AutomationTarget::plugin, pluginChain(track)[(size_t) control.insert]->id, control.parameterId};
@@ -193,7 +243,7 @@ bool Engine::setControlValueAt(const AutomationAddress& input, float value, doub
     }
     if (!record && curve) curve->enabled = false;
     project.setManualValue(address, value);
-    if (parameter) { parameter->beginChangeGesture(); parameter->setValueNotifyingHost(value); parameter->endChangeGesture(); }
+    if (parameter) { const juce::ScopedValueSetter<bool> applying(applyingPerformanceEvent,true); parameter->beginChangeGesture(); parameter->setValueNotifyingHost(value); parameter->endChangeGesture(); }
     return true;
 }
 }

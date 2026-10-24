@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "EffectTail.h"
 #include <charconv>
 #include <cmath>
 
@@ -12,14 +13,14 @@ juce::Result Workstation::applyEffectTail(double seconds)
     if (valid.failed() || engine.project.effectTailSeconds == seconds) return valid;
     engine.setPlaying(false); engine.finishAutomation(); remember(); engine.project.effectTailSeconds = seconds;
     engine.resetPlugins(); timeline.updateSize(); refresh();
-    setStatus(seconds > 0 ? "Effect ending: " + juce::String(seconds, 3) + " seconds. Export can include it or stop at the last clip." : "Effect tails stop at the last clip.");
+    setStatus(seconds > 0 ? "Minimum effect ending: " + juce::String(seconds, 3) + " seconds. Longer reported effect tails are kept." : "Effect endings follow the duration reported by each effect.");
     return juce::Result::ok();
 }
 void Workstation::configureEffectTail(std::function<void()> after)
 {
     if (busy) return;
-    auto* dialog = new juce::AlertWindow("Effect ending", "Let effects ring out after the music stops. Use 0 to stop with the last clip.", juce::MessageBoxIconType::NoIcon, this);
-    dialog->addTextEditor("seconds", juce::String(engine.project.effectTailSeconds, 6), "Seconds");
+    auto* dialog = new juce::AlertWindow("Effect ending", "Reported effect tails finish automatically. Set a longer minimum for effects that do not report their duration. Use 0 for automatic endings.", juce::MessageBoxIconType::NoIcon, this);
+    dialog->addTextEditor("seconds", juce::String(engine.project.effectTailSeconds, 6), "Minimum seconds");
     dialog->addButton("Apply", 1, juce::KeyPress(juce::KeyPress::returnKey)); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, after](int answer)
     {
@@ -38,9 +39,9 @@ void Workstation::configureEffectTail(std::function<void()> after)
 void Workstation::chooseExportEnd(const juce::File& file)
 {
     if (busy) return;
-    const double tail = engine.project.effectTailSeconds;
+    const double tail = effectAudibleEnd(engine) - engine.project.duration();
     auto* dialog = new juce::AlertWindow("Export mix", "Choose where the audio ends.\nEffects can ring for " + juce::String(tail, 3) + " seconds.", juce::MessageBoxIconType::NoIcon, this);
-    dialog->addButton("Last clip", 1); if (tail > 0) dialog->addButton("Include tail", 2);
+    dialog->addButton("Last segment", 1); if (tail > 0) dialog->addButton("Include tail", 2);
     dialog->addButton("Set tail...", 3); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), file](int answer)
     {
@@ -53,12 +54,14 @@ void Workstation::beginWavExport(const juce::File& file, WavExportOptions option
 {
     if (busy || exportTask) return;
     auto task = std::make_shared<ExportTask>(); task->destination = file; task->options = options;
-    const auto valid = engine.planWavExport(file, options, task->plan); if (valid.failed()) { fail(valid.getErrorMessage()); return; }
+    if (engine.capturingPerformance()) { setStatus("Stop to finalise the take before exporting."); return; }
     engine.setPlaying(false); engine.finishAutomation(); setBusy(true);
     if (engine.exporting.exchange(true)) { setBusy(false); fail("An export is already running."); return; }
     engine.silenceNotes();
-    juce::String error; task->renderer = engine.createExportRenderer(error, task->cancelled);
+    juce::String error; task->renderer = selectedExportTake>=0 ? engine.prepareTakeReplay(selectedExportTake,error) : engine.createExportRenderer(error, task->cancelled);
+    selectedExportTake=-1;
     if (!task->renderer) { engine.exporting = false; setBusy(false); fail(error); return; }
+    const auto valid=task->renderer->planWavExport(file,options,task->plan); if (valid.failed()) { engine.exporting=false; setBusy(false); fail(valid.getErrorMessage()); return; }
     exportTask = task; importProgress.setExporting(file, task->plan); resized();
     setStatus("Rendering " + juce::String(task->plan.seconds(), 2) + " seconds to WAV...");
     audioWorkers.addJob([task, safe = juce::Component::SafePointer<Workstation>(this)]() mutable

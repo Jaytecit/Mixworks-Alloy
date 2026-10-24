@@ -8,7 +8,7 @@ namespace mixworks
 namespace
 {
 constexpr int cacheVersion = 1;
-constexpr int64_t maxRecordBytes = 1024 * 1024; // At most 8000 waveform buckets and three detector windows.
+constexpr int64_t maxRecordBytes = 1024 * 1024; // Waveforms, bounded detector facts and supplementary activity windows.
 const char* recordFormat = "mixworks-track-analysis";
 struct RecordDocument { juce::String text; juce::var value; };
 std::optional<RecordDocument> readRecordDocument(const juce::File& file)
@@ -97,6 +97,11 @@ AnalysisRecordRead parseAnalysisRecord(const juce::var& root, const std::optiona
         || !a["variableTempo"].isBool() || !a["beatWindows"].isArray() || a["beatWindows"].size() > maxAnalysisWindows) return refresh();
     const int bucket = std::max(1, source.frames / 4000), expectedPeaks = (source.frames + bucket - 1) / bucket;
     auto& result = record.analysis;
+    if (a.hasProperty("attackTimingRevision"))
+    {
+        if (!a["attackTimingRevision"].isInt() || (int)a["attackTimingRevision"] < 0 || (int)a["attackTimingRevision"] > 1) return refresh();
+        result.attackTimingRevision = (int)a["attackTimingRevision"];
+    }
     if (record.revision >= 7)
     {
         if (!a["rhythmMethod"].isString() || !a["rhythmIssue"].isString() || a["rhythmIssue"].toString().length() > 4096) return refresh();
@@ -112,13 +117,27 @@ AnalysisRecordRead parseAnalysisRecord(const juce::var& root, const std::optiona
             && result.downbeatMethod != "signal-conflict" && result.downbeatMethod != "beat-this-final0") return refresh();
         if (result.downbeatMethod == "signal-conflict" && (double) a["downbeatOrigin"] >= 0) return refresh();
         if (result.rhythmMethod != "dsp" && result.rhythmMethod != "beat-this-final0" && result.rhythmMethod != "unavailable") return refresh();
-        if (result.rhythmIssue.isNotEmpty() || result.rhythmMethod == "unavailable") return refresh();
+        // A focused attempt can retain a useful key alongside an unresolved
+        // tempo. Supplemental retry evidence makes that partial result durable.
+        if ((result.rhythmIssue.isNotEmpty() || result.rhythmMethod == "unavailable") && !a["retryEvidence"].isObject()) return refresh();
     }
     result.bpm = (double) a["bpm"]; result.beatOrigin = (double) a["beatOrigin"]; result.tempoConfidence = (double) a["tempoConfidence"]; result.gridErrorMs = (double) a["gridErrorMs"];
     result.downbeatOrigin = (double) a["downbeatOrigin"]; result.downbeatConfidence = (double) a["downbeatConfidence"];
     result.downbeatExaminedSeconds = a.hasProperty("downbeatExaminedSeconds") ? (double) a["downbeatExaminedSeconds"] : 0;
+    if (a.hasProperty("keyGuess"))
+    { if (!key(a["keyGuess"])) return refresh(); result.keyGuess = (int) a["keyGuess"]; }
+    if (a.hasProperty("downbeatGuess"))
+    { if (!number(a["downbeatGuess"], -1, duration) || ((double) a["downbeatGuess"] < 0 && (double) a["downbeatGuess"] != -1)) return refresh(); result.downbeatGuess = (double) a["downbeatGuess"]; }
     result.key = (int) a["key"]; result.alternativeKey = (int) a["alternativeKey"]; result.keyConfidence = (double) a["keyConfidence"];
     result.tuningCents = (double) a["tuningCents"]; result.examinedSeconds = (double) a["examinedSeconds"]; result.variableTempo = (bool) a["variableTempo"];
+    const auto focused = a["focusedRetry"];
+    if (a["retryEvidence"].isObject() && juce::JSON::toString(a["retryEvidence"]).length() <= 32768) result.retryEvidence = a["retryEvidence"];
+    if (focused.isObject() && focused["revision"].isInt() && (int) focused["revision"] == focusedAnalysisRevision
+        && focused["tempo"].isInt() && number(focused["tempo"], 0, 2) && focused["key"].isInt() && number(focused["key"], 0, 2))
+    {
+        result.focusedRevision = focusedAnalysisRevision;
+        result.focusedTempo = (int) focused["tempo"]; result.focusedKey = (int) focused["key"];
+    }
     double previous = -1;
     for (const auto& w : *a["beatWindows"].getArray())
     {
@@ -146,6 +165,8 @@ AnalysisRecordRead parseAnalysisRecord(const juce::var& root, const std::optiona
     };
     if (!waveform("peaks", record.peaks)) return refresh();
     if ((root.hasProperty("waveformRms") || root.hasProperty("waveformRmsF32")) && !waveform("waveformRms", record.waveformRms)) return refresh();
+    // Supplemental damage/missing/future evidence never invalidates a good grid.
+    record.energy = parseMusicalEnergy(root["musicalEnergy"], duration);
     const bool current = record.revision == analysisRevision;
     return {std::move(record), current, true};
 }
@@ -153,7 +174,10 @@ juce::var analysisRecordToJson(const TrackAnalysisRecord& record, bool compactWa
 {
     auto* root = new juce::DynamicObject(); juce::var document(root);
     root->setProperty("format", recordFormat); root->setProperty("version", cacheVersion); root->setProperty("analysisRevision", record.revision); root->setProperty("source", identityJson(record.source));
+    if (record.energy.complete() && std::abs(record.energy.duration - record.source.frames / record.source.sampleRate) <= 1e-6)
+        root->setProperty("musicalEnergy", musicalEnergyToJson(record.energy));
     const auto& a = record.analysis; auto* analysis = new juce::DynamicObject();
+    if (a.retryEvidence.isObject()) analysis->setProperty("retryEvidence",a.retryEvidence);
     analysis->setProperty("bpm", a.bpm); analysis->setProperty("beatOrigin", a.beatOrigin); analysis->setProperty("tempoConfidence", a.tempoConfidence); analysis->setProperty("gridErrorMs", a.gridErrorMs);
     analysis->setProperty("downbeatOrigin", a.downbeatOrigin); analysis->setProperty("downbeatConfidence", a.downbeatConfidence);
     analysis->setProperty("downbeatExaminedSeconds", a.downbeatExaminedSeconds);
@@ -161,9 +185,17 @@ juce::var analysisRecordToJson(const TrackAnalysisRecord& record, bool compactWa
     analysis->setProperty("examinedSeconds", a.examinedSeconds); analysis->setProperty("variableTempo", a.variableTempo);
     analysis->setProperty("rhythmMethod", a.rhythmMethod); analysis->setProperty("rhythmIssue", a.rhythmIssue);
     analysis->setProperty("neuralPhaseCorrectionMs", a.neuralPhaseCorrectionMs);
+    if (a.attackTimingRevision > 0) analysis->setProperty("attackTimingRevision", a.attackTimingRevision);
     analysis->setProperty("neuralBpm", a.neuralBpm); analysis->setProperty("signalBpm", a.signalBpm);
     analysis->setProperty("signalTempoConfidence", a.signalTempoConfidence); analysis->setProperty("signalGridNeedsReview", a.signalGridNeedsReview);
     analysis->setProperty("downbeatMethod", a.downbeatMethod);
+    analysis->setProperty("keyGuess", a.keyGuess); analysis->setProperty("downbeatGuess", a.downbeatGuess);
+    if (a.focusedRevision == focusedAnalysisRevision)
+    {
+        auto* focused = new juce::DynamicObject(); focused->setProperty("revision", a.focusedRevision);
+        focused->setProperty("tempo", a.focusedTempo); focused->setProperty("key", a.focusedKey);
+        analysis->setProperty("focusedRetry", juce::var(focused));
+    }
     juce::Array<juce::var> windows;
     for (const auto& w : a.beatWindows) { auto* object = new juce::DynamicObject(); object->setProperty("sourceStart", w.sourceStart); object->setProperty("bpm", w.bpm); object->setProperty("origin", w.origin); object->setProperty("confidence", w.confidence); windows.add(juce::var(object)); }
     auto waveform = [&](const char* name, const std::vector<float>& values)
@@ -206,6 +238,15 @@ juce::String writeAnalysisRecord(const juce::File& audio, const TrackAnalysisRec
             && (int) legacy->value["analysisRevision"] > record.revision) return "A newer detector's legacy analysis was kept; this build will not downgrade it.";
     }
     const auto document = analysisRecordToJson(record, true);
+    if (previous)
+    {
+        const auto future = previous->value["musicalEnergy"];
+        const auto old = parseAnalysisRecord(previous->value);
+        // Preserve an opaque newer supplement when correcting the same source.
+        // A changed source must never inherit another source identity's profile.
+        if (future.isObject() && future["revision"].isInt() && (int) future["revision"] > musicalEnergyRevision
+            && old.record && old.record->source == record.source) document.getDynamicObject()->setProperty("musicalEnergy", future);
+    }
     document.getDynamicObject()->setProperty("sourcePath", audio.getFullPathName());
     const auto text = juce::JSON::toString(document, false, 17);
     if (text.getNumBytesAsUTF8() > maxRecordBytes) return "The analysis record exceeds its storage budget.";

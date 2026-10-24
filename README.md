@@ -1,37 +1,65 @@
+**0.55.47 stems:** right-click a Library or Playlist song and choose **Split track…** for local four-stem separation with progress, Cancel and validated reusable WAVs. [Setup, limits and workflow](docs/STEM-SEPARATION.md); [measured speed/alignment and listening limits](docs/research/STEM-DIRECTION-20261023.md). Existing analysis and reviewed downbeats are preserved. Timeline stem mixing remains later work.
+
+**0.55.46 interface:** compact Editing, short curve labels and plain feedback. See [popup hints and guide](docs/POPUP-HINTS.md).
+
 # Mixworks Alloy
+
+**0.55.43 editing:** [Range tool and multi-selection](docs/RANGE-EDITING.md) add direct audio intervals and scoped Copy/Cut/Delete/Paste. Analysis11/session34 and saved downbeat references are retained. Group drag and partial linked-transition deletion remain later work.
 
 **Work-in-progress beta.** Official project: [Jaytecit/Mixworks-Alloy](https://github.com/Jaytecit/Mixworks-Alloy). Free for personal, non-commercial testing under the [Personal Beta Licence](LICENSE); commercial use, redistribution and rebranding require written permission. Original application rights are reserved; third-party licences remain applicable. **Public binary distribution is pending dependency clearance** described in [licensing](docs/LICENSING.md).
 
-A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Local release: 0.55.2 beta. Analysis revision: 9. Session format: 26.** Four real mixer lanes support audio, inserts, automation, pan, low-pass, mute/solo and MIDI. Formats 1–23 and 25 open normally. Format 24 opens when lanes 5–8 are unused; mixes with work there remain intact and can be reorganised using retained 0.54.1.
+A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Local release: 0.55.46 beta, staged for the next normal launch. Analysis revision: 11. Session format: 34.** Four real mixer lanes support audio, inserts, automation, pan, DJ cutoff, mute/solo and MIDI. Older builds cannot open newly saved format34 sessions.
 
-Run **Mixworks.cmd**. The launcher selects `out/releases/0.55.2-9166219e0087/Mixworks.exe`. Keep the adjacent runtime, model, notices and licences with the application. Previous releases remain available for rollback; newer sessions may require the newer app.
+Run **Mixworks.cmd**. The launcher selects `out/releases/0.55.46-e764e0d1c94f/Mixworks.exe`. Keep the adjacent runtime, model, notices and licences with the application. Previous releases remain available for rollback; newer sessions may require the newer app.
+
+The node/preset audit removes invented empty-curve endpoints and duplicate neutral guards; Add creates one requested node. Selected swaps expose vertical amount controls on both songs, and RMB pairing retains sharp cuts. The Library panel collapses like the inspector; RMB menus open at the cursor; new-track NONE is explicit; BPM/key sorting can use the highlighted library source as a similarity reference. See [preset nodes](docs/PRESET-NODES.md), [editing](docs/TIMELINE-EDITING.md) and the [DJ.Studio editing/stem investigation](docs/research/DJSTUDIO-EDITING-STEMS-20261022.md). Stem separation remains future Alloy work.
+
+Playing hotcues now queue source jumps for one segment while the programme clock continues. The Library shows track totals and persistent recursive Music scan progress/results. See [hotcues](docs/HOTCUES.md) and [library scanning](docs/LOADING-AND-ANALYSIS.md). Private Performance routing and discrete event recording remain unfinished.
+
+Editing now brings automation owner, parameter, node actions and Read/recording state together. Filter and FX share explicit insertion routes; browsing leaves the mix unchanged and right-click offers node actions. See [automation in Editing](docs/TIMELINE-EDITING.md#automation-in-editing-05524).
+
+Automatic Sections now aligns paired measured changes and puts Bass swap at their common boundary, using a complete-bar frame. A genuine match can extend beyond the preferred overlap limit. See [automatic section transitions](docs/TIMELINE-EDITING.md#automatic-shared-section-transitions-05522). These energy hints remain suggestions for listening review.
+
+Attack timing now follows the beginning of distinct kick envelopes. Snapped movement retains an existing manual alignment correction; hold Alt to change that alignment freely. See [movement and manual alignment](docs/TIMELINE-EDITING.md#preserve-manual-alignment-when-moving-05521).
+
+Beatmatch now has clear source-only save and save/rebuild actions, durable save-error handling, +/-0.01 BPM fine tuning, Library/Playlist right-click access, beat/half/quarter snapping and twice the maximum timeline zoom. See [Beatmatch corrections](docs/TIMELINE-EDITING.md#beatmatch-corrections-and-fine-snapping-05514). Rebuilding can replace manual transition placement; source-only saving retains the prepared timeline clock.
+
+The header handle now moves the selected box and following tracks with its incoming transition fixed; Shift-drag retains audio-only slip. Live cutoff knobs consistently control their lane even when an older clip is selected.
+
+Clip controls now live in the lower detachable **Editing** console. VST3 inserts stay on the right with **Keyboard** and **Audio / MIDI...** access; see [Editing](docs/TIMELINE-EDITING.md#editing-console-05511).
 
 ## Making a mix
 
-1. Import audio or enable background Music-folder scanning. The remembered library supports search, sorting, artwork and note/Camelot keys. Notes use compact labels: `Gb` means Gb major, `Gbm` means Gb minor; hover over a key for the full name. `?` retains the existing uncertainty marker. Search accepts compact or full key names; switching key display updates the key sort immediately, with unknowns last. Existing valid analysis and prepared audio are reused. See [loading and analysis](docs/LOADING-AND-ANALYSIS.md).
+1. Import audio or enable background Music-folder scanning. The remembered library supports search, sorting, artwork and note/Camelot keys. Notes use compact labels: `Gb` means Gb major, `Gbm` means Gb minor; hover over a key for the full name. The adjacent **CONFIDENCE** column shows **1 No key**, **2 Low**, **3 Good**, **4 Excellent**, or **Manual**; these describe detector evidence rather than accuracy probabilities. Key labels have no question-mark suffix. Search accepts compact or full key names; switching key display updates the key sort immediately, with unknowns last. Existing valid analysis and prepared audio are reused. See [loading and analysis](docs/LOADING-AND-ANALYSIS.md).
 2. Check the BPM, beat pulse and bar phase before relying on automatic alignment. Use source-grid audition and manual correction when needed. Constant-tempo 4/4 music is the current supported detection priority; a kick alone does not identify beat one. See [detection findings and limits](docs/RHYTHM-TIMING-REVIEW.md).
 3. Add tracks to the timeline. The default Crossfade uses **Sections 8–64 bars**, preferring aligned energy-section changes on both tracks, then one; missing hints fall back to an eight-bar grid overlap. Edit the mix tempo map, position tracks, slip audio within a fixed clip, and use linked IN/OUT alignment and transition frames. The ruler and overview remain fixed while navigating. See [timeline editing](docs/TIMELINE-EDITING.md), [layout and resizing](docs/TIMELINE-LAYOUT-049.md) and [bar navigation](docs/BAR-NAVIGATION.md).
 4. Select a transition to adjust length, Volume/Bass/Mid/High treatments, swap gaps and filter sweeps. Lock a pair to protect it, compare A/B/C rehearsals, and save named presets. **Pair bass swap** in the timeline right-click menu gives the clicked receiver the opposite manual bass ramp from its partner. See [transition presets](docs/TRANSITION-PRESETS.md), [paired handles](docs/SWAP-HANDLES.md), [filters](docs/TRANSITION-FILTERS.md) and [keyboard controls](docs/TRANSITION-KEYBOARD.md).
 5. Use the Controller desk or lane headers to mix. Record captures control automation; Mix / Automation and the timeline right-click menu contain curve commands. Advanced modes and arming are in Recording options. See [live desk and FLkey guide](docs/LIVE-DESK.md).
 6. Save a `.mixworks` session and export WAV. Master processing, spectrum analysis, labels/tracklists, recovery snapshots, monitor mute and bounded effect-tail export are available. See [mastering](docs/MASTERING.md), [export](docs/EXPORTING.md) and [recovery](docs/RECOVERY-AND-MONITORING.md).
 
+Popup help is enabled by default. Use **View > Popup hints** to save it on or off; see [popup hints](docs/POPUP-HINTS.md).
+
+Audio / MIDI now shows callback-work and silent-skip counters plus driver xruns when supported; see [playback diagnostics](docs/RECOVERY-AND-MONITORING.md#playback-diagnostics-05510). The earlier breakup remains unconfirmed.
+
 ## Workspace and audio
+
+The slider beside Snap dims the timeline grid and remembers its brightness independently of the mix. Double-click restores the subtle default. Wheel over the timeline to zoom; View / Fit whole mix and overview navigation remain available.
 
 All four mixer lanes stay visible with their complete lane controls. The stretch grip beneath the tempo footer is always available, including while Controller or Transitions is docked. Docking limits expansion to preserve panel space. Drag individual lane boundaries to share the existing area; lanes cannot collapse away their controls or cause vertical scrolling. Home/double-click resets the timeline height. Layout preferences remain separate from musical sessions and Undo.
 
 The toolbar BPM follows the actual arrangement tempo at the playhead during playback, including ramps. Later tracks added during playback receive their own future source-BPM targets after the protected existing-audio/caller-marker horizon; existing voices retain their timing. Stopped marker editing and in-progress text/drag edits remain protected.
 
-Only the selected automation node shows its percentage while editing. Other node dots and curves remain visible. Precise entry keeps its physical units.
+The transition header keeps its step counter and adjacent bar count. Click an automation line to reveal its nodes; selected nodes have larger grab targets, Left/Right navigation, precise Enter editing and undoable Delete. The selected-value caption stays clear of editable dots and handles; cutoff nodes show LP/HP frequency or Off. Precise entry keeps physical units. See [direct curve selection](docs/TIMELINE-EDITING.md#direct-curve-selection-0555).
 
 Snap, mute and solo switches capture one Undo step through the same engine boundary for mapped MIDI and desk controls. Toolbar/menu Snap shares that path. Held/repeated button messages do not add extra steps; mapped Undo/Redo works with Snap without changing controller assignments.
 
-**The MIDI status indicator** in the bottom bar distinguishes detected, connected and recently receiving inputs. Click it for Audio / MIDI, where **Reload saved mappings** validates and restores the saved assignments without rewriting the profile or changing the mix. The settings list shows the actual active profile path/count. See [controller status](docs/LIVE-DESK.md).
+**The controller/settings button** in the toolbar distinguishes detected, connected and recently receiving inputs, with full input names in its tooltip. When no input is detected it reads Audio / MIDI. Click it for settings, where **Reload saved mappings** validates and restores the saved assignments without rewriting the profile or changing the mix. The live desk header shows the active mapping title (or Unnamed mapping / Default); the settings list retains the active profile path/count. Settings guided setup and Map live desk share the current layout and Learn state; Cancel in either window ends pending learning everywhere. See [controller status](docs/LIVE-DESK.md).
 
 **Audio / MIDI** exposes Windows audio types and **ASIO**. Choose an installed driver and its channels/buffer there. ASIO4ALL v2 and FL Studio ASIO were enumerated during 0.53 verification; physical ASIO playback and latency have not been verified. No driver is installed by Mixworks.
 
 Resizing the overall timeline divides the height evenly across all four lanes, within one pixel. Individual lane-edge adjustments apply until the next overall resize; width-only changes retain them.
 
-The desk's paired EQ/LPF lane selectors address all four lanes, excluding their partner. Its level/pan faders, reset pads and lower mute/solo pads keep their existing lane 1–4 assignments. The verified FLkey profile remains compatible without remapping. Live VST instruments accept MIDI notes; automation Record is distinct from audio/MIDI-note recording.
+The desk's paired EQ/cutoff lane selectors address all four lanes, excluding their partner. Its level/pan faders, reset pads and lower mute/solo pads keep their existing lane 1–4 assignments. Cutoff is centre Off, left low-pass and right high-pass; double-click/Home resets it. Old low-pass MIDI action IDs load as aliases; the user explicitly cleared its assignments for diagnosis. Clear mappings in Audio/MIDI backs up and empties the active/saved profile; no remapping is installed automatically. Live VST instruments accept MIDI notes; automation Record is distinct from audio/MIDI-note recording.
 
 **View / Molten sparks / forge playhead** enables optional meter sparks and the molten overlap seam. **View / Forge motion** defaults to Follow Windows; choose Animated explicitly to see the effect when Windows animations are disabled. The responsive stereo PEAK panel has independent L/R peak hold, clipping reset and master gain. All enabled dials, sliders and meter fills heat toward maximum. See [metering and motion controls](docs/MASTERING.md).
 

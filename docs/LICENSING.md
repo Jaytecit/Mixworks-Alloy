@@ -30,6 +30,27 @@ Licensor's independent original material; it does not relicense incorporated
 third-party material. No dependencies or third-party agreements were purchased,
 accepted or changed as part of setting up this licence.
 
+## Optional local stem runtime (23 October2026)
+
+The explicit local installer pins maintainer Demucs4.1.0 commit
+`2883f3db65617d6d178c6ed10d869dc14e44e59b`; its [MIT notice](../licenses/Demucs-MIT.txt)
+is retained separately from Alloy's licence. The HTDemucs955717e8 safetensors
+weights are fetched from the maintainer's Hugging Face repository at revision
+`cbc8a9b1a87023b7fd74e7b3412e6321c0eab003`, with the full Git-LFS SHA-256 checked
+before registration. The model card identifies the upstream model but does not
+state a separate weight licence. The upstream README states Demucs is MIT;
+record explicit weight redistribution provenance before packaging it publicly.
+
+Torch2.6.0+cu124, Python, NumPy, SoundFile/libsndfile, Julius, safetensors, sphn,
+CUDA components and transitive dependencies retain their own terms. The actual
+local runtime records `requirements-qualified.txt` and its configuration records
+the inference package versions/model/worker hashes. No runtime, CUDA installer,
+model or executable is included in a public package by this change. A future
+package must audit its complete resolved dependency/notice set and satisfy any
+relinking or redistributable requirements; an MIT wrapper alone is insufficient.
+Local installation/measurement does not resolve the existing JUCE/ASIO/SoundTouch
+release prerequisites or establish rights to distribute separated user music.
+
 Keep the public package's licence visible before download/install and include
 LICENSE, this distribution status, THIRD-PARTY-NOTICES.md and the relevant licence
 texts beside the executable when a compliant package is prepared. Have the final

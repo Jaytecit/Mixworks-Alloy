@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "PresetNodes.h"
 #include <cmath>
 #include <limits>
 
@@ -85,7 +86,7 @@ void runTransitionSwapTests(const std::function<void(bool, const juce::String&)>
         Workstation pairUi(false); pairUi.stopTimer(); pairUi.engine.project = manual; pairUi.selectedClip = id; pairUi.engine.selectedTrack = 3;
         pairUi.engine.position = 43; pairUi.engine.playing = true; pairUi.refresh(); const auto history = pairUi.undoHistory.size();
         const auto menu = pairUi.timelineMenu(43.9, 1);
-        bool found = false; for (juce::PopupMenu::MenuItemIterator it(menu); it.next();)
+        bool found = false; for (juce::PopupMenu::MenuItemIterator it(menu,true); it.next();)
             if (it.getItem().itemID == (int) TimelineAction::pairBassSwap) found = it.getItem().isEnabled;
         check(found, "RMB menu exposes Pair bass swap on the clicked linked track");
         pairUi.performTimelineAction(TimelineAction::pairBassSwap, 43.9, 1);
@@ -199,5 +200,57 @@ void runTransitionSwapTests(const std::function<void(bool, const juce::String&)>
     if (!narrow.empty()) ui.viewport.setViewPosition(std::max(0, (int) narrow.front().bounds.getCentreX() - ui.viewport.getViewWidth() / 2), 0);
     check(narrow.size() == 2 && ui.timeline.swapHandleAt(narrow.front().bounds.getCentre()).has_value()
         && ui.viewport.getViewArea().contains(narrow.front().bounds.getCentre().toInt()), "paired handles remain visible and hit-testable at narrow size and low zoom");
+    for (int band = 0; band < 4; ++band)
+    {
+        auto nodes = base;
+        const auto placed = placeTransitionBandNodes(nodes,id,band,{TransitionBandMode::swap,.75,2,.5});
+        const auto times = nodes.transitionSwapTimes(*nodes.transitionFor(id),band);
+        check(placed.wasOk() && times && !nodes.transitionFor(id)->bands[(size_t)band] && !nodes.transitionFor(id)->bassSwap,
+            "ordinary-node swap exposes paired positions without a hidden generator, band " + juce::String(band));
+        if (!times) continue;
+        const auto old = nodes; const auto moved = nodes.setTransitionSwapTime(id,band,true,(*times)[1]+.5);
+        const auto next = nodes.transitionSwapTimes(*nodes.transitionFor(id),band);
+        check(moved.wasOk() && next && std::abs((*next)[0]-(*times)[0]-.5)<1.e-7 && std::abs((*next)[1]-(*times)[1]-.5)<1.e-7,
+            "ordinary swap drag moves both actual curves and keeps their gap, band " + juce::String(band) + ": " + moved.getErrorMessage());
+        check(parseProject(json(nodes)).error.isEmpty() && nodes.clips[0].start == old.clips[0].start && nodes.clips[1].start == old.clips[1].start,
+            "moved ordinary swaps save/reopen and keep source placement");
+        auto lockedNodes = nodes; lockedNodes.setTransitionLocked(id,true); const auto lockedJson = json(lockedNodes);
+        check(lockedNodes.setTransitionSwapTime(id,band,false,41).failed() && json(lockedNodes) == lockedJson,"ordinary-node swap respects transition lock atomically");
+        const auto unchanged = json(nodes);
+        check(nodes.setTransitionSwapTime(id,band,false,60).failed() && json(nodes) == unchanged,"ordinary-node swap refuses outside-frame placement atomically");
+    }
+    auto ordinary = base;
+    check(placeTransitionBandNodes(ordinary,id,1,{TransitionBandMode::swapFade,1,2,.5}).wasOk()
+        && ordinary.transitionSwapTimes(*ordinary.transitionFor(id),1).has_value(),"ordinary bass fade handover also exposes paired handles");
+    auto cross = base; placeTransitionBandNodes(cross,id,1,{TransitionBandMode::crossfade,1,0,.5});
+    check(!cross.transitionSwapTimes(*cross.transitionFor(id),1),"full-frame crossfade is not misidentified as a short swap");
+    ui.setSize(1440,940); ui.engine.playing = false; ui.engine.project = base; ui.selectedClip = id; ui.selectedTransition.clear();
+    ui.timeline.pixelsPerSecond = 30; ui.engine.selectedTrack = 3; ui.transitionCurveShown[1] = false; ui.transitionCurveOnlyBand = 2; ui.refresh();
+    const auto placementUndo = ui.undoHistory.size(); const auto placementBefore = json(ui.engine.project);
+    ui.performTimelineAction(TimelineAction::placeBassSwap,41,1);
+    const auto placedTimes = ui.engine.project.transitionSwapTimes(*ui.engine.project.transitionFor(id),1);
+    check(placedTimes && std::abs((*placedTimes)[0]-41)<1.e-7 && std::abs((*placedTimes)[1]-41)<1.e-7
+        && ui.selectedTransition == id && ui.engine.selectedTrack == 1 && ui.selectedAutomationTarget == 1 && ui.transitionCurveVisible(1)
+        && ui.timeline.swapHandles().size() == 2 && ui.undoHistory.size() == placementUndo+1,
+        "RMB Place Bass swap uses click time, reveals correct lane/curve and paired handles with one Undo");
+    const auto placedJson = json(ui.engine.project); ui.undo(false); const bool placementRestored = json(ui.engine.project) == placementBefore; ui.undo(true);
+    check(placementRestored && json(ui.engine.project) == placedJson,"node swap placement Undo/Redo round-trips the complete shape");
+    ui.selectedTransition = id; ui.transitionNodeOptionsFor.clear(); ui.refresh();
+    check(ui.transitionBandModes[1].getSelectedId() == (int)TransitionBandMode::swap+1,"reselecting a node swap shows Swap instead of misleading None");
+    ui.selectedTransition.clear();
+    check(ui.timeline.swapHandles().size() == 2,"selecting a participating segment also exposes its ordinary-node swap handles");
+    ui.selectedTransition = id;
+    ui.viewport.setViewPosition(1000,0); const auto nodeHandles = ui.timeline.swapHandles();
+    if (!nodeHandles.empty())
+    {
+        const auto point = nodeHandles.front().bounds.getCentre(); const auto destination = point.translated(15,0); const auto count = ui.undoHistory.size();
+        ui.timeline.mouseDown(event(point,point,false)); ui.timeline.mouseDrag(event(destination,point,true)); ui.timeline.mouseUp(event(destination,point,true));
+        const auto after = ui.engine.project.transitionSwapTimes(*ui.engine.project.transitionFor(id),1);
+        check(after && std::abs((*after)[0]-41.5)<1.e-7 && std::abs((*after)[1]-41.5)<1.e-7 && ui.undoHistory.size() == count+1
+            && !ui.engine.project.transitionFor(id)->bassSwap,"native regular-node handle moves the real paired step without recreating legacy ownership");
+    }
+    else check(false,"regular-node swap drag handles exist");
+    auto nodeCapture = report.getSiblingFile("ordinary-node-swap-handles.png").createOutputStream();
+    check(nodeCapture && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*nodeCapture),"capture ordinary-node paired swap handles and active Bass curve");
 }
 }

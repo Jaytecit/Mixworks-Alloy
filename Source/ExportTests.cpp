@@ -212,7 +212,7 @@ void runExportTests(const std::function<void(bool, const juce::String&)>& check,
     const auto nativeBefore = juce::JSON::toString(ui->engine.captureProject()); const auto nativeUndo = ui->undoHistory.size();
     ui->chooseExportEnd(nativeDestination);
     auto* prompt = dynamic_cast<juce::AlertWindow*>(juce::ModalComponentManager::getInstance()->getModalComponent(0));
-    check(prompt && prompt->getButton("Last clip") && prompt->getButton("Include tail") && prompt->getButton("Set tail..."), "native export makes cutoff versus configured tail an explicit choice");
+    check(prompt && prompt->getButton("Last segment") && prompt->getButton("Include tail") && prompt->getButton("Set tail..."), "native export makes cutoff versus configured tail an explicit choice");
     if (prompt) prompt->triggerButtonClick("Cancel");
     struct Poll final : juce::Timer { std::function<void()> tick; void timerCallback() override { tick(); } } poll;
     const double began = juce::Time::getMillisecondCounterHiRes(); int phase = 0; bool sawProgress = false, lateAdmissionDrained = false;

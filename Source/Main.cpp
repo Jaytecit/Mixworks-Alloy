@@ -2,7 +2,10 @@
 #include "AppWindow.h"
 #include "RhythmDecoder.h"
 
+#include "PromoControl.h"
+#include <juce_cryptography/juce_cryptography.h>
 namespace mixworks { int runSelfTests(const juce::String& commandLine); }
+namespace mixworks { int runImportRecovery(const juce::StringArray&); }
 namespace
 {
 int migrateAnalysis(const juce::StringArray& args)
@@ -103,8 +106,25 @@ public:
         if (args.contains("--rhythm-research")) { setApplicationReturnValue(mixworks::runRhythmResearch(args)); quit(); return; }
         if (args.contains("--self-test")) { setApplicationReturnValue(mixworks::runSelfTests(commandLine)); quit(); return; }
         if (args.contains("--analyse")) { setApplicationReturnValue(analyseFiles(args)); quit(); return; }
+        if (args.contains("--recover-imports")) { setApplicationReturnValue(mixworks::runImportRecovery(args)); quit(); return; }
         if (args.contains("--migrate-analysis")) { setApplicationReturnValue(migrateAnalysis(args)); quit(); return; }
         if (args.contains("--prepare-library")) { setApplicationReturnValue(prepareSavedLibrary(args)); quit(); return; }
+        if (args.contains("--promo-control") || args.contains("--dev-control"))
+        {
+            const bool development = args.contains("--dev-control");
+            const int at = args.indexOf(development ? "--dev-control" : "--promo-control");
+            if (args.size() != 2 || at != 0 || !juce::File::isAbsolutePath(args[1].unquoted())) { setApplicationReturnValue(2); quit(); return; }
+            const juce::File root(args[1].unquoted());
+            promoLease = std::make_unique<juce::InterProcessLock>("AlloyPromo-" + juce::SHA256(root.getFullPathName().toLowerCase().toUTF8()).toHexString());
+            if (!promoLease->enter(0) || mixworks::PromoControl::prepare(root).failed()) { setApplicationReturnValue(2); quit(); return; }
+            auto* workstation = new mixworks::Workstation(false);
+            window = std::make_unique<mixworks::AppWindow>(workstation);
+            window->setName(development ? "Mixworks Alloy - Development" : "Mixworks Alloy - Promo"); window->setVisible(true);
+            promo = std::make_unique<mixworks::PromoControl>(*workstation,root);
+            const auto error=workstation->engine.startDevice(false);
+            if (error.isNotEmpty()) workstation->status="Promo audio device: "+error;
+            return;
+        }
         window = std::make_unique<mixworks::AppWindow>(new mixworks::Workstation());
         window->setVisible(true);
         if (auto* workstation = dynamic_cast<mixworks::Workstation*>(window->getContentComponent()))
@@ -113,7 +133,7 @@ public:
             else { juce::Array<juce::File> files; for (const auto& arg : args) if (juce::File::isAbsolutePath(arg.unquoted())) files.add(juce::File(arg.unquoted())); if (!files.isEmpty()) workstation->importFiles(files); }
         }
     }
-    void shutdown() override { window.reset(); juce::LookAndFeel::setDefaultLookAndFeel(nullptr); }
+    void shutdown() override { promo.reset(); window.reset(); if(promoLease) promoLease->exit(); promoLease.reset(); juce::LookAndFeel::setDefaultLookAndFeel(nullptr); }
     void systemRequestedQuit() override
     {
         if (window) window->closeButtonPressed(); else quit();
@@ -121,5 +141,7 @@ public:
 private:
     mixworks::AlloyLookAndFeel look;
     std::unique_ptr<mixworks::AppWindow> window;
+    std::unique_ptr<mixworks::PromoControl> promo;
+    std::unique_ptr<juce::InterProcessLock> promoLease;
 };
 START_JUCE_APPLICATION(MixworksApplication)

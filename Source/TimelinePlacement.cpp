@@ -11,18 +11,37 @@ bool audioFiles(const juce::StringArray& paths)
     return !paths.isEmpty() && std::all_of(paths.begin(), paths.end(), [](const auto& path)
     { return juce::File::isAbsolutePath(path) && juce::File(path).hasFileExtension("wav;aif;aiff;flac;ogg;mp3"); });
 }
+juce::StringArray draggedSources(const juce::var& description)
+{
+    juce::StringArray ids;
+    if (description.isString()) ids.add(description.toString());
+    else if (const auto* values = description.getArray()) for (const auto& value : *values)
+    {
+        if (!value.isString() || value.toString().isEmpty() || ids.contains(value.toString())) return {};
+        ids.add(value.toString());
+    }
+    return ids;
+}
 }
 juce::var LibraryTable::getDragSourceDescription(const juce::SparseSet<int>& rows)
 {
-    if (isPlaylist || owner.busy || rows.size() != 1) return {};
-    const int row = rows[0];
-    if (row < 0 || row >= (int) owner.visibleMedia.size()) return {};
-    return owner.engine.library[(size_t) owner.visibleMedia[(size_t) row]]->id;
+    if (isPlaylist || owner.busy || rows.isEmpty()) return {};
+    juce::Array<juce::var> ids;
+    // SparseSet rows are ascending display indices, not selection-click order
+    // or underlying catalogue order. Freeze identities at drag start.
+    for (int i = 0; i < rows.size(); ++i)
+    {
+        const int row = rows[i]; if (row < 0 || row >= (int)owner.visibleMedia.size()) return {};
+        ids.add(owner.engine.library[(size_t)owner.visibleMedia[(size_t)row]]->id);
+    }
+    return ids.size() == 1 ? ids[0] : juce::var(ids);
 }
 bool Timeline::isInterestedInDragSource(const SourceDetails& details)
 {
-    return !owner.busy && details.sourceComponent.get() == &owner.libraryTable.table && details.description.isString()
-        && std::any_of(owner.engine.library.begin(), owner.engine.library.end(), [&](const auto& media) { return media->id == details.description.toString(); });
+    const auto ids = draggedSources(details.description);
+    return !owner.busy && details.sourceComponent.get() == &owner.libraryTable.table && !ids.isEmpty()
+        && std::all_of(ids.begin(),ids.end(),[&](const auto& id)
+        { return std::any_of(owner.engine.library.begin(),owner.engine.library.end(),[&](const auto& media) { return media->id == id; }); });
 }
 std::optional<TimelinePlacement> Timeline::placementAt(juce::Point<int> position) const
 {
@@ -30,10 +49,7 @@ std::optional<TimelinePlacement> Timeline::placementAt(juce::Point<int> position
     if (owner.busy || !owner.viewport.getViewArea().contains(position) || position.x < 0
         || position.y < 0 || position.y >= laneTop(contentLaneCount()) || !std::isfinite(pixelsPerSecond) || pixelsPerSecond <= 0) return {};
     const auto& p = owner.engine.project;
-    const double beats = owner.transitionOverlapBeats();
-    const auto last = std::max_element(p.clips.begin(), p.clips.end(), [](const auto& a, const auto& b) { return a.end() < b.end(); });
-    const auto grid = p.followTrackTempo ? p.tempo : TempoMap {p.bpm, {}};
-    const double time = last == p.clips.end() ? 0 : grid.timeAtBeat(std::max(grid.beatsAt(last->start), grid.beatsAt(last->end()) - beats));
+    const double time = p.snappedTime(position.x / pixelsPerSecond, p.snap);
     return TimelinePlacement {trackAt((float) position.y), time};
 }
 void Timeline::previewDrop(juce::Point<int> position) { dropPreview = placementAt(position); repaint(); }
@@ -49,8 +65,14 @@ void Timeline::itemDropped(const SourceDetails& details)
     clearDropPreview();
     if (!isInterestedInDragSource(details)) return;
     const auto placement = placementAt(details.localPosition); if (!placement) return;
-    const auto found = std::find_if(owner.engine.library.begin(), owner.engine.library.end(), [&](const auto& media) { return media->id == details.description.toString(); });
-    if (found != owner.engine.library.end()) owner.addMedia((int) std::distance(owner.engine.library.begin(), found), placement);
+    std::vector<Workstation::TimelineSource> sources;
+    for (const auto& id : draggedSources(details.description))
+    {
+        const auto found = std::find_if(owner.engine.library.begin(),owner.engine.library.end(),[&](const auto& media) { return media->id == id; });
+        if (found == owner.engine.library.end()) return;
+        sources.push_back({(*found)->file,*found});
+    }
+    owner.loadTimelineSources(std::move(sources),placement);
 }
 void Timeline::paintDropPreview(juce::Graphics& g)
 {
@@ -130,18 +152,18 @@ void Workstation::insertTimelineMedia(const std::vector<std::shared_ptr<Media>>&
             const auto found = std::find_if(engine.library.begin(), engine.library.end(), [&](const auto& item) { return item->id == media->id; });
             if (found == engine.library.end()) engine.library.push_back(media); else *found = media;
             Clip clip; clip.media = media; clip.length = media->duration() > 0 ? media->duration() : 8; clip.start = time;
-            clip.pendingPlacement = PendingPlacement::append;
-            clip.pendingTransitionPreset = selectedTransitionPreset(); clip.pendingTransitionBeats = transitionOverlapBeats();
-            clip.pendingSectionTransition = transitionIndex == 5;
+            clip.pendingPlacement = placement ? PendingPlacement::drop : PendingPlacement::append;
+            clip.hotcuesPending = true;
             clip.awaitingSourceLength = media->sourceDetailsPending;
             if (pendingOrder) clip.pendingPredecessor = predecessor;
             pendingOrder = pendingOrder || media->sourceDetailsPending; predecessor = clip.id;
             clip.track = placement ? placement->track : (int) engine.project.clips.size() % trackCount;
+            pendingStemDiscovery.insert(clip.id);
             time = clip.end(); selectedClip = clip.id; engine.project.clips.push_back(std::move(clip));
         }
     }
     markCatalogueChanged(); selectTrack(engine.project.clips.back().track); refresh();
-    setStatus("Track added. Preparing tempo matching and beat alignment...");
+    setStatus("Track added. Preparing independent audio and beat alignment...");
 }
 
 void Workstation::prepareTimelineAudio(const std::shared_ptr<Media>& source)
@@ -156,6 +178,8 @@ void Workstation::prepareTimelineAudio(const std::shared_ptr<Media>& source)
     {
         if (*cancelled) return;
         juce::AudioFormatManager formats; formats.registerBasicFormats(); auto result = readMedia(formats, file, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::playback, expected.sha256.isEmpty() ? nullptr : &displayRecord, cancelled);
+        if (result.media && source->sessionMetadataPending && source->manualBeatOrigin > result.media->duration())
+        { result.media.reset(); result.error = "Saved beat marker exceeds source audio: " + file.getFullPathName(); }
         const bool sameSource = result.media && !expected.sha256.isEmpty() && result.media->analysisSource == expected;
         juce::MessageManager::callAsync([safe, source, cancelled, sameSource, result = std::move(result)]() mutable
         {
@@ -166,7 +190,7 @@ void Workstation::prepareTimelineAudio(const std::shared_ptr<Media>& source)
             {
                 auto media = result.media;
                 if (sameSource || source->analysisSource.sha256.isEmpty()) media->id = source->id;
-                if (sameSource) { media->name = source->name; media->manualBpm = source->manualBpm; media->manualBeatOrigin = source->manualBeatOrigin; media->manualKey = source->manualKey; }
+                if (sameSource || source->sessionMetadataPending) { media->name = source->name; media->manualBpm = source->manualBpm; media->manualBeatOrigin = source->manualBeatOrigin; media->manualKey = source->manualKey; }
                 if (safe->selectedLibraryId == source->id) safe->selectedLibraryId = media->id;
                 const juce::ScopedLock guard(safe->engine.lock);
                 for (auto& item : safe->engine.library) if (item == source) item = media;
@@ -195,6 +219,7 @@ void Workstation::prepareTimelineAudio(const std::shared_ptr<Media>& source)
 void Workstation::finishTimelineAudio()
 {
     if (busy || !timelineLoads.empty()) return;
+    if (restoreTimelineStems()) return;
     if (engine.playing && engine.project.hasPendingPlacement())
     {
         // Geometry only: preserve the transport, plugins and established voices.
@@ -221,7 +246,7 @@ void Workstation::finishTimelineAudio()
         }
         dirty = true; refresh();
         auto action = std::move(afterTimelineAudio); afterTimelineAudio = {};
-        setStatus(engine.sourceAudioReady() ? "Track ready / synced to the running mix tempo." : "Live mix continues. An incoming source is unavailable; remove or reimport its clip.");
+        setStatus(engine.sourceAudioReady() ? "Track ready / synced to the running mix tempo." : "Live mix continues. An incoming source is unavailable; remove or reimport its segment.");
         if (action && engine.playbackReady()) action();
         return;
     }

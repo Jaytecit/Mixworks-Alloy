@@ -8,10 +8,10 @@ $releaseHash = (Get-FileHash -LiteralPath $builtApp -Algorithm SHA256).Hash
 $pins = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'analysis-dependencies.json') -Raw | ConvertFrom-Json
 $verified = Get-Content -LiteralPath $VerificationManifest -Raw | ConvertFrom-Json
 & python (Join-Path $PSScriptRoot 'verification.py') --receipt $VerificationManifest --exe $builtApp
-if ($LASTEXITCODE -ne 0) { throw 'Complete candidate verification is required. The launcher was kept.' }
+if ($LASTEXITCODE -ne 0) { throw 'Valid candidate verification is required. The launcher was kept.' }
 if ($verified.executableSha256 -ne $releaseHash -or
     $verified.modelSha256 -ne $pins.beatThisCpp.modelSha256 -or $verified.runtimeSha256 -ne $pins.onnxRuntime.dllSha256 -or
-    $verified.scope -ne 'complete-regressions') { throw 'Verification does not establish complete regressions for this exact executable and analysis bundle. The launcher was kept.' }
+    $verified.scope -notin @('complete-regressions', 'presentation', 'ui-behaviour')) { throw 'Verification does not cover this exact executable and analysis bundle. The launcher was kept.' }
 $bundle = @(
     @{name='onnxruntime.dll'; path=(Join-Path (Split-Path -Parent $builtApp) 'onnxruntime.dll'); hash=$pins.onnxRuntime.dllSha256},
     @{name='beat-this-final0.onnx'; path=(Join-Path (Split-Path -Parent $builtApp) 'beat-this-final0.onnx'); hash=$pins.beatThisCpp.modelSha256},

@@ -35,6 +35,7 @@ public:
     void drawPopupMenuBackground(juce::Graphics&, int, int) override;
     void drawResizableWindowBorder(juce::Graphics&, int, int, const juce::BorderSize<int>&, juce::ResizableWindow&) override;
     void drawCallOutBoxBackground(juce::CallOutBox&, juce::Graphics&, const juce::Path&, juce::Image&) override;
+    juce::Rectangle<int> getTooltipBounds(const juce::String&, juce::Point<int>, juce::Rectangle<int>) override;
     void drawFileBrowserRow(juce::Graphics&, int, int, const juce::File&, const juce::String&, juce::Image*,
         const juce::String&, const juce::String&, bool, bool, int, juce::DirectoryContentsDisplayComponent&) override;
     void drawScrollbar(juce::Graphics&, juce::ScrollBar&, int, int, int, int, bool, int, int, bool, bool) override;
@@ -42,8 +43,21 @@ public:
     static juce::Colour metalHeat(float amount);
     static AlloyBeatPulse fourCountPulse(double mixBeats, bool playing, bool animate);
     static bool motionAllowed();
-    static void drawEmblem(juce::Graphics&, juce::Rectangle<float>);
+    static void drawEmblem(juce::Graphics&, juce::Rectangle<float>, juce::Colour glow = juce::Colours::transparentBlack);
     static bool styleNativeTitleBar(juce::Component&);
+};
+
+// One host serves the main window and app-owned detached/modal panels.
+class AlloyHints final : public juce::TooltipWindow
+{
+public:
+    AlloyHints() : juce::TooltipWindow(nullptr, 850) { setWantsKeyboardFocus(false); setInterceptsMouseClicks(false, false); }
+    void setHintsEnabled(bool value) { enabled = value; hideTip(); }
+    bool hintsEnabled() const { return enabled; }
+    juce::String getTipFor(juce::Component&) override;
+    static juce::String textFor(juce::Component&);
+private:
+    bool enabled = true;
 };
 
 // App-owned detached panels keep their client edge inside the native caption.
@@ -55,7 +69,7 @@ public:
     using Window::Window;
     void closeButtonPressed() override { this->setVisible(false); }
     void paintOverChildren(juce::Graphics& g) override
-    { g.setColour(colour::moltenOrange); g.drawRect(this->getLocalBounds()); }
+    { g.setColour(colour::moltenOrange); g.drawRect(this->getLocalBounds(), 2); }
 };
 
 // Keeps JUCE's value/accessibility/text-entry and drag notifications. Only the
@@ -64,11 +78,15 @@ class AlloyDial final : public juce::Slider
 {
 public:
     void configure(const juce::String& name, double defaultValue = 0);
+    void configureCutoff();
+    double valueToProportionOfLength(double) override;
+    double proportionOfLengthToValue(double) override;
+    double snapValue(double, DragMode) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed(const juce::KeyPress&) override;
 private:
     double resetValue = 0;
-    bool configured = false;
+    bool configured = false, cutoffMode = false;
 };
 }

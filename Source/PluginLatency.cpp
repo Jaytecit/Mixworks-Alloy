@@ -40,7 +40,7 @@ juce::String Engine::pluginLatencyError() const
     for (int lane = 0; lane < trackCount; ++lane) for (const auto& slot : plugins[(size_t) lane])
     { const auto error = issue(*slot, "Lane " + juce::String(lane + 1)); if (error.isNotEmpty()) return error; }
     for (const auto& clip : project.clips) for (const auto& slot : clip.effects->plugins)
-    { const auto error = issue(*slot, "Clip " + clip.media->name); if (error.isNotEmpty()) return error; }
+    { const auto error = issue(*slot, "Segment " + clip.media->name); if (error.isNotEmpty()) return error; }
     return {};
 }
 bool Engine::processPlugin(PluginSlot& slot, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)

@@ -47,7 +47,7 @@ void runTransitionFilterTests(const std::function<void(bool, const juce::String&
     auto changed = project; changed.transitionLinks[1].filter = {TransitionFilterMode::lowToHigh, .5};
     check(project.validateTransitionLocks(changed).failed(), "indirect commits cannot add a filter to a locked neighbour");
     project.setTransitionLocked(id, false);
-    TransitionStyle style; check(project.captureTransitionStyle(id, style).wasOk() && style.filter == project.transitionLinks[0].filter, "capture filter into a reusable treatment");
+    TransitionStyle style; check(project.captureTransitionStyle(id, style).wasOk() && style.nodes && style.nodes->curves[0][5].active() && !style.filter.active(), "capture filter into a reusable ordinary-node treatment");
     check(project.storeTransitionAlternative(id, 0).wasOk() && project.putTransitionPreset({"Copper sweep", style}).wasOk(), "store filter in A and a named preset");
     auto parsed = parseProject(json(project));
     check(parsed.error.isEmpty() && parsed.project.transitionLinks == project.transitionLinks && parsed.project.transitionPresets[0].style == style, "session 20 round-trips filter, A/B/C and named presets");
@@ -129,6 +129,10 @@ void runTransitionFilterTests(const std::function<void(bool, const juce::String&
         check(highPass ? high > .085 && bass < .002 : bass > .085 && high < .002, "measured " + juce::String(highPass ? "high-pass" : "low-pass") + " spectrum at " + juce::String(rate, 0) + " Hz");
     }
     wet.project.storeTransitionAlternative(id, 0); auto cancelled = std::make_shared<std::atomic<bool>>(false);
+    // All saved presets now apply their normal Cutoff nodes. Exercise the
+    // current ordinary shape here; legacy filter DSP is measured above.
+    check(wet.project.applyTransitionStyle(id,*wet.project.transitionLinks[0].alternatives[0]).wasOk(),"apply the saved Filter shape as ordinary cutoff nodes before rehearsal");
+    wet.seek(0); const auto rehearsalPcm = render(wet,256);
     const auto beforeRehearsal = json(wet.project);
     check(wet.prepareTransitionRehearsal(id, cancelled).wasOk() && wet.auditionTransitionAlternative(0).wasOk() && json(wet.project) == beforeRehearsal, "filter alternative renders and auditions without applying it");
     double rehearsalDifference = 0; std::array<float, 512> left {}, right {}; float* channels[] {left.data(), right.data()};
@@ -136,7 +140,7 @@ void runTransitionFilterTests(const std::function<void(bool, const juce::String&
     {
         const int count = std::min(512, 48000 - offset); wet.audioDeviceIOCallbackWithContext(nullptr, 0, channels, 2, count, {});
         for (int i = 0; i < count; ++i) for (int ch = 0; ch < 2; ++ch)
-            rehearsalDifference = std::max(rehearsalDifference, std::abs((double) channels[ch][i] - wetPcm.getSample(ch, offset + i)));
+            rehearsalDifference = std::max(rehearsalDifference, std::abs((double) channels[ch][i] - rehearsalPcm.getSample(ch, offset + i)));
     }
     check(rehearsalDifference < 1e-6, "single-alternative rehearsal callbacks match the same complete filter window sample by sample");
     wet.endTransitionRehearsal();
@@ -146,7 +150,8 @@ void runTransitionFilterTests(const std::function<void(bool, const juce::String&
 
     Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940); ui.engine.project = base; ui.selectTransition(id); ui.engine.position = 1;
     ui.transitionFilterMode.setSelectedId(2, juce::sendNotificationSync); ui.transitionFilterDepth.setSelectedId(75, juce::sendNotificationSync);
-    check(ui.undoHistory.size() == 2 && ui.dirty && ui.engine.position == 1 && !ui.busy && ui.engine.project.transitionLinks[0].filter.strength == .75, "native filter controls commit one Undo per edit and retain transport");
+    check(ui.undoHistory.size() == 2 && ui.dirty && ui.engine.position == 1 && !ui.busy && !ui.engine.project.transitionLinks[0].filter.active()
+        && ui.engine.project.clips[0].controls.automation[5].active(), "native filter preset controls place ordinary nodes with one Undo per edit and retain transport");
     const auto edited = json(ui.engine.project); ui.undo(false); ui.undo(true);
     check(json(ui.engine.project) == edited, "filter Undo/Redo retains the complete graph");
     ui.transitionLock.onClick(); check(!ui.transitionFilterMode.isEnabled() && !ui.transitionFilterDepth.isEnabled(), "native lock disables filter editing");

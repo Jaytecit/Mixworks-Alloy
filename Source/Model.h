@@ -4,15 +4,25 @@
 #include <memory>
 #include <optional>
 #include <vector>
+#include <map>
 #include "AnalysisCache.h"
 #include "PcmCache.h"
 #include "LibraryAssets.h"
 #include "Mastering.h"
+#include "PerformanceTake.h"
 
 namespace mixworks
 {
 constexpr int trackCount = 4;
-constexpr int projectVersion = 26;
+constexpr int projectVersion = 41;
+enum class LaunchTiming { immediate, nextBeat, nextBar, nextPhrase };
+struct LaunchSettings
+{
+    LaunchTiming timing = LaunchTiming::nextBar;
+    int phraseBars = 16;
+    juce::Result validate() const;
+    bool operator==(const LaunchSettings& other) const { return timing == other.timing && phraseBars == other.phraseBars; }
+};
 struct ElasticSource;
 struct LabelMarker
 {
@@ -31,11 +41,14 @@ struct TempoMap
 {
     double fallback = 120;
     std::vector<TempoPoint> points;
+    double origin = 0; // Engine seconds of musical zero; earlier audio is playable pre-roll.
+    double beatsFromStart(double time) const;
+    double timeFromStartBeat(double beat) const;
     double bpmAt(double time) const;
     double beatsAt(double time) const;
     double timeAtBeat(double beat) const;
-    double snap(double time, bool enabled) const;
-    double snapWithPreroll(double time, bool enabled) const; // Signed audio edits extend the first held tempo before mix zero.
+    double snap(double time, bool enabled, double step = 1) const;
+    double snapWithPreroll(double time, bool enabled, double step = 1) const; // Signed audio edits extend the first held tempo before mix zero.
     std::vector<TempoPoint> localPoints(double begin, double end) const;
     int setPoint(double time, double bpm, bool ramp = true);
     void movePoint(int index, double time, double bpm);
@@ -68,16 +81,25 @@ struct Media
     juce::String analysisCacheWarning;
     juce::String playbackError; // Transient source-check failure; never silently play a missing clip.
     bool sourceDetailsPending = false; // Fresh insertion: current identity and duration await worker verification.
+    bool sessionMetadataPending = false; // Unused saved reference: retain its identity/overrides on first hydration.
     double manualBpm = 0, manualBeatOrigin = -1;
     int manualKey = -1;
-    SourceBeatGrid grid() const { return resolveSourceGrid(analysis, manualBpm, manualBeatOrigin); }
+    SourceBeatGrid grid() const
+    {
+        auto grid = resolveSourceGrid(analysis, manualBpm, manualBeatOrigin);
+        if (manualBeatOrigin < 0 && grid.hasPulse() && grid.downbeatOrigin < 0 && analysis.downbeatGuess >= 0) grid.downbeatOrigin = analysis.downbeatGuess;
+        return grid;
+    }
     double bpm() const { return grid().bpm; }
     double beatOrigin() const { return grid().pulseOrigin; }
     double downbeatOrigin() const;
-    int key() const { return manualKey >= 0 ? manualKey : analysis.key; }
-    bool keyConfirmed() const { return key() >= 0 && key() < 24 && (manualKey >= 0 || analysis.keyConfidence >= .55); }
+    int key() const { return manualKey >= 0 ? manualKey : analysis.key >= 0 ? analysis.key : analysis.keyGuess; }
+    bool keyConfirmed() const { return key() >= 0 && key() < 24 && (manualKey >= 0 || analysis.keyConfidence >= keyReviewConfidence); }
     bool needsAnalysis() const;
     std::vector<float> peaks, waveformRms; // Saved display data, never an audio gain.
+    MusicalEnergyProfile energy; // Independently versioned, source-owned activity evidence.
+    SourceSections sectionTemplate; // Reusable source defaults; explicit placed snapshots retain priority.
+    juce::String sectionTemplateError;
     bool hasPlayback() const { return cache != nullptr || samples.getNumSamples() > 0; }
     int frames() const { return cache ? cache->frames : samples.getNumSamples() > 0 ? samples.getNumSamples() : analysisSource.frames; }
     int channels() const { return cache ? cache->channels : samples.getNumSamples() > 0 ? samples.getNumChannels() : analysisSource.channels; }
@@ -90,6 +112,16 @@ struct Media
     TrackAnalysisRecord analysisRecord() const;
     std::shared_ptr<Media> catalogueCopy() const;
 };
+constexpr int stemCount = 4;
+inline constexpr const char* stemNames[] {"drums", "bass", "other", "vocals"};
+struct StemAssets
+{
+    juce::File directory;
+    juce::String manifestHash;
+    std::array<std::shared_ptr<Media>, stemCount> sources;
+};
+juce::Result loadStemAssets(const Media&, const juce::File&, const juce::String& expectedManifest, std::shared_ptr<const StemAssets>&);
+juce::Result loadCachedStemAssets(const Media&, const juce::File& root, std::shared_ptr<const StemAssets>&);
 struct PreparedClipGeometry
 {
     std::shared_ptr<const Media> source;
@@ -119,7 +151,7 @@ struct PluginControl
     int insert = 0;
     juce::String parameterId;
 };
-enum class AutomationTarget { volume, bass, mid, treble, pan, lowPass, master, plugin };
+enum class AutomationTarget { volume, bass, mid, treble, pan, cutoff, master, plugin };
 enum class AutomationEdit { change, removePoint, clearCurve };
 constexpr int trackAutomationCount = 6;
 struct AutomationAddress
@@ -127,21 +159,34 @@ struct AutomationAddress
     int track = 0;
     AutomationTarget target = AutomationTarget::volume;
     juce::String slotId, parameterId, clipId;
-    bool operator==(const AutomationAddress& other) const { return track == other.track && target == other.target && slotId == other.slotId && parameterId == other.parameterId && clipId == other.clipId; }
+    int stem = -1; // Parent-owned source clock; never a separate analysed song.
+    bool operator==(const AutomationAddress& other) const { return stem == other.stem && track == other.track && target == other.target && slotId == other.slotId && parameterId == other.parameterId && clipId == other.clipId; }
 };
+// Cutoff storage is affine in Hz on either side of centre, preserving legacy ramps.
+float lowPassToCutoff(float hz);
+float cutoffFromPosition(double position);
+double cutoffPosition(float value);
+float cutoffFromMidi(float value);
+juce::String cutoffText(float value, bool compact = false);
+bool parseCutoffText(const juce::String&, float& value);
 juce::Range<float> automationRange(AutomationTarget);
 const char* automationId(AutomationTarget);
 const char* automationName(AutomationTarget);
-struct AutomationPoint { double time = 0; float value = 0; };
+// Bend belongs to the following segment: -1 brings the change forward, +1
+// holds the first value until the second node. Zero preserves legacy ramps.
+double automationProgress(double fraction, double bend, bool exponential = false);
+// Exponential spans represent frequency sweeps directly; false retains existing rational bends.
+struct AutomationPoint { double time = 0; float value = 0; double bend = 0; bool exponential = false; bool gainSpace = false; };
 struct AutomationCurve
 {
     bool enabled = false;
-    std::vector<AutomationPoint> points; // Session seconds for mixer lanes, source-elapsed seconds for clips; linear in the target's units, held endpoints.
+    std::vector<AutomationPoint> points; // Session seconds for mixer lanes, source-elapsed seconds for clips; held endpoints.
     bool active() const { return enabled && !points.empty(); }
     float valueAt(double time, float manualValue) const;
     float interpolatedValue(double time, float fallback) const;
     int setPoint(double time, float value);
     void movePoint(int index, double time, float value);
+    AutomationCurve sliced(double begin, double end, float fallback) const;
 };
 struct PluginAutomation
 {
@@ -152,17 +197,20 @@ struct PluginAutomation
 struct TrackSettings
 {
     juce::String name;
-    float gainDb = 0, pan = 0, lowPassHz = 20000;
+    float gainDb = 0, pan = 0, filterCutoff = 0;
     bool mute = false, solo = false;
     std::array<float, 3> eqDb {};
     std::array<AutomationCurve, trackAutomationCount> automation;
     std::vector<PluginAutomation> pluginAutomation;
-    float manualValue(AutomationTarget target) const { return target == AutomationTarget::volume ? gainDb : target == AutomationTarget::pan ? pan : target == AutomationTarget::lowPass ? lowPassHz : eqDb[(size_t) target - 1]; }
+    float manualValue(AutomationTarget target) const { return target == AutomationTarget::volume ? gainDb : target == AutomationTarget::pan ? pan : target == AutomationTarget::cutoff ? filterCutoff : eqDb[(size_t) target - 1]; }
     float valueAt(AutomationTarget target, double time) const { return automation[(size_t) target].valueAt(time, manualValue(target)); }
     std::array<PluginControl, 8> pluginControls;
 };
 struct ClipEffects;
 std::shared_ptr<ClipEffects> makeClipEffects();
+const juce::String& effectsIdentity(const std::shared_ptr<ClipEffects>&);
+void restoreEffectsIdentity(const std::shared_ptr<ClipEffects>&,const juce::String&);
+double naturalEffectTail(const std::shared_ptr<ClipEffects>&);
 struct RehearsalContext
 {
     int beforeBars = 1, afterBars = 1;
@@ -178,10 +226,11 @@ struct TransitionBandSettings
 {
     TransitionBandMode mode = TransitionBandMode::none;
     double strength = 1, gapBeats = 0, position = 0.5;
+    std::array<double, 2> bend {}; // Incoming and outgoing, independently editable.
     juce::Result validate(int band) const;
     bool generated() const { return mode != TransitionBandMode::none && mode != TransitionBandMode::manual; }
     bool swapping() const { return mode == TransitionBandMode::swap || mode == TransitionBandMode::swapFade; }
-    bool operator==(const TransitionBandSettings& b) const { return mode == b.mode && strength == b.strength && gapBeats == b.gapBeats && position == b.position; }
+    bool operator==(const TransitionBandSettings& b) const { return mode == b.mode && strength == b.strength && gapBeats == b.gapBeats && position == b.position && bend == b.bend; }
 };
 enum class TransitionFilterMode { none, highToLow, lowToHigh };
 struct TransitionFilterSettings
@@ -198,6 +247,15 @@ juce::Result readTransitionFilter(const juce::var&, TransitionFilterSettings&);
 // timeline span; manual curves, song geometry and effects are never captured.
 struct TransitionStyle
 {
+    // Presets snapshot ordinary source curves in frame-relative coordinates.
+    // Legacy procedural fields below remain input compatibility only.
+    struct Nodes
+    {
+        std::array<std::array<AutomationCurve, trackAutomationCount>, 2> curves;
+        juce::Result validate() const;
+        bool operator==(const Nodes&) const;
+    };
+    std::optional<Nodes> nodes;
     std::array<std::optional<TransitionBandSettings>, 4> bands;
     TransitionFilterSettings filter;
     std::array<double, 4> volume {0, 0, 1, 1}; // in begin/end, out begin/end
@@ -205,7 +263,7 @@ struct TransitionStyle
     std::array<float, 4> bassValues {};
     std::array<bool, 2> bassEnabled {true, true};
     juce::Result validate() const;
-    bool operator==(const TransitionStyle& b) const { return bands == b.bands && filter == b.filter && volume == b.volume && bassPositions == b.bassPositions && bassValues == b.bassValues && bassEnabled == b.bassEnabled; }
+    bool operator==(const TransitionStyle& b) const { return nodes == b.nodes && bands == b.bands && filter == b.filter && volume == b.volume && bassPositions == b.bassPositions && bassValues == b.bassValues && bassEnabled == b.bassEnabled; }
 };
 struct NamedTransitionStyle { juce::String name; TransitionStyle style; };
 juce::var transitionStyleToJson(const TransitionStyle&);
@@ -222,6 +280,7 @@ struct TransitionBandEnvelope
     bool rising = false;
     bool constantPower = false;
     bool instant = false;
+    double bend = 0;
     float gainAt(double time) const;
 };
 struct TransitionFilterEnvelope
@@ -245,13 +304,34 @@ struct ClipEnvelope
     double length = 0, intro = 0, outro = 0, fadeIn = 0, fadeOut = 0;
     float gainAt(double localTime) const;
 };
+struct HotcueMarker
+{
+    juce::String id;
+    double sourceSeconds = 0;
+    bool manual = false;
+    bool operator==(const HotcueMarker& b) const { return id == b.id && sourceSeconds == b.sourceSeconds && manual == b.manual; }
+};
+using HotcueSlots = std::array<std::optional<HotcueMarker>, 9>;
 struct Clip
 {
     TrackSettings controls;
     bool automaticBass = false;
+    std::shared_ptr<const StemAssets> stems;
+    juce::File stemDirectory; // Saved asset reference, validated before playback admission.
+    juce::String stemManifestHash;
+    bool stemsEnabled = true, stemsExpanded = true;
+    std::array<TrackSettings, stemCount> stemControls;
+    std::array<std::shared_ptr<const PreparedAudio>, stemCount> stemPrepared;
+
     std::shared_ptr<ClipEffects> effects = makeClipEffects();
+    double effectOffset = 0; // Original track's source clock, retained across cuts.
     juce::String id = juce::Uuid().toString();
     std::shared_ptr<Media> media;
+    // Absolute file seconds, owned by this placed instance. Null means automatic
+    // reusable track defaults, then RMS suggestions; viewing never materialises edits.
+    std::optional<std::vector<SourceSectionMarker>> sectionMarkers;
+    std::optional<HotcueSlots> hotcues;
+    bool hotcuesPending = false; // New-instance intent only; never seeded by Open/view/reanalysis.
     int track = 0;
     double start = 0, offset = 0, length = 0, fadeIn = 0, fadeOut = 0;
     double audioSlip = 0; // Timeline seconds of audio-only delay; automation and frame clocks stay fixed.
@@ -274,6 +354,7 @@ struct Clip
     bool awaitingSourceLength = false;
     juce::String pendingPredecessor; // Transient ordering of external files whose durations are not known yet.
     PendingPlacement pendingPlacement = PendingPlacement::none; // Transient; copied with undo, never saved as a completed mix.
+    bool pendingAutoTransition = false; // Only Auto Arrange opts into linked placement.
     std::optional<TransitionPreset> pendingTransitionPreset;
     std::optional<double> pendingTransitionBeats;
     std::optional<bool> pendingSectionTransition;
@@ -303,6 +384,7 @@ struct Clip
 std::optional<std::array<double, 4>> initialiseTransition(Clip&, Clip&, double overlap, TransitionPreset, std::optional<juce::Range<double>> window = {});
 struct Project
 {
+    std::vector<PerformanceTake> performanceTakes;
     enum class TransitionEdit { moveWindow, resizeStart, resizeEnd, moveOutgoing, moveIncoming };
     struct TransitionLink
     {
@@ -313,7 +395,9 @@ struct Project
         std::array<std::optional<TransitionBandSettings>, 4> bands;
         std::array<std::optional<TransitionStyle>, 3> alternatives;
         TransitionFilterSettings filter;
-        bool operator==(const TransitionLink& other) const { return outgoing == other.outgoing && incoming == other.incoming && bassSwap == other.bassSwap && locked == other.locked && bands == other.bands && alternatives == other.alternatives && filter == other.filter; }
+        std::optional<std::array<double, 2>> frame; // Outgoing source-elapsed start/end, independent of fades.
+        bool muteOutside = false;
+        bool operator==(const TransitionLink& other) const { return outgoing == other.outgoing && incoming == other.incoming && bassSwap == other.bassSwap && locked == other.locked && bands == other.bands && alternatives == other.alternatives && filter == other.filter && frame == other.frame && muteOutside == other.muteOutside; }
     };
     juce::String name = "Untitled session";
     double bpm = 120;
@@ -323,31 +407,58 @@ struct Project
     MasterSettings mastering;
     double effectTailSeconds = 0;
     RehearsalContext rehearsalContext;
+    LaunchSettings launch;
+    std::map<juce::String, SourceSections> sourceSectionEdits; // Undo ownership only; never auto-applied by session Open.
     juce::Result setRehearsalContext(const RehearsalContext&);
     juce::Result setEffectTailSeconds(double);
-    double audibleEnd() const { return duration() + effectTailSeconds; }
+    double audibleEnd() const;
     AutomationCurve masterAutomation;
     bool snap = true;
+    int snapDivision = 1; // 1 beat, 2 half beats, 4 quarter beats.
+    double snapStep() const { return snapDivision == 4 ? 0.25 : snapDivision == 2 ? 0.5 : 1.0; }
     int keyDisplay = 2; // 0 note, 1 Camelot, 2 both.
     std::vector<Clip> clips;
     std::vector<TransitionLink> transitionLinks;
     std::vector<NamedTransitionStyle> transitionPresets;
-    bool transitionLinksKnown = false; // Legacy relationships are adopted once after source clocks are restored.
+    bool transitionLinksKnown = true;
     std::vector<LabelMarker> labels; // Absolute session seconds, ordered by time; identity survives moves.
     std::array<TrackSettings, trackCount> tracks;
+    std::map<juce::String, TrackSettings> effectControls; // Value-owned for Undo; processors are shared by split pieces.
+    TrackSettings& effectSettings(const Clip&);
+    const TrackSettings& effectSettings(const Clip&) const;
+    const Clip* effectOwner(const Clip&) const;
+    juce::Range<double> automationBounds(const AutomationAddress&) const;
     Project();
+    TempoMap gridClock() const { return followTrackTempo ? tempo : TempoMap {bpm, {}, tempo.origin}; }
+    double playbackStart() const;
+    juce::Result setTimelineOrigin(double seconds);
     double duration() const;
     bool hasPendingPlacement() const;
     juce::Result putLabelMarker(const LabelMarker&);
     double snappedTime(double seconds, bool enabled) const;
+    double snappedMoveTime(double reference, double seconds, bool enabled) const;
     double snappedClipStart(const Clip&, double seconds, bool enabled, double magnetSeconds = 0) const;
     juce::Result moveTransitionAnchor(const juce::String& clipId, bool intro, double timelineTime, bool snapToBeat);
     void ensureTransitionLinks();
     juce::Result validateTransitionLinks() const;
     juce::Result linkClips(const juce::String& outgoing, const juce::String& incoming);
+    juce::Result addTransition(const juce::String& outgoing, const juce::String& incoming, double beats, TransitionPreset);
+    juce::Result setTransitionMuteOutside(const juce::String& incoming, bool);
     void detachTransitionLinks(const juce::String& clipId);
+    juce::Result unlinkClips(const std::vector<juce::String>& clipIds);
+    juce::Result moveClipFollowing(const juce::String& clipId, double start, bool snapping);
+    // Global half-open splice. An optional unpaired segment must exactly fill
+    // the range; every other segment must lie wholly before or after it.
+    juce::Result closeTimeRange(double begin, double end, const juce::String& removeClipId = {});
+    // Index -1 inserts a boundary; other indices edit an existing boundary.
+    juce::Result setSectionMarkerTime(const juce::String& clipId, int index, double sourceSeconds, std::optional<juce::String> label = {});
+    juce::Result resetSectionMarkers(const juce::String& clipId);
+    juce::Result putHotcue(const juce::String& clipId, int slot, double sourceSeconds);
+    juce::Result removeHotcue(const juce::String& clipId, int slot);
+    juce::Result seedHotcues(const juce::String& clipId);
     juce::Result setClipAudioSlip(const juce::String& clipId, double seconds);
     juce::Result moveClip(const juce::String& clipId, double start, bool snapping, double magnetSeconds = 0, bool adoptMarkedNeighbours = true);
+    juce::Result moveClipGroup(const std::vector<juce::String>& ids, const juce::String& anchor, double start, int track, bool snapping);
     juce::Result applyPlacements(const Project&);
     juce::Range<double> transitionRange(const TransitionLink&) const;
     juce::Result editTransition(const juce::String& incoming, TransitionEdit, double delta, bool snapping);
@@ -392,14 +503,14 @@ struct Project
     void setManualValue(const AutomationAddress&, float);
 };
 struct MediaResult { std::shared_ptr<Media> media; juce::String error; };
-enum class MediaReadStage { decode, waveform, analyse, cache, lookupAnalysis, savedAnalysis, playlist, savedAudio, tempo };
+enum class MediaReadStage { decode, waveform, analyse, cache, lookupAnalysis, savedAnalysis, playlist, savedAudio, tempo, energy };
 using MediaProgress = std::function<void(MediaReadStage)>;
-enum class MediaReadPurpose { playback, catalogue };
+enum class MediaReadPurpose { playback, catalogue, energyAnalysis };
 MediaResult readMedia(juce::AudioFormatManager&, const juce::File&, const MediaProgress& = {}, AnalysisCacheMode = AnalysisCacheMode::readWrite, MediaReadPurpose = MediaReadPurpose::playback, const TrackAnalysisRecord* libraryRecord = nullptr, const std::shared_ptr<std::atomic<bool>>& cancelled = {});
 double snapTime(double seconds, double bpm, bool enabled);
 juce::String timeText(double seconds);
 enum class MidiActionKind { play, start, stop, home, master, volume, pan, mute, select, pluginParameter, bass, mid, treble,
-    solo, record, read, arm, previousTrack, nextTrack, previousTransition, nextTransition, undo, redo, snap, panic, armTrack, armMaster, resetEq, lowPass, deskPot, cyclePot, resetLowPass, resetPans };
+    solo, record, read, arm, previousTrack, nextTrack, previousTransition, nextTransition, undo, redo, snap, panic, armTrack, armMaster, resetEq, cutoff, deskPot, cyclePot, resetCutoff, resetPans };
 struct MidiAction
 {
     MidiActionKind kind = MidiActionKind::play;
@@ -429,4 +540,5 @@ struct ProjectResult
     juce::String error;
 };
 ProjectResult parseProject(const juce::String& text);
+juce::String relinkProjectSource(const ProjectResult&, const juce::String& mediaId, const juce::File& replacement);
 }

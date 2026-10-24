@@ -64,6 +64,41 @@ void runAnalysisCacheTests(const std::function<void(bool, const juce::String&)>&
         && a.rhythmMethod == b.rhythmMethod && a.rhythmIssue == b.rhythmIssue && near(a.neuralPhaseCorrectionMs, b.neuralPhaseCorrectionMs);
     for (size_t i = 0; same && i < a.beatWindows.size(); ++i) same = near(a.beatWindows[i].sourceStart, b.beatWindows[i].sourceStart) && near(a.beatWindows[i].bpm, b.beatWindows[i].bpm) && near(a.beatWindows[i].origin, b.beatWindows[i].origin) && near(a.beatWindows[i].confidence, b.beatWindows[i].confidence);
     check(same && recordFile.loadFileAsString() == originalRecord && !recordFile.getSiblingFile(recordFile.getFileName() + ".bak").exists(), "warm import retains all measured facts and waveform buckets without rewriting the record");
+    check(first.media->energy.complete() && juce::JSON::toString(musicalEnergyToJson(first.media->energy)) == juce::JSON::toString(musicalEnergyToJson(second.media->energy)),
+          "cold import extracts supplementary activity and warm import reuses its exact profile");
+    auto damaged = analysisRecordToJson(first.media->analysisRecord()); damaged.getDynamicObject()->setProperty("musicalEnergy", "invalid");
+    const auto damagedRead = parseAnalysisRecord(damaged, first.media->analysisSource);
+    check(damagedRead.reusableAutomatic && damagedRead.record && !damagedRead.record->energy.complete()
+          && damagedRead.record->analysis.bpm == first.media->analysis.bpm, "malformed supplementary activity does not invalidate reusable beat analysis");
+    const auto upgradeAudio = folder.getChildFile("energy-upgrade.wav"); audio.copyFileTo(upgradeAudio);
+    auto legacyEnergy = first.media->analysisRecord(); legacyEnergy.energy = {}; legacyEnergy.manualBpm = 125.25; legacyEnergy.manualBeatOrigin = .213; legacyEnergy.manualKey = 17;
+    check(writeAnalysisRecord(upgradeAudio, legacyEnergy).isEmpty(), "store a valid grid fixture predating supplementary activity");
+    const auto warmCatalogue = readMedia(formats, upgradeAudio, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::catalogue);
+    check(warmCatalogue.media && warmCatalogue.media->analysisFromCache && !warmCatalogue.media->hasPlayback() && !warmCatalogue.media->energy.complete()
+          && !warmCatalogue.media->decodedFromCache, "ordinary warm catalogue access does not decode old sources merely to upgrade activity");
+    const auto upgraded = readMedia(formats, upgradeAudio, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::energyAnalysis);
+    check(upgraded.media && upgraded.media->analysisFromCache && upgraded.media->energy.complete() && !upgraded.media->hasPlayback()
+          && upgraded.media->manualBpm == 125.25 && upgraded.media->manualBeatOrigin == .213 && upgraded.media->manualKey == 17
+          && upgraded.media->analysis.bpm == legacyEnergy.analysis.bpm && upgraded.media->analysis.downbeatOrigin == legacyEnergy.analysis.downbeatOrigin,
+          "energy-only upgrade preserves detector facts and exact manual BPM/downbeat/key without retaining PCM");
+    const auto upgradeBytes = analysisRecordFile(upgradeAudio).loadFileAsString();
+    auto cancelEnergy = std::make_shared<std::atomic<bool>>(true);
+    check(!readMedia(formats, upgradeAudio, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::energyAnalysis, nullptr, cancelEnergy).media
+          && analysisRecordFile(upgradeAudio).loadFileAsString() == upgradeBytes, "cancelled energy upgrade retains an existing complete record");
+    if (upgraded.media)
+    {
+        auto futureProfile = juce::JSON::parse(upgradeBytes); auto supplement = futureProfile["musicalEnergy"];
+        supplement.getDynamicObject()->setProperty("revision", musicalEnergyRevision + 1); supplement.getDynamicObject()->setProperty("futureData", "keep opaque data");
+        const auto opaque = juce::JSON::toString(supplement);
+        check(analysisRecordFile(upgradeAudio).replaceWithText(juce::JSON::toString(futureProfile)), "store an opaque future supplementary profile fixture");
+        auto correction = upgraded.media->analysisRecord(); correction.manualBpm = 127.5;
+        check(writeAnalysisRecord(upgradeAudio, correction).isEmpty()
+            && juce::JSON::toString(juce::JSON::parse(analysisRecordFile(upgradeAudio).loadFileAsString())["musicalEnergy"]) == opaque,
+            "manual correction preserves an opaque newer supplementary version for the same source");
+        const auto futureRead = readAnalysisRecord(upgradeAudio, correction.source);
+        check(futureRead.reusableAutomatic && futureRead.record && !futureRead.record->energy.complete() && futureRead.record->manualBpm == 127.5,
+            "future activity stays unknown while its valid grid and updated manual correction remain reusable");
+    }
     auto unavailable = first.media->analysisRecord(); unavailable.manualBpm = 126.75; unavailable.manualKey = 17;
     unavailable.analysis.rhythmMethod = "unavailable"; unavailable.analysis.rhythmIssue = "Missing model";
     const auto unavailableRead = parseAnalysisRecord(analysisRecordToJson(unavailable), unavailable.source);
@@ -101,6 +136,7 @@ void runAnalysisCacheTests(const std::function<void(bool, const juce::String&)>&
           && analysisRecordFile(legacyAudio).existsAsFile() && !readAnalysisRecord(legacyAudio, first.media->analysisSource).legacyLocation
           && legacyFile.loadFileAsString() == legacyText, "legacy reuse migrates verified analysis and corrections without rewriting the legacy file");
     Engine engine; second.media->manualBpm = 0; second.media->manualKey = -1; engine.library = {second.media};
+    Clip required; required.media = second.media; required.length = 0.25; engine.project.clips.push_back(required);
     const auto saved = juce::JSON::toString(engine.captureProject());
     check(engine.restoreProject(saved).isEmpty() && engine.library[0]->analysisFromCache && engine.library[0]->manualBpm == 0 && engine.library[0]->manualKey == -1,
           "session reopen uses saved analysis while explicit session corrections remain authoritative");

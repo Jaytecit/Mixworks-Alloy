@@ -4,8 +4,35 @@
 
 namespace mixworks
 {
+void runFocusedSignalTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runFocusedRealProbe(const std::function<void(bool, const juce::String&)>& check, const juce::File& report, const juce::File& manifest)
+{
+    const auto sources = juce::JSON::parse(manifest);
+    check(sources.isArray() && sources.size() > 0 && sources.size() <= 12, "bounded real-source probe manifest");
+    if (!sources.isArray() || sources.size() > 12) return;
+    juce::AudioFormatManager formats; formats.registerBasicFormats(); juce::Array<juce::var> outcomes;
+    for (const auto& entry : *sources.getArray())
+    {
+        const juce::File file(entry["path"].toString()); const auto old = parseAnalysisRecord(entry["record"]);
+        check(old.reusableAutomatic && old.record.has_value(), "source-identity-bound baseline: " + file.getFileName()); if (!old.record) continue;
+        const auto began = juce::Time::getMillisecondCounterHiRes();
+        const auto result = readMedia(formats, file, {}, AnalysisCacheMode::focused, MediaReadPurpose::catalogue, &*old.record);
+        check(result.media && result.error.isEmpty(), "real-source retry completes: " + file.getFileName() + " " + result.error); if (!result.media) continue;
+        const auto& m = *result.media; const auto& a = m.analysis;
+        check(m.analysisSource == old.record->source && audioDigest(file) == old.record->source.sha256
+            && m.manualBpm == old.record->manualBpm && m.manualBeatOrigin == old.record->manualBeatOrigin && m.manualKey == old.record->manualKey,
+            "original audio and manual corrections unchanged: " + file.getFileName());
+        check(a.focusedTempo != 2 || (!a.variableTempo && a.tempoConfidence > old.record->analysis.tempoConfidence), "real tempo adoption has stronger consistent evidence");
+        check(a.focusedKey != 2 || a.keyConfidence > old.record->analysis.keyConfidence, "real key adoption has stronger evidence");
+        auto* row = new juce::DynamicObject(); row->setProperty("path", file.getFullPathName());
+        row->setProperty("milliseconds", juce::Time::getMillisecondCounterHiRes() - began);
+        row->setProperty("before", entry["record"]); row->setProperty("after", analysisRecordToJson(m.analysisRecord())); outcomes.add(juce::var(row));
+    }
+    check(report.getSiblingFile("real-retry-results.json").replaceWithText(juce::JSON::toString(juce::var(outcomes))), "retain independent real-source numerical outcomes (not ground truth)");
+}
 void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    runFocusedSignalTests(check, report);
     Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940);
     for (int track = 0; track < 4; ++track)
     {
@@ -30,6 +57,31 @@ void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)
     ui.engine.library[1]->manualKey = -1; ui.engine.library[1]->analysis.key = -1;
     ui.engine.library[2]->analysisVersion = analysisRevision - 1;
     check(ui.analysisTargets(1).size() == 2 && ui.analysisTargets(2).size() == 4, "incomplete scope includes unknown/outdated facts and respects complete manual corrections");
+    {
+        const auto previous = ui.engine.library[1]->analysisRecord();
+        auto retried = readMedia(ui.engine.formats, ui.engine.library[1]->file, {}, AnalysisCacheMode::focused, MediaReadPurpose::catalogue, &previous);
+        check(retried.media && retried.media->analysis.focusedKey == 1 && retried.media->analysis.focusedTempo == 0
+            && retried.media->manualBpm == previous.manualBpm && retried.media->manualBeatOrigin == previous.manualBeatOrigin
+            && retried.media->manualKey == -1 && retried.media->analysis.bpm == previous.analysis.bpm,
+            "focused source load protects manual BPM/downbeat and persists an honest unchanged unknown key");
+        if (retried.media)
+        {
+            const auto record = retried.media->analysisRecord(); const auto parsed = readAnalysisRecord(retried.media->file, record.source);
+            check(parsed.reusableAutomatic && parsed.record->analysis.focusedKey == 1, "completed focused retry survives source-bound cache parsing");
+            int work = 0;
+            auto again = readMedia(ui.engine.formats, retried.media->file, [&](MediaReadStage stage) { work += stage == MediaReadStage::analyse || stage == MediaReadStage::decode; }, AnalysisCacheMode::focused, MediaReadPurpose::catalogue, &record);
+            check(again.media && again.media->analysisFromCache && work == 0 && !Workstation::canRetryAnalysis(*again.media), "identical focused retry reuses saved results without decoding or rerunning analysis");
+            auto invalid = analysisRecordToJson(record); invalid["analysis"]["focusedRetry"].getDynamicObject()->setProperty("key", "invalid");
+            const auto damaged = parseAnalysisRecord(invalid, record.source);
+            check(damaged.reusableAutomatic && damaged.record->analysis.focusedRevision == 0 && damaged.record->manualBeatOrigin == record.manualBeatOrigin,
+                  "malformed optional retry evidence cannot invalidate the existing analysis or manual downbeat");
+            auto identity = record.source; identity.sha256 = juce::String::repeatedString("a", 64);
+            check(!parseAnalysisRecord(analysisRecordToJson(record), identity).record, "focused attempts cannot leak to changed source identities");
+        }
+        auto protectedSource = ui.engine.library[0]->catalogueCopy(); protectedSource->manualBpm = 0;
+        protectedSource->analysis.bpm = 0; protectedSource->analysis.keyConfidence = 1;
+        check(!Workstation::canRetryAnalysis(*protectedSource), "manual downbeat protects its pulse even when the automatic BPM looks weak");
+    }
     auto playback = readMedia(ui.engine.formats, ui.engine.library[0]->file);
     check(playback.media != nullptr, "load actual arranged playback"); if (!playback.media) return;
     Clip clip; clip.media = playback.media; clip.length = playback.media->duration(); clip.pendingPlacement = PendingPlacement::append;
@@ -43,6 +95,49 @@ void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)
     const auto sorted = ui.analysisTargets(0);
     check(selected.size() == 2 && sorted.size() == 2 && std::all_of(sorted.begin(), sorted.end(), [&](const auto& media)
         { return std::any_of(selected.begin(), selected.end(), [&](const auto& old) { return old->id == media->id; }); }), "multiple selection survives sorting and refresh by identity");
+    const auto rightClick = [&](int row)
+    {
+        auto& table = ui.libraryTable.table; const auto point = juce::Point<float> {40, 12};
+        const auto event = juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
+            juce::ModifierKeys(juce::ModifierKeys::rightButtonModifier), 1, 0, 0, 0, 0,
+            &table, &table, juce::Time::getCurrentTime(), point, juce::Time::getCurrentTime(), 1, false);
+        ui.libraryTable.cellClicked(row, 1, event);
+    };
+    const auto rows = ui.libraryTable.table.getSelectedRows(); rightClick(rows[0]);
+    juce::Component* menuRow = nullptr;
+    std::function<void(juce::Component&)> findMenu = [&](juce::Component& component)
+    {
+        if (const auto* handler = component.getAccessibilityHandler())
+            if (handler->getRole() == juce::AccessibilityRole::menuItem && handler->getTitle() == "Re-analyse selected tracks") menuRow = &component;
+        for (auto* child : component.getChildren()) findMenu(*child);
+    };
+    auto& desktop = juce::Desktop::getInstance();
+    for (int i = 0; i < desktop.getNumComponents(); ++i) findMenu(*desktop.getComponent(i));
+    bool menuCaptured = false;
+    if (menuRow)
+    {
+        auto* popup = menuRow->getTopLevelComponent(); auto image = report.getSiblingFile("library-batch-menu.png").createOutputStream(); juce::PNGImageFormat format;
+        menuCaptured = image && format.writeImageToStream(popup->createComponentSnapshot(popup->getLocalBounds()), *image);
+    }
+    check(menuCaptured, "capture actual native right-click batch menu");
+    check(ui.libraryTable.table.getSelectedRows() == rows && juce::PopupMenu::dismissAllActiveMenus(), "RMB on a selected row preserves the batch and opens the real popup");
+    auto menu = ui.libraryTable.beatmatchMenu(rows[0]); bool batch = false, single = false;
+    for (juce::PopupMenu::MenuItemIterator i(menu, true); i.next();) { batch |= i.getItem().itemID == 60; single |= i.getItem().itemID == 8600; }
+    check(batch && !single, "batch menu exposes selected re-analysis without pretending single-track splitting is batched");
+    int other = 0; while (rows.contains(other)) ++other; rightClick(other);
+    check(ui.libraryTable.table.getNumSelectedRows() == 1 && ui.libraryTable.table.isRowSelected(other) && juce::PopupMenu::dismissAllActiveMenus(), "RMB outside the selection targets only the clicked source");
+    ui.libraryTable.table.selectRowsBasedOnModifierKeys(0, juce::ModifierKeys(), false);
+    ui.libraryTable.table.selectRowsBasedOnModifierKeys(2, juce::ModifierKeys(juce::ModifierKeys::ctrlModifier), false);
+    check(ui.libraryTable.table.getNumSelectedRows() == 2, "native Ctrl-click adds a non-adjacent source");
+    ui.libraryTable.table.selectRowsBasedOnModifierKeys(3, juce::ModifierKeys(juce::ModifierKeys::shiftModifier), false);
+    check(ui.libraryTable.table.isRowSelected(2) && ui.libraryTable.table.isRowSelected(3), "native Shift-click selects a contiguous range");
+    ui.menuItemSelected(65, 3); check(ui.libraryTable.table.getNumSelectedRows() == 4, "Select all visible tracks selects the native table");
+    ui.libraryTable.table.deselectAllRows();
+    check(ui.libraryTable.table.keyPressed(juce::KeyPress('a', juce::ModifierKeys::commandModifier, 0))
+        && ui.libraryTable.table.getNumSelectedRows() == 4, "native Ctrl+A selects every visible library row");
+    ui.search.setText("refresh-1", juce::dontSendNotification); ui.filterLibrary(); ui.menuItemSelected(65, 3);
+    check(ui.analysisTargets(0).size() == 1 && ui.analysisTargets(0)[0]->file.getFileName() == "refresh-1.wav", "filtered Select all cannot include hidden library sources");
+    ui.search.setText({}, juce::dontSendNotification); ui.filterLibrary();
     auto repeated = ui.engine.project.clips[0]; repeated.id = juce::Uuid().toString(); repeated.start += repeated.length;
     ui.engine.project.clips.push_back(repeated); ui.showBrowserPage(1); ui.refresh();
     juce::SparseSet<int> both; both.addRange({0, 2}); ui.playlistTable.table.setSelectedRows(both, juce::sendNotification);
@@ -83,6 +178,28 @@ void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)
             int completed = 0; for (size_t i = 0; i < beforeCancel.size(); ++i) completed += ui.engine.library[i] != beforeCancel[i];
             check(completed > 0 && completed < (int) beforeCancel.size() && !ui.importProgress.isVisible(), "Stop analysis retains completed results and skips remaining tracks");
             check(juce::JSON::toString(projectToJson(ui.engine.project)) == geometry, "cancelling analysis also retains the arrangement");
+            auto& source = ui.engine.library[1]; source->manualKey = -1; source->analysis.key = -1;
+            source->analysis.focusedRevision = source->analysis.focusedKey = source->analysis.focusedTempo = 0;
+            check(writeAnalysisRecord(source->file, source->analysisRecord()).isEmpty(), "seed an untried weak automatic key for the native batch retry");
+            ui.showBrowserPage(0); ui.refresh(); ui.menuItemSelected(65, 3); beforeCancel = ui.engine.library;
+            ui.menuItemSelected(64, 3);
+            check(ui.busy && ui.importProgress.isVisible(), "native focused command starts cancellable batch work");
+            auto capture = report.getSiblingFile("focused-retry-progress.png").createOutputStream(); juce::PNGImageFormat imageFormat;
+            check(capture && imageFormat.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()), *capture), "capture actual focused retry and selected library rows");
+            phase = 3;
+        }
+        else if (phase == 3 && !ui.busy)
+        {
+            check(ui.engine.library[1]->analysis.focusedKey == 1 && ui.engine.library[1]->manualBpm == 121
+                && ui.engine.library[1]->manualBeatOrigin == .213 && ui.engine.library[0] == beforeCancel[0]
+                && ui.engine.library[2] == beforeCancel[2] && ui.engine.library[3] == beforeCancel[3],
+                "native focused batch attempts only weak unprotected fields and skips manual sources");
+            check(ui.status.contains("0 improved; 1 unchanged; 3 skipped; 0 failed")
+                && juce::JSON::toString(projectToJson(ui.engine.project)) == geometry && ui.engine.project.clips[0].prepared == pcm,
+                "focused completion reports unchanged honestly and preserves arranged PCM and clocks");
+            const auto completed = ui.engine.library;
+            ui.menuItemSelected(64, 3);
+            check(!ui.busy && ui.engine.library == completed && ui.status.contains("No untried"), "repeating completed batch retry is a no-op with clear feedback");
             poll.stopTimer(); juce::MessageManager::getInstance()->stopDispatchLoop();
         }
     };

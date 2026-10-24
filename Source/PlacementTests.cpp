@@ -5,6 +5,13 @@ namespace mixworks
 {
 void runPlacementTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    const auto menuCommand = [](Workstation& ui, int page, const juce::String& label)
+    {
+        auto menu = ui.getMenuForIndex(page, {});
+        for (juce::PopupMenu::MenuItemIterator it(menu, true); it.next();)
+            if (it.getItem().text == label) return it.getItem().itemID;
+        return 0;
+    };
     {
         auto media = std::make_shared<Media>(); media->sampleRate = 8000; media->samples.setSize(2, 64000); media->samples.clear();
         media->manualBpm = 120; media->manualBeatOrigin = .25;
@@ -56,8 +63,8 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
     {
         const auto& c = ui.engine.project.clips.front(); return c.id == existing.id && c.start == existing.start && c.length == existing.length && c.gainDb == existing.gainDb;
     };
-    check(ui.transitionIndex == 2 && ui.getMenuBarNames().contains("Beatmatch"), "explicit 8-bar insertion choice and rebuild remain available through the Beatmatch menu");
-    ui.showBrowserPage(1); check(ui.getMenuBarNames().contains("Beatmatch"), "Beatmatch menu remains available on Playlist"); ui.showBrowserPage(0);
+    check(ui.transitionIndex == 2 && ui.getMenuBarNames().contains("Beat grids"), "explicit 8-bar insertion choice and rebuild remain available through the Beatmatch menu");
+    ui.showBrowserPage(1); check(ui.getMenuBarNames().contains("Beat grids"), "Beatmatch menu remains available on Playlist"); ui.showBrowserPage(0);
     juce::SparseSet<int> rows;
     for (int i = 0; i < (int) ui.visibleMedia.size(); ++i) if (ui.engine.library[(size_t) ui.visibleMedia[(size_t) i]]->id == b.media->id) rows.addRange({i, i + 1});
     const auto description = ui.libraryTable.getDragSourceDescription(rows);
@@ -138,7 +145,8 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
         {
             
             const auto& placed = ui.engine.project.clips.back();
-            check(placed.beatmatched && placed.start >= 0 && placed.track == 0 && placed.fadeIn == 0 && (ui.engine.project.transitionPlaybackFor(placed).pairs[0][1].instant || ui.engine.project.transitionPlaybackFor(placed).pairs[1][1].instant) && originalKept(),
+            check(placed.beatmatched && placed.start >= 0 && placed.track == 0 && placed.fadeIn == 0 && placed.controls.automation[1].active()
+                && std::any_of(placed.controls.automation[1].points.begin(),placed.controls.automation[1].points.end(),[](const auto& point) { return point.bend == 1; }) && originalKept(),
                   "an occupied-lane drop uses the selected bass swap without volume fades: " + ui.status);
             ui.viewport.setViewPosition(0, 0);
             const auto point = ui.getLocalPoint(&timeline, juce::Point<int>(237, ui.timeline.laneTop(3) + 40));
@@ -180,9 +188,9 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
         else if (phase == 5)
         {
             const auto& clips = ui.engine.project.clips;
-            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && ui.engine.project.transitionPlaybackFor(clips[0]).pairs[1][1].instant && ui.engine.project.transitionPlaybackFor(clips[1]).pairs[0][1].instant,
+            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && clips[0].controls.automation[1].active() && clips[1].controls.automation[1].active(),
                   "default append creates an overlapping transition at the first track's tempo");
-            const auto before = juce::JSON::toString(projectToJson(ui.engine.project)); ui.menuItemSelected(41, 3);
+            const auto before = juce::JSON::toString(projectToJson(ui.engine.project)); ui.menuItemSelected(menuCommand(ui, 3, ui.transitionLength.getItemText(1)), 3);
             check(ui.transitionIndex == 1 && juce::JSON::toString(projectToJson(ui.engine.project)) == before,
                   "Beatmatch menu sets transition length without silently rearranging the mix");
             ui.menuItemSelected(13, 3); phase = 6;
@@ -190,9 +198,9 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
         else if (phase == 6)
         {
             const auto& clips = ui.engine.project.clips;
-            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && ui.engine.project.transitionPlaybackFor(clips[0]).pairs[1][1].instant && ui.engine.project.transitionPlaybackFor(clips[1]).pairs[0][1].instant,
+            check(clips.size() == 2 && clips[1].start < clips[0].end() && clips[0].fadeOut == 0 && clips[1].fadeIn == 0 && clips[0].controls.automation[1].active() && clips[1].controls.automation[1].active(),
                   "Beatmatch menu explicitly rebuilds the requested overlapping transition");
-            ui.menuItemSelected(40, 3); ui.menuItemSelected(13, 3); phase = 7;
+            ui.menuItemSelected(menuCommand(ui, 3, ui.transitionLength.getItemText(0)), 3); ui.menuItemSelected(13, 3); phase = 7;
         }
         else if (phase == 7)
         {
@@ -256,7 +264,7 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
             ui.transitionPreset.setSelectedId(3, juce::dontSendNotification); // A later UI choice must not change an in-flight insertion.
             phase = 14;
         }
-        else
+        else if (phase == 14)
         {
             const auto& out = ui.engine.project.clips.front(); const auto& in = ui.engine.project.clips.back();
             check(ui.engine.project.clips.size() == 2 && out.outroAnchor == std::optional<double>(5)
@@ -264,6 +272,29 @@ void runPlacementTests(const std::function<void(bool, const juce::String&)>& che
                 "native alignment-only drop pairs new IN with the user's existing OUT");
             check(in.fadeIn == 0 && in.fadeOut == 0 && out.fadeOut == 0 && !in.controls.automation[1].active() && !out.controls.automation[1].active(),
                 "native drop creates no default transition and retains the preset captured before background preparation");
+            ui.newSession(); ui.engine.library = {a.media,b.media}; ui.librarySortColumn = 1; ui.librarySortForward = false;
+            ui.search.setText({},false); ui.filterLibrary(); ui.refresh(); ui.timeline.pixelsPerSecond = 40; ui.timeline.updateSize(); ui.viewport.setViewPosition(0,0);
+            juce::SparseSet<int> selectedRows; selectedRows.addRange({0,2});
+            const auto payload = ui.libraryTable.getDragSourceDescription(selectedRows);
+            check(payload.isArray() && payload.size() == 2 && payload[0].toString() == b.media->id && payload[1].toString() == a.media->id,
+                "multi-track library drag freezes the visible descending sort order");
+            const auto multiPoint = juce::Point<int>(20,ui.timeline.laneTop(2)+40);
+            ui.librarySortForward = true; ui.filterLibrary(); // display changes after drag start
+            check(ui.timeline.isInterestedInDragSource({payload,&ui.libraryTable.table,multiPoint})
+                && !ui.timeline.isInterestedInDragSource({juce::var(juce::Array<juce::var>{b.media->id,"missing-id"}),&ui.libraryTable.table,multiPoint}),
+                "batch payload survives resorting and rejects an entire stale selection");
+            ui.transitionPreset.setSelectedId(1,juce::dontSendNotification);
+            ui.timeline.itemDropped({payload,&ui.libraryTable.table,multiPoint}); phase = 15;
+        }
+        else
+        {
+            check(ui.engine.project.clips.size() == 2 && ui.engine.project.clips[0].media->id == b.media->id
+                && ui.engine.project.clips[1].media->id == a.media->id && ui.engine.project.clips[0].start < ui.engine.project.clips[1].start
+                && ui.engine.project.clips[0].track == 2 && ui.engine.project.clips[1].track == 2 && ui.engine.playbackReady(),
+                "batch library drop prepares all songs in frozen library order on the chosen lane");
+            ui.undo(false); const bool undoneBatch = ui.engine.project.clips.empty(); ui.undo(true);
+            check(undoneBatch && ui.engine.project.clips.size() == 2 && ui.engine.project.clips[0].media->id == b.media->id,
+                "one Undo/Redo covers the entire library drag batch");
             poll.stopTimer(); juce::MessageManager::getInstance()->stopDispatchLoop();
         }
     };

@@ -18,9 +18,9 @@ void runTempoUiTests(const std::function<void(bool, const juce::String&)>& check
     {
         Workstation points(false); points.stopTimer(); points.setSize(1250, 800);
         points.timeline.pixelsPerSecond = 40;
-        const AutomationAddress volume {0, AutomationTarget::volume}, filter {1, AutomationTarget::lowPass};
+        const AutomationAddress volume {0, AutomationTarget::volume}, filter {1, AutomationTarget::cutoff};
         auto& gain = points.engine.project.tracks[0].automation[0]; gain.setPoint(4, -6.0206f); gain.setPoint(8, -12);
-        points.engine.project.tracks[1].automation[(size_t) AutomationTarget::lowPass].setPoint(4, 10010);
+        points.engine.project.tracks[1].automation[(size_t) AutomationTarget::cutoff].setPoint(4, 0);
         points.refresh();
         const auto baseline = juce::JSON::toString(projectToJson(points.engine.project)); const auto history = points.undoHistory.size();
         check(points.timeline.automationPointLabel(volume, 0).isEmpty() && points.timeline.automationPointLabel(filter, 0).isEmpty(),
@@ -28,10 +28,16 @@ void runTempoUiTests(const std::function<void(bool, const juce::String&)>& check
         auto click = [&](juce::Point<float> location)
         { points.timeline.mouseDown(event(points.timeline, location, location, false)); points.timeline.mouseUp(event(points.timeline, location, location, false)); };
         click({160, points.timeline.automationY(0, -6.0206f, (int) AutomationTarget::volume)});
+        check(points.automationLane() == (int) AutomationTarget::volume && points.timeline.automationPointLabel(volume, 0).isEmpty(),
+            "first line click reveals its nodes before choosing a value caption");
+        click({160, points.timeline.automationY(0, -6.0206f, (int) AutomationTarget::volume)});
         check(points.timeline.automationPointLabel(volume, 0) == "50%" && points.timeline.automationPointLabel(volume, 1).isEmpty()
             && points.timeline.automationPointLabel(filter, 0).isEmpty(), "native node selection shows exactly its percentage after mouse release");
-        click({160, points.timeline.automationY(1, 10010, (int) AutomationTarget::lowPass)});
-        check(points.timeline.automationPointLabel(volume, 0).isEmpty() && points.timeline.automationPointLabel(filter, 0) == "50%",
+        click({160, points.timeline.automationY(1, 0, (int) AutomationTarget::cutoff)});
+        check(points.timeline.automationPointLabel(volume, 0).isEmpty() && points.timeline.automationPointLabel(filter, 0).isEmpty(),
+            "switching lines clears the previous caption while revealing the newly selected line's nodes");
+        click({160, points.timeline.automationY(1, 0, (int) AutomationTarget::cutoff)});
+        check(points.timeline.automationPointLabel(volume, 0).isEmpty() && points.timeline.automationPointLabel(filter, 0) == "Off",
             "selecting another curve moves the one value caption to its actual node");
         auto stream = report.getSiblingFile("selected-node-percentage-1250.png").createOutputStream(); juce::PNGImageFormat png;
         check(stream && png.writeImageToStream(points.createComponentSnapshot(points.getLocalBounds()), *stream), "capture only the selected node's percentage in the native timeline");
@@ -171,8 +177,9 @@ void runTempoUiTests(const std::function<void(bool, const juce::String&)>& check
     for (int page : {1, 2})
     {
         ui.menuItemSelected(page == 1 ? 20 : 21, 3);
-        check(ui.masterSlider.isVisible() && !ui.clipSliders[0].isVisible() && (page == 1 ? ui.pluginList.list.isVisible() && !ui.piano.isVisible() : ui.piano.isVisible() && !ui.pluginList.list.isVisible()),
-              page == 1 ? "View / Effects exposes VST tools while retaining master output" : "View / MIDI exposes the keyboard while retaining master output");
+        check(ui.masterSlider.isVisible() && ui.clipSliders[0].getParentComponent() == &ui.editingBody
+              && ui.pluginList.list.isVisible() && ui.piano.isVisible() == (page == 2),
+              page == 1 ? "View / Effects retains VST tools, separate Editing and master output" : "View / MIDI exposes the keyboard alongside VST tools and master output");
         const auto image = ui.createComponentSnapshot(ui.getLocalBounds()); auto file = report.getSiblingFile(page == 1 ? "workspace-effects-1250.png" : "workspace-midi-1250.png"); auto stream = file.createOutputStream();
         if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat format; format.writeImageToStream(image, *stream); }
     }

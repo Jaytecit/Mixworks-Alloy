@@ -77,14 +77,110 @@ void runAudioSlipTests(const std::function<void(bool, const juce::String&)>& che
         double difference = 0; for (int i = 0; i < 64; ++i) difference = std::max(difference, (double) std::abs(a.getSample(0, i) - b.getSample(0, i)));
         check(difference < 1.e-6 && a.getRMSLevel(0, 0, 64) > .01, "audible automation stays at mix time instead of following the slipped audio clock");
     }
+    auto forwardMoveTests = [&]
+    {
+        Project movement; movement.followTrackTempo = false; movement.bpm = 120; movement.snap = false;
+        for (int i = 0; i < 4; ++i)
+        {
+            Clip c; c.media = media; c.track = i; c.start = i == 3 ? 10 : i * 2; c.length = 4;
+            c.introAnchor = .5; c.outroAnchor = 2.5; c.fadeInAnchor = .5; c.fadeOutAnchor = 2.5; c.fadeIn = c.fadeOut = 1.5;
+            movement.clips.push_back(c);
+        }
+        movement.transitionLinksKnown = true;
+        for (int i = 0; i < 2; ++i)
+        {
+            auto& out = movement.clips[(size_t) i]; auto& in = movement.clips[(size_t) i + 1];
+            movement.linkClips(out.id, in.id);
+            auto& a = out.controls.automation[1]; auto& b = in.controls.automation[1]; a.enabled = b.enabled = true;
+            a.setPoint(2.75, 0); a.setPoint(3.25, -60); b.setPoint(.75, -60); b.setPoint(1.25, 0);
+            movement.transitionLinks[(size_t) i].bassSwap = std::array<double, 4>{2.75, 3.25, .75, 1.25};
+        }
+        const auto id = movement.clips[1].id;
+        const auto incoming = movement.transitionRange(movement.transitionLinks[0]);
+        const auto outgoing = movement.transitionRange(movement.transitionLinks[1]);
+        const auto earlier = juce::JSON::toString(projectToJson(movement)["clips"][0]);
+        for (double delta : {-.2, .2})
+        {
+            auto moved = movement; const auto result = moved.moveClipFollowing(id, 2 + delta, false);
+            check(result.wasOk() && moved.validateTransitionLinks().wasOk(), "forward move retains paired transition ownership: " + result.getErrorMessage());
+            if (result.failed()) continue;
+            check(std::abs(moved.clips[1].start - 2 - delta) < 1e-8 && std::abs(moved.clips[2].start - 4 - delta) < 1e-8
+                && std::abs(moved.clips[3].start - 10 - delta) < 1e-8, "selected box, linked successor and unlinked later track move together");
+            check(juce::JSON::toString(projectToJson(moved)["clips"][0]) == earlier && moved.transitionRange(moved.transitionLinks[0]) == incoming,
+                "the entire earlier clip and incoming transition stay at their exact original positions");
+            const auto after = moved.transitionRange(moved.transitionLinks[1]);
+            check(std::abs(after.getStart() - outgoing.getStart() - delta) < 1e-8 && std::abs(after.getEnd() - outgoing.getEnd() - delta) < 1e-8
+                && moved.transitionLinks[1] == movement.transitionLinks[1], "later transition window moves intact with its source-owned bass treatment");
+            const auto& pair = *moved.transitionLinks[0].bassSwap;
+            check(std::abs(moved.clips[1].start + moved.clips[1].localTimeForSource(pair[2]) - 2.75) < 1e-8
+                && std::abs(moved.clips[1].start + moved.clips[1].localTimeForSource(pair[3]) - 3.25) < 1e-8,
+                "incoming bass endpoints stay fixed while the selected audio and box move");
+            const auto parsed = parseProject(json(moved));
+            check(parsed.error.isEmpty() && parsed.clips.size() == 4 && std::abs(parsed.clips[1].clip.start - 2 - delta) < 1e-8,
+                "forward geometry and pinned anchors survive the existing session format");
+        }
+        for (double target : {-1., 3., std::numeric_limits<double>::quiet_NaN()})
+        {
+            auto rejected = movement; const auto before = json(rejected);
+            check(rejected.moveClipFollowing(id, target, false).failed() && json(rejected) == before, "invalid/out-of-frame forward movement rejects atomically");
+        }
+        for (const auto& lockId : {movement.clips[1].id, movement.clips[2].id})
+        {
+            auto locked = movement; locked.setTransitionLocked(lockId, true); const auto before = json(locked);
+            check(locked.moveClipFollowing(id, 2.2, false).failed() && json(locked) == before, "incoming and later transition locks protect the whole forward edit");
+        }
+        auto pending = movement; pending.clips[3].pendingPlacement = PendingPlacement::append; const auto beforePending = json(pending);
+        check(pending.moveClipFollowing(id, 2.2, false).failed() && json(pending) == beforePending, "pending later tracks cannot be partly moved");
+        auto snapped = movement; const auto aligned = snapped.moveClipFollowing(id, 2.26, true);
+        check(aligned.wasOk() && std::abs(snapped.clips[1].start - 2.5) < 1e-6
+            && std::abs(snapped.clips[2].start - 4.5) < 1e-6
+            && std::abs(snapped.clips[1].firstBeatTime() - movement.clips[1].firstBeatTime()) < 1e-6,
+            "forward Snap moves by whole beats and retains both manually placed source phases");
+        auto mapped = movement; mapped.followTrackTempo = true; mapped.tempo = TempoMap {120, {{0, 120, false}, {8, 126, false}}};
+        const auto map = std::make_shared<const TempoMap>(mapped.tempo);
+        for (auto& c : mapped.clips) { c.beatmatched = true; c.tempoSourceBpm = 120; c.tempoMap = map; c.length = c.localTimeForSource(4); c.rate = 4 / c.length; }
+        const auto beforeMapped = mapped;
+        const auto mappedResult = mapped.moveClipFollowing(id, 2.2, false);
+        check(mappedResult.wasOk() && std::abs(mapped.tempo.beatsAt(mapped.clips[3].start) - mapped.tempo.beatsAt(beforeMapped.clips[3].start) - .4) < 1e-7,
+            "an unlinked later track carries musical displacement through a different project tempo");
+        auto dry = std::make_unique<Engine>(juce::File(), false); auto wet = std::make_unique<Engine>(juce::File(), false);
+        dry->sampleRate = wet->sampleRate = 8000; dry->project = wet->project = movement;
+        check(wet->project.moveClipFollowing(id, 2.2, false).wasOk(), "prepare a forward render comparison");
+        juce::AudioBuffer<float> a(2, 64), b(2, 64); juce::MidiBuffer midi;
+        dry->render(a, 64, 1, midi); wet->render(b, 64, 1, midi); double difference = 0;
+        for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 64; ++i) difference = std::max(difference, (double) std::abs(a.getSample(ch, i) - b.getSample(ch, i)));
+        check(difference < 1e-7 && a.getRMSLevel(0, 0, 64) > .001, "audio before the pinned incoming transition remains sample-identical");
+        dry->resetPlugins(); wet->resetPlugins(); dry->render(a, 64, 5, midi); wet->render(b, 64, 5.2, midi); difference = 0;
+        for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 64; ++i) difference = std::max(difference, (double) std::abs(a.getSample(ch, i) - b.getSample(ch, i)));
+        check(difference < 1e-5 && a.getRMSLevel(0, 0, 64) > .001, "later transition audio and treatment translate together through production rendering");
+        auto owned = std::make_unique<Workstation>(false); auto& desk = *owned; desk.stopTimer(); desk.setSize(1920, 1080);
+        desk.engine.project = movement; desk.engine.library = {media}; desk.timeline.pixelsPerSecond = 100; desk.refresh();
+        const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+        auto event = [&](juce::Point<float> p, juce::Point<float> down, bool drag)
+        { return juce::MouseEvent(mouse, p, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::altModifier), 1, 0, 0, 0, 0, &desk.timeline, &desk.timeline, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag); };
+        const auto down = desk.timeline.audioSlipBounds(desk.engine.project.clips[1]).getCentre();
+        desk.timeline.mouseDown(event(down, down, false)); desk.timeline.mouseDrag(event(down.translated(20, 0), down, true));
+        desk.engine.project.masterDb = -7;
+        desk.timeline.mouseDrag(event(down.translated(32, 0), down, true)); desk.timeline.mouseDrag(event(down.translated(32, 0), down, true));
+        desk.timeline.mouseUp(event(down.translated(32, 0), down, true));
+        check(std::abs(desk.engine.project.clips[1].start - 2.32) < 1e-7 && std::abs(desk.engine.project.clips[3].start - 10.32) < 1e-7
+            && desk.undoHistory.size() == 1 && desk.engine.project.masterDb == -7 && desk.engine.project.clips[1].audioSlip == 0,
+            "default native handle drag moves the boxes repeatedly with one Undo and retains live master changes");
+        desk.undo(false); check(json(desk.engine.project) == json(movement), "Undo restores the complete forward handle gesture"); desk.undo(true);
+        check(std::abs(desk.engine.project.clips[2].start - 4.32) < 1e-7, "Redo restores the translated following arrangement");
+        auto stream = report.getSiblingFile("forward-move-pinned.png").createOutputStream(); juce::PNGImageFormat png;
+        check(stream && png.writeImageToStream(desk.createComponentSnapshot(desk.getLocalBounds()), *stream), "capture native forward movement with the fixed incoming transition");
+    };
+    forwardMoveTests();
+
     Workstation ui(false); ui.stopTimer(); ui.engine.project = base; ui.engine.library = {media}; ui.setSize(1440, 940);
     ui.timeline.pixelsPerSecond = 100; ui.refresh(); ui.engine.position = 1.125; ui.engine.playing = true;
     const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
     auto event = [&](juce::Point<float> point, juce::Point<float> down, bool drag, int modifiers = 0)
-    { return juce::MouseEvent(mouse, point, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | modifiers), 1, 0, 0, 0, 0, &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag); };
+    { return juce::MouseEvent(mouse, point, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier | modifiers), 1, 0, 0, 0, 0, &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag); };
     const auto firstHandle = ui.timeline.audioSlipBounds(ui.engine.project.clips[0]), secondHandle = ui.timeline.audioSlipBounds(ui.engine.project.clips[1]);
     check(!firstHandle.isEmpty() && !secondHandle.isEmpty() && ui.timeline.audioSlipAt(firstHandle.getCentre()) == clip.id
-        && ui.timeline.audioSlipAt(secondHandle.getCentre()) == partner.id, "every timeline clip has its own independently hit-testable audio slip handle");
+        && ui.timeline.audioSlipAt(secondHandle.getCentre()) == partner.id, "every timeline clip has its own independently hit-testable move / Shift-slip handle");
     const auto down = firstHandle.getCentre();
     ui.timeline.mouseDown(event(down, down, false)); ui.timeline.mouseUp(event(down, down, false));
     check(ui.undoHistory.empty() && ui.engine.position == 1.125, "clicking the slip icon selects its track without moving audio, seeking or creating Undo");

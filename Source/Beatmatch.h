@@ -10,6 +10,7 @@ struct MatchResult { Project project; juce::String error; int matched = 0, skipp
 MatchResult prepareBeatmatch(Project project, double bpm, bool align, double overlapBeats, int64_t existingResidentBytes = 0);
 MatchResult prepareTempoMap(Project project, bool align, double overlapBeats, int64_t existingResidentBytes = 0, size_t alignFrom = 0, std::optional<double> livePosition = {}, TransitionPreset preset = TransitionPreset::bassSwap, bool sectionTransitions = false);
 // Same placement/tempo/transition owner, without decoding or preparing playback.
-MatchResult planTempoMap(Project, double overlapBeats, TransitionPreset, bool sectionTransitions, double maxSectionBeats = 256);
+MatchResult planTempoMap(Project, double overlapBeats, TransitionPreset, bool sectionTransitions, double maxSectionBeats = 256, std::optional<double> livePosition = {});
+juce::String prepareAppendedClips(Project&, size_t first, int64_t existingResidentBytes);
 juce::String prepareSavedClips(Project&);
 }

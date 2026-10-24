@@ -86,7 +86,7 @@ void LibraryAssets::prepareArtworkGrouping()
 }
 LibraryAssets readLibraryAssets(const juce::File& audio)
 {
-    LibraryAssets result;
+    LibraryAssets result; result.genreRead = true;
 #if JUCE_WINDOWS
     ComApartment apartment; if (!apartment.ready()) return result;
     ComPtr<IShellItem2> item;
@@ -94,7 +94,7 @@ LibraryAssets readLibraryAssets(const juce::File& audio)
     {
         ComPtr<IPropertyStore> properties;
         if (SUCCEEDED(item->GetPropertyStore(GPS_DEFAULT, IID_PPV_ARGS(&properties))))
-        { result.title = property(*properties.Get(), PKEY_Title); result.artist = property(*properties.Get(), PKEY_Music_Artist); result.album = property(*properties.Get(), PKEY_Music_AlbumTitle); }
+        { result.title = property(*properties.Get(), PKEY_Title); result.artist = property(*properties.Get(), PKEY_Music_Artist); result.album = property(*properties.Get(), PKEY_Music_AlbumTitle); result.genre = property(*properties.Get(), PKEY_Music_Genre); }
         ComPtr<IShellItemImageFactory> factory;
         if (SUCCEEDED(item.As(&factory))) result.cover = audioCover(*factory.Get());
         if (result.cover.isValid()) { result.coverSource = audio; result.audioThumbnail = true; result.prepareArtworkGrouping(); return result; }
@@ -109,5 +109,17 @@ LibraryAssets readLibraryAssets(const juce::File& audio)
     juce::ignoreUnused(audio);
 #endif
     return result;
+}
+juce::String readLibraryGenre(const juce::File& audio)
+{
+#if JUCE_WINDOWS
+    ComApartment apartment; if (!apartment.ready()) return {};
+    ComPtr<IShellItem2> item; ComPtr<IPropertyStore> properties;
+    if (SUCCEEDED(SHCreateItemFromParsingName(audio.getFullPathName().toWideCharPointer(), nullptr, IID_PPV_ARGS(&item)))
+        && SUCCEEDED(item->GetPropertyStore(GPS_DEFAULT, IID_PPV_ARGS(&properties)))) return property(*properties.Get(), PKEY_Music_Genre);
+#else
+    juce::ignoreUnused(audio);
+#endif
+    return {};
 }
 }

@@ -21,10 +21,19 @@ struct AudioCache
 class PcmStore
 {
 public:
-    explicit PcmStore(juce::File root, int64_t budget = 8LL * 1024 * 1024 * 1024);
+    static constexpr int64_t defaultBudgetBytes = 128LL * 1024 * 1024 * 1024;
+    struct Settings
+    {
+        juce::File root, retainedRoot;
+        int64_t budget = defaultBudgetBytes;
+        juce::String error;
+    };
+    explicit PcmStore(juce::File root, int64_t budget = defaultBudgetBytes, juce::File retainedRoot = {});
     // The first caller selects the root for this process; tests select an isolated root before starting workers.
     static PcmStore& shared(const juce::File& initialRoot = defaultRoot());
     static juce::File defaultRoot();
+    static juce::File settingsFile();
+    static Settings readSettings(const juce::File& settings, const juce::File& fallback);
     static juce::String decodedKey(const SourceIdentity&);
     static constexpr int headerBytes = 256;
     juce::File entryFile(const juce::String& key) const { return root.getChildFile(key + ".mwpcm"); }
@@ -32,8 +41,9 @@ public:
     std::unique_ptr<AudioCache> write(const juce::String& key, double rate, const juce::AudioBuffer<float>&, juce::String& warning);
     const juce::String& error() const { return problem; }
     const juce::File& directory() const { return root; }
+    int64_t limitBytes() const { return budget; }
 private:
-    juce::File root;
+    juce::File root, retainedRoot;
     int64_t budget;
     juce::String problem;
     bool ownedEntry(const juce::File&) const;

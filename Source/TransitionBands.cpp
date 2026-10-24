@@ -20,7 +20,7 @@ TransitionBandEnvelope compileBand(const TransitionBandSettings& setting, juce::
             : std::min(clock.bpmAt(clock.timeAtBeat(middle)) / 60 * 0.004, span / 8);
         begin = clock.timeAtBeat(middle - width / 2); end = clock.timeAtBeat(middle + width / 2);
     }
-    return {begin, end, (float) setting.strength, incoming, setting.mode == TransitionBandMode::constantPower, setting.mode == TransitionBandMode::swap && band > 0};
+    return {begin, end, (float) setting.strength, incoming, setting.mode == TransitionBandMode::constantPower, setting.mode == TransitionBandMode::swap && band > 0, setting.bend[incoming ? 0 : 1]};
 }
 }
 juce::Result TransitionBandSettings::validate(int band) const
@@ -30,7 +30,8 @@ juce::Result TransitionBandSettings::validate(int band) const
         || (mode == TransitionBandMode::constantPower && band != 0)
         || !std::isfinite(strength) || strength < 0 || strength > 1
         || !std::isfinite(gapBeats) || gapBeats < 0 || gapBeats > 32
-        || !std::isfinite(position) || position <= 0 || position >= 1)
+        || !std::isfinite(position) || position <= 0 || position >= 1
+        || std::any_of(bend.begin(), bend.end(), [](double value) { return !std::isfinite(value) || value < -1 || value > 1; }))
         return juce::Result::fail("Invalid transition band mode, strength, gap or position.");
     return juce::Result::ok();
 }
@@ -39,8 +40,10 @@ float TransitionBandEnvelope::gainAt(double time) const
     if (strength == 0) return 1;
     if (instant) return time < begin ? (rising ? 1 - strength : 1) : (rising ? 1 : 1 - strength);
     if (end <= begin) return 1;
+    if (bend >= 1) return time < end ? (rising ? 1 - strength : 1) : (rising ? 1 : 1 - strength);
     const double progress = juce::jlimit(0.0, 1.0, (time - begin) / (end - begin));
-    const double linear = rising ? progress : 1 - progress;
+    const double shaped = automationProgress(progress, bend);
+    const double linear = rising ? shaped : 1 - shaped;
     const double gain = constantPower ? std::sin(linear * juce::MathConstants<double>::halfPi) : linear;
     return (float) (1 - strength * (1 - gain));
 }
@@ -51,7 +54,7 @@ float TransitionPlayback::gainAt(int band, double time) const
 }
 juce::Result Project::validateTransitionBands(const TransitionLink& link) const
 {
-    const TempoMap fixed {bpm, {}}; const auto& clock = followTrackTempo ? tempo : fixed;
+    const TempoMap fixed {bpm, {}, tempo.origin}; const auto& clock = followTrackTempo ? tempo : fixed;
     for (int band = 0; band < 4; ++band) if (link.bands[(size_t) band])
     {
         const auto& setting = *link.bands[(size_t) band]; const auto valid = setting.validate(band); if (valid.failed()) return valid;
@@ -76,7 +79,7 @@ juce::Result Project::validateTransitionBands(const TransitionLink& link) const
 TransitionPlayback Project::transitionPlaybackFor(const Clip& clip) const
 {
     TransitionPlayback result;
-    const TempoMap fixed {bpm, {}}; const auto& clock = followTrackTempo ? tempo : fixed;
+    const TempoMap fixed {bpm, {}, tempo.origin}; const auto& clock = followTrackTempo ? tempo : fixed;
     for (const auto& link : transitionLinks)
     {
         const bool incoming = link.incoming == clip.id;
@@ -87,7 +90,8 @@ TransitionPlayback Project::transitionPlaybackFor(const Clip& clip) const
         // A valid chain has at most one incoming and one outgoing relationship.
         auto& pair = result.pairs[incoming ? 0 : 1];
         const auto range = transitionRange(link);
-        if (incoming) result.startCut = range.getStart(); else result.endCut = range.getEnd();
+        if (link.muteOutside)
+        { if (incoming) result.startCut = range.getStart(); else result.endCut = range.getEnd(); }
         result.filters[incoming ? 0 : 1] = {range.getStart(), range.getEnd(), link.filter, incoming};
         for (size_t band = 0; band < 4; ++band) if (link.bands[band]) pair[band] = compileBand(*link.bands[band], range, clock, incoming, (int) band);
     }
@@ -126,6 +130,7 @@ juce::var transitionBandsToJson(const Project::TransitionLink& link)
         if (!setting) { bands.add(juce::var()); continue; }
         auto* value = new juce::DynamicObject(); value->setProperty("mode", modeIds[(int) setting->mode]);
         value->setProperty("strength", setting->strength); value->setProperty("gapBeats", setting->gapBeats); value->setProperty("position", setting->position);
+        if (setting->bend != std::array<double, 2> {}) { juce::Array<juce::var> bends; for (double bend : setting->bend) bends.add(bend); value->setProperty("bend", bends); }
         bands.add(juce::var(value));
     }
     return bands;
@@ -140,6 +145,11 @@ juce::Result readTransitionBands(const juce::var& value, Project::TransitionLink
         if (!item.isObject() || !item["mode"].isString() || !modeIds.contains(item["mode"].toString())
             || !numeric(item["strength"]) || !numeric(item["gapBeats"]) || !numeric(item["position"])) return juce::Result::fail("Invalid transition band settings.");
         TransitionBandSettings setting {(TransitionBandMode) modeIds.indexOf(item["mode"].toString()), (double) item["strength"], (double) item["gapBeats"], (double) item["position"]};
+        if (item.hasProperty("bend"))
+        {
+            if (!item["bend"].isArray() || item["bend"].size() != 2) return juce::Result::fail("Invalid transition bend.");
+            for (int side = 0; side < 2; ++side) { if (!numeric(item["bend"][side])) return juce::Result::fail("Invalid transition bend."); setting.bend[(size_t) side] = (double) item["bend"][side]; }
+        }
         const auto valid = setting.validate(band); if (valid.failed()) return valid;
         link.bands[(size_t) band] = setting;
     }

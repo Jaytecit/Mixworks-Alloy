@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 
 from capacity_fixture import ensure_capacity_fixture
+from test_artifacts import require_space
 
 from verification import REGRESSION_SUITES, bundle_identity, create_receipt, plugin_identity, run_checks, write_json
 
@@ -13,13 +14,17 @@ def main(argv=None):
     parser.add_argument('--exe', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--receipt', type=Path, help='Write a regression receipt only after every suite passes.')
+    parser.add_argument('--include-stress', action='store_true', help='Explicitly enable the Alloy playback/paint stress probe; required for a complete receipt.')
     args = parser.parse_args(argv)
+    if args.receipt and not args.include_stress:
+        parser.error('--receipt requires --include-stress; routine runs do not establish complete stress coverage.')
     args.output.mkdir(parents=True, exist_ok=False)
     exe = args.exe.resolve()
     workspace = Path(__file__).resolve().parents[1]
     summary = dict(format='mixworks-analysis-tests', schemaVersion=2, suites=[], errors=[])
     summary_file = args.output / 'summary.json'
     try:
+        require_space(workspace)
         identity = bundle_identity(exe)
         summary.update(identity)
         plugin = workspace / 'build/MixworksTestGain_artefacts/Release/VST3/Mixworks Test Gain.vst3'
@@ -49,7 +54,8 @@ def main(argv=None):
                 flags += ['--instrument', str(instrument)]
             else:
                 flags.insert(0, '--' + suite + '-only')
-            result = dict(name=suite, **run_checks(target, flags, args.output / suite, cwd=workspace))
+            result = dict(name=suite, **run_checks(target, flags, args.output / suite, cwd=workspace,
+                                                include_stress=args.include_stress))
             summary['suites'].append(result)
             write_json(summary_file, summary)
             print(f"{suite}: {result['summary']}; exit {result['exit']}", flush=True)

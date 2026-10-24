@@ -80,12 +80,36 @@ class VerificationTests(unittest.TestCase):
         for mutate in (lambda s: s['suites'].pop(),
                        lambda s: s['suites'].append(s['suites'][0]),
                        lambda s: s['suites'][0].update(name='unknown'),
+                       lambda s: s['suites'][0].update(invocation=[]),
                        lambda s: s['suites'][0].update(report=s['suites'][1]['report']),
-                       lambda s: s['suites'][0]['invocation'].update(flags=['--tempo-only'])):
+                       lambda s: s['suites'][0]['invocation'].update(flags=['--tempo-only']),
+                       lambda s: s['suites'][0]['invocation'].update(mode='interactive-bridge')):
             changed = copy.deepcopy(original)
             mutate(changed)
             with self.assertRaises(ValueError):
                 validate_regressions(changed, self.exe)
+
+    def test_routine_runs_lower_priority_and_require_explicit_stress_opt_in(self):
+        def child(command, **kwargs):
+            Path(command[-1]).write_text('PASS fixture\n1 checks; 0 failures\n')
+            return types.SimpleNamespace(returncode=0)
+        with patch.dict('os.environ', {'MIXWORKS_TEST_STRESS': '1'}):
+            for enabled in (False, True):
+                with patch('verification.subprocess.run', side_effect=child) as run:
+                    result = run_checks(self.exe, ['--alloy-only'], self.folder / str(enabled), include_stress=enabled)
+                self.assertEqual(result['exit'], 0)
+                self.assertEqual(run.call_args.kwargs['env']['MIXWORKS_TEST_STRESS'], '1' if enabled else '0')
+                self.assertEqual(run.call_args.kwargs['creationflags'], getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0))
+                self.assertEqual(result['invocation']['includeStress'], enabled)
+
+    def test_routine_alloy_cannot_be_claimed_as_complete_regressions(self):
+        summary = self.summary()
+        alloy = next(s for s in summary['suites'] if s['name'] == 'alloy')
+        alloy['invocation']['includeStress'] = False
+        with self.assertRaisesRegex(ValueError, 'omits stress'):
+            validate_regressions(summary, self.exe)
+        alloy['invocation']['includeStress'] = True
+        validate_regressions(summary, self.exe)
 
     def test_receipt_binds_reports_summary_and_all_bundle_assets(self):
         summary_path = self.folder / 'summary.json'

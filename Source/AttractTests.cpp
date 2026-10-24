@@ -27,6 +27,7 @@ void runAttractTests(Workstation& ui, const std::function<void(bool, const juce:
     const auto status = ui.status; const auto position = ui.engine.position.load(); const auto playing = ui.engine.playing.load();
     const auto record = ui.engine.automationRecordMode; const auto armed = ui.engine.automationArmed;
     const auto learn = ui.engine.learnAction.hasValue();
+    const int inspector = ui.inspectorPage;
     auto snapshot = [&](juce::Component& component) { return component.createComponentSnapshot(component.getLocalBounds()); };
     auto save = [&](juce::Component& component, const juce::String& name, float scale = 1)
     {
@@ -40,6 +41,40 @@ void runAttractTests(Workstation& ui, const std::function<void(bool, const juce:
         for (int y = 0; y < a.getHeight(); ++y) for (int x = 0; x < a.getWidth(); ++x) count += a.getPixelAt(x, y) != b.getPixelAt(x, y);
         return count;
     };
+    // Escape can leave one antialiased curve-edge pixel differing by 3/255.
+    // Keep this tolerance local to appearance restoration; state and PCM stay exact.
+    auto restoredAppearance = [](const juce::Image& a, const juce::Image& b)
+    {
+        if (!a.isValid() || !b.isValid() || a.getBounds() != b.getBounds()) return false;
+        int changed = 0;
+        for (int y = 0; y < a.getHeight(); ++y) for (int x = 0; x < a.getWidth(); ++x)
+        {
+            const auto left = a.getPixelAt(x, y), right = b.getPixelAt(x, y);
+            if (left == right) continue;
+            if (++changed > 1 || left.getAlpha() != right.getAlpha()
+                || std::abs(int(left.getRed()) - int(right.getRed())) > 3
+                || std::abs(int(left.getGreen()) - int(right.getGreen())) > 3
+                || std::abs(int(left.getBlue()) - int(right.getBlue())) > 3) return false;
+        }
+        return true;
+    };
+    {
+        juce::Image reference(juce::Image::ARGB, 2, 2, true);
+        reference.clear(reference.getBounds(), juce::Colour(135, 127, 72));
+        auto changed = reference.createCopy();
+        check(restoredAppearance(reference, changed), "appearance comparison accepts identical pixels");
+        changed.setPixelAt(0, 0, juce::Colour(132, 124, 71));
+        check(restoredAppearance(reference, changed) && restoredAppearance(changed, reference),
+              "appearance comparison accepts the recorded single-pixel variation in either direction");
+        changed.setPixelAt(1, 0, juce::Colour(132, 124, 71));
+        check(!restoredAppearance(reference, changed), "appearance comparison rejects two changed pixels");
+        changed = reference.createCopy(); changed.setPixelAt(0, 0, juce::Colour(131, 127, 72));
+        check(!restoredAppearance(reference, changed), "appearance comparison rejects a channel difference above three");
+        changed = reference.createCopy(); changed.setPixelAt(0, 0, juce::Colour(135, 127, 72).withAlpha(juce::uint8(254)));
+        check(!restoredAppearance(reference, changed), "appearance comparison rejects an alpha change");
+        check(!restoredAppearance(reference, juce::Image(juce::Image::ARGB, 1, 2, true))
+            && !restoredAppearance(juce::Image(), juce::Image()), "appearance comparison rejects missing or resized captures");
+    }
     const bool wasVisible = ui.isVisible(); ui.setVisible(true);
     ui.setSize(1920, 1080); ui.showToolPage(0);
     juce::MidiBuffer midi; juce::AudioBuffer<float> before(2, 256), after(2, 256);
@@ -67,6 +102,7 @@ void runAttractTests(Workstation& ui, const std::function<void(bool, const juce:
         ui.attractState.startedAtMs = juce::Time::getMillisecondCounterHiRes() - (scene * 8. + 3) * 1000;
         check(save(ui, "attract-scene-" + juce::String(scene) + ".png"), "capture native animated attract scene " + juce::String(scene));
     }
+    check(ui.workspaceDirty == workspaceDirty, "attract lighting alone does not change saved workspace preferences");
     ui.showToolPage(1); check(save(ui, "attract-transitions.png"), "attract lighting covers the selected Transitions panel");
     ui.detachToolPanel(1, true); ui.transitionWindow->setSize(1100, 620);
     ui.detachToolPanel(0, true);
@@ -77,14 +113,20 @@ void runAttractTests(Workstation& ui, const std::function<void(bool, const juce:
     ui.detachToolPanel(0, false); ui.detachToolPanel(1, false); ui.showToolPage(0);
     ui.setSize(1250, 800); check(save(ui, "attract-1250.png"), "attract lighting follows the narrow native layout");
     ui.showInspectorPage(2); check(save(ui, "attract-keys-200.png", 2), "keyboard edge lights and controls remain vector-rendered at 200 percent");
-    ui.showInspectorPage(0); ui.setSize(1920, 1080);
+    ui.showInspectorPage(inspector); ui.showToolPage(0); ui.setSize(1920, 1080);
     check(project == juce::JSON::toString(projectToJson(ui.engine.project)) && ui.undoHistory.size() == undo && ui.redoHistory.size() == redo
-        && ui.dirty == dirty && ui.workspaceDirty == workspaceDirty && ui.status == status && ui.engine.position == position && ui.engine.playing == playing
+        && ui.dirty == dirty && ui.status == status && ui.engine.position == position && ui.engine.playing == playing
         && ui.engine.automationRecordMode == record && ui.engine.automationArmed == armed && ui.engine.learnAction.hasValue() == learn,
           "light sequences, resizing and detached panels preserve the mix, transport, Undo, record and learn state");
     ui.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
-    check(!ui.attractState.enabled && !ui.attractLights.isVisible() && differences(normal, snapshot(ui)) == 0,
-          "Escape restores the original native appearance exactly");
+    const auto restored = snapshot(ui); const int restoredDifferences = differences(normal, restored);
+    if (restoredDifferences != 0)
+    {
+        for (const auto& capture : {std::pair<juce::String, juce::Image>{"escape-before.png", normal}, {"escape-after.png", restored}})
+        { auto output = report.getSiblingFile(capture.first).createOutputStream(); juce::PNGImageFormat png; if (output) png.writeImageToStream(capture.second, *output); }
+    }
+    check(!ui.attractState.enabled && !ui.attractLights.isVisible() && restoredAppearance(normal, restored),
+          "Escape restores the original native appearance within one pixel at RGB tolerance three");
     const juce::KeyPress shortcut('A', juce::ModifierKeys::ctrlModifier | juce::ModifierKeys::shiftModifier, 0);
     check(ui.keyPressed(shortcut) && ui.attractState.enabled, "Ctrl+Shift+A enables attract lighting");
     ui.busy = true; const bool exited = ui.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)); ui.busy = false;
@@ -92,8 +134,32 @@ void runAttractTests(Workstation& ui, const std::function<void(bool, const juce:
     ui.menuItemSelected(77, 4); ui.menuItemSelected(77, 4);
     check(!ui.attractState.enabled, "View menu toggles attract lighting off again without persisting it");
     ui.menuItemSelected(80, 4); ui.menuItemSelected(77, 4);
-    const auto steadyFrame = snapshot(ui); ui.attractState.startedAtMs -= 20000;
-    check(!ui.attractState.allowsMotion() && differences(steadyFrame, snapshot(ui)) == 0, "Steady choice stops native lighting motion even when explicitly enabled");
+    // Assert the native lighting surface itself. The host also paints waveform
+    // curves, whose rasterisation is independent of the attract clock.
+    const auto steadyHost = snapshot(ui), steadyFrame = snapshot(ui.attractLights);
+    ui.attractState.startedAtMs -= 20000;
+    const auto steadyHostLater = snapshot(ui), steadyLater = snapshot(ui.attractLights);
+    const int steadyDifferences = differences(steadyFrame, steadyLater), hostDifferences = differences(steadyHost, steadyHostLater);
+    bool hasLighting = false;
+    for (int y = 0; y < steadyFrame.getHeight() && !hasLighting; ++y)
+        for (int x = 0; x < steadyFrame.getWidth() && !hasLighting; ++x) hasLighting = steadyFrame.getPixelAt(x, y).getAlpha() != 0;
+    {
+        auto* facts = new juce::DynamicObject(); facts->setProperty("lightingPixelsChanged", steadyDifferences);
+        facts->setProperty("hostPixelsChanged", hostDifferences); facts->setProperty("lightingHasInk", hasLighting);
+        report.getSiblingFile("steady-render-comparison.json").replaceWithText(juce::JSON::toString(juce::var(facts)));
+    }
+    if (steadyDifferences != 0 || hostDifferences != 0)
+    {
+        for (bool laterFrame : {false, true})
+        {
+            auto output = report.getSiblingFile(laterFrame ? "steady-later-failure.png" : "steady-before-failure.png").createOutputStream();
+            juce::PNGImageFormat png; if (output) png.writeImageToStream(laterFrame ? steadyHostLater : steadyHost, *output);
+            auto lighting = report.getSiblingFile(laterFrame ? "steady-lighting-later.png" : "steady-lighting-before.png").createOutputStream();
+            if (lighting) png.writeImageToStream(laterFrame ? steadyLater : steadyFrame, *lighting);
+        }
+    }
+    check(!ui.attractState.allowsMotion() && hasLighting && steadyDifferences == 0,
+          "Steady choice stops native lighting motion even when explicitly enabled (" + juce::String(steadyDifferences) + " lighting pixels; " + juce::String(hostDifferences) + " host pixels changed)");
     ui.menuItemSelected(77, 4); ui.menuItemSelected(78, 4);
     check(ui.attractState.motion == AttractMotion::system && ui.attractState.allowsMotion() == AlloyLookAndFeel::motionAllowed(),
           "Follow Windows restores the current reduced-motion preference");

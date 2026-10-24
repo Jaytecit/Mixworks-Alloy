@@ -36,23 +36,33 @@ void Workstation::selectTracksNeedingAnalysis()
         if (engine.library[(size_t) visibleMedia[(size_t) row]]->needsAnalysis()) rows.addRange({row, row + 1});
     libraryTable.table.setSelectedRows(rows, juce::dontSendNotification);
     selectedLibraryId = rows.isEmpty() ? juce::String() : engine.library[(size_t) visibleMedia[(size_t) rows[0]]]->id;
-    setStatus("Selected " + juce::String(rows.size()) + " tracks with missing, outdated or uncertain analysis. Ctrl/Shift selects individual tracks.");
+    setStatus("Selected " + juce::String(rows.size()) + " songs with missing, outdated or uncertain analysis. Ctrl/Shift selects individual songs.");
 }
-void Workstation::reanalyseTracks(int scope)
+bool Workstation::canRetryAnalysis(const Media& media)
+{
+    return (media.manualBpm <= 0 && media.manualBeatOrigin < 0 && needsFocusedTempo(media.analysis))
+        || (media.manualKey < 0 && needsFocusedKey(media.analysis));
+}
+void Workstation::reanalyseTracks(int scope, bool focused, std::vector<std::shared_ptr<Media>> targets)
 {
     if (busy) return;
-    if (engine.playing) { setStatus("Pause playback before re-analysing tracks."); return; }
+    if (engine.playing) { setStatus("Pause playback before re-analysing songs."); return; }
     if (!timelineLoads.empty() || pendingTempo > 0 || tempoPreparationPending || engine.exporting)
-    { setStatus("Wait for timeline audio and tempo preparation before re-analysing tracks."); return; }
-    const auto targets = analysisTargets(scope);
-    if (targets.empty()) { setStatus("No tracks selected for re-analysis."); return; }
-    setBusy(true); setStatus("Re-analysing automatic BPM, key and downbeat. Manual corrections and arrangements are retained.");
+    { setStatus("Wait for timeline audio and tempo preparation before re-analysing songs."); return; }
+    if (targets.empty()) targets = analysisTargets(scope);
+    const int selected = (int) targets.size();
+    if (focused) targets.erase(std::remove_if(targets.begin(), targets.end(), [](const auto& m) { return !canRetryAnalysis(*m); }), targets.end());
+    if (targets.empty()) { setStatus(focused ? "No untried weak BPM/key results in the selection. Manual values are protected." : "No songs selected for re-analysis."); return; }
+    setBusy(true); setStatus(focused ? "Retrying weak BPM/key results. Manual corrections and arrangements are retained."
+                                   : "Re-analysing automatic BPM, key and downbeat. Manual corrections and arrangements are retained.");
     auto cancelled = std::make_shared<std::atomic<bool>>(false); importCancellation = cancelled;
-    importProgress.begin((int) targets.size()); importProgress.setReanalysis();
+    importProgress.begin((int) targets.size()); importProgress.setReanalysis(focused);
     auto safe = juce::Component::SafePointer<Workstation>(this);
-    workers.addJob([safe, targets, cancelled]
+    const auto retryReport=catalogueFile.getSiblingFile("AnalysisRetries").getChildFile("retry-"+juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S")+"-"+juce::Uuid().toString().substring(0,8)+".json");
+    workers.addJob([safe, targets, cancelled, focused, retryReport, skipped = selected - (int) targets.size()]
     {
-        juce::AudioFormatManager formats; formats.registerBasicFormats(); juce::StringArray failures; int processed = 0;
+        juce::Array<juce::var> evidence;
+        juce::AudioFormatManager formats; formats.registerBasicFormats(); juce::StringArray failures; int processed = 0, improved = 0;
         for (const auto& previous : targets)
         {
             if (*cancelled) break;
@@ -60,10 +70,23 @@ void Workstation::reanalyseTracks(int scope)
             auto result = readMedia(formats, previous->file, [safe, cancelled, name = previous->file.getFileName()](MediaReadStage stage)
             {
                 juce::MessageManager::callAsync([safe, cancelled, name, stage] { if (safe && safe->importCancellation == cancelled) safe->importProgress.showFile(name, stage); });
-            }, AnalysisCacheMode::refresh, MediaReadPurpose::catalogue, &record, cancelled);
+            }, focused ? AnalysisCacheMode::focused : AnalysisCacheMode::refresh, MediaReadPurpose::catalogue, &record, cancelled);
+            if (*cancelled && !result.media) break; // Completed writes remain visible; cancelled in-flight work is not a failure.
             if (!result.media) failures.add(result.error);
-            else if (result.media->analysis.rhythmIssue.isNotEmpty()) { failures.add(previous->file.getFileName() + ": " + result.media->analysis.rhythmIssue); result.media.reset(); }
+            else if (!focused && result.media->analysis.rhythmIssue.isNotEmpty()) { failures.add(previous->file.getFileName() + ": " + result.media->analysis.rhythmIssue); result.media.reset(); }
+            else if (focused)
+            {
+                const auto& a = result.media->analysis;
+                improved += (a.focusedTempo == 2 && needsFocusedTempo(record.analysis)) || (a.focusedKey == 2 && needsFocusedKey(record.analysis));
+            }
             ++processed;
+            if (focused)
+            {
+                juce::var row(new juce::DynamicObject()); auto* e=row.getDynamicObject(); e->setProperty("source",previous->file.getFullPathName()); e->setProperty("before",analysisRecordToJson(record));
+                if (result.media) { e->setProperty("after",analysisRecordToJson(result.media->analysisRecord())); e->setProperty("decision",result.media->analysis.retryEvidence); }
+                else e->setProperty("failure",result.error); evidence.add(row);
+                if (retryReport.getParentDirectory().createDirectory().wasOk()) retryReport.replaceWithText(juce::JSON::toString(evidence),false,false,"\n");
+            }
             juce::MessageManager::callAsync([safe, cancelled, previous, fresh = std::move(result.media)]
             {
                 if (!safe || safe->importCancellation != cancelled) return;
@@ -86,11 +109,14 @@ void Workstation::reanalyseTracks(int scope)
                 safe->importProgress.finishFile();
             });
         }
-        juce::MessageManager::callAsync([safe, cancelled, processed, total = (int) targets.size(), failures]
+        juce::MessageManager::callAsync([safe, cancelled, processed, total = (int) targets.size(), failures, focused, improved, skipped]
         {
             if (!safe || safe->importCancellation != cancelled) return;
             safe->importProgress.setVisible(false); safe->importCancellation.reset(); safe->setBusy(false); safe->refresh();
             safe->setStatus(juce::String(processed < total ? "Analysis stopped. " : "Re-analysis complete. ") + juce::String(processed - failures.size()) + " refreshed; " + juce::String(failures.size()) + " failed. Manual corrections and arrangements retained.");
+            if (focused) safe->setStatus(juce::String(processed < total ? "Retry stopped. " : "Focused retry complete. ")
+                + juce::String(improved) + " improved; " + juce::String(processed - failures.size() - improved) + " unchanged; "
+                + juce::String(skipped) + " skipped; " + juce::String(failures.size()) + " failed. Uncertain results still need review.");
             if (std::any_of(safe->engine.project.clips.begin(), safe->engine.project.clips.end(), [](const auto& clip)
                 { return clip.tempoSourceBpm > 0 && clip.media->manualBpm <= 0 && std::abs(clip.tempoSourceBpm - clip.media->bpm()) > 0.01; }))
                 safe->setStatus(safe->status + " Beatmatch applies refreshed tempos to this mix.");
@@ -102,10 +128,11 @@ bool Workstation::adoptLibraryRefresh(const std::shared_ptr<Media>& previous, co
 {
     const auto found = std::find(engine.library.begin(), engine.library.end(), previous);
     if (found == engine.library.end() || timelineLoads.count(previous->id)) return false;
-    if (previous->analysisSource == verified->analysisSource)
+    if (previous->sessionMetadataPending || previous->analysisSource == verified->analysisSource)
     {
         verified->id = previous->id; verified->manualBpm = previous->manualBpm;
         verified->manualBeatOrigin = previous->manualBeatOrigin; verified->manualKey = previous->manualKey;
+        verified->name = previous->name;
     }
     if (selectedLibraryId == previous->id) selectedLibraryId = verified->id;
     // Only replace the catalogue entry. Arranged/Undo audio keeps its verified source object.
@@ -152,7 +179,11 @@ void Workstation::tickLibraryCatalogue()
                     if (std::any_of(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& m) { return m->file == source; })) continue;
                     const auto found = std::find_if(saved.media.begin(), saved.media.end(), [&](const auto& m) { return m->file == source; });
                     if (found != saved.media.end()) { safe->engine.library.push_back(*found); safe->catalogueRefreshQueue.push_back(*found); }
-                    else { auto pending = std::make_shared<Media>(); pending->file = source; safe->catalogueRefreshQueue.push_back(std::move(pending)); }
+                    else
+                    {
+                        auto pending = std::make_shared<Media>(); pending->file = source; pending->name = source.getFileNameWithoutExtension(); pending->sourceDetailsPending = true;
+                        safe->engine.library.push_back(pending); safe->catalogueRefreshQueue.push_back(std::move(pending));
+                    }
                 }
                 safe->refresh(); safe->setStatus("Music library ready. Source checks run in the background.");
             });
@@ -169,29 +200,43 @@ void Workstation::tickLibraryCatalogue()
         workers.addJob([safe, previous, cancelled = sourceReadsCancelled]
         {
             MediaResult result;
+            std::optional<juce::String> genre;
             const auto sidecar = analysisRecordInputFile(previous->file);
             const bool sameSidecar = sidecar.getSize() == previous->analysisFileBytes && sidecar.getLastModificationTime().toMilliseconds() == previous->analysisFileModified;
-            const bool unchanged = previous->analysisVersion == analysisRevision && !previous->analysisSource.sha256.isEmpty() && previous->file.existsAsFile()
+            const bool unchanged = !previous->sessionMetadataPending && previous->analysisVersion == analysisRevision && !previous->analysisSource.sha256.isEmpty() && previous->file.existsAsFile()
                 && previous->file.getSize() == previous->analysisSource.bytes && previous->file.getLastModificationTime().toMilliseconds() == previous->sourceModified
                 && sameSidecar;
+            if (unchanged && !previous->assets.genreRead) genre = readLibraryGenre(previous->file);
             if (!unchanged)
             {
                 juce::AudioFormatManager formats; formats.registerBasicFormats(); const auto record = previous->analysisRecord();
                 result = readMedia(formats, previous->file, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::catalogue,
                     previous->analysisVersion != analysisRevision && !record.source.sha256.isEmpty() && (sameSidecar || !sidecar.exists()) ? &record : nullptr, cancelled);
+                if (result.media && previous->sessionMetadataPending && previous->manualBeatOrigin > result.media->duration())
+                { result.media.reset(); result.error = "Saved beat marker exceeds source audio: " + previous->file.getFullPathName(); }
             }
-            juce::MessageManager::callAsync([safe, previous, result = std::move(result), unchanged]() mutable
+            juce::MessageManager::callAsync([safe, previous, result = std::move(result), unchanged, genre]() mutable
             {
-                if (!safe) return; safe->catalogueRefreshPending = false; if (unchanged) return;
-                auto found = std::find_if(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& m) { return m->file == previous->file; });
+                if (!safe) return; safe->catalogueRefreshPending = false;
+                if (unchanged)
+                {
+                    if (genre)
+                    {
+                        const juce::ScopedLock guard(safe->engine.lock);
+                        previous->assets.genre = *genre; previous->assets.genreRead = true;
+                        safe->markCatalogueChanged(); safe->refresh();
+                    }
+                    return;
+                }
+                auto found = std::find(safe->engine.library.begin(), safe->engine.library.end(), previous);
+                if (found == safe->engine.library.end()) return; // An older session's worker cannot publish into a newer entry.
                 if (result.media)
                 {
-                    if (found == safe->engine.library.end()) safe->engine.library.push_back(result.media);
-                    else safe->adoptLibraryRefresh(previous, result.media);
+                    safe->adoptLibraryRefresh(previous, result.media);
                     safe->markCatalogueChanged(); safe->refresh();
                 }
                 else if (found != safe->engine.library.end() && *found == previous && !previous->hasPlayback())
-                { const juce::ScopedLock guard(safe->engine.lock); previous->playbackError = result.error; safe->timeline.repaint(); }
+                { const juce::ScopedLock guard(safe->engine.lock); previous->sourceDetailsPending = false; previous->playbackError = result.error; safe->refresh(); }
             });
         });
     }

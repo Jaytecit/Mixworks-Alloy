@@ -4,8 +4,8 @@ namespace mixworks
 {
 void Workstation::initialiseTransitionRehearsalUI()
 {
-    alternativesLabel.setText("A / B / C: store current treatment", juce::dontSendNotification);
-    savedPresetsLabel.setText("Saved session presets", juce::dontSendNotification);
+    alternativesLabel.setText("A / B / C", juce::dontSendNotification);
+    savedPresetsLabel.setText("Saved presets", juce::dontSendNotification);
     for (auto* component : std::initializer_list<juce::Component*> {&alternativesLabel, &savedPresetsLabel, &prepareRehearsal, &endRehearsal, &savedTransitionPresets, &saveTransitionPreset, &removeTransitionPreset, &importTransitionPreset, &exportTransitionPreset}) transitionAdvancedBody.addAndMakeVisible(component);
     rehearsalContextLabel.setText("Rehearsal context / bars", juce::dontSendNotification);
     for (auto* component : std::initializer_list<juce::Component*> {&rehearsalContextLabel, &rehearsalLeadIn, &rehearsalLeadOut}) transitionAdvancedBody.addAndMakeVisible(component);
@@ -34,6 +34,7 @@ void Workstation::initialiseTransitionRehearsalUI()
         audition.onClick = [this, i]
         {
             if (busy) return;
+            if (engine.workMode==WorkMode::recordPerform) { prepareSelectedRehearsal(i); return; }
             const auto result = engine.auditionTransitionAlternative(i);
             if (result.failed()) prepareSelectedRehearsal(i);
             else { setStatus(engine.rehearsalSummary()); refresh(); }
@@ -41,8 +42,15 @@ void Workstation::initialiseTransitionRehearsalUI()
         apply.onClick = [this, i]
         { const auto* link = engine.project.transitionFor(selectedTransition); if (link && link->alternatives[(size_t) i]) applySelectedStyle(*link->alternatives[(size_t) i]); };
     }
+    prepareRehearsal.setTooltip("Render saved A/B/C alternatives for matched-RMS comparison with the chosen context.");
+    endRehearsal.setTooltip("End comparison playback and restore the previous mix cursor, paused.");
+    savedTransitionPresets.setTooltip("Choose a session preset to apply its treatment to the selected frame. One Undo restores the previous treatment.");
+    saveTransitionPreset.setTooltip("Name and save the selected transition treatment as a preset in this session.");
+    removeTransitionPreset.setTooltip("Remove the chosen preset from this session. Undo restores it.");
+    importTransitionPreset.setTooltip("Load a transition preset file into this session.");
+    exportTransitionPreset.setTooltip("Save the chosen transition preset to a separate file for reuse.");
     prepareRehearsal.onClick = [this] { prepareSelectedRehearsal(); };
-    endRehearsal.onClick = [this] { engine.endTransitionRehearsal(); setStatus("Rehearsal ended; returned to the previous cursor, paused."); refresh(); };
+    endRehearsal.onClick = [this] { if (engine.workMode==WorkMode::recordPerform) libraryPreview.stop(); else engine.endTransitionRehearsal(); setStatus("Rehearsal stopped."); refresh(); };
     savedTransitionPresets.setTextWhenNothingSelected("Choose saved preset..."); savedTransitionPresets.setTitle("Saved session transition preset");
     savedTransitionPresets.onChange = [this]
     {
@@ -55,7 +63,7 @@ void Workstation::initialiseTransitionRehearsalUI()
         if (busy) return; const int index = savedTransitionPresets.getSelectedId() - 1;
         if (index < 0 || index >= (int) engine.project.transitionPresets.size()) return;
         remember(); { const juce::ScopedLock guard(engine.lock); engine.project.transitionPresets.erase(engine.project.transitionPresets.begin() + index); }
-        savedTransitionPresets.setSelectedId(0, juce::dontSendNotification); refresh(); setStatus("Preset removed from this session. Undo restores it.");
+        savedTransitionPresets.setSelectedId(0, juce::dontSendNotification); refresh(); setStatus("Preset removed.");
     };
     importTransitionPreset.onClick = [this] { chooseTransitionPresetFile(false); };
     exportTransitionPreset.onClick = [this] { chooseTransitionPresetFile(true); };
@@ -143,11 +151,18 @@ void Workstation::applySelectedStyle(const TransitionStyle& style)
     if (result.failed()) { setStatus(result.getErrorMessage()); refresh(); return; }
     if (juce::JSON::toString(projectToJson(candidate)) != juce::JSON::toString(projectToJson(engine.project))) { remember(); engine.project = std::move(candidate); }
     else engine.endTransitionRehearsal();
-    refresh(); setStatus("Transition treatment applied; manual automation, effects, frame and song positions retained.");
+    refresh(); setStatus("Transition applied.");
 }
 void Workstation::prepareSelectedRehearsal(int slot)
 {
     if (busy || pendingTempo > 0 || tempoPreparationPending) return;
+    if (engine.workMode==WorkMode::recordPerform)
+    {
+        libraryPreview.stop(); auto result=privatePreparation.prepareTransition(selectedTransition);
+        if (result.wasOk() && slot>=0) result=privatePreparation.alternative(slot);
+        if (result.wasOk()) result=libraryPreview.playPrepared(privatePreparation,"private-transition");
+        setStatus(result.failed() ? result.getErrorMessage() : "Private transition playing. Audience programme and MIDI target are unchanged."); return;
+    }
     engine.flushMidiControls(); const auto incoming = selectedTransition;
     if (!engine.project.transitionFor(incoming)) return;
     setBusy(true); engine.setPlaying(false);
@@ -175,7 +190,7 @@ void Workstation::chooseTransitionPresetName()
 {
     if (busy) return; TransitionStyle style; const auto result = engine.project.captureTransitionStyle(selectedTransition, style);
     if (result.failed()) { setStatus(result.getErrorMessage()); return; }
-    auto* dialog = new juce::AlertWindow("Save transition preset", "Name this blend. Use an existing name to replace it. Undo brings it back.", juce::MessageBoxIconType::NoIcon, this);
+    auto* dialog = new juce::AlertWindow("Save transition preset", "Name this blend.", juce::MessageBoxIconType::NoIcon, this);
     dialog->addTextEditor("name", {}, "Preset name"); dialog->getTextEditor("name")->setInputRestrictions(128);
     dialog->addButton("Save", 1, juce::KeyPress(juce::KeyPress::returnKey)); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, style](int answer)

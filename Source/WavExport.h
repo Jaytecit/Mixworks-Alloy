@@ -9,7 +9,7 @@ struct WavExportOptions { bool includeTail = false; };
 struct WavExportPlan
 {
     bool available = false; // Timing/size facts can be available even if resource admission fails.
-    double sampleRate = 0, arrangementEnd = 0, tailSeconds = 0;
+    double sampleRate = 0, arrangementStart = 0, arrangementEnd = 0, tailSeconds = 0;
     juce::int64 frames = 0, estimatedBytes = 0;
     double seconds() const { return sampleRate > 0 ? frames / sampleRate : 0; }
 };

@@ -9,6 +9,7 @@
 #include <limits>
 #include <set>
 #include <map>
+#include <BPMDetect.h>
 
 namespace mixworks
 {
@@ -26,14 +27,57 @@ struct Pulse
     bool independentPhysical = false;
     double sourceStart = 0;
 };
-std::pair<double, double> refineAttack(const std::vector<float>& signal, int centre, int radius)
+std::pair<double, double> refineAttack(const std::vector<float>& signal, int centre, int radius, bool* boundary = nullptr)
 {
+    if (boundary) *boundary = false;
     constexpr int step = 22; int strongest = centre; double strength = 0;
     for (int i = std::max(step, centre - radius); i < std::min((int) signal.size() - step, centre + radius); i += step)
     {
         double rise = 0;
         for (int j = 0; j < step; ++j) rise += std::abs(signal[(size_t) (i + j)]) - std::abs(signal[(size_t) (i - j - 1)]);
         if (rise > strength) { strength = rise; strongest = i; }
+    }
+    // The steepest part of a kick/bass envelope is not its beginning. Using it
+    // as the event time makes a whole grid consistently late, by an amount
+    // depending on the attack shape. Backtrack to the preceding low-energy
+    // boundary only when this event has a clear local floor; dense/ambiguous
+    // audio keeps the measured rise rather than inventing an earlier onset.
+    if (strength > 0)
+    {
+        const int half = (int) (.0025 * analysisRate), hop = (int) (.001 * analysisRate);
+        auto envelope = [&](int at)
+        {
+            double value = 0;
+            for (int j = std::max(0, at - half); j <= std::min((int) signal.size() - 1, at + half); ++j)
+                value += std::abs(signal[(size_t) j]);
+            return value / (2 * half + 1);
+        };
+        double peak = 0;
+        for (int at = strongest; at <= std::min((int) signal.size() - half - 1, strongest + (int) (.010 * analysisRate)); at += hop)
+            peak = std::max(peak, envelope(at));
+        std::vector<double> floor;
+        // A low-frequency cycle can supply the strongest rise well inside the
+        // hit. Its quiet beginning may precede the old 35 ms search entirely.
+        // Search the packet's preceding floor; never subtract a fixed delay.
+        constexpr double history = .100;
+        for (int at = std::max(half, strongest - (int) (history * analysisRate)); at < strongest - (int) (.020 * analysisRate); at += hop)
+            floor.push_back(envelope(at));
+        if (floor.size() >= 4)
+        {
+            std::sort(floor.begin(), floor.end()); const double background = floor[floor.size() / 4];
+            if (peak > std::max(1.0e-6, background * 4))
+            {
+                const double threshold = background + .02 * (peak - background);
+                int quiet = 0;
+                for (int at = strongest; at >= std::max(half, strongest - (int) (history * analysisRate)); at -= hop)
+                {
+                    quiet = envelope(at) <= threshold ? quiet + 1 : 0;
+                    // A centred envelope sees the onset before its centre.
+                    // Timestamp its right edge, not that look-ahead position.
+                    if (quiet >= 2) { strongest = at + hop + half; if (boundary) *boundary = true; break; }
+                }
+            }
+        }
     }
     return {strongest / analysisRate, strength};
 }
@@ -243,14 +287,14 @@ Pulse pulse(const Segment& segment, bool percussive = false, const std::vector<f
     if (!percussive) for (const auto& beat : inliers) result.transients.push_back({beat.second + segment.sourceStart, 1.0});
     return result;
 }
-Pulse percussionPulse(const Segment& part)
+Pulse percussionPulse(const Segment& part, bool midBand = false)
 {
     // The low band proposes attacks; their timing belongs to the original
     // waveform. Share this boundary between distributed and targeted windows.
     Segment percussion; percussion.sourceStart = part.sourceStart; percussion.mono.resize(part.mono.size());
     juce::dsp::IIR::Filter<float> highpass, lowpass;
-    highpass.coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(analysisRate, 35.0);
-    lowpass.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(analysisRate, 180.0);
+    highpass.coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(analysisRate, midBand ? 180.0 : 35.0);
+    lowpass.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(analysisRate, midBand ? 1800.0 : 180.0);
     for (size_t i = 0; i < part.mono.size(); ++i) percussion.mono[i] = lowpass.processSample(highpass.processSample(part.mono[i]));
     return pulse(percussion, true, &part.mono);
 }
@@ -460,19 +504,49 @@ double correlation(const std::array<double, 12>& chroma, const double* profile, 
     return cc * pp > 1.0e-12 ? cross / std::sqrt(cc * pp) : 0;
 }
 struct TonalPeak { double note, weight; int frame; };
-void tonality(const std::vector<Segment>& parts, MusicAnalysis& result)
+void tonality(const std::vector<Segment>& parts, MusicAnalysis& result, bool harmonic = false,
+              const std::shared_ptr<std::atomic<bool>>& cancelled = {})
 {
     constexpr int size = 8192, hop = 4096, firstBin = 40, lastBin = 2970;
     juce::dsp::FFT fft(13); juce::dsp::WindowingFunction<float> window(size, juce::dsp::WindowingFunction<float>::hann);
     std::vector<float> spectrum(size * 2); std::vector<TonalPeak> peaks;
     double tuningX = 0, tuningY = 0, tuningWeight = 0; int frames = 0;
     for (const auto& part : parts)
+    {
+        // Bounded per-passage median masks suppress short broadband attacks.
+        // No resynthesis or stem model is involved; chroma sees the masked FFT.
+        std::vector<std::vector<float>> spectra;
+        if (harmonic) for (int pos = 0; pos + size <= (int) part.mono.size(); pos += hop)
+        {
+            if (cancelled && *cancelled) return;
+            std::fill(spectrum.begin(), spectrum.end(), 0.0f);
+            std::copy_n(part.mono.data() + pos, size, spectrum.data());
+            window.multiplyWithWindowingTable(spectrum.data(), size); fft.performFrequencyOnlyForwardTransform(spectrum.data());
+            spectra.emplace_back(spectrum.begin(), spectrum.begin() + lastBin + 9);
+        }
         for (int pos = 0; pos + size <= (int) part.mono.size(); pos += hop)
         {
+            if (cancelled && *cancelled) return;
             std::fill(spectrum.begin(), spectrum.end(), 0.0f); std::copy_n(part.mono.data() + pos, size, spectrum.data()); window.multiplyWithWindowingTable(spectrum.data(), size); fft.performFrequencyOnlyForwardTransform(spectrum.data());
+            if (harmonic)
+            {
+                const int frame = pos / hop;
+                for (int bin = firstBin - 8; bin < lastBin + 8; ++bin)
+                {
+                    std::array<float, 5> time;
+                    std::array<float, 17> frequency;
+                    for (int n = -2; n <= 2; ++n) time[(size_t) (n + 2)] = spectra[(size_t) juce::jlimit(0, (int) spectra.size() - 1, frame + n)][(size_t) bin];
+                    for (int n = -8; n <= 8; ++n) frequency[(size_t) (n + 8)] = spectra[(size_t) frame][(size_t) juce::jlimit(0, lastBin + 8, bin + n)];
+                    std::nth_element(time.begin(), time.begin() + 2, time.end());
+                    std::nth_element(frequency.begin(), frequency.begin() + 8, frequency.end());
+                    const double h = time[2] * time[2], p = frequency[8] * frequency[8];
+                    spectrum[(size_t) bin] *= (float) (h / std::max(1e-20, h + p));
+                }
+            }
             // Normalize spectral registers separately. A loud kick/bass must
             // not gate out the quieter third/seventh carried by another voice.
-            if (*std::max_element(spectrum.begin() + firstBin, spectrum.begin() + lastBin) < 0.00001f) continue;
+            const float frameMaximum = *std::max_element(spectrum.begin() + firstBin, spectrum.begin() + lastBin);
+            if (frameMaximum < 0.00001f) continue;
             std::vector<float> envelope(lastBin); std::deque<int> maxima; int right = firstBin;
             for (int bin = firstBin; bin < lastBin; ++bin)
             {
@@ -490,7 +564,10 @@ void tonality(const std::vector<Segment>& parts, MusicAnalysis& result)
             for (int bin = firstBin; bin < lastBin; ++bin)
             {
                 float magnitude = spectrum[(size_t) bin];
-                const float max = envelope[(size_t) bin];
+                // Masking numerical residue can create narrow peaks in otherwise
+                // empty registers. Do not whiten those into equal musical votes.
+                if (harmonic && magnitude < frameMaximum * .0001f) continue;
+                const float max = harmonic ? std::max(envelope[(size_t) bin], frameMaximum * .01f) : envelope[(size_t) bin];
                 if (magnitude < max * 0.06f || magnitude <= spectrum[(size_t) bin - 1] || magnitude <= spectrum[(size_t) bin + 1]) continue;
                 // Require a narrow spectral peak above its local noise floor.
                 // Frame normalization alone otherwise gives noise/percussion the
@@ -528,6 +605,7 @@ void tonality(const std::vector<Segment>& parts, MusicAnalysis& result)
             }
             ++frames;
         }
+    }
     if (frames < 4 || peaks.size() < 20) return;
     if (std::hypot(tuningX, tuningY) < tuningWeight * 0.2) return; // No coherent semitone tuning, e.g. broadband noise.
     result.tuningCents = std::atan2(tuningY, tuningX) * 100 / (2 * pi);
@@ -567,6 +645,7 @@ void tonality(const std::vector<Segment>& parts, MusicAnalysis& result)
     for (int key = 0; key < 24; ++key) score[(size_t) key] = 0.7 * (correlation(global, profiles[key / 12], key % 12) + correlation(global, profiles[2 + key / 12], key % 12)) * 0.5 + 0.3 * votes[(size_t) key] / std::max(1.0e-12, maxVote);
     std::array<int, 24> order; std::iota(order.begin(), order.end(), 0); std::sort(order.begin(), order.end(), [&](int a, int b) { return score[(size_t) a] > score[(size_t) b]; });
     double energy = std::accumulate(global.begin(), global.end(), 0.0), maximum = *std::max_element(global.begin(), global.end());
+    if (energy >= 1.0e-8 && maximum / energy <= 0.85 && score[(size_t) order[0]] > 0) result.keyGuess = order[0];
     if (energy < 1.0e-8 || maximum / energy > 0.85 || score[(size_t) order[0]] < 0.45) return; // A single tone is a pitch, not evidence of a key.
     result.key = order[0]; result.alternativeKey = order[1];
     const double margin = (score[(size_t) order[0]] - score[(size_t) order[1]]) / std::max(1.0e-12, 1 - score[(size_t) order[1]]);
@@ -921,7 +1000,8 @@ bool fitNeuralGrid(const NeuralRhythm& neural, double duration, const std::vecto
 }
 
 }
-MusicAnalysis analyseMusic(const PcmView& samples, double rate, const std::shared_ptr<std::atomic<bool>>& cancelled, RhythmDiagnostics* diagnostics)
+static MusicAnalysis analyseMusicPass(const PcmView& samples, double rate, const std::shared_ptr<std::atomic<bool>>& cancelled,
+                                     RhythmDiagnostics* diagnostics, bool focused = false, bool rhythm = true, bool key = true, bool neuralEnabled = true)
 {
     MusicAnalysis result; if (diagnostics) *diagnostics = {};
     const auto aborted = [&]
@@ -934,11 +1014,21 @@ MusicAnalysis analyseMusic(const PcmView& samples, double rate, const std::share
     if (aborted()) return result;
     if (!std::isfinite(rate) || rate < 8000 || samples.getNumChannels() < 1 || samples.getNumSamples() < rate * 2) return result;
     auto parts = segments(samples, rate, cancelled);
+    if (focused && samples.getNumSamples() / rate > 30)
+    {
+        // Shift away from the normal pass's endpoints. Three separated passages
+        // bound the extra work and expose disagreement instead of rerunning an intro.
+        parts.clear(); const double duration = samples.getNumSamples() / rate;
+        for (double fraction : {.22, .5, .78})
+            parts.push_back(monoSegment(samples, rate, std::max(0., duration * fraction - 10), 20, false, cancelled));
+    }
+    if (rhythm)
+    {
     // Stable source observations own their data while selected fits borrow pointers.
     std::deque<Pulse> measurements;
     std::vector<const Pulse*> pulses; pulses.reserve(parts.size());
     if (aborted()) return result;
-    const auto neural = analyseNeuralRhythm(samples, rate, nullptr, cancelled);
+    const auto neural = neuralEnabled ? analyseNeuralRhythm(samples, rate, nullptr, cancelled) : NeuralRhythm {};
     if (aborted()) return result;
     for (const auto& part : parts)
     {
@@ -949,6 +1039,11 @@ MusicAnalysis analyseMusic(const PcmView& samples, double rate, const std::share
         // its onset phase belongs to that band all the way through time fitting.
         measurements.push_back(percussionPulse(part));
         const Pulse* selected = &measurements.back();
+        if (focused && selected->confidence < .5)
+        {
+            measurements.push_back(percussionPulse(part, true));
+            if (measurements.back().confidence > selected->confidence) selected = &measurements.back();
+        }
         if (selected->confidence < 0.35)
         {
             measurements.push_back(pulse(part));
@@ -1072,6 +1167,24 @@ MusicAnalysis analyseMusic(const PcmView& samples, double rate, const std::share
         result.tempoConfidence = 0; result.downbeatOrigin = -1; result.downbeatConfidence = 0;
         result.downbeatMethod = "unknown";
     }
+    if (result.bpm > 0 && result.downbeatOrigin < 0 && neural.error.isEmpty())
+    {
+        // Keep the strongest model phase even when the acceptance gate abstains.
+        // Quantise it onto the chosen pulse; manual review always wins in Media.
+        double anchor = result.beatOrigin;
+        if (!neural.downbeats.empty())
+        {
+            size_t best = 0;
+            for (size_t i = 1; i < neural.downbeats.size() && i < neural.downbeatConfidence.size(); ++i)
+                if (neural.downbeatConfidence[i] > neural.downbeatConfidence[best]) best = i;
+            anchor = neural.downbeats[best];
+        }
+        const double period = 60 / result.bpm;
+        const double guess = result.beatOrigin + std::round((anchor - result.beatOrigin) / period) * period;
+        if (guess >= 0 && guess < samples.getNumSamples() / rate) result.downbeatGuess = guess;
+    }
+    }
+    if (!key) return result;
     auto harmonicParts = parts;
     if (samples.getNumChannels() >= 2) for (const auto& part : parts)
     {
@@ -1085,7 +1198,236 @@ MusicAnalysis analyseMusic(const PcmView& samples, double rate, const std::share
             harmonicParts.push_back(std::move(side));
         }
     }
-    tonality(harmonicParts, result); aborted(); return result;
+    tonality(harmonicParts, result, focused, cancelled);
+    if (focused && parts.size() >= 2)
+    {
+        // Intro/drum-only passages need not bury repeated tonal evidence. Require
+        // agreement across independent source passages; mid/side are one vote.
+        std::array<double, 24> votes {}, confidence {}, tuning {};
+        std::array<int, 24> counts {}; double total = 0;
+        for (const auto& part : parts)
+        {
+            if (aborted()) return result;
+            std::vector<Segment> passage;
+            for (const auto& item : harmonicParts) if (item.sourceStart == part.sourceStart) passage.push_back(item);
+            MusicAnalysis local; tonality(passage, local, true, cancelled);
+            if (local.key < 0 || local.keyConfidence < .15) continue;
+            const auto k = (size_t) local.key; const double weight = local.keyConfidence;
+            votes[k] += weight; confidence[k] += weight * weight; tuning[k] += weight * local.tuningCents;
+            ++counts[k]; total += weight;
+        }
+        const auto best = (size_t) std::distance(votes.begin(), std::max_element(votes.begin(), votes.end()));
+        if (counts[best] >= 2 && votes[best] >= .75 * total)
+        {
+            const double score = confidence[best] / votes[best] * votes[best] / total;
+            if (score > result.keyConfidence && (result.key == (int) best || result.keyConfidence < .15))
+            {
+                if (result.key != (int) best) result.alternativeKey = result.key;
+                result.key = (int) best; result.keyConfidence = score; result.tuningCents = tuning[best] / votes[best];
+            }
+        }
+    }
+    aborted(); return result;
+}
+bool refineAttackTiming(const PcmView& samples, double rate, MusicAnalysis& analysis, double manualBpm, double manualBeatOrigin,
+                        const std::shared_ptr<std::atomic<bool>>& cancelled)
+{
+    if (analysis.attackTimingRevision >= 1 || manualBpm > 0 || manualBeatOrigin >= 0
+        || analysis.variableTempo || !std::isfinite(analysis.bpm) || analysis.bpm < 20 || analysis.bpm > 400 || analysis.tempoConfidence < .2
+        || !std::isfinite(rate) || rate <= 0 || samples.getNumChannels() < 1) return false;
+    const double duration = samples.getNumSamples() / rate, oldPeriod = 60 / analysis.bpm, oldOrigin = analysis.beatOrigin;
+    if (duration < 6 || !std::isfinite(oldOrigin)) return false;
+    const int windows = duration >= 24 ? 3 : duration >= 12 ? 2 : 1;
+    const double length = std::min(8.0, duration / windows);
+    const double barBeat = std::round((analysis.downbeatOrigin - oldOrigin) / oldPeriod);
+    const bool knownBar = analysis.downbeatOrigin >= 0 && analysis.downbeatConfidence >= .2
+        && std::abs(analysis.downbeatOrigin - oldOrigin - barBeat * oldPeriod) < oldPeriod * .05;
+    const size_t minimumLocal = knownBar ? 2 : 6, minimumFit = knownBar ? 6 : 12;
+    struct Observation { double beat, time; int window; };
+    std::vector<Observation> observations;
+    std::vector<std::pair<double, double>> anchors;
+    for (int window = 0; window < windows; ++window)
+    {
+        if (cancelled && *cancelled) return false;
+        const double start = windows == 1 ? 0 : (duration - length) * window / (windows - 1);
+        const auto part = monoSegment(samples, rate, start, length, false, cancelled);
+        if (cancelled && *cancelled) return false;
+        std::vector<Observation> local;
+        std::vector<double> offsets;
+        const double first = std::ceil((start + .03 - oldOrigin) / oldPeriod);
+        for (double beat = first; oldOrigin + beat * oldPeriod < start + length - .05; ++beat)
+        {
+            // Compare the same position in each known bar. Anticipated notes on
+            // other beats must not pull the entire grid towards their attacks.
+            // This uses the existing bar choice; it does not infer beat one.
+            if (knownBar && std::fmod(beat - barBeat, 4.0) != 0) continue;
+            const double expected = oldOrigin + beat * oldPeriod;
+            bool boundary = false;
+            const auto attack = refineAttack(part.mono, (int)((expected - start) * analysisRate), (int)(.020 * analysisRate), &boundary);
+            const double time = start + attack.first;
+            if (!boundary || attack.second <= .001 || std::abs(time - expected) > std::min(.100, oldPeriod * .22)) continue;
+            local.push_back({beat, time, window}); offsets.push_back(time - expected);
+        }
+        if (local.size() < minimumLocal) continue;
+        std::sort(offsets.begin(), offsets.end());
+        const double median = offsets[offsets.size() / 2];
+        double ordinal = 0;
+        for (const auto& item : local) ordinal += item.beat;
+        ordinal /= local.size();
+        anchors.emplace_back(ordinal, oldOrigin + ordinal * oldPeriod + median);
+        observations.insert(observations.end(), local.begin(), local.end());
+    }
+    if (cancelled && *cancelled) return false;
+    // Remember a bounded attempt, including abstention, without rerunning the
+    // neural/key analysis or invalidating decoded/prepared audio caches.
+    analysis.attackTimingRevision = 1;
+    if (observations.size() < minimumFit || (windows > 1 && anchors.size() < 2)) return true;
+    double period = oldPeriod, origin = oldOrigin;
+    std::vector<double> offsets;
+    for (const auto& item : observations) offsets.push_back(item.time - (oldOrigin + item.beat * oldPeriod));
+    std::sort(offsets.begin(), offsets.end()); origin += offsets[offsets.size() / 2];
+    if (anchors.size() >= 2)
+    {
+        const double span = anchors.back().first - anchors.front().first;
+        if (span > 0) period = (anchors.back().second - anchors.front().second) / span;
+        origin = anchors.front().second - anchors.front().first * period;
+    }
+    std::vector<std::pair<double, double>> inliers;
+    for (int pass = 0; pass < 3; ++pass)
+    {
+        inliers.clear();
+        for (const auto& item : observations)
+            if (std::abs(item.time - (origin + item.beat * period)) <= .008) inliers.emplace_back(item.beat, item.time);
+        if (inliers.size() < minimumFit || inliers.size() < observations.size() * .65 || !fitGrid(inliers, period, origin)) return true;
+    }
+    std::set<int> support;
+    double squaredError = 0;
+    for (const auto& item : observations) if (std::abs(item.time - (origin + item.beat * period)) <= .008) support.insert(item.window);
+    for (const auto& item : inliers) squaredError += std::pow(item.second - origin - item.first * period, 2);
+    const double error = std::sqrt(squaredError / inliers.size());
+    if ((windows > 1 && support.size() < 2) || error > .006 || std::abs(period / oldPeriod - 1) > .005
+        || std::abs(origin - oldOrigin) > std::min(.100, oldPeriod * .22)) return true;
+    const auto barAnchor = [&](double anchor)
+    {
+        if (anchor < 0) return anchor;
+        double time = origin + std::round((anchor - oldOrigin) / oldPeriod) * period;
+        while (time < 0) time += 4 * period;
+        return time < duration ? time : -1.0;
+    };
+    analysis.downbeatOrigin = barAnchor(analysis.downbeatOrigin);
+    analysis.downbeatGuess = barAnchor(analysis.downbeatGuess);
+    analysis.neuralPhaseCorrectionMs += (origin - oldOrigin) * 1000;
+    analysis.bpm = 60 / period;
+    analysis.beatOrigin = std::fmod(std::fmod(origin, period) + period, period);
+    analysis.gridErrorMs = error * 1000;
+    return true;
+}
+MusicAnalysis analyseMusic(const PcmView& samples, double rate, const std::shared_ptr<std::atomic<bool>>& cancelled, RhythmDiagnostics* diagnostics)
+{
+    auto result = analyseMusicPass(samples, rate, cancelled, diagnostics);
+    refineAttackTiming(samples, rate, result, 0, -1, cancelled);
+    return result;
+}
+bool needsFocusedTempo(const MusicAnalysis& a)
+{
+    return (a.focusedRevision != focusedAnalysisRevision || a.focusedTempo == 0)
+        && (a.bpm <= 0 || a.variableTempo || a.tempoConfidence < .2 || a.rhythmIssue.isNotEmpty() || a.downbeatOrigin < 0);
+}
+bool needsFocusedKey(const MusicAnalysis& a)
+{
+    return (a.focusedRevision != focusedAnalysisRevision || a.focusedKey == 0) && (a.key < 0 || a.keyConfidence < keyReviewConfidence);
+}
+MusicAnalysis retryMusicAnalysis(const PcmView& samples, double rate, const MusicAnalysis& previous,
+                                bool tempo, bool key, const std::shared_ptr<std::atomic<bool>>& cancelled, MusicAnalysis* candidateEvidence)
+{
+    if (candidateEvidence) *candidateEvidence = {};
+    tempo = tempo && needsFocusedTempo(previous); key = key && needsFocusedKey(previous);
+    if ((!tempo && !key) || (cancelled && *cancelled)) return previous;
+    // A missing/unavailable model is not repaired by asking it again. Physical
+    // pulse fitting remains independent; key-only retries never invoke it.
+    auto candidate = analyseMusicPass(samples, rate, cancelled, nullptr, true, tempo, key, previous.rhythmIssue.isEmpty());
+    juce::Array<juce::var> passages;
+    const double duration = rate > 0 ? samples.getNumSamples() / rate : 0;
+    auto addPassage = [&](double begin, double length)
+    {
+        juce::var entry(new juce::DynamicObject()); auto* e = entry.getDynamicObject();
+        e->setProperty("start", begin); e->setProperty("end", std::min(duration, begin + length));
+        if (tempo && !(cancelled && *cancelled))
+        {
+            auto part = monoSegment(samples, rate, begin, length, false, cancelled);
+            soundtouch::BPMDetect detector(1, (int)analysisRate);
+            for (size_t offset = 0; offset < part.mono.size() && !(cancelled && *cancelled); offset += 1024)
+                detector.inputSamples(part.mono.data() + offset, (int)std::min(size_t(1024), part.mono.size() - offset));
+            const double bpm = detector.getBpm(); e->setProperty("soundTouchBpm", std::isfinite(bpm) ? bpm : 0);
+            const double ratio = candidate.bpm > 0 ? bpm / candidate.bpm : 0;
+            e->setProperty("comparison", bpm <= 0 ? "no repeating pulse" : std::abs(ratio-1) < .015 ? "agrees" : std::abs(ratio-2) < .03 || std::abs(ratio-.5) < .0075 ? "half/double ambiguity" : "disagrees");
+        }
+        passages.add(entry);
+    };
+    if (duration > 30) for (double fraction : {.22, .5, .78}) addPassage(std::max(0., duration*fraction-10),20);
+    else if (duration >= 2) addPassage(0,duration);
+    candidate.retryEvidence = juce::var(new juce::DynamicObject());
+    candidate.retryEvidence.getDynamicObject()->setProperty("passages", passages);
+    candidate.retryEvidence.getDynamicObject()->setProperty("method", previous.rhythmIssue.isEmpty() ? "shifted passages; physical pulse/mid-band; harmonic profiles/tuning; SoundTouch comparison" : "model unavailable: physical pulse/mid-band; harmonic profiles/tuning; SoundTouch comparison");
+    if (candidateEvidence) *candidateEvidence = candidate;
+    if (cancelled && *cancelled) return previous;
+    return mergeAnalysisRetry(previous,candidate,tempo,key);
+}
+MusicAnalysis mergeAnalysisRetry(const MusicAnalysis& previous, const MusicAnalysis& candidate, bool tempo, bool key)
+{
+    auto result = previous;
+    if (result.focusedRevision != focusedAnalysisRevision) result.focusedTempo = result.focusedKey = 0;
+    result.focusedRevision = focusedAnalysisRevision;
+    if (tempo)
+    {
+        result.focusedTempo = 1;
+        if (result.downbeatOrigin < 0 && candidate.bpm == result.bpm && candidate.downbeatGuess >= 0) result.downbeatGuess = candidate.downbeatGuess;
+        // A new BPM must arrive with a coherent pulse, not just a stronger peak.
+        // Do not trade a known bar anchor for an unanchored alternative.
+        const bool acceptedPulse = previous.bpm > 0 && !previous.variableTempo && previous.tempoConfidence >= .2 && previous.rhythmIssue.isEmpty();
+        if (!acceptedPulse && candidate.rhythmIssue.isEmpty() && candidate.bpm > 0 && !candidate.variableTempo && candidate.tempoConfidence >= .35
+            && candidate.tempoConfidence >= previous.tempoConfidence + .05
+            && candidate.gridErrorMs <= 20 && (previous.downbeatOrigin < 0 || candidate.downbeatOrigin >= 0))
+        {
+            const auto oldKey = result;
+            result = candidate;
+            result.key = oldKey.key; result.keyGuess = oldKey.keyGuess; result.alternativeKey = oldKey.alternativeKey;
+            result.keyConfidence = oldKey.keyConfidence; result.tuningCents = oldKey.tuningCents;
+            result.focusedRevision = focusedAnalysisRevision; result.focusedTempo = 2; result.focusedKey = oldKey.focusedKey;
+        }
+        else if (acceptedPulse && previous.downbeatOrigin < 0 && candidate.downbeatOrigin >= 0 && candidate.downbeatConfidence >= .35
+            && std::abs(candidate.bpm/previous.bpm-1) < .0005
+            && std::abs(std::remainder(candidate.beatOrigin-previous.beatOrigin,60/previous.bpm)) < .010)
+        {
+            result.downbeatOrigin = previous.beatOrigin + std::round((candidate.downbeatOrigin-previous.beatOrigin)*previous.bpm/60)*60/previous.bpm;
+            result.downbeatConfidence = candidate.downbeatConfidence; result.downbeatMethod = candidate.downbeatMethod;
+            result.focusedTempo = 2;
+        }
+    }
+    if (key)
+    {
+        result.focusedKey = 1;
+        if (result.key < 0 && candidate.keyGuess >= 0) result.keyGuess = candidate.keyGuess;
+        const double minimum = previous.key < 0 || candidate.key == previous.key ? .15 : .30;
+        if (candidate.key >= 0 && candidate.keyConfidence >= minimum && candidate.keyConfidence >= previous.keyConfidence + .05)
+        {
+            result.key = candidate.key; result.alternativeKey = candidate.alternativeKey;
+            result.keyConfidence = candidate.keyConfidence; result.tuningCents = candidate.tuningCents; result.focusedKey = 2;
+        }
+    }
+    juce::var evidence(new juce::DynamicObject()); auto* e=evidence.getDynamicObject();
+    e->setProperty("revision",focusedAnalysisRevision); e->setProperty("method",candidate.retryEvidence["method"]);
+    e->setProperty("passages",candidate.retryEvidence["passages"]);
+    e->setProperty("previousBpm",previous.bpm); e->setProperty("candidateBpm",candidate.bpm); e->setProperty("resultBpm",result.bpm);
+    e->setProperty("previousTempoConfidence",previous.tempoConfidence); e->setProperty("candidateTempoConfidence",candidate.tempoConfidence); e->setProperty("candidateGridErrorMs",candidate.gridErrorMs);
+    e->setProperty("previousDownbeat",previous.downbeatOrigin); e->setProperty("candidateDownbeat",candidate.downbeatOrigin); e->setProperty("resultDownbeat",result.downbeatOrigin);
+    e->setProperty("priorFailure",previous.rhythmIssue.isNotEmpty() ? previous.rhythmIssue : previous.variableTempo ? "unstable/discordant pulse windows" : previous.bpm<=0 ? "missing BPM" : previous.downbeatOrigin<0 ? "missing bar anchor; accepted pulse protected" : "weak tonal evidence; accepted rhythm protected");
+    e->setProperty("previousKey",keyNoteName(previous.key)); e->setProperty("candidateKey",keyNoteName(candidate.key)); e->setProperty("resultKey",keyNoteName(result.key));
+    e->setProperty("previousKeyConfidence",previous.keyConfidence); e->setProperty("candidateKeyConfidence",candidate.keyConfidence);
+    e->setProperty("tempoDecision",!tempo ? "protected or not requested" : result.focusedTempo==2 ? "improved: coherent pulse/bar evidence" : candidate.rhythmIssue.isNotEmpty() ? "kept: "+candidate.rhythmIssue : "kept: accepted fields protected or no stronger coherent pulse/bar evidence");
+    e->setProperty("keyDecision",!key ? "protected or not requested" : result.focusedKey==2 ? "improved: stronger tonal evidence" : "kept: no stronger unambiguous tonal evidence; review required");
+    result.retryEvidence = evidence;
+    return result;
 }
 namespace
 {

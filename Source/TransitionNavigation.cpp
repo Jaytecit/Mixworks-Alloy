@@ -34,14 +34,14 @@ bool Workstation::transitionKeyPressed(const juce::KeyPress& key)
     const auto* link = engine.project.transitionFor(selectedTransition);
     if (!link) { setStatus("Select a transition frame first."); return true; }
     const auto range = engine.project.transitionRange(*link);
-    const auto clock = engine.project.followTrackTempo ? engine.project.tempo : TempoMap {engine.project.bpm, {}};
+    const auto clock = engine.project.gridClock();
     const auto edit = modifiers.isShiftDown() ? Project::TransitionEdit::resizeEnd : Project::TransitionEdit::moveWindow;
     const double reference = modifiers.isShiftDown() ? range.getEnd() : range.getStart();
     const double delta = clock.timeAtBeat(clock.beatsAt(reference) + direction) - reference;
     auto candidate = engine.project; const auto result = candidate.editTransition(selectedTransition, edit, delta, false);
     if (result.failed()) { setStatus(result.getErrorMessage()); refresh(); return true; }
     if (juce::JSON::toString(projectToJson(candidate)) != juce::JSON::toString(projectToJson(engine.project)))
-    { remember(); engine.project = std::move(candidate); setStatus(modifiers.isShiftDown() ? "Transition end resized by one mix beat." : "Transition frame moved by one mix beat; its aligned incoming chain followed."); }
+    { remember(); engine.project = std::move(candidate); setStatus(modifiers.isShiftDown() ? "Transition end resized by one mix beat." : "Transition frame moved by one mix beat; track positions kept."); }
     refresh(); return true;
 }
 }

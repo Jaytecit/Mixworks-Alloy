@@ -13,7 +13,7 @@ struct ElasticSource
     Clip clip;
     double progressAt(double sessionTime) const;
     double timeAtProgress(double sourceSeconds) const;
-    float sample(int channel, double sourceProgress) const;
+    float sample(int channel, double sourceProgress, int stem = -1) const;
 };
 
 // Continuous pitch-preserving streams with bounded recent-output caches.
@@ -23,7 +23,8 @@ class ElasticRenderer
 public:
     static constexpr double windowSeconds = 0.1;
     void beginBlock() { ++clock; }
-    void add(juce::AudioBuffer<float>&, int frames, double at, double outputRate, const Clip&);
+    void add(juce::AudioBuffer<float>&, int frames, double at, double outputRate, const Clip&, int stem = -1);
+    void prepare(const Clip&, double at, double outputRate, int frames); // Message thread; private live-cue stream only.
     void reset();
     uint64_t windowsRendered() const { return rendered; }
 private:
@@ -37,6 +38,7 @@ private:
         std::shared_ptr<const ElasticSource> source;
         std::array<Window, 4> windows;
         soundtouch::SoundTouch processor;
+        int stem = -1;
         uint64_t age = 0;
         int64_t nextWindow = std::numeric_limits<int64_t>::min(), inputFrames = 0;
         double sourceOrigin = 0;
@@ -45,6 +47,6 @@ private:
     std::vector<std::unique_ptr<Stream>> streams;
     std::array<float, 256> input {}, output {};
     uint64_t clock = 1, rendered = 0;
-    Window& window(const std::shared_ptr<const ElasticSource>&, int64_t);
+    Window& window(const std::shared_ptr<const ElasticSource>&, int64_t, int stem);
 };
 }

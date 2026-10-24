@@ -50,7 +50,7 @@ PlaylistTextResult playlistText(const Project& project, PlaylistExport format)
     std::vector<const Clip*> ordered;
     for (const auto& clip : project.clips) ordered.push_back(&clip);
     std::stable_sort(ordered.begin(), ordered.end(), [](const auto* a, const auto* b) { return a->start < b->start; });
-    if (ordered.empty()) { result.error = "Arrange some clips before exporting a playlist."; return result; }
+    if (ordered.empty()) { result.error = "Arrange some segments before exporting a playlist."; return result; }
     auto oneLine = [](const juce::String& value) { return value.replaceCharacters("\r\n\t", "   "); };
     if (format == PlaylistExport::m3u) result.text = "#EXTM3U\n";
     else result.text = "Mixworks tracklist: " + oneLine(project.name) + "\nTimes are absolute mix times. Audio edits remain in the .mixworks session.\n\nSTART\tLENGTH\tLANE\tTITLE\tSOURCE BPM\tKEY\tSOURCE\n";
@@ -61,13 +61,13 @@ PlaylistTextResult playlistText(const Project& project, PlaylistExport format)
         if (format == PlaylistExport::m3u)
             result.text += "#EXTINF:" + juce::String((juce::int64) std::round(media.duration())) + "," + oneLine(media.name) + "\n" + path + "\n";
         else
-            result.text += timeText(clip->start) + "\t" + timeText(clip->length) + "\t" + juce::String(clip->track + 1) + "\t" + oneLine(media.name) + "\t"
+            result.text += timeText(clip->start - project.playbackStart()) + "\t" + timeText(clip->length) + "\t" + juce::String(clip->track + 1) + "\t" + oneLine(media.name) + "\t"
                 + (media.bpm() > 0 ? juce::String(media.bpm(), 4) : "Unknown") + "\t" + (media.key() >= 0 ? keyNoteName(media.key()) + " / " + keyCamelot(media.key()) : "Unknown") + "\t" + oneLine(path) + "\n";
     }
     if (format == PlaylistExport::text && !project.labels.empty())
     {
         result.text += "\nLABEL TIME\tLABEL\n";
-        for (const auto& label : project.labels) result.text += timeText(label.time) + "\t" + label.text + "\n";
+        for (const auto& label : project.labels) result.text += timeText(label.time - project.playbackStart()) + "\t" + label.text + "\n";
     }
     return result;
 }

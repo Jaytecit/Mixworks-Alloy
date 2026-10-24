@@ -39,7 +39,7 @@ void Workstation::jumpBars(int bars, int direction)
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement())
     { setStatus("Wait for preparation before jumping by mix bars."); return; }
     const juce::ScopedLock guard(engine.lock);
-    const auto clock = engine.project.followTrackTempo ? engine.project.tempo : TempoMap {engine.project.bpm, {}};
+    const auto clock = engine.project.gridClock();
     const double target = clock.timeAtBeat(clock.beatsAt(engine.position) + direction * bars * 4.);
     if (!std::isfinite(target)) { setStatus("This bar position is unavailable."); return; }
     engine.seek(juce::jlimit(0., engine.project.audibleEnd(), target));
@@ -53,7 +53,7 @@ void Workstation::moveTrackBars(int bars, int direction)
     { setStatus("Wait for preparation before moving tracks by bars."); return; }
     engine.flushMidiControls(); engine.finishAutomation(); const juce::ScopedLock guard(engine.lock);
     const auto id = selectedClip; const auto* clip = engine.project.clipFor(id); if (!clip) return;
-    const auto clock = engine.project.followTrackTempo ? engine.project.tempo : TempoMap {engine.project.bpm, {}};
+    const auto clock = engine.project.gridClock();
     const double target = clock.timeAtBeat(clock.beatsAt(clip->start) + direction * bars * 4.);
     if (!std::isfinite(target) || target < 0) { setStatus("That whole bar step would put the track before the mix."); return; }
     auto candidate = engine.project; const auto result = candidate.moveClip(id, target, false, 0, false);

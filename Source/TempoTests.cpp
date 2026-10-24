@@ -101,7 +101,9 @@ void runTempoTests(const std::function<void(bool, const juce::String&)>& check, 
         for (auto item : automatic.project.clips) { item.moveTo(automatic.project.snappedClipStart(item, item.start, true)); const double beat = automatic.project.tempo.beatsAt(item.start + item.firstBeatTime()); aligned = aligned && near(beat, std::round(beat)) && near(item.length * item.rate, 24); }
         check(aligned, "beat-snapped moves align source phases, waveform markers and global grid across the transition");
         const auto& second = automatic.project.clips[1];
-        check(near(second.start + second.transitionTime(true), automatic.project.tempo.points.back().time) && near(automatic.project.clips[0].fadeOut, second.fadeIn), "tempo reaches its incoming target at musical IN without adding volume fades");
+        check(automatic.project.tempo.points.back().time > second.start + second.transitionTime(true)
+            && near(automatic.project.tempo.beatsAt(automatic.project.tempo.points.back().time), 64)
+            && near(automatic.project.clips[0].fadeOut, second.fadeIn), "close rebuilt target finishes after IN over sixteen bars without adding volume fades");
         const double placed = automatic.project.snappedClipStart(second, second.start + 0.27, true);
         Clip moved = second; moved.start = placed; const double beat = automatic.project.tempo.beatsAt(placed + moved.firstBeatTime());
         check(near(beat, std::round(beat)), "drag snapping aligns a clip's measured first pulse, including a nonzero source beat phase");

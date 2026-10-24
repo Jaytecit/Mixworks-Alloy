@@ -1,12 +1,22 @@
 #pragma once
 #include "Analysis.h"
+#include "MusicalEnergy.h"
 #include <optional>
 
 namespace mixworks
 {
 // Increment when the detector or the interpretation of its results changes.
-constexpr int analysisRevision = 9;
-enum class AnalysisCacheMode { readWrite, readOnly, refresh };
+constexpr int analysisRevision = 11;
+struct SourceSectionMarker
+{
+    juce::String id;
+    double sourceSeconds = 0, contrastDb = 0;
+    bool manual = false;
+    juce::String label;
+    bool operator==(const SourceSectionMarker& b) const { return id == b.id && sourceSeconds == b.sourceSeconds && contrastDb == b.contrastDb && manual == b.manual && label == b.label; }
+};
+using SourceSections = std::optional<std::vector<SourceSectionMarker>>;
+enum class AnalysisCacheMode { readWrite, readOnly, refresh, focused };
 struct SourceIdentity
 {
     juce::String sha256;
@@ -24,6 +34,7 @@ struct TrackAnalysisRecord
     int manualKey = -1;
     std::vector<float> waveformRms;
     int revision = analysisRevision;
+    MusicalEnergyProfile energy;
 };
 struct AnalysisRecordRead
 {

@@ -1,11 +1,157 @@
 #include "Workstation.h"
 #include "Beatmatch.h"
+#include "AutoArrangement.h"
 #include <cmath>
 
 namespace mixworks
 {
 void runBeatGridTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report, const juce::File& reference)
 {
+    const auto args = juce::StringArray::fromTokens(juce::JUCEApplicationBase::getCommandLineParameters(), true);
+    if (args.contains("--grid-attack-only"))
+    {
+        constexpr int sr = 22050, seconds = 24;
+        constexpr double onset = .07375, period = .5;
+        auto media = std::make_shared<Media>(); media->name = "Measured kick attacks"; media->sampleRate = sr;
+        media->samples.setSize(1, sr * seconds); media->samples.clear();
+        for (double beat = onset; beat < seconds; beat += period)
+            for (int i = 0; i < (int)(.23 * sr) && (int)(beat * sr) + i < media->frames(); ++i)
+            {
+                const double t = i / (double)sr, envelope = std::min(1., t / .0015) * std::exp(-10 * t);
+                media->samples.setSample(0, (int)(beat * sr) + i, (float)(.8 * envelope * std::sin(juce::MathConstants<double>::twoPi * (150 * t - 180 * t * t))));
+            }
+        MusicAnalysis old; old.bpm = 120.025; old.beatOrigin = onset + .060; old.downbeatOrigin = old.beatOrigin + 8 * 60 / old.bpm;
+        old.downbeatConfidence = .8; old.tempoConfidence = .9; old.gridErrorMs = 15; old.key = 4; old.keyConfidence = .8;
+        media->analysis = old;
+        const bool refined = refineAttackTiming(media->audioView(), sr, media->analysis, 0, -1);
+        check(refined
+              && std::abs(media->analysis.beatOrigin - onset) < .003 && std::abs(media->analysis.bpm - 120) < .01,
+              "late cached grid is refitted to clear PCM attack beginnings: " + juce::String(media->analysis.beatOrigin, 6) + " s / " + juce::String(media->analysis.bpm, 5) + " BPM");
+        check(std::abs(media->analysis.downbeatOrigin - onset - 4) < .003 && media->analysis.key == old.key && media->analysis.keyConfidence == old.keyConfidence,
+              "refinement preserves the chosen bar ordinal and existing key analysis");
+        const auto corrected = media->analysis;
+        check(!refineAttackTiming(media->audioView(), sr, media->analysis, 0, -1) && media->analysis.beatOrigin == corrected.beatOrigin,
+              "completed timing attempts are reused without repeat refinement");
+        auto manual = old;
+        check(!refineAttackTiming(media->audioView(), sr, manual, 126, -1) && manual.bpm == old.bpm && manual.beatOrigin == old.beatOrigin
+              && !refineAttackTiming(media->audioView(), sr, manual, 0, .37) && manual.attackTimingRevision == 0,
+              "manual BPM and reviewed downbeat choices bypass automatic timing changes");
+        juce::AudioBuffer<float> ambiguous(1, sr * seconds); juce::FloatVectorOperations::fill(ambiguous.getWritePointer(0), .2f, ambiguous.getNumSamples());
+        auto retained = old; refineAttackTiming(ambiguous, sr, retained, 0, -1);
+        check(retained.beatOrigin == old.beatOrigin && retained.bpm == old.bpm && retained.attackTimingRevision == 1,
+              "audio without distinct repeating attack boundaries keeps its existing grid");
+        auto cancelled = old;
+        check(!refineAttackTiming(media->audioView(), sr, cancelled, 0, -1, std::make_shared<std::atomic<bool>>(true)) && cancelled.attackTimingRevision == 0,
+              "cancelled timing refinement leaves the stored attempt and grid untouched");
+        media->analysisSource = {juce::String::repeatedString("a",64), 1000, sr, media->frames(), 1};
+        const int bucket = media->frames() / 4000; media->peaks.resize((size_t)((media->frames() + bucket - 1) / bucket), .8f);
+        const auto decoded = parseAnalysisRecord(analysisRecordToJson(media->analysisRecord()));
+        check(decoded.reusableAutomatic && decoded.record && decoded.record->analysis.attackTimingRevision == 1
+              && decoded.record->analysis.beatOrigin == corrected.beatOrigin && decoded.record->analysis.key == old.key,
+              "timing refinement round-trips in the existing analysis cache without discarding other analysis");
+        {
+            const auto file = report.getSiblingFile("cached-grid.wav");
+            juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> output = file.createOutputStream();
+            auto writer = wav.createWriterFor(output, juce::AudioFormatWriterOptions().withSampleRate(sr).withNumChannels(1).withBitsPerSample(24));
+            const bool written = writer && writer->writeFromAudioSampleBuffer(media->samples, 0, media->frames()); writer.reset();
+            auto stale = media->catalogueCopy(); stale->file = file; stale->analysis = old;
+            stale->analysisSource = {audioDigest(file), file.getSize(), sr, media->frames(), 1};
+            const auto stored = writeAnalysisRecord(file, stale->analysisRecord());
+            check(written && stored.isEmpty(), "seed a small source with existing late-grid analysis in the isolated test store");
+            if (written && stored.isEmpty())
+            {
+                Workstation ui(false); ui.stopTimer(); ui.engine.library = {stale};
+                AutoArrangementOptions options; options.trackCount = 1; options.startingId = stale->id;
+                options.preset = TransitionPreset::alignOnly; options.sectionTransitions = false; options.transitions = AutoTransitionStyle::current;
+                struct Wait final : juce::Timer
+                {
+                    Workstation& ui; double started = juce::Time::getMillisecondCounterHiRes();
+                    explicit Wait(Workstation& w) : ui(w) {}
+                    void timerCallback() override
+                    {
+                        if (!ui.busy || juce::Time::getMillisecondCounterHiRes() - started > 10000)
+                        { stopTimer(); juce::MessageManager::getInstance()->stopDispatchLoop(); }
+                    }
+                } wait(ui);
+                ui.startAutoArrangement(options); wait.startTimer(10); juce::MessageManager::getInstance()->runDispatchLoop();
+                bool aligned = !ui.busy && ui.engine.project.clips.size() == 1;
+                if (aligned)
+                {
+                    const auto& clip = ui.engine.project.clips.front();
+                    aligned = clip.media->analysisFromCache && clip.media->analysis.attackTimingRevision == 1
+                        && std::abs(std::remainder(ui.engine.project.gridClock().beatsAt(clip.start + clip.audioTimelineTime(onset)),1.0)) < .006;
+                }
+                check(aligned, "actual Auto Arrange hydrates saved analysis and rebuilds its shortlist on refined timing: " + ui.status.replaceCharacters("\r\n", "  "));
+                juce::AudioFormatManager formats; formats.registerBasicFormats(); int analysed = 0;
+                const auto warm = readMedia(formats, file, [&](MediaReadStage stage) { if (stage == MediaReadStage::analyse) ++analysed; });
+                check(warm.media && warm.media->decodedFromCache && warm.media->analysisFromCache && analysed == 0
+                      && warm.media->analysis.attackTimingRevision == 1 && warm.media->analysis.key == old.key
+                      && warm.media->manualBeatOrigin == -1 && warm.media->analysisSource == stale->analysisSource,
+                      "subsequent loads reuse refined analysis and cached audio without neural analysis or loss of source identity");
+            }
+        }
+        Project visual;
+        for (int route = 0; route < 3; ++route)
+        {
+            Project p; p.tempo.origin = 0; p.tempo.points.clear(); p.bpm = media->bpm();
+            Clip clip; clip.media = media; clip.length = media->duration(); clip.start = route == 1 ? 2 : 0;
+            clip.pendingPlacement = route == 2 ? PendingPlacement::none : route == 1 ? PendingPlacement::drop : PendingPlacement::append;
+            p.clips = {clip};
+            auto placed = prepareTempoMap(p, route == 2, 0, 0, 0, {}, TransitionPreset::alignOnly, false);
+            bool aligned = placed.error.isEmpty();
+            if (aligned)
+            {
+                const auto& c = placed.project.clips.front(); const auto clock = placed.project.gridClock();
+                for (double source : {onset, onset + 4, onset + 12})
+                {
+                    const double time = c.start + c.audioTimelineTime(source);
+                    aligned &= std::abs(std::remainder(clock.beatsAt(time), 1.0)) < .006;
+                }
+                Engine render; render.sampleRate = sr; render.project = placed.project; render.project.masterDb = 0;
+                const double time = c.start + c.audioTimelineTime(onset + 4), grid = clock.timeAtBeat(std::round(clock.beatsAt(time)));
+                juce::AudioBuffer<float> pcm(2, 512); juce::MidiBuffer midi; render.render(pcm, 512, grid - .01, midi);
+                int first = 0; while (first < pcm.getNumSamples() && std::abs(pcm.getSample(0, first)) < .01f) ++first;
+                aligned &= first < pcm.getNumSamples() && std::abs(first / (double)sr - .01) < .004;
+                aligned &= c.waveformRange(time - c.start + .002, time - c.start + .006).peak > .05f;
+                if (route == 0) visual = placed.project;
+            }
+            check(aligned, "source attacks, rendered PCM and waveform agree with the ruler after " + juce::String(route == 0 ? "append" : route == 1 ? "drop" : "Auto Arrange") + ": " + placed.error);
+        }
+        if (!visual.clips.empty())
+        {
+            Workstation ui(false); ui.stopTimer(); ui.setSize(1250, 850); ui.engine.project = visual;
+            Clip reference = visual.clips.front(); reference.id = juce::Uuid().toString(); reference.track = 1;
+            reference.start += media->analysis.beatOrigin - onset; ui.engine.project.clips.push_back(reference);
+            ui.refresh(); ui.timeline.pixelsPerSecond = 800; ui.timeline.updateSize();
+            const int x = (int)((visual.clips.front().start + onset - .1) * 800);
+            ui.viewport.setViewPosition(std::max(0,x),0);
+            auto stream = report.getSiblingFile("attack-grid.png").createOutputStream(); juce::PNGImageFormat png;
+            check(stream && png.writeImageToStream(ui.timeline.createComponentSnapshot({std::max(0,x),0,1050,ui.timeline.laneTop(2)}), *stream),
+                  "capture native automatic placement beside an independently positioned onset reference");
+        }
+        const int exampleIndex = args.indexOf("--grid-example"), pcmIndex = args.indexOf("--grid-pcm");
+        if (exampleIndex >= 0 && exampleIndex + 1 < args.size() && pcmIndex >= 0 && pcmIndex + 1 < args.size())
+        {
+            const auto example = juce::JSON::parse(juce::File(args[exampleIndex + 1].unquoted()));
+            const auto parsed = parseAnalysisRecord(example["record"]);
+            juce::MemoryMappedFile mapped(juce::File(args[pcmIndex + 1].unquoted()), juce::MemoryMappedFile::readOnly);
+            const bool valid = parsed.reusableAutomatic && parsed.record && mapped.getData()
+                && mapped.getSize() == PcmStore::headerBytes + (size_t)parsed.record->source.frames * parsed.record->source.channels * sizeof(float);
+            check(valid, "read the exact saved example PCM without loading the production app or changing its cache");
+            if (valid)
+            {
+                const auto& s = parsed.record->source; auto analysis = parsed.record->analysis;
+                const PcmView audio(reinterpret_cast<const float*>(static_cast<const char*>(mapped.getData()) + PcmStore::headerBytes),s.channels,s.frames,s.frames);
+                refineAttackTiming(audio,s.sampleRate,analysis,0,-1);
+                check(std::abs(analysis.beatOrigin - .071633) < .006 && std::abs(analysis.bpm - 126) < .01,
+                      "real cached example grid meets the independently measured opening attack: " + juce::String(analysis.beatOrigin,6) + " s / " + juce::String(analysis.bpm,5) + " BPM");
+                auto* result = new juce::DynamicObject(); result->setProperty("beforeOrigin",parsed.record->analysis.beatOrigin); result->setProperty("afterOrigin",analysis.beatOrigin);
+                result->setProperty("beforeBpm",parsed.record->analysis.bpm); result->setProperty("afterBpm",analysis.bpm); result->setProperty("rmsMs",analysis.gridErrorMs);
+                report.getSiblingFile("real-attack-timing.json").replaceWithText(juce::JSON::toString(juce::var(result)));
+            }
+        }
+        return;
+    }
     auto first = std::make_shared<Media>(); first->sampleRate = 8000; first->manualBpm = 120; first->manualBeatOrigin = 0.213;
     first->samples.setSize(1, 8000 * 24); first->samples.clear();
     auto second = std::make_shared<Media>(); second->sampleRate = 8000; second->manualBpm = 144; second->manualBeatOrigin = 1.213;
@@ -14,6 +160,65 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     Clip b; b.media = second; b.track = 1; b.length = 24;
     Project project; project.clips = {a, b};
     auto matched = prepareTempoMap(project, true, 16);
+    // A user can correct a detector's phase by freely positioning the audio.
+    // Subsequent snapped movement must retain that phase, not reapply detection.
+    {
+        Project moved = matched.project;
+        const auto id = moved.clips[0].id;
+        auto* clip = moved.clipFor(id); clip->moveTo(clip->start + .017);
+        const auto clock = moved.gridClock(); const double phase = clock.beatsAt(clip->start);
+        const double target = clock.timeAtBeat(phase + 8.18);
+        const auto result = moved.moveClip(id, target, true, 0, false);
+        check(result.wasOk() && std::abs(clock.beatsAt(moved.clipFor(id)->start) - phase - 8) < 1e-7,
+              "snapped body movement retains manual phase while moving by whole beats");
+    }
+    {
+        auto manual = matched.project;
+        const auto id = manual.clips[0].id;
+        const auto corrected = manual.moveClip(id, manual.clips[0].start + .017, false, 0, false);
+        check(corrected.wasOk(), "manual phase fixture moves its complete linked group");
+        const auto clock = manual.gridClock();
+        auto following = manual; const double phase = clock.beatsAt(following.clips[0].start);
+        const auto followed = following.moveClipFollowing(id, clock.timeAtBeat(phase + 1.18), true);
+        check(followed.wasOk() && std::abs(clock.beatsAt(following.clips[0].start) - phase - 1) < 1e-7,
+              "snapped title-handle movement preserves the manually corrected phase");
+        for (const auto edit : {Project::TransitionEdit::moveWindow, Project::TransitionEdit::resizeStart, Project::TransitionEdit::resizeEnd,
+             Project::TransitionEdit::moveOutgoing, Project::TransitionEdit::moveIncoming})
+        {
+            auto trial = manual; const auto link = trial.transitionLinks.front();
+            const auto range = trial.transitionRange(link);
+            const bool out = edit == Project::TransitionEdit::moveOutgoing, in = edit == Project::TransitionEdit::moveIncoming;
+            const double reference = out ? trial.clipFor(link.outgoing)->start : in ? trial.clipFor(link.incoming)->start
+                : edit == Project::TransitionEdit::resizeEnd ? range.getEnd() : range.getStart();
+            const int direction = out ? 1 : -1;
+            const double target = clock.timeAtBeat(clock.beatsAt(reference) + direction * 1.18);
+            const auto result = trial.editTransition(link.incoming, edit, target - reference, true);
+            const auto after = trial.transitionRange(*trial.transitionFor(link.incoming));
+            const double actual = out ? trial.clipFor(link.outgoing)->start : in ? trial.clipFor(link.incoming)->start
+                : edit == Project::TransitionEdit::resizeEnd ? after.getEnd() : after.getStart();
+            check(result.wasOk() && std::abs(clock.beatsAt(actual) - clock.beatsAt(reference) - direction) < 1e-7,
+                  "snapped transition gesture " + juce::String((int) edit) + " preserves its existing phase: " + result.getErrorMessage());
+        }
+        for (bool intro : {false, true})
+        {
+            auto trial = manual; const auto clipId = intro ? trial.clips[1].id : id;
+            const auto* selected = trial.clipFor(clipId); const double reference = selected->start + selected->transitionTime(intro);
+            const double target = clock.timeAtBeat(clock.beatsAt(reference) + 1.18);
+            const auto result = trial.moveTransitionAnchor(clipId, intro, target, true);
+            if (intro)
+            {
+                const auto* after = trial.clipFor(clipId);
+                check(result.wasOk() && std::abs(clock.beatsAt(after->start) - clock.beatsAt(manual.clipFor(clipId)->start) + 1) < 1e-7,
+                      "snapped IN selection moves the source by one beat without resetting manual phase");
+            }
+            else
+            {
+                const auto* after = trial.clipFor(clipId);
+                check(result.wasOk() && std::abs(clock.beatsAt(after->start + after->transitionTime(false)) - clock.beatsAt(reference) - 1) < 1e-7,
+                      "snapped OUT selection preserves the source-corrected anchor phase");
+            }
+        }
+    }
     bool bars = matched.error.isEmpty();
     for (const auto& clip : matched.project.clips)
     {
@@ -38,13 +243,13 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
             && std::abs(std::remainder(automatic.project.tempo.beatsAt(clip.start + clip.firstDownbeatTime()), 4)) < 1.0e-7;
     check(automaticBars, "normal insertion aligns different source bar phases through a tempo ramp without trimming audio or requiring Beatmatch");
     {
-        Workstation guides(false); guides.stopTimer(); guides.setSize(1440, 940);
+        auto guidesOwner = std::make_unique<Workstation>(false); auto& guides = *guidesOwner; guides.stopTimer(); guides.setSize(1440, 940);
         Clip offset; offset.media = first; offset.start = 0.137; offset.length = 24; offset.beatmatched = true; offset.tempoSourceBpm = 120;
         guides.engine.project.tempo.points = {{0, 120}}; offset.tempoMap = std::make_shared<const TempoMap>(guides.engine.project.tempo);
         guides.engine.project.clips = {offset}; guides.timeline.pixelsPerSecond = 81.3; guides.refresh();
         const auto snapshot = guides.timeline.createComponentSnapshot({0, 0, 650, guides.timeline.laneTop(1)});
         const int beatX = Clip::gridPixel(4.5, 81.3), sourceX = Clip::gridPixel(4.35, 81.3);
-        const int middle = guides.timeline.laneTop(0) + 65, tick = guides.timeline.laneTop(0) + Timeline::laneHeight - 18;
+        const int middle = guides.timeline.laneTop(0) + 65, tick = juce::roundToInt(guides.timeline.clipBounds(offset).getBottom() - 9);
         check(snapshot.getPixelAt(beatX, middle).getPerceivedBrightness() > snapshot.getPixelAt(beatX + 2, middle).getPerceivedBrightness()
               && snapshot.getPixelAt(sourceX, middle) == snapshot.getPixelAt(sourceX + 2, middle),
               "native full-height track guides use the timeline grid even when a source is deliberately offset");
@@ -54,7 +259,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
         check(image && png.writeImageToStream(snapshot, *image), "capture shared timeline guides with independently visible source timing");
     }
     {
-        Workstation pixelUi(false); pixelUi.stopTimer();
+        auto pixelOwner = std::make_unique<Workstation>(false); auto& pixelUi = *pixelOwner; pixelUi.stopTimer();
         auto pulse = std::make_shared<Media>(); pulse->sampleRate = 8000; pulse->manualBpm = 120; pulse->manualBeatOrigin = .218;
         pulse->samples.setSize(1, 16000); pulse->samples.clear(); pulse->samples.setSample(0, 1744, .95f);
         Clip clip; clip.media = pulse; clip.start = .137; clip.length = 2;
@@ -71,7 +276,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     // tempo curve just as the real Remove command does. Check the whole clip,
     // rather than only the first beat at the insertion boundary.
     {
-        Workstation replacement(false); replacement.stopTimer(); replacement.setSize(1440, 940);
+        auto replacementOwner = std::make_unique<Workstation>(false); auto& replacement = *replacementOwner; replacement.stopTimer(); replacement.setSize(1440, 940);
         for (int removed : {0, 1}) for (bool live : {false, true})
         {
             replacement.engine.project = automatic.project;
@@ -106,7 +311,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
         // occupy one timestamp. Both endpoints carry timing information.
         coincident.tempo.points = {{0, 120}, {12, 150, true, coincident.clips[1].id}, {12, 120, false}};
         auto prepared = prepareTempoMap(coincident, false, 16);
-        Workstation removal(false); removal.stopTimer(); removal.engine.project = prepared.project;
+        auto removalOwner = std::make_unique<Workstation>(false); auto& removal = *removalOwner; removal.stopTimer(); removal.engine.project = prepared.project;
         removal.selectedClip = coincident.clips[1].id; removal.removeClip();
         bool clock = prepared.error.isEmpty();
         for (double time = 0; time < 36; time += 0.137)
@@ -158,7 +363,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     check(audible.error.isEmpty(), "real two-tempo overlap prepares both source tracks: " + audible.error);
     if (audible.error.isEmpty())
     {
-        Engine render; render.sampleRate = 22050; render.project = audible.project; render.project.masterDb = 0;
+        auto renderOwner = std::make_unique<Engine>(); auto& render = *renderOwner; render.sampleRate = 22050; render.project = audible.project; render.project.masterDb = 0;
         const auto& map = audible.project.tempo; double worst = 0, separation = 0; int measured = 0;
         for (int beat = (int) std::ceil(map.beatsAt(audible.project.clips[1].start)) + 5; map.timeAtBeat(beat) < audible.project.clips[0].end() - 0.2; ++beat)
         {
@@ -183,7 +388,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
         }
         check(measured >= 6 && worst < 0.035 && separation < 0.035,
               "rendered transients remain aligned during the BPM ramp; grid error " + juce::String(worst * 1000, 2) + " ms, track separation " + juce::String(separation * 1000, 2) + " ms");
-        Workstation transitionUi(false); transitionUi.stopTimer(); transitionUi.setSize(1440, 940);
+        auto transitionOwner = std::make_unique<Workstation>(false); auto& transitionUi = *transitionOwner; transitionUi.stopTimer(); transitionUi.setSize(1440, 940);
         transitionUi.engine.project = audible.project; transitionUi.timeline.pixelsPerSecond = 150; transitionUi.refresh();
         transitionUi.viewport.setViewPosition((int) ((audible.project.clips[1].start - 0.5) * 150), 0);
         const auto snapshot = transitionUi.createComponentSnapshot(transitionUi.getLocalBounds()); auto out = report.getSiblingFile("beat-grid-transition.png").createOutputStream();
@@ -191,7 +396,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     }
 
     // A real timeline paint must distinguish PCM transients within one overview bucket.
-    Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940);
+    auto uiOwner = std::make_unique<Workstation>(false); auto& ui = *uiOwner; ui.stopTimer(); ui.setSize(1440, 940);
     auto detail = std::make_shared<Media>(); detail->sampleRate = 8000;
     detail->samples.setSize(1, 8000 * 360); detail->samples.clear();
     detail->samples.setSample(0, 800, 0.9f); // 100 ms: the overview bucket spans 90 ms.
@@ -249,6 +454,9 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
         structure->samples.setSample(0, i, i % 800 == 0 ? 0.98f : energy);
     }
     structure->prepareWaveformBody(); Clip structural; structural.media = structure; structural.length = 64;
+    // This fixture checks the original full-strength accent contrast and tempo-map spacing.
+    // The dimmer/default/off pixel and persistence cases live in AlloyTests.
+    ui.gridDimmer.setValue(1, juce::sendNotificationSync);
     ui.engine.project.clips = {structural}; ui.engine.project.tempo = {120, {}}; ui.timeline.pixelsPerSecond = 8; ui.refresh();
     const auto overview = ui.timeline.createComponentSnapshot({0, 0, 520, ui.timeline.laneTop(4)});
     check(differentRows(overview, 19, 147) > 35 && differentRows(overview, 147, 211) > 35,
@@ -303,7 +511,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     ui.workers.removeAllJobs(false, -1);
     writeAnalysisRecord(wav, warm.media->analysisRecord());
     check(warm.media->manualBeatOrigin == 2.213 && ui.dirty, "native waveform downbeat correction retains the exact clicked source time");
-    const auto saved = juce::JSON::toString(ui.engine.captureProject()); Engine reopened;
+    const auto saved = juce::JSON::toString(ui.engine.captureProject()); auto reopenOwner = std::make_unique<Engine>(); auto& reopened = *reopenOwner;
     check(reopened.restoreProject(saved).isEmpty() && reopened.library[0]->manualBeatOrigin == 2.213,
           "manual first downbeat correction survives the production session round trip");
     const auto old = juce::JSON::parse(analysisRecordFile(wav)); auto stale = juce::JSON::parse(juce::JSON::toString(old));
@@ -325,7 +533,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
         check(actual.media != nullptr, "read the requested waveform reference without changing source analysis: " + actual.error);
         if (actual.media)
         {
-            Workstation preview(false); preview.stopTimer(); preview.setSize(1440, 940);
+            auto previewOwner = std::make_unique<Workstation>(false); auto& preview = *previewOwner; preview.stopTimer(); preview.setSize(1440, 940);
             preview.engine.library = {actual.media}; Clip clip; clip.media = actual.media; clip.length = actual.media->duration();
             Project referenceProject; referenceProject.clips = {clip};
             auto placed = prepareTempoMap(referenceProject, true, 32);

@@ -167,10 +167,10 @@ void runMasteringTests(const std::function<void(bool, const juce::String&)>& che
     Workstation ui(false); ui.stopTimer(); ui.engine.project = p; ui.engine.sampleRate = 8000;
     ui.workspacePreference = root.getChildFile("workspace.json"); ui.refresh(); const auto beforeOpen = json(ui.engine.project);
     ui.addToDesktop(0); ui.setVisible(true); ui.masterPanelButton->onClick();
-    check(ui.masterWindow && ui.masterWindow->isVisible() && ui.masterPanelButton->getBounds().getRight() <= ui.laneAmount.getX()
+    check(ui.masterWindow && ui.masterWindow->isVisible() && ui.masterPanelButton->getBounds().getRight() <= ui.followButton.getX()
           && ui.masterPanelButton->getAccessibilityHandler() && json(ui.engine.project) == beforeOpen,
-          "native timeline hexagon opens the master panel without obscuring lane count or changing the mix; visible=" + juce::String((int) (ui.masterWindow && ui.masterWindow->isVisible()))
-          + ", geometry=" + juce::String((int) (ui.masterPanelButton->getBounds().getRight() <= ui.laneAmount.getX())) + ", accessible=" + juce::String((int) (ui.masterPanelButton->getAccessibilityHandler() != nullptr))
+          "native timeline hexagon opens the master panel without obscuring Follow playhead or changing the mix; visible=" + juce::String((int) (ui.masterWindow && ui.masterWindow->isVisible()))
+          + ", geometry=" + juce::String((int) (ui.masterPanelButton->getBounds().getRight() <= ui.followButton.getX())) + ", accessible=" + juce::String((int) (ui.masterPanelButton->getAccessibilityHandler() != nullptr))
           + ", sameModel=" + juce::String((int) (json(ui.engine.project) == beforeOpen)));
     if (!ui.masterWindow) return;
     auto* panel = ui.masterWindow->getContentComponent();

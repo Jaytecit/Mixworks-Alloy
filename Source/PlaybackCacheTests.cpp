@@ -5,6 +5,67 @@
 
 namespace mixworks
 {
+void runCacheSettingsTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
+{
+    const auto folder = report.getParentDirectory().getChildFile("cache-settings-" + juce::Uuid().toString());
+    folder.createDirectory();
+    const auto profile = folder.getChildFile("location.json"), oldRoot = folder.getChildFile("retained"), newRoot = folder.getChildFile("expanded");
+    auto settings = PcmStore::readSettings(profile, oldRoot);
+    check(settings.error.isEmpty() && settings.root == oldRoot && settings.budget == 128LL * 1024 * 1024 * 1024,
+          "missing cache profile preserves the default location with a 128 GiB budget");
+    juce::DynamicObject::Ptr object = new juce::DynamicObject();
+    object->setProperty("format", "mixworks-audio-cache-location"); object->setProperty("version", 1);
+    object->setProperty("root", newRoot.getFullPathName()); object->setProperty("retainedRoot", oldRoot.getFullPathName());
+    object->setProperty("budgetGiB", 128);
+    const auto saveProfile = [&] { return profile.replaceWithText(juce::JSON::toString(juce::var(object.get()))); };
+    const bool saved = saveProfile(); settings = PcmStore::readSettings(profile, oldRoot);
+    check(saved && settings.error.isEmpty() && settings.root == newRoot && settings.retainedRoot == oldRoot
+          && settings.budget == 128LL * 1024 * 1024 * 1024 && !oldRoot.exists() && !newRoot.exists(),
+          "valid location settings select the expanded cache without changing any existing data");
+    bool invalid = true;
+    for (const auto& field : {juce::String("root"), juce::String("retainedRoot"), juce::String("budgetGiB"), juce::String("version")})
+    {
+        const auto previous = object->getProperty(field);
+        object->setProperty(field, "invalid"); invalid &= saveProfile();
+        const auto bytes = profile.loadFileAsString();
+        invalid &= PcmStore::readSettings(profile, oldRoot).error.isNotEmpty() && profile.loadFileAsString() == bytes;
+        object->setProperty(field, previous);
+    }
+    check(invalid && !oldRoot.exists() && !newRoot.exists(), "invalid paths and numeric settings are rejected without modifying caches or settings");
+    check(PcmStore::shared().directory() != PcmStore::defaultRoot()
+          && PcmStore::shared().limitBytes() == PcmStore::defaultBudgetBytes,
+          "explicit isolated test roots do not use the production cache profile");
+    PcmStore oldStore(oldRoot, 1024 * 1024);
+    juce::AudioBuffer<float> audio(2, 1024); audio.clear(); audio.setSample(0, 123, 0.375f); audio.setSample(1, 321, -0.25f);
+    const auto first = juce::String::repeatedString("a", 64), late = juce::String::repeatedString("b", 64), fresh = juce::String::repeatedString("c", 64);
+    juce::String warning;
+    auto seed = oldStore.write(first, 48000, audio, warning);
+    check(seed && warning.isEmpty(), "small existing PCM fixture uses the unchanged cache format");
+    if (!seed) return;
+    seed.reset();
+    const auto originalHash = juce::SHA256(oldStore.entryFile(first)).toHexString();
+    PcmStore expanded(settings.root, settings.budget, settings.retainedRoot);
+    const bool copied = oldStore.entryFile(first).copyFileTo(expanded.entryFile(first));
+    auto reused = expanded.read(first, 48000, 2, 1024);
+    check(copied && reused && reused->file == expanded.entryFile(first)
+          && reused->channelData(0)[123] == 0.375f && reused->channelData(1)[321] == -0.25f
+          && juce::SHA256(oldStore.entryFile(first)).toHexString() == originalHash,
+          "copied audio is reused exactly from the expanded cache while the original is preserved");
+    auto lateSeed = oldStore.write(late, 48000, audio, warning); lateSeed.reset();
+    const auto lateHash = juce::SHA256(oldStore.entryFile(late)).toHexString();
+    auto lateRead = expanded.read(late, 48000, 2, 1024);
+    auto lateWrite = expanded.write(late, 48000, audio, warning);
+    check(lateRead && lateWrite && lateRead->file == oldStore.entryFile(late) && lateWrite->file == oldStore.entryFile(late)
+          && !expanded.entryFile(late).exists() && juce::SHA256(oldStore.entryFile(late)).toHexString() == lateHash,
+          "entries completed by the previous scan are reused read-only without redecoding or rewriting");
+    auto added = expanded.write(fresh, 48000, audio, warning);
+    check(added && warning.isEmpty() && added->file == expanded.entryFile(fresh) && !oldStore.entryFile(fresh).exists(),
+          "new audio writes go exclusively to the expanded cache");
+    const auto marker = oldRoot.getChildFile(".mixworks-cache");
+    check(marker.replaceWithText("unidentified cache") && !expanded.read(late, 48000, 2, 1024)
+          && juce::SHA256(oldStore.entryFile(late)).toHexString() == lateHash,
+          "retained-cache ownership is checked before reuse and rejected files remain untouched");
+}
 void runPlaybackCacheTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
     const auto folder = report.getParentDirectory().getChildFile("playback-workflows-" + juce::Uuid().toString()); folder.createDirectory();
@@ -199,6 +260,7 @@ void runPlaybackCacheTests(const std::function<void(bool, const juce::String&)>&
     MusicScan scan(scanRoot, {}, {}); int discovered = 0;
     for (int guard = 0; guard < 10; ++guard) { auto step = scan.step(); if (step.loaded.media) ++discovered; if (step.done) break; }
     check(discovered == 2 && analysisRecordFile(scanRoot.getChildFile("new.wav")).existsAsFile(), "Music scan recursively discovers and analyses new supported audio without importing unrelated files");
+    check(scan.progress().checked == 2 && scan.progress().file.hasFileExtension("wav"), "scan progress counts supported audio in parent and child folders, excluding unrelated files");
     MusicScan cancelled(scanRoot, {}, {}); cancelled.cancelled = true; auto cancelledStep = cancelled.step();
     check(cancelledStep.done && !cancelledStep.loaded.media, "cancelled Music scans stop before decoding a candidate");
     const auto preferences = folder.getChildFile("scan-preferences.json");
@@ -208,20 +270,43 @@ void runPlaybackCacheTests(const std::function<void(bool, const juce::String&)>&
     preferences.replaceWithText("{unknown"); check(writeScanPreference(preferences, true).isNotEmpty() && preferences.loadFileAsString() == "{unknown", "malformed scan preferences are preserved and reported");
 
     Workstation ui(false); ui.stopTimer(); ui.musicFolder = scanRoot; ui.musicPreference = folder.getChildFile("ui-scan.json"); ui.musicScanEnabled = true; ui.nextMusicScan = 0;
+    ui.musicScanManual = true; ui.engine.playing = true; ui.refreshMusicScanStatus();
+    check(ui.musicScanNotice.getText().contains("waiting") && ui.musicScanNotice.getTooltip().contains(scanRoot.getFullPathName()), "manual scan waiting notification names the actual root and explains playback admission");
+    ui.engine.playing = false; ui.musicScanManual = false;
     ui.engine.project.labels.push_back({"keep-label", 1, "Keep session"});
     struct Poll final : juce::Timer { std::function<void()> tick; void timerCallback() override { tick(); } } poll;
-    const double deadline = juce::Time::getMillisecondCounterHiRes() + 20000; int phase = 0; bool tempoContinued = false;
+    const double deadline = juce::Time::getMillisecondCounterHiRes() + 20000; int phase = 0; bool tempoContinued = false, scanNoticeChecked = false;
     std::shared_ptr<Media> oldScanSource;
     poll.tick = [&]
     {
         if (juce::Time::getMillisecondCounterHiRes() > deadline) { check(false, "background Music UI workflow completes within deadline"); poll.stopTimer(); juce::MessageManager::getInstance()->stopDispatchLoop(); return; }
         ui.tickMusicScan();
+        ui.refreshMusicScanStatus();
+        if (ui.musicScan && !scanNoticeChecked)
+        {
+            scanNoticeChecked = true;
+            check(ui.musicScanNotice.getText().contains("Scanning Music") && ui.musicScanNotice.getTooltip().contains("Includes subfolders"), "actual asynchronous scan exposes a persistent nonmodal progress notice");
+            ui.setSize(1250,940); auto stream = report.getSiblingFile("music-scan-active-1250.png").createOutputStream(); juce::PNGImageFormat png;
+            check(stream && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*stream), "capture the active library scan notice at compact width");
+        }
         if (ui.musicScan || ui.musicScanJobPending) return;
         if (phase == 0)
         {
             if (ui.engine.library.size() != 2) return;
             check(ui.engine.library.size() == 2 && ui.engine.project.clips.empty() && ui.engine.project.labels[0].id == "keep-label"
                   && std::none_of(ui.engine.library.begin(), ui.engine.library.end(), [](const auto& media) { return media->hasPlayback(); }), "automatic scan commits lightweight library entries through the native worker/message queue without changing the arrangement");
+            check(scanNoticeChecked && ui.musicScanNotice.getText().contains("Scan complete") && ui.musicScanNotice.getText().contains("2 added")
+                && ui.libraryTab.getButtonText() == "Library (2)", "completion notification retains actual additions and the Library tab shows the full track total");
+            ui.search.setText("nested",false); ui.filterLibrary();
+            check(ui.libraryTab.getButtonText() == "Library (1 / 2)" && ui.visibleMedia.size() == 1, "search shows matching / total library counts without changing the library");
+            ui.search.setText("no matching music",false); ui.filterLibrary();
+            check(ui.libraryTab.getButtonText() == "Library (0 / 2)", "an empty search result still discloses the complete library total");
+            ui.search.setText({},false); ui.filterLibrary();
+            for (int width : {1250,1920})
+            {
+                ui.setSize(width,940); auto stream = report.getSiblingFile("music-scan-complete-" + juce::String(width) + ".png").createOutputStream(); juce::PNGImageFormat png;
+                check(stream && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*stream), "capture library counts and completed scan / width " + juce::String(width));
+            }
             ui.engine.library[0]->manualBpm = 123.4; analysisRecordFile(ui.engine.library[0]->file).deleteFile(); ui.nextMusicScan = 0; ++phase;
         }
         else if (phase == 1)
@@ -261,12 +346,14 @@ void runPlaybackCacheTests(const std::function<void(bool, const juce::String&)>&
                   && ui.engine.library[0]->manualBpm == 123.4, "adding a scanned catalogue track hydrates its decoded cache on the worker, retains corrections and completes normal tempo preparation");
             const auto metadataSession = folder.getChildFile("catalogue-session.mixworks"); ui.engine.saveProject(metadataSession);
             check(ui.engine.restoreProject(metadataSession.loadFileAsString()).isEmpty() && ui.engine.library[0]->hasPlayback() && !ui.engine.library[1]->hasPlayback()
-                  && !ui.engine.library[2]->hasPlayback() && ui.engine.library[1]->frames() > 0, "session reopening hydrates timeline sources and keeps unused library entries lightweight");
+                  && !ui.engine.library[2]->hasPlayback() && ui.engine.library[1]->sessionMetadataPending && ui.engine.library[1]->frames() == 0,
+                  "session reopening hydrates timeline sources and defers unused library source checks");
             ui.musicScanEnabled = false; ui.musicFolder = folder.getChildFile("unavailable-Music"); ui.menuItemSelected(37, 4); ++phase; return;
         }
         else if (phase == 5)
         {
             check(!ui.musicScan && !ui.musicScanJobPending && !ui.musicScanManual && ui.status.contains("unavailable") && !ui.musicFolder.exists(), "an unavailable Music folder ends a manual scan with a reason without creating folders or enabling repeated scans");
+            check(ui.musicScanNotice.getText().contains("unavailable"), "unavailable folder leaves a persistent library notice instead of falsely reporting completion");
             ui.undoHistory = {largePrepared.project}; ui.redoHistory.clear(); ui.engine.project = firstRamp.project; ui.engine.library = {repaired.media};
             auto revised = firstRamp.project; revised.tempo.points[1].bpm += 0.7654321;
             ui.afterTempoPreparation = [&] { tempoContinued = true; }; ui.prepareTempo(std::move(revised), false); ++phase; return;

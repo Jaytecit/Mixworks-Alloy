@@ -3,18 +3,21 @@
 namespace mixworks
 {
 GridCorrectionEditor::GridCorrectionEditor(Engine& e, std::shared_ptr<const Media> media, const juce::String& details,
-                                           std::function<juce::Result(const SourceCorrection&)> commit)
+                                           std::function<juce::Result(const SourceCorrection&, bool)> commit)
     : engine(e), source(std::move(media)), apply(std::move(commit)), draft(SourceCorrection::from(*source))
 {
-    setSize(900, 650); setWantsKeyboardFocus(true);
-    for (auto* component : std::initializer_list<juce::Component*> {&heading, &info, &bpm, &phase, &key, &zoom, &bpmLabel, &phaseLabel, &keyLabel, &status,
+    setSize(900, 600); setWantsKeyboardFocus(true);
+    setTooltip("Click the source waveform to move the audition cursor. Review the beat and downbeat grid at the beginning, middle and end before applying corrections.");
+    for (auto* component : std::initializer_list<juce::Component*> {&heading, &instructions, &effectiveTempo, &slower, &faster, &rebuild, &info, &bpm, &phase, &key, &zoom, &bpmLabel, &phaseLabel, &keyLabel, &status,
         &half, &twice, &tap, &resetTap, &beatOne, &earlier, &later, &automatic, &beginning, &middle, &end, &quiet, &play, &save, &cancel, &click, &sourceAudio, &cursor, &level})
         addAndMakeVisible(component);
     heading.setText("SOURCE BEAT GRID  /  " + source->name, juce::dontSendNotification);
-    info.setMultiLine(true); info.setReadOnly(true); info.setText(details, false); info.setFont(juce::FontOptions(12));
-    bpmLabel.setText("BPM override (blank = detected)", juce::dontSendNotification);
-    phaseLabel.setText("Downbeat anchor, source seconds (blank = inferred/unknown)", juce::dontSendNotification);
-    keyLabel.setText("Key override", juce::dontSendNotification);
+    info.setVisible(false); heading.setTooltip(details);
+    instructions.setVisible(false);
+    instructions.setFont(juce::FontOptions(12));
+    bpmLabel.setText("BPM", juce::dontSendNotification);
+    phaseLabel.setText("Beat one (seconds)", juce::dontSendNotification);
+    keyLabel.setText("Key", juce::dontSendNotification);
     bpm.setText(draft.bpm > 0 ? juce::String(draft.bpm, 4) : juce::String(), false);
     phase.setText(draft.downbeat >= 0 ? juce::String(draft.downbeat, 4) : juce::String(), false);
     bpm.setName("BPM override"); phase.setName("Downbeat anchor in source seconds");
@@ -28,12 +31,39 @@ GridCorrectionEditor::GridCorrectionEditor(Engine& e, std::shared_ptr<const Medi
     level.setRange(-36, -3, 0.1); level.setValue(-12, juce::dontSendNotification); level.setTextValueSuffix(" dB");
     level.setSliderStyle(juce::Slider::LinearHorizontal); level.setTextBoxStyle(juce::Slider::TextBoxRight, false, 80, 24); level.setName("Source audition level");
     click.setToggleState(true, juce::dontSendNotification); sourceAudio.setToggleState(true, juce::dontSendNotification);
+    bpm.setTooltip("Override constant source BPM. Leave blank to use detection; Apply correction commits the draft.");
+    phase.setTooltip("Source time of any known downbeat, in seconds. The 4/4 bar grid extends both ways from it. Leave blank for inferred or unknown phase.");
+    key.setTooltip("Choose a manual musical key, or Automatic key to use detection.");
+    zoom.setTooltip("Choose how many source seconds the waveform shows around the cursor.");
+    cursor.setTooltip("Move the source audition cursor in seconds. This does not move the mix cursor.");
+    level.setTooltip("Set audition volume for source audio and grid click. This does not change segment or export gain.");
+    click.setTooltip("Include the beat-grid click in source audition to check alignment.");
+    sourceAudio.setTooltip("Include the original source audio in audition. Turn off to hear only the grid click.");
+    half.setTooltip("Halve the draft BPM to correct double-time detection.");
+    twice.setTooltip("Double the draft BPM to correct half-time detection.");
+    tap.setTooltip("Tap at least three beats to estimate the draft BPM. Listen across the track before applying.");
+    resetTap.setTooltip("Clear the tap history before starting a new BPM estimate.");
+    beatOne.setTooltip("Set the draft downbeat anchor at the current source cursor.");
+    automatic.setTooltip("Clear draft BPM, downbeat and key overrides and use detected values after applying.");
+    beginning.setTooltip("Move source audition to the beginning to check the grid.");
+    middle.setTooltip("Move source audition to the middle to check timing drift.");
+    end.setTooltip("Move source audition near the end to check timing drift.");
+    quiet.setTooltip("Suggest a quiet passage from waveform RMS for grid review. This is an approximate location.");
+    play.setTooltip("Play or pause this source audition. Wait for source audio preparation if unavailable.");
+    save.setTooltip("Save BPM, downbeat and key for this source. Existing timeline audio and placement keep their prepared clock. Use Save + rebuild timeline to apply corrections to the mix.");
+    rebuild.setName("Save corrections and rebuild timeline");
+    rebuild.setTooltip("Save corrections, then Beatmatch the whole mix using the current transition preset and length. This can move tracks and replaces manual transition placement. Timeline rebuilding is undoable; saved source corrections remain. Unlock all transitions first.");
+    slower.setName("Decrease source tempo by 0.01 BPM"); faster.setName("Increase source tempo by 0.01 BPM");
+    slower.setTooltip("Decrease source BPM by 0.01 to fine tune steady timing drift. The downbeat anchor stays fixed until saved. You can also type an exact BPM.");
+    faster.setTooltip("Increase source BPM by 0.01 to fine tune steady timing drift. The downbeat anchor stays fixed until saved. You can also type an exact BPM.");
+    slower.onClick = [this] { adjustTempo(-0.01); }; faster.onClick = [this] { adjustTempo(0.01); };
+    cancel.setTooltip("Close source-grid review without applying the draft corrections.");
     bpm.onTextChange = phase.onTextChange = key.onChange = click.onClick = sourceAudio.onClick = level.onValueChange = [this] { changed(); };
     half.onClick = [this] { changeRate(0.5); }; twice.onClick = [this] { changeRate(2); };
     tap.onClick = [this]
     {
         if (auto value = taps.tap(juce::Time::getMillisecondCounterHiRes() / 1000)) { bpm.setText(juce::String(*value, 4), false); changed(); }
-        else status.setText("Tap at least three steady quarter notes. Tapping does not identify beat one.", juce::dontSendNotification);
+        else status.setText("Tap three or more steady beats.", juce::dontSendNotification);
     };
     resetTap.onClick = [this] { taps.reset(); status.setText("Tap tempo reset.", juce::dontSendNotification); };
     beatOne.onClick = [this] { phase.setText(juce::String(cursor.getValue(), 4), false); changed(); };
@@ -51,17 +81,11 @@ GridCorrectionEditor::GridCorrectionEditor(Engine& e, std::shared_ptr<const Medi
             const auto range = source->waveformRange(at, std::min(source->duration(), at + 12));
             if (range.rms < lowest) { lowest = range.rms; best = at; }
         }
-        setCursor(best); status.setText("Quiet suggestion from 32 waveform windows; review it as a possible breakdown.", juce::dontSendNotification);
+        setCursor(best); status.setText("Quiet passage found.", juce::dontSendNotification);
     };
     play.onClick = [this] { togglePlay(); }; cancel.onClick = [this] { dismiss(); };
-    save.onClick = [this]
-    {
-        const auto result = readDraft(); if (result.failed()) { status.setText(result.getErrorMessage(), juce::dontSendNotification); return; }
-        { const juce::ScopedLock guard(engine.lock); engine.gridAudition.stop(); }
-        const auto committed = apply(draft);
-        if (committed.failed()) { status.setText(committed.getErrorMessage(), juce::dontSendNotification); return; }
-        dismiss();
-    };
+    save.onClick = [this] { this->commit(false); };
+    rebuild.onClick = [this] { this->commit(true); };
     status.setColour(juce::Label::textColourId, colour::muted);
     if (source->hasPlayback()) playback = source;
     play.setEnabled(playback != nullptr); changed(); setCursor(0, false); startTimerHz(25);
@@ -71,17 +95,29 @@ juce::Result GridCorrectionEditor::readDraft()
 {
     return SourceCorrection::parse(bpm.getText(), phase.getText(), key.getSelectedId() - 2, source->duration(), draft);
 }
+void GridCorrectionEditor::commit(bool rebuildTimeline)
+{
+    const auto result = readDraft(); if (result.failed()) { status.setText(result.getErrorMessage(), juce::dontSendNotification); return; }
+    { const juce::ScopedLock guard(engine.lock); engine.gridAudition.stop(); }
+    const auto committed = apply(draft, rebuildTimeline);
+    if (committed.failed()) { status.setText(committed.getErrorMessage(), juce::dontSendNotification); return; }
+    dismiss();
+}
 void GridCorrectionEditor::changed()
 {
     const auto result = readDraft(); validDraft = result.wasOk(); save.setEnabled(validDraft);
     const juce::ScopedLock guard(engine.lock);
+    const bool inTimeline = std::any_of(engine.project.clips.begin(), engine.project.clips.end(), [this](const auto& clip)
+    { return clip.media && (clip.media == source || (clip.media->file == source->file && clip.media->analysisSource == source->analysisSource)); });
+    rebuild.setEnabled(validDraft && inTimeline && !engine.project.hasLockedTransitions());
+    effectiveTempo.setText(validDraft ? "Tempo: " + juce::String(draft.grid(*source).bpm, 4) + " BPM" + (draft.bpm > 0 ? " (manual)" : " (detected)") : "Correct the invalid fields before saving.", juce::dontSendNotification);
     if (!validDraft) { engine.gridAudition.stop(); status.setText(result.getErrorMessage(), juce::dontSendNotification); }
     else
     {
         const auto grid = draft.grid(*source); engine.gridAudition.configure(grid, sourceAudio.getToggleState(), click.getToggleState(), (float) level.getValue());
-        status.setText(!grid.hasPulse() ? "Pulse unknown. Listen and tap a steady BPM before checking the grid."
-            : grid.hasBar() ? "Accented 4/4 click. Check beginning, middle, end and quiet passages; Apply keeps the arrangement."
-            : "Beat one unknown: equal clicks only. Locate beat one and choose Beat 1 here.", juce::dontSendNotification);
+        status.setText(!grid.hasPulse() ? "Tap a steady beat to set the tempo."
+            : grid.hasBar() ? "Beat one is set."
+            : "Choose beat one.", juce::dontSendNotification);
     }
     repaint();
 }
@@ -126,11 +162,18 @@ void GridCorrectionEditor::changeRate(double factor)
     if (value < 20 || value > 400) { status.setText("The corrected BPM must remain between 20 and 400.", juce::dontSendNotification); return; }
     bpm.setText(juce::String(value, 4), false); changed();
 }
+void GridCorrectionEditor::adjustTempo(double delta)
+{
+    if (readDraft().failed()) return;
+    const double value = draft.grid(*source).bpm + delta;
+    if (value < 20 || value > 400) { status.setText("Source BPM must remain between 20 and 400.", juce::dontSendNotification); return; }
+    bpm.setText(juce::String(value, 4), false); changed();
+}
 void GridCorrectionEditor::nudge(double seconds)
 {
     if (readDraft().failed()) return;
     const auto grid = draft.grid(*source);
-    if (!grid.hasBar()) { status.setText("Locate beat one first. A pulse-only grid has no bar identity to nudge.", juce::dontSendNotification); return; }
+    if (!grid.hasBar()) { status.setText("Choose beat one first.", juce::dontSendNotification); return; }
     const double factor = juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown() ? 10 : 1;
     phase.setText(juce::String(juce::jlimit(0.0, cursor.getMaximum(), grid.downbeatOrigin + seconds * factor), 4), false); changed();
 }
@@ -182,15 +225,17 @@ void GridCorrectionEditor::paint(juce::Graphics& g)
 }
 void GridCorrectionEditor::resized()
 {
-    auto r = getLocalBounds().reduced(14); heading.setBounds(r.removeFromTop(26)); info.setBounds(r.removeFromTop(78)); r.removeFromTop(8);
+    auto r = getLocalBounds().reduced(14); heading.setBounds(r.removeFromTop(26)); r.removeFromTop(6);
     auto labels = r.removeFromTop(21); bpmLabel.setBounds(labels.removeFromLeft(210)); phaseLabel.setBounds(labels.removeFromLeft(385)); keyLabel.setBounds(labels);
     auto fields = r.removeFromTop(27); bpm.setBounds(fields.removeFromLeft(200)); fields.removeFromLeft(10); phase.setBounds(fields.removeFromLeft(375)); fields.removeFromLeft(10); key.setBounds(fields);
-    r.removeFromTop(6); auto actions = r.removeFromTop(28);
+    r.removeFromTop(6); auto fine = r.removeFromTop(28);
+    slower.setBounds(fine.removeFromLeft(105).reduced(2, 0)); faster.setBounds(fine.removeFromLeft(105).reduced(2, 0)); effectiveTempo.setBounds(fine);
+    r.removeFromTop(4); auto actions = r.removeFromTop(28);
     for (auto* button : {&half, &twice, &tap, &resetTap, &beatOne, &earlier, &later, &automatic}) { button->setBounds(actions.removeFromLeft(105).reduced(2, 0)); }
-    r.removeFromTop(10); waveform = r.removeFromTop(180); cursor.setBounds(r.removeFromTop(31));
+    r.removeFromTop(10); waveform = r.removeFromTop(150); cursor.setBounds(r.removeFromTop(31));
     auto checks = r.removeFromTop(29); for (auto* button : {&beginning, &middle, &end, &quiet}) button->setBounds(checks.removeFromLeft(140).reduced(2, 0)); zoom.setBounds(checks);
     r.removeFromTop(7); auto monitor = r.removeFromTop(32); play.setBounds(monitor.removeFromLeft(125)); click.setBounds(monitor.removeFromLeft(125)); sourceAudio.setBounds(monitor.removeFromLeft(140)); level.setBounds(monitor);
-    status.setBounds(r.removeFromTop(43)); auto footer = r.removeFromBottom(32); cancel.setBounds(footer.removeFromRight(110)); footer.removeFromRight(8); save.setBounds(footer.removeFromRight(180));
+    status.setBounds(r.removeFromTop(43)); auto footer = r.removeFromBottom(32); cancel.setBounds(footer.removeFromRight(110)); footer.removeFromRight(8); rebuild.setBounds(footer.removeFromRight(200)); footer.removeFromRight(8); save.setBounds(footer.removeFromRight(160));
 }
 GridCorrectionWindow::GridCorrectionWindow(GridCorrectionEditor* editor) : AlloyPopupWindow("Source beat grid / corrections", colour::background, true)
 {

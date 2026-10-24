@@ -16,6 +16,25 @@ juce::var preferenceDocument(const juce::File& file)
 bool validPreference(const juce::var& doc) { return doc.isObject() && doc["format"].toString() == "mixworks-library-scan" && doc["version"].isInt() && (int) doc["version"] == 1 && doc["enabled"].isBool(); }
 }
 juce::File scanPreferenceFile() { return PcmStore::defaultRoot().getParentDirectory().getChildFile("library-scan.json"); }
+juce::File musicScanReportsFolder(const juce::File& preference) { return preference.getSiblingFile("ScanReports"); }
+juce::Result writeMusicScanIssue(const juce::File& report, const juce::File& source, const MediaResult& loaded)
+{
+    juce::String reason = loaded.error;
+    if (loaded.media) reason = loaded.media->analysisCacheWarning + "\n" + loaded.media->playbackCacheWarning;
+    reason = reason.trim();
+    if (loaded.media && reason.isEmpty()) return juce::Result::ok();
+    if (reason.isEmpty()) reason = "The reader returned no audio. The source file was kept.";
+    const auto directory = report.getParentDirectory().createDirectory();
+    if (directory.failed()) return directory;
+    juce::FileOutputStream output(report);
+    if (!output.openedOk()) return output.getStatus();
+    if (output.getPosition() == 0)
+        output.writeText("Mixworks Music scan issues / " + juce::Time::getCurrentTime().toISO8601(true)
+            + "\nFAILED means no library entry was added or refreshed. CACHE WARNING means the file was read successfully."
+              "\nExisting analysis and audio are kept. Tools / Scan Music folder now retries failed files.\n\n",false,false,nullptr);
+    output.writeText(juce::String(loaded.media ? "CACHE WARNING" : "FAILED") + "\n" + source.getFullPathName() + "\n" + reason + "\n\n",false,false,nullptr);
+    output.flush(); return output.getStatus();
+}
 ScanPreference readScanPreference(const juce::File& file)
 {
     if (!file.exists()) return {};
@@ -41,9 +60,17 @@ juce::String musicFileStamp(const juce::File& file)
     const auto record = analysisRecordInputFile(file);
     return juce::String(file.getSize()) + ":" + juce::String(file.getLastModificationTime().toMilliseconds()) + ":" + juce::String(record.getSize()) + ":" + juce::String(record.getLastModificationTime().toMilliseconds()) + ":" + juce::String(analysisRevision);
 }
-MusicScan::MusicScan(const juce::File& root, std::map<juce::String, ScanKnown> sources, std::map<juce::String, juce::String> previous)
+MusicScan::MusicScan(const juce::File& root, std::map<juce::String, ScanKnown> sources, std::map<juce::String, juce::String> previous, juce::File reports)
     : cursor(root, true, "*", juce::File::findFiles, juce::File::FollowSymlinks::no), known(std::move(sources)), attempts(std::move(previous))
-{ formats.registerBasicFormats(); }
+{
+    formats.registerBasicFormats();
+    if (reports == juce::File()) reports = PcmStore::shared().directory().getSiblingFile("ScanReports");
+    report = reports.getChildFile("scan-" + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + "-" + juce::Uuid().toString().substring(0,8) + ".txt");
+}
+MusicScanProgress MusicScan::progress() const
+{
+    const juce::ScopedLock guard(progressLock); return latest;
+}
 MusicScanStep MusicScan::step()
 {
     MusicScanStep result;
@@ -52,18 +79,32 @@ MusicScanStep MusicScan::step()
         if (cancelled) { result.done = true; return result; }
         const auto file = (*cursor).getFile(); ++cursor;
         if (file.isSymbolicLink() || !file.hasFileExtension("wav;aif;aiff;flac;ogg;mp3")) continue;
+        { const juce::ScopedLock guard(progressLock); ++latest.checked; latest.file = file; latest.stage = MediaReadStage::lookupAnalysis; }
         const auto path = file.getFullPathName(), stamp = musicFileStamp(file);
         if (auto attempted = attempts.find(path); attempted != attempts.end() && attempted->second == stamp) continue;
         if (const auto found = known.find(path); found != known.end() && file.getSize() == found->second.source.bytes && file.getLastModificationTime().toMilliseconds() == found->second.modified
             && readAnalysisRecord(file, found->second.source).reusableAutomatic) continue;
-        result.file = file; result.loaded = readMedia(formats, file, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::catalogue); result.stamp = musicFileStamp(file); return result;
+        result.file = file;
+        result.loaded = readMedia(formats, file, [this](MediaReadStage stage)
+        { const juce::ScopedLock guard(progressLock); latest.stage = stage; }, AnalysisCacheMode::readWrite, MediaReadPurpose::catalogue);
+        result.stamp = musicFileStamp(file);
+        if (!result.loaded.media || result.loaded.media->analysisCacheWarning.isNotEmpty() || result.loaded.media->playbackCacheWarning.isNotEmpty())
+        {
+            result.report = report;
+            result.reportError = writeMusicScanIssue(report,file,result.loaded).getErrorMessage();
+        }
+        return result;
     }
     result.done = cancelled || cursor == juce::RangedDirectoryIterator(); return result;
 }
-void Workstation::stopMusicScan()
+void Workstation::stopMusicScan(bool completed)
 {
+    if (completed || musicScan || musicScanJobPending || musicScanManual)
+        musicScanSummary = juce::String(completed ? "Scan complete" : "Scan stopped") + " / " + juce::String(musicAdded) + " added / "
+            + juce::String(musicRefreshed) + " refreshed / " + juce::String(musicFailures) + " failed / " + juce::String(musicProblems) + " cache warnings";
     if (musicScan) musicScan->cancelled = true;
     ++musicScanGeneration; musicScanManual = false; musicScan.reset(); nextMusicScan = juce::Time::getMillisecondCounterHiRes() + 60000;
+    refreshMusicScanStatus();
 }
 void Workstation::toggleMusicScan()
 {
@@ -77,14 +118,18 @@ void Workstation::toggleMusicScan()
 void Workstation::beginMusicScan(bool manuallyRequested)
 {
     if (busy || !timelineLoads.empty() || engine.playing || engine.exporting || musicScanJobPending) { nextMusicScan = juce::Time::getMillisecondCounterHiRes() + 60000; return; }
-    stopMusicScan(); musicAdded = musicRefreshed = musicProblems = 0;
+    stopMusicScan(); musicAdded = musicRefreshed = musicProblems = musicFailures = 0;
+    if (manuallyRequested) musicAttempts.clear();
+    musicLastIssue.clear();
+    musicScanSummary.clear();
     musicScanManual = manuallyRequested; const auto generation = musicScanGeneration;
     std::map<juce::String, ScanKnown> known;
     for (const auto& media : engine.library) known[media->file.getFullPathName()] = {media->analysisSource, media->sourceModified};
     // Constructing the iterator can touch the filesystem; it belongs to the worker too.
     musicScanJobPending = true;
     auto safe = juce::Component::SafePointer<Workstation>(this); const auto root = musicFolder; const auto attempts = musicAttempts;
-    workers.addJob([safe, root, known = std::move(known), attempts, generation, manuallyRequested]
+    const auto reports = musicScanReportsFolder(musicPreference);
+    workers.addJob([safe, root, known = std::move(known), attempts, generation, manuallyRequested, reports]
     {
         if (!root.isDirectory())
         {
@@ -92,11 +137,12 @@ void Workstation::beginMusicScan(bool manuallyRequested)
             {
                 if (!safe) return; safe->musicScanJobPending = false;
                 if (safe->musicScanGeneration != generation) return;
-                safe->stopMusicScan(); if (manuallyRequested) safe->setStatus("Music folder is unavailable: " + root.getFullPathName());
+                safe->stopMusicScan(); safe->musicScanSummary = "Music folder unavailable"; safe->refreshMusicScanStatus();
+                if (manuallyRequested) safe->setStatus("Music folder is unavailable: " + root.getFullPathName());
             });
             return;
         }
-        auto scan = std::make_shared<MusicScan>(root, known, attempts);
+        auto scan = std::make_shared<MusicScan>(root, known, attempts, reports);
         juce::MessageManager::callAsync([safe, scan, generation]
         {
             if (!safe) return; safe->musicScanJobPending = false;
@@ -126,7 +172,8 @@ void Workstation::tickMusicScan()
             if (result->file != juce::File())
             {
                 const auto path = result->file.getFullPathName(); auto loaded = result->loaded.media;
-                if (!loaded) { ++safe->musicProblems; safe->musicAttempts[path] = result->stamp; }
+                if (result->report != juce::File()) safe->musicReport = result->report;
+                if (!loaded) { ++safe->musicFailures; safe->musicAttempts[path] = result->stamp; safe->musicLastIssue = result->loaded.error; }
                 else
                 {
                     const auto existing = std::find_if(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& source) { return source->file == result->file; });
@@ -135,11 +182,13 @@ void Workstation::tickMusicScan()
                     if (loaded->analysisCacheWarning.isNotEmpty() || loaded->playbackCacheWarning.isNotEmpty()) { ++safe->musicProblems; safe->musicAttempts[path] = result->stamp; }
                     safe->filterLibrary(); safe->libraryTable.table.updateContent(); safe->libraryTable.table.repaint();
                 }
+                if (result->reportError.isNotEmpty()) safe->musicLastIssue = "Could not save the scan report: " + result->reportError;
             }
             if (result->done)
             {
-                safe->stopMusicScan();
-                if (safe->musicAdded || safe->musicRefreshed || safe->musicProblems) safe->setStatus("Music scan: " + juce::String(safe->musicAdded) + " added / " + juce::String(safe->musicRefreshed) + " refreshed / " + juce::String(safe->musicProblems) + " warnings. Existing clips keep their audio; see BPM / Key for cache warnings.");
+                safe->stopMusicScan(true);
+                // The library notice is persistent; do not overwrite an unrelated editing status every idle pass.
+                if (safe->musicAdded || safe->musicRefreshed || safe->musicProblems || safe->musicFailures) safe->setStatus(safe->musicScanSummary + ". Tools / Music scan reports lists affected files and reasons.");
             }
         });
     });

@@ -7,6 +7,8 @@ The [Mixworks Personal Beta Licence](LICENSE) applies only to the Licensor's ori
 
 ## Local analysis components
 
+The local JUCE build applies the repository-owned `Source/JuceMp3Length.cmake` / `JuceMp3Length.inc` patch. It counts complete MP3 frames when no Xing/Info length is available, replacing the first-frame-size estimate. Upstream notices and licence terms remain unchanged; the exact patched source is retained with local verification evidence.
+
 Mixworks performs analysis locally. No music is uploaded for detection.
 
 - **Beat This! final0 model** — Francesco Foscarin, Jan Schlüter and Gerhard Widmer, ISMIR 2024. [Original project](https://github.com/CPJKU/beat_this), MIT licensed code and weights. The pinned ONNX export comes from [Masaki Ono's C++ port](https://github.com/mosynthkey/beat_this_cpp), commit `07ab790a9ec2eda8093d52d249e3ec4f0510ee72`. Its SHA-256 is `c5c1466e08abdb03fdeb50668a06f244b787d564c212490482231a9cfbe9ccbd`. Mixworks incorporates the port's Mel transform and minimal postprocessor with attribution; model inference and grid admission are owned by Mixworks.
@@ -19,3 +21,12 @@ Full license texts and ONNX Runtime's additional notices are in `licenses/`, inc
 The tonal estimator uses published Sha'ath and Faraldo pitch-class profile data. Its implementation uses JUCE spectral analysis, register normalization and independent stereo evidence; it does not incorporate libKeyFinder or Essentia code or binaries. See the [Sha'ath thesis](https://ibrahimshaath.co.uk/keyfinder/KeyFinder.pdf) and [Faraldo profile documentation and references](https://essentia.upf.edu/reference/std_Key.html).
 
 Windows audio also includes JUCE's bundled Steinberg ASIO SDK headers (2025). Their dual Steinberg ASIO / GPLv3 licence is reproduced in `licenses/ASIO-SDK.txt`. This local prototype uses the GPLv3 option; publishing a proprietary build requires the applicable Steinberg agreement. ASIO is a trademark of Steinberg Media Technologies GmbH. No ASIO driver is distributed.
+
+Optional local stem separation uses maintainer Demucs4.1.0 (Meta Platforms and
+contributors, MIT; `licenses/Demucs-MIT.txt`) with HTDemucs955717e8 safetensors
+weights. The explicit setup script downloads the pinned runtime/model separately;
+they are not bundled with this source. Torch/CUDA, Python, SoundFile/libsndfile,
+NumPy, Julius, safetensors and other resolved packages retain their own licences.
+See [the exact local dependency and model provenance](docs/LICENSING.md) and
+[the workflow](docs/STEM-SEPARATION.md). Before distributing any runtime or model,
+audit its complete actual notices and weight redistribution provenance.

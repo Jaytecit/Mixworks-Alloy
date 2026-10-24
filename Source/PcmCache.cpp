@@ -89,8 +89,41 @@ juce::File PcmStore::defaultRoot()
 {
     return juce::File::getSpecialLocation(juce::File::windowsLocalAppData).getChildFile("Mixworks/AudioCache-v1");
 }
-PcmStore& PcmStore::shared(const juce::File& initialRoot) { static PcmStore store(initialRoot); return store; }
-PcmStore::PcmStore(juce::File directory, int64_t limit) : root(std::move(directory)), budget(limit)
+juce::File PcmStore::settingsFile() { return defaultRoot().getParentDirectory().getChildFile("audio-cache-location.json"); }
+PcmStore::Settings PcmStore::readSettings(const juce::File& file, const juce::File& fallback)
+{
+    Settings result; result.root = fallback;
+    if (!file.exists()) return result;
+    const auto fail = [&]() { result.error = "Invalid audio cache settings; the file and existing cache were kept."; return result; };
+    if (file.isSymbolicLink() || !file.existsAsFile() || file.getSize() > 4096) return fail();
+    const auto value = juce::JSON::parse(file);
+    if (!value.isObject() || value["format"].toString() != "mixworks-audio-cache-location"
+        || !value["version"].isInt() || (int)value["version"] != 1
+        || !value["root"].isString() || !juce::File::isAbsolutePath(value["root"].toString())
+        || !value["budgetGiB"].isInt() || (int)value["budgetGiB"] < 1 || (int)value["budgetGiB"] > 4096) return fail();
+    if (value.hasProperty("retainedRoot") && (!value["retainedRoot"].isString()
+        || !juce::File::isAbsolutePath(value["retainedRoot"].toString()))) return fail();
+    result.root = juce::File(value["root"].toString());
+    result.budget = (int64_t)(int)value["budgetGiB"] * 1024 * 1024 * 1024;
+    if (value.hasProperty("retainedRoot")) result.retainedRoot = juce::File(value["retainedRoot"].toString());
+    if (result.retainedRoot == result.root) result.retainedRoot = {};
+    return result;
+}
+PcmStore& PcmStore::shared(const juce::File& initialRoot)
+{
+    static PcmStore store = [&]
+    {
+        // Explicit test/bridge roots never consult the user's profile. Keep
+        // defaultRoot stable: workspace and scan preferences still live there.
+        Settings settings; settings.root = initialRoot;
+        if (initialRoot == defaultRoot()) settings = readSettings(settingsFile(),initialRoot);
+        PcmStore result(settings.root,settings.budget,settings.retainedRoot);
+        if (settings.error.isNotEmpty()) result.problem = settings.error;
+        return result;
+    }();
+    return store;
+}
+PcmStore::PcmStore(juce::File directory, int64_t limit, juce::File retained) : root(std::move(directory)), retainedRoot(std::move(retained)), budget(limit)
 {
     juce::InterProcessLock mutex(cacheLockName(root));
     if (!mutex.enter(2000)) { problem = "Playback cache initialization is busy in another Mixworks instance."; return; }
@@ -121,7 +154,15 @@ bool PcmStore::ownedEntry(const juce::File& file) const
 std::unique_ptr<AudioCache> PcmStore::read(const juce::String& key, double rate, int channels, int frames, bool touch)
 {
     if (problem.isNotEmpty() || !digestName(key) || channels < 1 || channels > 2 || frames < 1 || !std::isfinite(rate) || rate <= 0) return {};
-    const auto file = entryFile(key); const int64_t payload = (int64_t) channels * frames * sizeof(float);
+    auto file = entryFile(key); const int64_t payload = (int64_t) channels * frames * sizeof(float);
+    // The previous app may finish more scan entries after relocation. Reuse
+    // those intact files read-only; all new writes/eviction belong to root.
+    if (!file.exists() && retainedRoot != juce::File() && retainedRoot != root && !retainedRoot.isSymbolicLink())
+    {
+        const auto marker = retainedRoot.getChildFile(".mixworks-cache");
+        if (marker.existsAsFile() && !marker.isSymbolicLink() && marker.getSize() == ownerText.getNumBytesAsUTF8() && marker.loadFileAsString() == ownerText)
+            file = retainedRoot.getChildFile(key + ".mwpcm");
+    }
     if (payload > 1024LL * 1024 * 1024 || file.isSymbolicLink() || file.getSize() != payload + headerBytes) return {};
     auto result = std::make_unique<AudioCache>(); result->transient = false; result->file = file;
     result->mapping = std::make_unique<juce::MemoryMappedFile>(file, juce::MemoryMappedFile::readOnly);
@@ -133,7 +174,7 @@ std::unique_ptr<AudioCache> PcmStore::read(const juce::String& key, double rate,
     juce::MemoryInputStream payloadInput(result->channelData(0), (size_t) payload, false);
     if (contentDigest(payloadInput) != juce::String::fromUTF8(hash, 64)) return {};
     for (int ch = 0; ch < channels; ++ch) for (int i = 0; i < frames; ++i) if (!std::isfinite(result->channelData(ch)[i])) return {};
-    if (touch) file.setLastAccessTime(juce::Time::getCurrentTime());
+    if (touch && file.getParentDirectory() == root) file.setLastAccessTime(juce::Time::getCurrentTime());
     return result;
 }
 bool PcmStore::makeRoom(int64_t bytes, const juce::File& target)

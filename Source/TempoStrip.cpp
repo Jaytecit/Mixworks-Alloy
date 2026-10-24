@@ -1,12 +1,92 @@
 #include "Workstation.h"
 #include <cmath>
+#include <cstring>
 
 namespace mixworks
 {
 TempoStrip::TempoStrip(Workstation& workstation) : owner(workstation)
 {
-    setWantsKeyboardFocus(true); setTitle("Tempo markers");
+    setWantsKeyboardFocus(true); setTitle("Tempo markers"); setFocusContainerType(FocusContainerType::focusContainer);
     setTooltip("Drag a tempo pin horizontally to move it. Click a BPM number to edit. Double-click empty space or press P to add. Right-click for Add, Edit and Remove.");
+}
+namespace
+{
+juce::String tempoMarkerKey(const TempoMap& map, int index)
+{
+    const auto& p = map.points[(size_t) index];
+    if (p.clipId.isNotEmpty()) return "tempo:segment:" + p.clipId;
+    juce::int64 bits = 0; std::memcpy(&bits, &p.time, sizeof(bits));
+    int duplicate = 0;
+    for (int i = index - 1; i >= 0 && map.points[(size_t) i].time == p.time; --i)
+        if (map.points[(size_t) i].clipId.isEmpty()) ++duplicate;
+    return "tempo:manual:" + juce::String::toHexString(bits) + ":" + juce::String(duplicate);
+}
+}
+std::unique_ptr<juce::AccessibilityHandler> TempoStrip::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler>(*this, juce::AccessibilityRole::list);
+}
+void TempoStrip::selectAccessibleMarker(int index)
+{
+    if (owner.busy || owner.engine.exporting || index < 0 || index >= (int) owner.engine.project.tempo.points.size()) return;
+    const auto key = tempoMarkerKey(owner.engine.project.tempo, index);
+    const double time = owner.engine.project.tempo.points[(size_t) index].time;
+    selectedTempoPoint = index; owner.timeline.selectedLabel.clear(); owner.timeline.selectAutomationPoint({}, -1);
+    const int x = Clip::gridPixel(time, owner.timeline.pixelsPerSecond);
+    if (x < owner.viewport.getViewPositionX() || x > owner.viewport.getViewPositionX() + owner.viewport.getViewWidth() - 68)
+    { owner.setFollowPlayhead(false); owner.viewport.setViewPosition(std::max(0, x - owner.viewport.getViewWidth() / 3), owner.viewport.getViewPositionY()); }
+    owner.refresh();
+    if (auto* item = findChildWithID(key)) item->repaint();
+}
+void TempoStrip::refreshAccessibleMarkers()
+{
+    const auto& points = owner.engine.project.tempo.points;
+    auto find = [this](const juce::String& key)
+    {
+        const auto& map = owner.engine.project.tempo;
+        for (int i = 0; i < (int) map.points.size(); ++i) if (tempoMarkerKey(map, i) == key) return i;
+        return -1;
+    };
+    std::vector<int> admitted;
+    auto admit = [&](int i) { if (i >= 0 && i < (int) points.size() && admitted.size() < 256 && std::find(admitted.begin(), admitted.end(), i) == admitted.end()) admitted.push_back(i); };
+    for (int step : {0, -1, 1}) admit(selectedTempoPoint + step);
+    for (int i = 0; i < (int) points.size() && admitted.size() < 256; ++i)
+        if (markerX(i) >= -8 && markerX(i) <= getWidth() + 8) admit(i);
+    for (int i = 0; i < (int) points.size() && admitted.size() < 256; ++i) admit(i);
+    std::sort(admitted.begin(), admitted.end());
+    setDescription("Tempo markers. Focus selects without seeking; Enter edits BPM/time, Delete removes a marker. Left/Right reaches every marker, including dense maps. Native BPM values are read-only.");
+    juce::StringArray retained;
+    for (const int index : admitted)
+    {
+        const auto key = tempoMarkerKey(owner.engine.project.tempo, index); retained.add(key);
+        const auto found = std::find_if(accessibleMarkers.begin(), accessibleMarkers.end(), [&](const auto& c) { return c->getComponentID() == key; });
+        TimelineAccessItem* item = found == accessibleMarkers.end() ? nullptr : found->get();
+        if (!item)
+        {
+            auto added = std::make_unique<TimelineAccessItem>(true); item = added.get(); item->setComponentID(key);
+            addAndMakeVisible(*item); accessibleMarkers.push_back(std::move(added));
+        }
+        auto bounds = tempoValueBounds(index).toNearestInt();
+        if (bounds.isEmpty()) bounds = {(int) std::round(markerX(index)) - 4, 1, 8, stripHeight - 2};
+        item->setBounds(bounds); item->setEnabled(!owner.busy && !owner.engine.exporting); item->setExplicitFocusOrder(index + 1);
+        item->setHelpText(getDescription());
+        item->read = [this, key, find]
+        {
+            const int i = find(key); if (i < 0) return juce::String("Removed tempo marker");
+            const auto& p = owner.engine.project.tempo.points[(size_t) i]; const auto* c = owner.engine.project.clipFor(p.clipId);
+            return "Tempo marker " + juce::String(i + 1) + ", " + juce::String(p.bpm, 4) + " BPM, project time " + timeText(p.time - owner.engine.project.tempo.origin)
+                + (c ? ", segment / " + c->media->libraryTitle() : ", independent marker") + (p.ramp ? ", ramp from previous" : ", held tempo")
+                + (owner.engine.project.hasLockedTransitions() ? ", locked" : "");
+        };
+        item->value = [this, key, find] { const int i = find(key); return i >= 0 ? owner.engine.project.tempo.points[(size_t) i].bpm : 0.; };
+        item->valueText = [value = item->value] { return juce::String(value(), 4) + " BPM"; };
+        item->selected = [this, key, find] { const int i = find(key); return i >= 0 && selectedTempoPoint == i; };
+        item->choose = [this, key, find] { selectAccessibleMarker(find(key)); };
+        item->open = [this, key, find]
+        { const int i = find(key); if (i >= 0 && !owner.busy && !owner.engine.exporting) owner.editTempoPoint(i, 0); };
+    }
+    for (const auto& item : accessibleMarkers) if (!retained.contains(item->getComponentID()) && item->hasKeyboardFocus(true)) grabKeyboardFocus();
+    accessibleMarkers.erase(std::remove_if(accessibleMarkers.begin(), accessibleMarkers.end(), [&](const auto& c) { return !retained.contains(c->getComponentID()); }), accessibleMarkers.end());
 }
 double TempoStrip::timeAt(float x) const { return std::max(0.0, (x + owner.viewport.getViewPositionX()) / owner.timeline.pixelsPerSecond); }
 float TempoStrip::markerX(int index) const
@@ -94,7 +174,7 @@ void TempoStrip::mouseDown(const juce::MouseEvent& event)
         const auto& points = owner.engine.project.tempo.points;
         const auto selected = selectedTempoPoint >= 0 ? points[(size_t) selectedTempoPoint] : TempoPoint {};
         const double time = timeAt(event.position.x);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe = juce::Component::SafePointer<Workstation>(&owner), selected, time](int action)
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [safe = juce::Component::SafePointer<Workstation>(&owner), selected, time](int action)
         {
             if (!safe || safe->busy) return;
             if (action == 1) { safe->editTempoPoint(-1, safe->engine.project.snappedTime(time, safe->engine.project.snap)); return; }
@@ -120,7 +200,7 @@ void TempoStrip::mouseDrag(const juce::MouseEvent& event)
     moved = true;
     tempoDraft.movePoint(selectedTempoPoint, owner.engine.project.snappedTime(timeAt(event.position.x), owner.engine.project.snap && !event.mods.isAltDown()), tempoDraft.points[(size_t) selectedTempoPoint].bpm);
     const auto& point = tempoDraft.points[(size_t) selectedTempoPoint];
-    owner.setStatus(timeText(point.time) + " / " + juce::String(point.bpm, 2) + " BPM"); repaint();
+    owner.setStatus(timeText(point.time - owner.engine.project.tempo.origin) + " / " + juce::String(point.bpm, 2) + " BPM"); repaint();
 }
 void TempoStrip::mouseUp(const juce::MouseEvent&)
 {
@@ -136,13 +216,23 @@ void TempoStrip::mouseDoubleClick(const juce::MouseEvent& event)
 }
 void TempoStrip::removeSelected()
 {
+    if (owner.busy || owner.engine.exporting) return;
     if (selectedTempoPoint <= 0 || selectedTempoPoint >= (int) owner.engine.project.tempo.points.size()) { owner.refresh(); return; }
     auto candidate = owner.engine.project; candidate.tempo.points.erase(candidate.tempo.points.begin() + selectedTempoPoint); selectedTempoPoint = -1;
     owner.prepareTempo(std::move(candidate), false);
 }
 bool TempoStrip::keyPressed(const juce::KeyPress& key)
 {
-    if (owner.busy) return false;
+    if (owner.busy || owner.engine.exporting) return false;
+    if (key.getKeyCode() == juce::KeyPress::leftKey || key.getKeyCode() == juce::KeyPress::rightKey)
+    {
+        const int count = (int) owner.engine.project.tempo.points.size(); if (count == 0) return true;
+        const int next = selectedTempoPoint < 0 ? (key.getKeyCode() == juce::KeyPress::rightKey ? 0 : count - 1)
+            : juce::jlimit(0, count - 1, selectedTempoPoint + (key.getKeyCode() == juce::KeyPress::rightKey ? 1 : -1));
+        selectAccessibleMarker(next);
+        if (auto* item = findChildWithID(tempoMarkerKey(owner.engine.project.tempo, next))) item->grabKeyboardFocus();
+        return true;
+    }
     if (key.getKeyCode() == juce::KeyPress::returnKey && selectedTempoPoint >= 0) { owner.editTempoPoint(selectedTempoPoint, 0); return true; }
     if (key.getKeyCode() == juce::KeyPress::deleteKey) { removeSelected(); return true; }
     if (key.getKeyCode() == juce::KeyPress::escapeKey) { selectedTempoPoint = -1; draggingTempo = moved = false; owner.refresh(); return true; }

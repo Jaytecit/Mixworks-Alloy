@@ -2,9 +2,12 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
+import time
+from test_artifacts import begin_run, finish_run
 
 REGRESSION_SUITES = (
     'rhythm-reliability', 'beat-grid', 'placement', 'tempo', 'tempo-browser',
@@ -72,9 +75,21 @@ def check_report(path, process_exit, process_error=None):
                 failures=failed, errors=errors, report=str(path), reportSha256=report_hash)
 
 
-def run_checks(exe, flags, folder, *, timeout=900, cwd=None):
+def run_checks(exe, flags, folder, *, timeout=900, cwd=None, retain_audio=False, driver=None, include_stress=False):
+    """Run native checks with owned retention. An interactive driver implements
+    run(exe, flags, folder, environment, log, startup, deadline) -> exit code,
+    owns/reaps every process it creates, and writes the same checks.txt format.
+    It cannot produce an ordinary regression receipt: its invocation is marked.
+    """
     folder = Path(folder)
     folder.mkdir()
+    workspace = Path(__file__).resolve().parents[1]
+    owner = begin_run(folder, workspace) if not retain_audio and folder.resolve().is_relative_to((workspace / '.local').resolve()) else None
+    temporary = folder / '.temporary'
+    temporary.mkdir()
+    environment = dict(os.environ, TEMP=str(temporary.resolve()), TMP=str(temporary.resolve()),
+                       MIXWORKS_TEST_STRESS='1' if include_stress else '0')
+    creationflags = getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0)
     report = (folder / 'checks.txt').resolve()
     startup = None
     if hasattr(subprocess, 'STARTUPINFO'):
@@ -82,18 +97,31 @@ def run_checks(exe, flags, folder, *, timeout=900, cwd=None):
         startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
     process_error = None
-    invocation = dict(executable=str(Path(exe).resolve()), flags=list(flags))
+    invocation = dict(executable=str(Path(exe).resolve()), flags=list(flags),
+                      includeStress=include_stress)
     try:
         invocation['executableSha256'] = digest(exe)
         with (folder / 'process.log').open('w', encoding='utf-8') as log:
-            process = subprocess.run([str(exe), '--self-test', *flags, '--report', str(report)],
-                                     cwd=cwd, stdout=log, stderr=log, startupinfo=startup, timeout=timeout)
-        process_exit = process.returncode
+            if driver is None:
+                process = subprocess.run([str(exe), '--self-test', *flags, '--report', str(report)],
+                                         cwd=cwd, stdout=log, stderr=log, startupinfo=startup, timeout=timeout,
+                                         env=environment, creationflags=creationflags)
+                invocation['priority'] = 'below-normal' if creationflags else 'default'
+                process_exit = process.returncode
+            else:
+                invocation['mode'] = 'interactive-bridge'
+                process_exit = driver.run(exe, flags, folder, environment, log, startup, time.monotonic()+timeout)
     except subprocess.TimeoutExpired:
         process_exit, process_error = 124, f'Suite timed out after {timeout} seconds.'
-    except OSError as error:
+    except (OSError, ValueError, RuntimeError) as error:
         process_exit, process_error = 1, f'Cannot start suite: {error}'
-    return dict(invocation=invocation, **check_report(report, process_exit, process_error))
+    result = dict(invocation=invocation, **check_report(report, process_exit, process_error))
+    if owner:
+        try:
+            result['artifactRetention'] = finish_run(folder, owner)
+        except (OSError, ValueError) as error:
+            result['artifactRetention'] = dict(errors=[str(error)], bytes=0, files=0)
+    return result
 
 
 def validate_regressions(summary, exe):
@@ -114,6 +142,10 @@ def validate_regressions(summary, exe):
         invocation = suite.get('invocation', {})
         if not isinstance(invocation, dict) or not isinstance(invocation.get('flags'), list) or any(not isinstance(f, str) for f in invocation['flags']):
             raise ValueError(f"Invalid invocation evidence: {suite['name']}")
+        if suite.get('name') == 'alloy' and invocation.get('includeStress') is False:
+            raise ValueError('Routine Alloy coverage omits stress checks; it cannot establish a complete regression receipt.')
+        if invocation.get('mode') is not None:
+            raise ValueError('Interactive evidence is supplemental, not a named native regression.')
         flag = '--neural-unavailable-only' if suite['name'] in ('missing-model', 'corrupt-model') else '--' + suite['name'] + '-only'
         flags = invocation.get('flags', [])
         selectors = [value for value in flags if value.endswith('-only')]
@@ -145,6 +177,9 @@ def create_receipt(summary_path, exe, destination):
 
 def validate_receipt(receipt_path, exe):
     receipt = read_json(receipt_path)
+    if receipt.get('scope') in ('presentation', 'ui-behaviour'):
+        from change_verification import validate_scoped_receipt
+        return validate_scoped_receipt(receipt, exe)
     if (not isinstance(receipt, dict) or receipt.get('format') != 'mixworks-release-verification' or receipt.get('schemaVersion') != 2
             or receipt.get('scope') != 'complete-regressions'):
         raise ValueError('Legacy or unsupported receipt: run the consolidated verification first.')
@@ -168,7 +203,7 @@ def main():
         validate_receipt(args.receipt, args.exe)
     except (ValueError, KeyError, TypeError, OSError) as error:
         parser.exit(1, f'Verification rejected: {error}\n')
-    print('Complete regression evidence verified for this exact bundle.')
+    print('Verification evidence accepted for this exact bundle.')
 
 
 if __name__ == '__main__':

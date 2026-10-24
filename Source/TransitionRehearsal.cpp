@@ -55,7 +55,7 @@ juce::Result Engine::prepareTransitionRehearsal(const juce::String& incoming, co
         const auto* link = project.transitionFor(incoming); if (!link) return juce::Result::fail("Select a transition first.");
         const auto contextValid = project.rehearsalContext.validate(); if (contextValid.failed()) return contextValid;
         styles = link->alternatives; baseline = project; rate = sampleRate.load(); renderBlockSize = blockSize;
-        const auto range = project.transitionRange(*link); const auto clock = project.followTrackTempo ? project.tempo : TempoMap {project.bpm, {}};
+        const auto range = project.transitionRange(*link); const auto clock = project.gridClock();
         begin = std::max(0., clock.timeAtBeat(clock.beatsAt(range.getStart()) - 4. * project.rehearsalContext.beforeBars)); end = std::min(project.audibleEnd(), clock.timeAtBeat(clock.beatsAt(range.getEnd()) + 4. * project.rehearsalContext.afterBars));
         eachPlugin([&](auto& p) { pluginStates.emplace_back(p.processor.get(), juce::MemoryBlock()); p.processor->getStateInformation(pluginStates.back().second); });
     }

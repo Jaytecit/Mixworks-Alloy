@@ -23,10 +23,10 @@ void runTransitionRehearsalTests(const std::function<void(bool, const juce::Stri
     base.transitionLinks = {{base.clips[0].id, id}, {id, base.clips[2].id}};
     base.clips[0].controls.automation[2].enabled = true; base.clips[0].controls.automation[2].setPoint(9, -3);
     Project project = base; TransitionStyle plain, bass, composed;
-    check(project.captureTransitionStyle(id, plain).wasOk() && plain.volume == std::array<double, 4> {0, 0, 1, 1}, "capture existing frame without copying manual automation");
+    check(project.captureTransitionStyle(id, plain).wasOk() && plain.nodes && plain.nodes->curves[0][2].active(), "capture existing frame including its ordinary manual automation");
     check(project.storeTransitionAlternative(id, 0).wasOk(), "store A from the actual transition owner");
     project.transitionLinks[0].bassSwap = initialiseTransition(project.clips[0], project.clips[1], 4, TransitionPreset::bassSwap, project.transitionRange(project.transitionLinks[0]));
-    check(project.transitionLinks[0].bassSwap.has_value() && project.captureTransitionStyle(id, bass).wasOk() && bass.bassPositions.has_value(), "capture legacy paired bass and its exact endpoint values");
+    check(project.transitionLinks[0].bassSwap.has_value() && project.captureTransitionStyle(id, bass).wasOk() && bass.nodes && bass.nodes->curves[0][1].active(), "capture legacy paired bass as ordinary nodes with its exact endpoint values");
     check(project.storeTransitionAlternative(id, 1).wasOk(), "store legacy bass treatment in B");
     check(project.setTransitionBand(id, 0, {TransitionBandMode::crossfade, .8, 0, .5}).wasOk()
         && project.setTransitionBand(id, 1, {TransitionBandMode::swapFade, .7, 1, .5}).wasOk()
@@ -34,15 +34,17 @@ void runTransitionRehearsalTests(const std::function<void(bool, const juce::Stri
     check(project.putTransitionPreset({"Copper", composed}).wasOk() && project.putTransitionPreset({"Copper", bass}).wasOk() && project.transitionPresets.size() == 1, "named preset replacement is explicit and idempotent");
     check(project.putTransitionPreset({"bad\nname", plain}).failed(), "preset names reject line breaks");
     const auto retained = project.transitionLinks[1]; const auto manual = project.clips[0].controls.automation[2].points;
-    check(project.applyTransitionStyle(id, bass).wasOk() && project.transitionLinks[0].bassSwap.has_value(), "apply B restores legacy paired bass ownership");
+    check(project.applyTransitionStyle(id, bass).wasOk() && !project.transitionLinks[0].bassSwap && project.clips[0].controls.automation[1].active(), "apply B restores bass as ordinary nodes without separate ownership");
     TransitionStyle roundtrip; project.captureTransitionStyle(id, roundtrip);
     check(roundtrip == bass && project.transitionLinks[1] == retained && project.clips[0].controls.automation[2].points[0].value == manual[0].value,
         "applied treatment round-trips while retaining neighbouring pair and manual mid curve");
     check(project.clips[0].start == base.clips[0].start && project.clips[1].start == base.clips[1].start && project.clips[1].effects == base.clips[1].effects
         && project.clips[0].tempoMap == base.clips[0].tempoMap && project.transitionRange(project.transitionLinks[0]) == base.transitionRange(base.transitionLinks[0]), "style application retains song positions, frame, effects and audio clocks");
     auto conflict = base; conflict.clips[0].controls.automation[1].enabled = true; conflict.clips[0].controls.automation[1].setPoint(10, -2);
-    const auto unchanged = json(conflict);
-    check(conflict.applyTransitionStyle(id, bass).failed() && json(conflict) == unchanged, "manual bass overlap rejects atomically without deleting user points");
+    conflict.clips[0].controls.automation[1].setPoint(3,-7);
+    check(conflict.applyTransitionStyle(id, bass).wasOk() && std::any_of(conflict.clips[0].controls.automation[1].points.begin(),conflict.clips[0].controls.automation[1].points.end(),
+        [](const auto& point) { return point.time == 3 && point.value == -7; }),
+        "explicit preset replaces overlapping manual points while retaining the exterior source curve");
     auto locked = project; locked.setTransitionLocked(base.clips[2].id, true); const auto lockedJson = json(locked);
     check(locked.applyTransitionStyle(id, composed).failed() && json(locked) == lockedJson, "a locked neighbouring track blocks alternative commit");
     check(locked.storeTransitionAlternative(id, 0).wasOk(), "locked transitions allow capturing read-only alternatives");
@@ -59,10 +61,10 @@ void runTransitionRehearsalTests(const std::function<void(bool, const juce::Stri
         auto data = projectToJson(project); data["transitionLinks"][0].getDynamicObject()->setProperty("alternatives", bad);
         check(parseProject(juce::JSON::toString(data)).error.isNotEmpty(), "malformed alternatives cannot become an empty accepted slot");
     }
-    auto malformed = transitionStyleToJson(bass); malformed["bassPositions"].getArray()->set(1, 0.0);
+    auto malformed = transitionStyleToJson(bass); malformed["nodes"][0][1]["points"][0].getDynamicObject()->setProperty("time",-1.);
     TransitionStyle kept = composed;
     check(readTransitionStyle(malformed, kept).failed() && kept == composed, "malformed portable style leaves caller's previous treatment intact");
-    auto broken = composed; broken.bands[0]->strength = std::numeric_limits<double>::quiet_NaN();
+    auto broken = composed; broken.nodes->curves[0][0].points.front().value = std::numeric_limits<float>::quiet_NaN();
     const auto before = json(project); check(project.applyTransitionStyle(id, broken).failed() && json(project) == before, "non-finite treatment fails before mutation");
     const auto portable = report.getSiblingFile("Copper.alloypreset");
     check(writeTransitionPreset(portable, {"Copper", bass}).wasOk(), "export portable named preset through atomic writer");
@@ -70,8 +72,8 @@ void runTransitionRehearsalTests(const std::function<void(bool, const juce::Stri
     check(readTransitionPreset(portable, imported).wasOk() && imported.style == bass && imported.name == "Copper", "portable preset reopens with exact treatment");
     check(writeTransitionPreset(portable, {"Copper", composed}).wasOk() && portable.getSiblingFile("Copper.alloypreset.bak").existsAsFile(), "replacing a portable preset backs up its previous bytes");
     const auto backup = portable.getSiblingFile("Copper.alloypreset.bak").loadFileAsString();
-    check(juce::JSON::parse(backup)["presets"][0]["style"]["bassPositions"].isArray(), "preset backup retains the previous legacy bass treatment");
-    portable.replaceWithText("{\"format\":\"alloy-transition-preset\",\"version\":3}");
+    check(juce::JSON::parse(backup)["presets"][0]["style"]["nodes"].isArray(), "preset backup retains the previous ordinary bass treatment");
+    portable.replaceWithText("{\"format\":\"alloy-transition-preset\",\"version\":4}");
     check(readTransitionPreset(portable, imported).failed(), "newer portable preset versions are rejected without mutation");
 
     Engine engine; engine.project = project; engine.sampleRate = 8000; engine.position = 3;

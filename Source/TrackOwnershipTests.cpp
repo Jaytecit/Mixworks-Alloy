@@ -1,11 +1,158 @@
 #include "Workstation.h"
 #include "Beatmatch.h"
+#include "AutoArrangement.h"
 #include <cmath>
 
 namespace mixworks
 {
 void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report, const juce::File& plugin)
 {
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--split-effects-only"))
+    {
+        constexpr int sr = 8000, frames = 4000;
+        auto media = std::make_shared<Media>(); media->sampleRate = sr; media->name = "One track, shared echo";
+        media->manualBpm = 120; media->manualBeatOrigin = 0; media->manualKey = 4;
+        media->file = report.getSiblingFile("split-source.wav"); media->samples.setSize(2, frames); media->samples.clear();
+        for (int sample : {120, 1760, 3360})
+        { media->samples.setSample(0, sample, .5f); media->samples.setSample(1, sample, -.25f); }
+        {
+            juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> stream = media->file.createOutputStream();
+            auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(sr).withNumChannels(2).withBitsPerSample(24));
+            check(writer && writer->writeFromAudioSampleBuffer(media->samples, 0, frames), "create a small isolated source for shared-effects checks");
+        }
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1600, 900); ui.engine.sampleRate = sr;
+        ui.engine.project.masterDb = 0; ui.engine.project.snap = false; ui.engine.library = {media};
+        Clip clip; clip.media = media; clip.length = .5; ui.engine.project.clips = {clip}; ui.selectedClip = clip.id; ui.selectTrack(0);
+        const auto loaded = ui.engine.addPlugin(0, plugin);
+        check(loaded.isEmpty(), "load the real finite echo VST3: " + loaded); if (loaded.isNotEmpty()) return;
+        auto render = [&](Engine& engine, int count = 7200)
+        {
+            engine.prepareClipProcessing(); engine.resetPlugins();
+            juce::AudioBuffer<float> result(2, count), block(2, 113); juce::MidiBuffer midi;
+            for (int at = 0; at < count; at += 113)
+            {
+                const int n = std::min(113, count - at); engine.render(block, n, at / (double)sr, midi);
+                for (int ch = 0; ch < 2; ++ch) result.copyFrom(ch, at, block, ch, 0, n);
+            }
+            return result;
+        };
+        const auto intact = render(ui.engine);
+        check(std::abs(ui.engine.project.audibleEnd() - .875) < 1.e-8 && std::abs(intact.getSample(0, 6360) - .05f) < 1.e-6f,
+              "reported echo duration extends playback automatically and retains the last echo after source end");
+        ui.engine.position = .18; ui.splitClip(); ui.engine.position = .34; ui.splitClip();
+        check(ui.engine.project.clips.size() == 3 && ui.engine.project.clips[0].effects == ui.engine.project.clips[1].effects
+              && ui.engine.project.clips[1].effects == ui.engine.project.clips[2].effects,
+              "the actual Split action retains one insert chain across all pieces");
+        const auto split = render(ui.engine); float error = 0;
+        for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < intact.getNumSamples(); ++i) error = std::max(error, std::abs(intact.getSample(ch,i) - split.getSample(ch,i)));
+        check(error < 1.e-6f, "split and unsplit echo output match sample-for-sample across boundaries and the final tail: " + juce::String(error, 9));
+        const auto group = ui.engine.project;
+        ui.selectedClip = group.clips[1].id; const auto address = ui.engine.pluginAddress(0, 0, 0);
+        check(address && ui.engine.ensurePluginAutomation(*address), "effect automation can be created from a middle piece"); if (!address) return;
+        auto* curve = ui.engine.project.curve(*address); curve->enabled = true; curve->setPoint(0, .25f); curve->setPoint(.7, 1);
+        auto firstAddress = *address; firstAddress.clipId = group.clips[0].id;
+        auto lastAddress = *address; lastAddress.clipId = group.clips[2].id;
+        check(ui.engine.project.curve(firstAddress) == curve && ui.engine.project.curve(lastAddress) == curve
+              && std::abs(ui.engine.project.automationTime(lastAddress, .42) - .42) < 1.e-8,
+              "all pieces edit one curve on the original track clock, including nodes beyond the final piece");
+        const auto automated = ui.engine.project;
+        ui.selectedClip = group.clips[0].id;
+        ui.editSelection.clips = {group.clips[0].id, group.clips[1].id, group.clips[2].id}; ui.editSelection.primary = ui.selectedClip;
+        ui.performTimelineAction(TimelineAction::removePiece, .25, 0);
+        check(ui.engine.project.clips.size() == 2 && ui.engine.project.clipFor(group.clips[0].id) && ui.engine.project.clipFor(group.clips[2].id),
+              "Delete this piece removes only the middle piece even with a whole-track selection");
+        ui.selectedClip = group.clips[0].id;
+        ui.engine.project.curve(firstAddress)->enabled = false; ui.engine.pluginChain(0)[0]->processor->getParameters()[0]->setValue(1);
+        const auto gap = render(ui.engine);
+        check(std::abs(gap.getSample(0, 2120) - .15f) < 1.e-6f && std::abs(gap.getSample(0, 6360) - .05f) < 1.e-6f,
+              "echo continues through the deleted gap and beyond the last surviving piece");
+        ui.engine.project = automated;
+        ui.engine.project.tempo.points.push_back({0, 120, false, group.clips[0].id});
+        ui.selectedClip = group.clips[0].id; ui.clearEditSelection(); ui.removeClip();
+        check(ui.engine.project.clips.size() == 2 && std::abs(ui.engine.project.automationTime(lastAddress, .42) - .42) < 1.e-8
+              && ui.engine.project.curve(lastAddress)->points.size() == 2,
+              "deleting the first piece preserves the shared effect curve and original clock");
+        check(ui.engine.project.tempo.points.size() == 1 && ui.engine.project.tempo.points[0].clipId == group.clips[1].id,
+              "deleting one piece retains its original track's automatic tempo marker on a survivor");
+        ui.undo(false);
+        check(ui.engine.project.clips.size() == 3 && ui.engine.project.clips[0].effects == ui.engine.project.clips[2].effects,
+              "Undo restores the deleted piece with shared effect ownership");
+        ui.engine.project = automated; ui.selectedClip = group.clips[1].id; ui.selectedAutomationTarget = -1;
+        ui.editSelection.clips = {group.clips[0].id, group.clips[1].id, group.clips[2].id}; ui.editSelection.primary = ui.selectedClip;
+        ui.timeline.pixelsPerSecond = 1200; ui.refresh();
+        const auto mouse = juce::Desktop::getInstance().getMainMouseSource(); const juce::Point<float> point {300, ui.timeline.laneY(0, 40)};
+        const auto event = juce::MouseEvent(mouse, point, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1, 0, 0, 0, 0,
+            &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), point, juce::Time::getCurrentTime(), 1, false);
+        ui.timeline.mouseDown(event); ui.timeline.mouseUp(event);
+        check(!ui.editSelection.multiple() && ui.selectedClip == group.clips[1].id, "a plain click selects one split piece from an existing group");
+        ui.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey));
+        check(ui.engine.project.clips.size() == 2 && !ui.engine.project.clipFor(group.clips[1].id), "Delete key after that click removes only the chosen piece");
+        ui.engine.project = automated; ui.selectedClip = group.clips[1].id; ui.clearEditSelection();
+        const auto second = ui.engine.addPlugin(0, plugin);
+        check(second.isEmpty() && ui.engine.project.clips[0].effects->plugins.size() == 2 && ui.engine.project.clips[2].effects->plugins.size() == 2,
+              "adding an effect after splitting applies it to every piece");
+        ui.engine.removePlugin(0, 1);
+        Clip other; other.media = media; other.start = .1; other.length = .3; other.track = 1;
+        ui.engine.project.clips.push_back(other);
+        check(other.effects != group.clips[0].effects && other.effects->plugins.empty(), "a separately placed copy of the same song keeps independent effects");
+        const auto saved = report.getSiblingFile("shared-effects.mixworks"); const auto saveError = ui.engine.saveProject(saved);
+        PreparedProject prepared; prepared.parsed = parseProject(saved.loadFileAsString()); prepared.library = {media};
+        for (auto reference : prepared.parsed.clips) { reference.clip.media = media; prepared.parsed.project.clips.push_back(std::move(reference.clip)); }
+        Engine reopened; reopened.sampleRate = sr;
+        const auto reopenedError = prepared.parsed.error.isNotEmpty() ? prepared.parsed.error : reopened.commitProject(std::move(prepared));
+        check(saveError.isEmpty() && reopenedError.isEmpty() && reopened.project.clips.size() == 4
+              && reopened.project.clips[0].effects == reopened.project.clips[2].effects && reopened.project.clips[3].effects != reopened.project.clips[0].effects
+              && reopened.project.curve(firstAddress) && reopened.project.curve(firstAddress)->points.size() == 2,
+              "save/reopen restores shared processors, continuous automation and separate placements: " + saveError + reopenedError);
+        juce::String exportError; auto exported = ui.engine.createExportRenderer(exportError);
+        check(exported && exportError.isEmpty() && exported->project.clips[0].effects == exported->project.clips[2].effects
+              && exported->project.clips[0].effects != ui.engine.project.clips[0].effects,
+              "export clones one independent processor per original track while retaining split ownership");
+        if (exported)
+        {
+            const auto live = render(ui.engine), offline = render(*exported); float difference = 0;
+            for (int i = 0; i < live.getNumSamples(); ++i) difference = std::max(difference, std::abs(live.getSample(0,i) - offline.getSample(0,i)));
+            check(difference < 1.e-6f, "live and export render the same shared effect automation and tails");
+        }
+        WavExportPlan plan; const auto planned = ui.engine.planWavExport(report.getSiblingFile("tail-plan.wav"), {true}, plan);
+        check(planned.wasOk() && std::abs(plan.tailSeconds - .375) < 1.e-8, "WAV export includes the natural echo tail without a manual tail setting");
+        {
+            Engine lane; lane.sampleRate = sr; Clip dry; dry.media = media; dry.length = .5; lane.project.clips = {dry};
+            const auto laneError = lane.addPlugin(0, plugin); WavExportPlan lanePlan;
+            check(laneError.isEmpty() && lane.planWavExport(report.getSiblingFile("lane-tail-plan.wav"), {true}, lanePlan).wasOk()
+                  && std::abs(lanePlan.tailSeconds - .375) < 1.e-8, "whole-lane effects also receive their reported natural ending");
+            lane.project.effectTailSeconds = 1;
+            check(lane.planWavExport(report.getSiblingFile("minimum-tail-plan.wav"), {true}, lanePlan).wasOk()
+                  && std::abs(lanePlan.tailSeconds - 1.375) < 1.e-8, "a manual effect ending still allows downstream lane echoes to finish");
+        }
+        ui.engine.project.clips.resize(3); ui.selectedClip = group.clips[1].id;
+        ui.performTimelineAction(TimelineAction::removePiece, .25, 0); ui.selectedClip = group.clips[0].id;
+        ui.pluginLane = firstAddress; ui.selectedAutomationTarget = (int)AutomationTarget::plugin;
+        check(ui.insertAutomationNode(firstAddress, .25, false) && ui.insertAutomationNode(firstAddress, .7, false),
+              "the native node editor permits effect nodes in a deleted gap and in the ending tail");
+        auto capture = [&](const juce::String& name, juce::Component& component)
+        {
+            auto stream = report.getSiblingFile(name + ".png").createOutputStream(); juce::PNGImageFormat png;
+            return stream && png.writeImageToStream(component.createComponentSnapshot(component.getLocalBounds()), *stream);
+        };
+        ui.refresh(); ui.timeline.pixelsPerSecond = 800; ui.timeline.updateSize();
+        check(capture("shared-effects", ui), "capture continuous effect automation across a deleted piece");
+        ui.showShortcuts(true); ui.refresh(); check(capture("shortcuts", ui), "capture the revised shortcuts panel");
+        ui.showAutoArrangement(); auto* dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
+        check(dialog && dialog->getComboBoxComponent("action")->getSelectedItemIndex() == 1 && !dialog->getComboBoxComponent("start")->isEnabled()
+              && dialog->getButton(0)->getButtonText() == "Extend mix", "Auto Arrange opens with Extend current arrangement selected for an existing mix");
+        if (dialog) { check(capture("auto-arrange", *dialog), "capture the actual Auto Arrange panel and orange border"); dialog->exitModalState(0); }
+        juce::Timer::callAfterDelay(20, [] { juce::MessageManager::getInstance()->stopDispatchLoop(); }); juce::MessageManager::getInstance()->runDispatchLoop();
+        juce::Image menu(juce::Image::RGB, 300, 100, true);
+        { juce::Graphics graphics(menu); ui.look.drawPopupMenuBackground(graphics, 300, 100); }
+        auto menuStream = report.getSiblingFile("menu-border.png").createOutputStream(); juce::PNGImageFormat png;
+        check(menuStream && png.writeImageToStream(menu, *menuStream), "capture the shared menu frame styling");
+        {
+            PluginWindow editor(*ui.engine.pluginChain(0)[0]);
+            check(capture("plugin-border", editor), "capture the native effect editor frame above its content");
+        }
+        return;
+    }
     auto near = [](double a, double b) { return std::abs(a - b) < 1.0e-6; };
     auto media = std::make_shared<Media>(); media->sampleRate = 8000; media->manualBpm = 120; media->manualBeatOrigin = 0.213;
     media->name = "Track ownership"; media->file = report.getSiblingFile("ownership.wav");
@@ -33,24 +180,26 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
           "insertion never introduces volume fades");
     check(near(first.start + first.transitionTime(false), next.start + next.transitionTime(true)), "default IN and OUT handles coincide at the overlap start");
     const auto& outgoingBass = first.controls.automation[1]; const auto& incomingBass = next.controls.automation[1];
-    const auto firstSwap = ready.project.transitionPlaybackFor(first).pairs[1][1];
-    const auto nextSwap = ready.project.transitionPlaybackFor(next).pairs[0][1];
-    check(!outgoingBass.active() && !incomingBass.active() && firstSwap.instant && nextSwap.instant
-        && firstSwap.gainAt(firstSwap.begin) == 0 && nextSwap.gainAt(nextSwap.begin) == 1,
-          "default transition swaps bass vertically without adding another source automation curve");
+    const auto stepped = [](const AutomationCurve& curve) { return curve.active() && std::any_of(curve.points.begin(),curve.points.end(),[](const auto& point) { return point.bend == 1; }); };
+    check(stepped(outgoingBass) && stepped(incomingBass) && !ready.project.transitionLinks[0].bands[1],
+          "default transition swaps bass vertically using the ordinary source automation curve");
     Clip third = b; third.id = juce::Uuid().toString(); third.effects = makeClipEffects(); third.pendingPlacement = PendingPlacement::append;
     auto chain = ready.project; chain.clips.push_back(third); auto three = prepareTempoMap(chain, false, 32);
-    check(three.error.isEmpty() && three.project.transitionPlaybackFor(three.project.clips[1]).pairs[0][1].instant
-          && three.project.transitionPlaybackFor(three.project.clips[1]).pairs[1][1].instant,
+    check(three.error.isEmpty() && stepped(three.project.clips[1].controls.automation[1])
+          && std::count_if(three.project.clips[1].controls.automation[1].points.begin(),three.project.clips[1].controls.automation[1].points.end(),[](const auto& point) { return point.bend == 1; }) >= 2,
           "the middle track keeps both its incoming and outgoing bass swaps");
     auto cutMix = prepareTempoMap(three.project, true, 0);
-    check(cutMix.error.isEmpty() && std::all_of(cutMix.project.clips.begin(), cutMix.project.clips.end(), [](const auto& c) { return c.controls.automation[1].points.empty(); }),
-          "rebuilding Cut removes only generated bass swaps");
+    bool preserved = cutMix.error.isEmpty() && cutMix.project.clips.size() == three.project.clips.size();
+    for (size_t i = 0; preserved && i < three.project.clips.size(); ++i)
+        preserved &= cutMix.project.clips[i].controls.automation[1].points.size() == three.project.clips[i].controls.automation[1].points.size();
+    check(preserved,"rebuilding alignment without overlap preserves ordinary source-owned bass nodes");
     auto staged = ready.project; staged.clips[1].start += 11; staged.clips[1].pendingPlacement = PendingPlacement::drop;
     staged.clips[1].moveTo(173.123456);
     const auto explicitlyMoved = prepareTempoMap(staged, false, 32);
-    check(explicitlyMoved.error.isNotEmpty() && near(staged.clips[1].start, 173.123456),
-          "a pending disjoint move cannot move the song back silently or place a generated handoff outside either song: " + explicitlyMoved.error);
+    bool noGenerator = explicitlyMoved.error.isEmpty();
+    for (const auto& link : explicitlyMoved.project.transitionLinks) for (const auto& band : link.bands) noGenerator &= !band || !band->generated();
+    check(noGenerator && near(explicitlyMoved.project.clips[1].start,173.123456) && explicitlyMoved.project.clips[1].controls.automation[1].active(),
+          "a pending disjoint move keeps its exact position and source-owned nodes without a generated external handoff: " + explicitlyMoved.error);
     auto free = staged.clips[1]; free.moveTo(4.123456);
     check(near(free.start, 4.123456), "freehand moves preserve an exact requested time");
     auto snapped = next; snapped.moveTo(ready.project.snappedClipStart(snapped, 33.721, true));
@@ -72,11 +221,12 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     ui.performTimelineAction(TimelineAction::volume, 6.123, 0);
     auto address = AutomationAddress {0, AutomationTarget::volume, {}, {}, a.id};
     auto* curve = ui.engine.project.curve(address);
-    check(curve && curve->points.size() == 2 && near(curve->points.back().time, 4.123) && ui.engine.project.tracks[0].automation[0].points.empty(),
+    check(curve && curve->points.size() == 1 && near(curve->points.front().time, 4.123) && ui.engine.project.tracks[0].automation[0].points.empty(),
           "RMB creates automation on its audio track in source coordinates");
-    curve->points.back().value = -12;
+    if (!curve || curve->points.empty()) return;
+    curve->points.front().value = -12;
     auto& voice = ui.engine.project.clips[0]; voice.moveTo(9.327); voice.track = 2; ui.engine.selectedTrack = 2;
-    check(near(ui.engine.project.automationSessionTime(address, curve->points.back().time), 13.45)
+    check(near(ui.engine.project.automationSessionTime(address, curve->points.front().time), 13.45)
           && near(ui.engine.automationValue(address, 13.45), -12) && voice.controls.automation[0].active(),
           "automation follows exact free movement and lane changes");
     ui.engine.project.followTrackTempo = true; ui.engine.project.tempo.setPoint(0, 120); ui.engine.project.tempo.setPoint(15, 160);
@@ -127,7 +277,8 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
     auto event = [&](juce::Point<float> position, juce::Point<float> down, bool drag)
     { return juce::MouseEvent(mouse, position, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1, 0, 0, 0, 0, &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag); };
-    const juce::Point<float> from {120, (float) ui.timeline.laneTop(0) + 105}, to {159, (float) ui.timeline.laneTop(3) + 105};
+    // Use the waveform body, clear of the footer and the horizontal VST line.
+    const juce::Point<float> from {120, ui.timeline.laneY(0, 40)}, to {159, ui.timeline.laneY(3, 40)};
     const auto attached = ui.engine.project.clips[0].effects;
     ui.timeline.mouseDown(event(from, from, false)); ui.timeline.mouseDrag(event(to, from, true)); ui.timeline.mouseUp(event(to, from, true));
     check(near(ui.engine.project.clips[0].start, 1.3) && ui.engine.project.clips[0].track == 3 && ui.engine.project.clips[0].effects == attached,

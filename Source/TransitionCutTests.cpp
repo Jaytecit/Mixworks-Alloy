@@ -177,8 +177,25 @@ void runTransitionCutTests(const std::function<void(bool, const juce::String&)>&
           "incoming waveform is visibly ghosted before its frame begins");
     check(brightness(shaded, 0, 4.25) < brightness(unshaded, 0, 4.25) * .85,
           "outgoing waveform is visibly ghosted after its frame ends");
-    check(std::abs(brightness(shaded, 1, 4.25) - brightness(unshaded, 1, 4.25)) < .01,
-          "audible waveform keeps its full-strength display between frame cutoffs");
+    const double audibleShaded = brightness(shaded, 1, 4.25), audiblePlain = brightness(unshaded, 1, 4.25);
+    // Fractional audible-region clipping can round antialiased edge channels by
+    // one byte at the smaller waveform height. Require per-channel agreement,
+    // rather than accumulating that harmless rounding across a whole row.
+    const auto audibleBounds = ui.timeline.clipBounds(base.clips[1]); bool unchangedWaveform = true;
+    for (int y = (int) audibleBounds.getBottom() - 15; y < (int) audibleBounds.getBottom() - 8; ++y)
+        for (int x = 425; x < 449; ++x)
+        {
+            const auto a = shaded.getPixelAt(x, y), b = unshaded.getPixelAt(x, y);
+            unchangedWaveform &= std::abs((int) a.getRed() - b.getRed()) <= 1 && std::abs((int) a.getGreen() - b.getGreen()) <= 1
+                && std::abs((int) a.getBlue() - b.getBlue()) <= 1;
+        }
+    check(unchangedWaveform,
+          "audible waveform keeps its full-strength display between frame cutoffs (" + juce::String(audibleShaded, 4) + " / " + juce::String(audiblePlain, 4) + ")");
+    for (bool withCuts : {true, false})
+    {
+        auto output = report.getSiblingFile(withCuts ? "cut-waveform-shaded.png" : "cut-waveform-plain.png").createOutputStream();
+        juce::PNGImageFormat png; if (output) png.writeImageToStream(withCuts ? shaded : unshaded, *output);
+    }
     auto capture = [&](const juce::String& name, float scale = 1)
     {
         auto output = report.getSiblingFile(name).createOutputStream(); if (output) { output->setPosition(0); output->truncate(); }

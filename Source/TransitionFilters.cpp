@@ -105,28 +105,44 @@ void TransitionFilterProcessor::process(juce::AudioBuffer<float>& audio, int fir
         }
     }
 }
-void LowPassProcessor::process(juce::AudioBuffer<float>& audio, int first, int frames, double sr, float hz)
+void CutoffFilterProcessor::process(juce::AudioBuffer<float>& audio, int first, int frames, double sr, float value)
 {
-    if (sr <= 0 || frames <= 0) return;
-    if (rate != sr) { reset(); rate = sr; smooth = hz; }
-    const double target = juce::jlimit(20., 20000., (double) hz);
+    if (!std::isfinite(sr) || sr <= 0 || frames <= 0) return;
+    const double target = std::isfinite(value) ? juce::jlimit(-1., 1., (double) value) : 0;
+    if (rate != sr) { reset(); rate = sr; smooth = target; }
     const double coefficient = 1 - std::exp(-1 / (.005 * sr));
     constexpr double damping = 1.4142135623730951;
     for (int i = first; i < first + frames; ++i)
     {
         smooth += coefficient * (target - smooth);
-        if (std::abs(target - smooth) < .001) smooth = target;
-        const double next = std::min(smooth, sr * .45);
-        if (next != cutoff) { cutoff = next; g = std::tan(juce::MathConstants<double>::pi * cutoff / sr); h = 1 / (1 + damping * g + g * g); }
-        // Feed state even at the exact dry endpoint, and fade into bypass near 20 kHz.
-        const double wet = juce::jlimit(0., 1., (20000 - smooth) / 1000.);
+        if (std::abs(target - smooth) < 1e-8) smooth = target;
+        const double lowHz = 20000 + std::min(0., smooth) * 19980;
+        const double highHz = 20 + std::max(0., smooth) * 19980;
+        const double wet = juce::jlimit(0., 1., smooth < 0 ? (20000 - lowHz) / 1000 : (highHz - 20) / 20);
+        for (int side = 0; side < 2; ++side)
+        {
+            auto& stage = stages[(size_t) side];
+            const double hz = std::min(side == 0 ? lowHz : highHz, sr * .45);
+            if (hz != stage.lastCutoff)
+            {
+                stage.lastCutoff = hz; stage.g = std::tan(juce::MathConstants<double>::pi * hz / sr);
+                stage.h = 1 / (1 + damping * stage.g + stage.g * stage.g);
+            }
+        }
         for (int ch = 0; ch < std::min(2, audio.getNumChannels()); ++ch)
         {
-            auto* samples = audio.getWritePointer(ch); const double dry = samples[i];
-            const double high = (dry - (damping + g) * band[(size_t) ch] - low[(size_t) ch]) * h;
-            const double b = g * high + band[(size_t) ch], l = g * b + low[(size_t) ch];
-            band[(size_t) ch] = g * high + b; low[(size_t) ch] = g * b + l;
-            if (wet > 0) samples[i] = (float) (dry + wet * (l - dry));
+            auto* samples = audio.getWritePointer(ch); const double dry = samples[i]; double filtered = dry;
+            // Independent states stay warm through neutral and changes of direction.
+            for (int side = 0; side < 2; ++side)
+            {
+                auto& stage = stages[(size_t) side];
+                const double high = (dry - (damping + stage.g) * stage.band[(size_t) ch] - stage.low[(size_t) ch]) * stage.h;
+                const double b = stage.g * high + stage.band[(size_t) ch], low = stage.g * b + stage.low[(size_t) ch];
+                stage.band[(size_t) ch] = stage.g * high + b; stage.low[(size_t) ch] = stage.g * b + low;
+                if ((smooth < 0 && side == 0) || (smooth > 0 && side == 1)) filtered = side == 0 ? low : high;
+            }
+            // Exact dry centre, including float bit patterns, once smoothing settles.
+            if (wet > 0) samples[i] = (float) (dry + wet * (filtered - dry));
         }
     }
 }

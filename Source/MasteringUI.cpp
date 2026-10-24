@@ -9,10 +9,11 @@ namespace
 class MasterButton final : public juce::Button
 {
 public:
-    MasterButton() : Button("Open master output and spectrum") { setTooltip("Master output / Spectrum. Lane count stays beside this button."); }
+    MasterButton() : Button("Open master output and spectrum") { setTooltip("Master output / Spectrum"); }
     void paintButton(juce::Graphics& g, bool over, bool down) override
     {
-        AlloyLookAndFeel::drawEmblem(g, getLocalBounds().toFloat().reduced(1));
+        const auto glow = juce::Colour::fromHSV((float) (double) getProperties().getWithDefault("emblemHue", .08), .72f, 1.f, 1.f);
+        AlloyLookAndFeel::drawEmblem(g, getLocalBounds().toFloat().reduced(4), glow);
         if (over || down || hasKeyboardFocus(true)) { g.setColour(colour::orange.withAlpha(down ? 1.f : .7f)); g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1), 5, 1.5f); }
     }
 };
@@ -20,7 +21,7 @@ class SpectrumView final : public juce::Component
 {
 public:
     SpectrumAnalysis analysis;
-    SpectrumView() { setComponentID("master-spectrum"); setTitle("Post-master stereo spectrum"); }
+    SpectrumView() { setComponentID("master-spectrum"); setTitle("Post-master stereo spectrum"); getProperties().set("mixworksHint", "Live stereo frequency spectrum after master processing, before monitor mute. This display does not change the audio."); }
     void tick(SpectrumFeed& feed) { analysis.update(feed); repaint(); }
     void paint(juce::Graphics& g) override
     {
@@ -66,11 +67,13 @@ public:
         : engine(e), canEdit(std::move(allowed)), beforeEdit(std::move(before)), edited(std::move(changed)), setMute(std::move(mute)), forwardKey(std::move(key))
     {
         addAndMakeVisible(spectrum);
-        const char* names[] {"Master gain", "Low shelf / 120 Hz", "Mid / 1 kHz", "High shelf / 8 kHz", "Stereo width", "Saturation drive"};
+        const char* names[] {"Master gain", "Bass", "Mid", "Treble", "Stereo width", "Drive"};
         const char* ids[] {"master-gain", "master-low", "master-mid", "master-high", "master-width", "master-drive"};
         for (size_t i = 0; i < controls.size(); ++i)
         {
             auto& slider = controls[i]; labels[i].setText(names[i], juce::dontSendNotification); addAndMakeVisible(labels[i]); addAndMakeVisible(slider);
+            const char* tips[] {"Adjust master gain before output. Lower it if peaks clip.", "Boost or cut low frequencies around 120 Hz.", "Boost or cut mid frequencies around 1 kHz.", "Boost or cut high frequencies around 8 kHz.", "Set stereo width: 0% mono, 100% original, 200% wider.", "Set harmonic saturation drive. Enable Soft saturation to hear this treatment."};
+            slider.setTooltip(tips[i]);
             slider.setComponentID(ids[i]); slider.setTitle(names[i]); slider.setSliderStyle(juce::Slider::LinearHorizontal); slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 76, 22);
             slider.setRange(i == 0 ? -60 : i == 4 || i == 5 ? 0 : -12, i == 0 || i == 5 ? 12 : i == 4 ? 200 : 12, .1);
             slider.setTextValueSuffix(i == 4 ? " %" : " dB"); slider.getProperties().set("alloyMolten", true);
@@ -89,6 +92,8 @@ public:
             };
         }
         for (auto* component : std::initializer_list<juce::Component*> {&saturation, &muteMonitor, &reset, &clearClip, &meters, &note}) addAndMakeVisible(component);
+    reset.setTooltip("Reset master EQ, stereo width and saturation to neutral. Master gain and its automation are kept.");
+    clearClip.setTooltip("Clear the held clipping warning. This does not reduce the audio level.");
         saturation.setComponentID("master-saturation"); saturation.onClick = [this]
         { if (!canEdit()) return; beforeEdit(false); { const juce::ScopedLock guard(engine.lock); engine.project.mastering.saturation = saturation.getToggleState(); } edited(); refresh(); };
         saturation.setTooltip("Deliberate harmonic saturation with a bounded output. This changes tone; it is not loudness matching.");
@@ -98,7 +103,8 @@ public:
         { if (!canEdit()) return; beforeEdit(false); { const juce::ScopedLock guard(engine.lock); engine.project.mastering = {}; } edited(); refresh(); };
         clearClip.onClick = [this] { engine.masterClipped = false; refresh(); };
         meters.setJustificationType(juce::Justification::topLeft); meters.setComponentID("master-meters");
-        note.setText("Spectrum follows processed audio before monitor mute. EQ, width and saturation are saved manual settings. Master gain retains its automation. dBFS is signal level, not perceived loudness.", juce::dontSendNotification);
+        note.setText({}, juce::dontSendNotification);
+        spectrum.getProperties().set("mixworksHint", "Spectrum follows processed audio before monitor mute. EQ, width and saturation are saved settings. Master gain keeps its automation. dBFS measures signal level, not perceived loudness.");
         note.setColour(juce::Label::textColourId, colour::muted); note.setJustificationType(juce::Justification::topLeft);
         setSize(980, 580); refresh(); startTimerHz(20);
     }
@@ -167,6 +173,13 @@ public:
     void closeButtonPressed() override { if (auto* panel = dynamic_cast<MasterPanel*>(getContentComponent())) panel->suspendMonitoring(); setVisible(false); }
     bool keyPressed(const juce::KeyPress& key) override { if (key == juce::KeyPress::escapeKey) { closeButtonPressed(); return true; } return DocumentWindow::keyPressed(key); }
 };
+}
+void Workstation::tickMasterEmblem()
+{
+    if (!masterPanelButton || !masterPanelButton->isShowing()) return;
+    const double hue = attractState.motion != AttractMotion::steady ? std::fmod(juce::Time::getMillisecondCounterHiRes() / 60000., 1.) : .08;
+    masterPanelButton->getProperties().set("emblemHue", hue);
+    masterPanelButton->repaint();
 }
 void Workstation::initialiseMasteringUI()
 {

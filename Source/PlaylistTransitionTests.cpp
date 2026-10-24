@@ -6,6 +6,27 @@
 
 namespace mixworks
 {
+namespace
+{
+std::optional<std::array<double,2>> nodeSwapTimes(const Project& p,const Project::TransitionLink& link)
+{
+    std::array<double,2> times{}; const auto frame = p.transitionRange(link);
+    for (int side = 0; side < 2; ++side)
+    {
+        const auto* clip = p.clipFor(side == 0 ? link.outgoing : link.incoming); if (!clip) return {};
+        const auto& curve = clip->controls.automation[1]; bool found = false;
+        for (size_t i = 1; i < curve.points.size(); ++i)
+        {
+            const auto& a = curve.points[i-1]; const auto& b = curve.points[i];
+            const double t = clip->start + clip->localTimeForSource(b.time);
+            if (curve.enabled && a.bend == 1 && (side == 0 ? b.value < a.value : b.value > a.value) && t >= frame.getStart() && t <= frame.getEnd())
+            { times[(size_t) side] = t; found = true; break; }
+        }
+        if (!found) return {};
+    }
+    return times;
+}
+}
 void runPlaylistTransitionTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
     auto source = std::make_shared<Media>(); source->name = "Energy sections / test source";
@@ -23,6 +44,16 @@ void runPlaylistTransitionTests(const std::function<void(bool, const juce::Strin
     const auto sections = detectEnergySections(*source);
     check(sections.size() == 2 && std::abs(sections[0].sourceSeconds - 32) < .01 && std::abs(sections[1].sourceSeconds - 64) < .01
         && sections[0].contrastDb > 3 && sections[1].contrastDb < -3, "sustained quiet/loud changes produce source-bar section suggestions at known boundaries");
+    {
+        juce::Image image(juce::Image::RGB, 960, 130, true);
+        {
+            juce::Graphics g(image); g.fillAll(colour::panel);
+            Clip clip; clip.media = source; clip.length = source->duration();
+            paintEnergySections(g, clip, {0, 0, 960, 130}, 10);
+        } // Finish the native graphics context before reading the captured pixels.
+        auto output = report.getSiblingFile("section-labels.png").createOutputStream(); juce::PNGImageFormat png;
+        check(output && png.writeImageToStream(image, *output), "capture actual source-energy section labels without confidence suffixes");
+    }
     auto rms = source->waveformRms;
     source->analysis.downbeatOrigin = -1; check(detectEnergySections(*source).empty(), "unknown source bar phase does not manufacture section alignment");
     source->analysis.downbeatOrigin = 48;
@@ -35,6 +66,59 @@ void runPlaylistTransitionTests(const std::function<void(bool, const juce::Strin
     source->waveformRms.assign(rms.size(), 0); check(detectEnergySections(*source).empty(), "silent sources produce no energy sections");
     source->waveformRms.clear(); check(detectEnergySections(*source).empty(), "missing retained RMS does not trigger decoding or guessed sections");
     source->waveformRms = rms;
+
+    {
+        auto brief = source->catalogueCopy(); brief->samples = source->samples;
+        for (size_t i = 0; i < brief->waveformRms.size(); ++i)
+        {
+            const double at = (i + .5) * bucket / brief->sampleRate;
+            brief->waveformRms[i] = at >= 12 && at < 16 ? .01f : .2f;
+        }
+        const auto changes = detectEnergySections(*brief);
+        check(std::any_of(changes.begin(), changes.end(), [](const auto& change) { return std::abs(change.sourceSeconds - 16) < .01 && change.contrastDb > 0; }),
+            "a sustained two-bar return remains a section change even when four-bar averaging dilutes it");
+    }
+
+    {
+        // A partial file tail makes the shared change different from the
+        // frame midpoint. No track names or externally supplied cue points.
+        auto outgoing = source->catalogueCopy(); outgoing->samples.setSize(1, 802400); outgoing->samples.clear();
+        const int step = outgoing->frames() / 4000;
+        outgoing->waveformRms.resize((size_t) ((outgoing->frames() + step - 1) / step));
+        for (size_t i = 0; i < outgoing->waveformRms.size(); ++i)
+        {
+            const double at = (i + .5) * step / outgoing->sampleRate;
+            outgoing->waveformRms[i] = at < 32 || at >= 64 ? .08f : .4f;
+        }
+        Project pending;
+        Clip a; a.media = outgoing; a.length = outgoing->duration(); a.pendingPlacement = PendingPlacement::append;
+        Clip b; b.media = source; b.track = 1; b.length = source->duration(); b.pendingPlacement = PendingPlacement::append;
+        pending.clips = {a, b};
+        const auto placed = planTempoMap(pending, 256, TransitionPreset::bassSwap, true);
+        bool shared = placed.error.isEmpty() && placed.project.transitionLinks.size() == 1;
+        double expected = -1, actual = -2;
+        if (shared)
+        {
+            const auto& p = placed.project; const auto& out = p.clips[0]; const auto& in = p.clips[1];
+            expected = out.start + out.audioTimelineTime(64);
+            shared = std::abs(expected - in.start - in.audioTimelineTime(32)) < 1e-7;
+            const auto swap = nodeSwapTimes(p,p.transitionLinks[0]);
+            actual = swap ? (*swap)[0] : -2;
+            shared = shared && swap && std::abs(actual - expected) < 1e-7 && std::abs((*swap)[1] - expected) < 1e-7;
+        }
+        check(shared, "automatic Bass swap uses the shared section change rather than an asymmetric frame midpoint: " + juce::String(actual, 6) + " / " + juce::String(expected, 6));
+        auto crossfade = planTempoMap(pending, 256, TransitionPreset::crossfade, true);
+        const auto switched = crossfade.project.applyTransitionPreset(b.id, TransitionPreset::bassSwap);
+        const auto* link = crossfade.project.transitionFor(b.id);
+        const auto swap = link ? nodeSwapTimes(crossfade.project,*link) : std::nullopt;
+        check(crossfade.error.isEmpty() && switched.wasOk() && swap && std::abs((*swap)[0] - expected) < 1e-7,
+            "applying Bass swap after automatic Crossfade retains the shared section handover: " + switched.getErrorMessage()
+                + " / " + juce::String(swap ? (*swap)[0] : -2.,9) + " / " + juce::String(expected,9));
+        Clip out; out.media = source; out.length = source->duration(); Clip in = out;
+        const auto longer = chooseSectionTransition(out, in, 64);
+        check(longer && longer->matchedSections == 2 && longer->overlapBeats > 64,
+            "a genuine paired section match may extend beyond the preferred overlap limit");
+    }
 
     {
         Clip out, in; out.media = in.media = source; out.length = in.length = source->duration();
@@ -56,14 +140,14 @@ void runPlaylistTransitionTests(const std::function<void(bool, const juce::Strin
             "trimmed sources plan section alignment from their visible source spans");
         source->sampleRate = 2000; out.offset = in.offset = 0; out.length = in.length = source->duration();
         const auto bounded = chooseSectionTransition(out, in);
-        check(bounded && bounded->matchedSections == 1 && bounded->overlapBeats == 256,
-            "section choices outside the last 64 outgoing bars or requiring over 64 overlap bars cannot win");
+        check(bounded && bounded->matchedSections == 2 && bounded->overlapBeats == 512,
+            "paired sections may extend beyond the normal limit when both complete sources contain the overlap");
         source->sampleRate = 8000;
     }
 
-    Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940);
+    auto owned = std::make_unique<Workstation>(false); auto& ui = *owned; ui.stopTimer(); ui.setSize(1440, 940);
     check(ui.selectedTransitionPreset() == TransitionPreset::crossfade && ui.transitionOverlapBeats() == 256
-        && ui.transitionLength.getText() == "Sections 8-64 bars", "new playlist additions default to section-aligned Crossfade within 8-64 bars");
+        && ui.transitionLength.getText() == "Sections 8-64+ bars", "new playlist additions expose automatic sections and permitted longer paired overlaps");
     ui.engine.project.followTrackTempo = false; ui.engine.project.bpm = ui.engine.project.tempo.fallback = 120;
     ui.insertTimelineMedia({source, source}, {});
     bool captured = true; for (const auto& clip : ui.engine.project.clips)
@@ -90,8 +174,8 @@ void runPlaylistTransitionTests(const std::function<void(bool, const juce::Strin
     ui.engine.project = matched.project; ui.undoHistory.clear(); ui.redoHistory.clear(); ui.refresh();
     const auto incoming = ui.engine.project.clips[1].id, outgoing = ui.engine.project.clips[0].id;
     const auto link = *ui.engine.project.transitionFor(incoming); const auto range = ui.engine.project.transitionRange(link);
-    check(std::abs(range.getLength() - 64) < 1e-6 && std::abs(ui.engine.project.clips[0].fadeOut - 64) < 1e-6
-        && std::abs(ui.engine.project.clips[1].fadeIn - 64) < 1e-6, "actual overlap is chosen from both section changes instead of a fixed bar length");
+    check(std::abs(range.getLength() - 64) < 1e-6 && ui.engine.project.clips[0].controls.automation[0].active()
+        && std::abs(ui.engine.project.transitionRange(ui.engine.project.transitionLinks[0]).getLength() - 64) < 1e-6, "actual overlap is chosen from both section changes instead of a fixed bar length");
     check(std::abs(ui.engine.project.clips[0].start + ui.engine.project.clips[0].audioTimelineTime(64)
         - ui.engine.project.clips[1].start - ui.engine.project.clips[1].audioTimelineTime(32)) < 1e-6,
         "default placement aligns the outgoing and incoming energy-section changes to the same project bar");
@@ -109,11 +193,12 @@ void runPlaylistTransitionTests(const std::function<void(bool, const juce::Strin
     ui.undo(true); check(ui.engine.project.clips[1].fadeIn == 0, "Redo reapplies the row transition treatment");
     ui.undo(false);
     TransitionStyle saved; check(ui.engine.project.captureTransitionStyle(incoming, saved).wasOk(), "a playlist transition can use the existing saved-style owner");
+    saved.nodes.reset(); // Explicit legacy-description import compiles to ordinary Filter nodes.
     saved.filter.mode = TransitionFilterMode::highToLow; saved.filter.strength = .5;
     ui.engine.project.transitionPresets.push_back({"Half sweep", saved}); ui.refresh();
     cell.release(); cell.reset(ui.playlistTable.refreshComponentForCell(rowFor(incoming), 6, false, picker));
     picker = dynamic_cast<juce::ComboBox*>(cell.get()); picker->setSelectedId(100, juce::dontSendNotification); picker->onChange();
-    check(ui.engine.project.transitionFor(incoming)->filter.mode == TransitionFilterMode::highToLow
+    check(ui.engine.project.clipFor(incoming)->controls.automation[5].active() && !ui.engine.project.transitionFor(incoming)->filter.active()
         && ui.engine.project.clips[1].start == matched.project.clips[1].start, "saved session presets are directly available in each playlist row and retain placement");
     ui.playlistTable.sortOrderChanged(3, false);
     cell.release(); cell.reset(ui.playlistTable.refreshComponentForCell(rowFor(outgoing), 6, false, picker)); picker = dynamic_cast<juce::ComboBox*>(cell.get());
@@ -162,6 +247,47 @@ void runPlaylistTransitionTests(const std::function<void(bool, const juce::Strin
         && ui.transitionPresetForSelection.getWidth() >= 120,
         "compact transition layout wraps into two band columns and retains readable primary controls");
     check(capturePanel("transitions-clean-compact.png"), "capture compact transition controls without track metadata or instruction paragraphs");
+    const auto displayBase = std::make_unique<Project>(ui.engine.project);
+    ui.showBrowserPage(1); ui.engine.project.transitionPresets.clear();
+    cell.release(); cell.reset(ui.playlistTable.refreshComponentForCell(rowFor(incoming), 6, false, picker)); picker = dynamic_cast<juce::ComboBox*>(cell.get());
+    picker->setSelectedId(2, juce::dontSendNotification); picker->onChange();
+    const auto builtIn = std::make_unique<Project>(ui.engine.project); const auto builtInJson = json(*builtIn); const auto history = ui.undoHistory.size();
+    auto readPicker = [&]
+    {
+        cell.release(); cell.reset(ui.playlistTable.refreshComponentForCell(rowFor(incoming), 6, false, picker)); picker = dynamic_cast<juce::ComboBox*>(cell.get());
+    };
+    readPicker();
+    check(picker->getSelectedId() == 2 && picker->getText() == "Bass swap" && json(ui.engine.project) == builtInJson && ui.undoHistory.size() == history,
+        "actual built-in Bass swap row is identified from its generated pair without document/history mutation");
+    for (int change = 0; change < 6; ++change)
+    {
+        ui.engine.project = *builtIn; auto& treatment = *std::find_if(ui.engine.project.transitionLinks.begin(), ui.engine.project.transitionLinks.end(), [&](const auto& pair) { return pair.incoming == incoming; });
+        auto& nodes = ui.engine.project.clipFor(incoming)->controls.automation[1].points;
+        size_t step = 1;
+        for (size_t i = 1; i < nodes.size(); ++i) if (nodes[i-1].bend == 1 && nodes[i].value > nodes[i-1].value) { step = i; break; }
+        if (change == 0) nodes.front().value = -12;
+        if (change == 1) nodes[step].time += .01;
+        if (change == 2) nodes[step].value = -9;
+        if (change == 3) nodes[step-1].bend = .2;
+        if (change == 4) treatment.filter = {TransitionFilterMode::highToLow, .5};
+        if (change == 5) treatment.bands[2] = TransitionBandSettings{TransitionBandMode::fadeOut, .5};
+        const auto manual = json(ui.engine.project); readPicker();
+        check(picker->getSelectedId() == 0 && picker->getText() == "Custom / edited" && json(ui.engine.project) == manual && ui.undoHistory.size() == history,
+            "edited/combined Bass treatment stays Custom and row viewing preserves values " + juce::String(change));
+    }
+    ui.engine.project = *builtIn; TransitionStyle namedBass;
+    check(ui.engine.project.captureTransitionStyle(incoming, namedBass).wasOk(), "capture the actual row Bass treatment for an exact named preset");
+    ui.engine.project.transitionPresets.push_back({"My exact Bass", namedBass}); readPicker();
+    check(picker->getSelectedId() == 100 && picker->getText() == "My exact Bass", "exact named session preset retains priority over built-in family recognition");
+    ui.engine.project = *builtIn;
+    auto* noOverlapOut = ui.engine.project.clipFor(outgoing); noOverlapOut->outroAnchor = noOverlapOut->sourceElapsed(noOverlapOut->length);
+    noOverlapOut->fadeOutAnchor = noOverlapOut->outroAnchor; noOverlapOut->fadeOut = 0;
+    const auto noOverlapJson = json(ui.engine.project); readPicker();
+    check(!picker->isEnabled() && picker->getText() == "No overlap" && json(ui.engine.project) == noOverlapJson && ui.undoHistory.size() == history,
+        "zero-overlap pair is named honestly and disables unavailable row treatment without changing audio data");
+    ui.engine.project = *builtIn; ui.refresh();
+    for (int width : {1250, 1920}) { ui.setSize(width, 940); check(capture("playlist-bass-" + juce::String(width) + ".png"), "capture actual recognised Bass row at width " + juce::String(width)); }
+    ui.engine.project = *displayBase; ui.refresh();
     check(ui.engine.project.clips[0].media->waveformRms == rms && ui.engine.project.clips[0].media->manualBpm == 0,
         "section suggestions and playlist presets retain original automatic analysis and waveform facts");
 }

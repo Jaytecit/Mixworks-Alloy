@@ -1,4 +1,5 @@
 #include "AlloyLookAndFeel.h"
+#include "Model.h"
 #include <cmath>
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
@@ -195,26 +196,25 @@ juce::Font AlloyLookAndFeel::getAlertWindowFont() { return juce::Font(juce::Font
 void AlloyLookAndFeel::drawAlertBox(juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>&, juce::TextLayout& text)
 {
     g.fillAll(colour::panel);
-    g.setColour(colour::moltenOrange); g.drawRect(alert.getLocalBounds());
+    g.setColour(colour::moltenOrange); g.drawRect(alert.getLocalBounds(), 2);
     g.setColour(colour::text);
     text.draw(g, juce::Rectangle<float>(20, 30, (float) alert.getWidth() - 40, text.getHeight()));
 }
 void AlloyLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width, int height)
 {
-    g.fillAll(colour::panel); g.setColour(colour::moltenOrange); g.drawRect(0, 0, width, height);
+    g.fillAll(colour::panel); g.setColour(colour::moltenOrange); g.drawRect(0, 0, width, height, 2);
 }
 void AlloyLookAndFeel::drawResizableWindowBorder(juce::Graphics& g, int width, int height,
     const juce::BorderSize<int>& border, juce::ResizableWindow& window)
 {
-    if (dynamic_cast<juce::FileChooserDialogBox*>(&window))
-    { g.setColour(colour::moltenOrange); g.drawRect(0, 0, width, height); }
-    else juce::LookAndFeel_V4::drawResizableWindowBorder(g, width, height, border, window);
+    juce::ignoreUnused(border, window);
+    g.setColour(colour::moltenOrange); g.drawRect(0, 0, width, height, 2);
 }
 void AlloyLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g, const juce::Path& path, juce::Image& cached)
 {
     juce::LookAndFeel_V4::drawCallOutBoxBackground(box, g, path, cached);
     g.setColour(colour::panel); g.fillPath(path);
-    g.setColour(colour::moltenOrange); g.strokePath(path, juce::PathStrokeType(1.f));
+    g.setColour(colour::moltenOrange); g.strokePath(path, juce::PathStrokeType(2.f));
 }
 void AlloyLookAndFeel::drawFileBrowserRow(juce::Graphics& g, int width, int height, const juce::File&, const juce::String& name,
     juce::Image* icon, const juce::String& size, const juce::String& date, bool directory, bool selected, int,
@@ -350,15 +350,20 @@ void AlloyLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wid
     else { g.setGradientFill(juce::ColourGradient(colour::text, pos, mid - 6, colour::muted.darker(0.3f), pos, mid + 6, false)); g.fillRoundedRectangle(thumb, 2); }
     g.setColour(slider.hasKeyboardFocus(true) ? colour::focus : colour::orange); g.drawRoundedRectangle(thumb, 2, 1);
 }
-void AlloyLookAndFeel::drawEmblem(juce::Graphics& g, juce::Rectangle<float> bounds)
+void AlloyLookAndFeel::drawEmblem(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour glow)
 {
     const auto c = bounds.getCentre(); const float r = std::min(bounds.getWidth(), bounds.getHeight()) * 0.48f;
-    auto cap = hexagon(c, r); g.setGradientFill(juce::ColourGradient(colour::text, bounds.getTopLeft(), colour::muted.darker(0.4f), bounds.getBottomRight(), false)); g.fillPath(cap);
+    auto cap = hexagon(c, r);
+    if (!glow.isTransparent())
+        for (float width : {8.f, 5.f, 3.f})
+        { g.setColour(glow.withAlpha(.10f)); g.strokePath(cap, juce::PathStrokeType(width)); }
+    g.setGradientFill(juce::ColourGradient(glow.isTransparent() ? colour::text : glow.interpolatedWith(juce::Colours::white, .6f), bounds.getTopLeft(),
+        glow.isTransparent() ? colour::muted.darker(.4f) : glow.darker(.45f), bounds.getBottomRight(), false)); g.fillPath(cap);
     juce::Path wave; wave.startNewSubPath(c.x - r * 0.72f, c.y); wave.lineTo(c.x - r * 0.38f, c.y);
     wave.lineTo(c.x - r * 0.2f, c.y - r * 0.25f); wave.lineTo(c.x, c.y + r * 0.38f);
     wave.lineTo(c.x + r * 0.2f, c.y - r * 0.45f); wave.lineTo(c.x + r * 0.38f, c.y); wave.lineTo(c.x + r * 0.72f, c.y);
     g.setColour(colour::background); g.strokePath(wave, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    g.setColour(colour::orange); g.strokePath(wave, juce::PathStrokeType(1.2f));
+    g.setColour(glow.isTransparent() ? colour::orange : glow.brighter(.6f)); g.strokePath(wave, juce::PathStrokeType(1.2f));
 }
 void AlloyDial::configure(const juce::String& name, double defaultValue)
 {
@@ -367,6 +372,20 @@ void AlloyDial::configure(const juce::String& name, double defaultValue)
     setRotaryParameters(juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
     setDoubleClickReturnValue(true, resetValue); setSliderSnapsToMousePosition(false); setMouseDragSensitivity(240);
 }
+void AlloyDial::configureCutoff()
+{
+    cutoffMode = true; resetValue = 0; setRange(-1, 1, 0); setDoubleClickReturnValue(true, 0);
+    setTextValueSuffix("");
+    textFromValueFunction = [](double value) { return cutoffText((float) value, true); };
+    valueFromTextFunction = [this](const juce::String& text) { float value = 0; return parseCutoffText(text, value) ? (double) value : getValue(); };
+    updateText();
+}
+double AlloyDial::valueToProportionOfLength(double value)
+{ return cutoffMode ? .5 + .5 * cutoffPosition((float) value) : juce::Slider::valueToProportionOfLength(value); }
+double AlloyDial::proportionOfLengthToValue(double position)
+{ return cutoffMode ? cutoffFromPosition(position * 2 - 1) : juce::Slider::proportionOfLengthToValue(position); }
+double AlloyDial::snapValue(double value, DragMode mode)
+{ return cutoffMode && mode != notDragging && std::abs(cutoffPosition((float) value)) < .015 ? 0 : juce::Slider::snapValue(value, mode); }
 void AlloyDial::mouseDown(const juce::MouseEvent& event)
 {
     // Decide sensitivity once per gesture so toggling Shift cannot jump a value.
@@ -377,6 +396,176 @@ void AlloyDial::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseW
     if (!configured || hasKeyboardFocus(true)) juce::Slider::mouseWheelMove(event, wheel);
     else juce::Component::mouseWheelMove(event, wheel);
 }
+juce::Rectangle<int> AlloyLookAndFeel::getTooltipBounds(const juce::String& text, juce::Point<int> point, juce::Rectangle<int> area)
+{
+    auto bounds = juce::LookAndFeel_V4::getTooltipBounds(text, point, area);
+    // Keep the hovered node and its caption clear, including at monitor edges.
+    const int x = point.x + 28 + bounds.getWidth() <= area.getRight() ? point.x + 28 : point.x - 28 - bounds.getWidth();
+    const int y = point.y + 40 + bounds.getHeight() <= area.getBottom() ? point.y + 40 : point.y - 40 - bounds.getHeight();
+    return bounds.withPosition(x, y).constrainedWithin(area);
+}
+
+namespace
+{
+juce::String commandHint(juce::String command)
+{
+    command = command.upToFirstOccurrenceOf(" (", false, false).trimCharactersAtEnd(". ").toLowerCase();
+    static const std::pair<const char*, const char*> entries[] {
+        {"popup hints", "Show or hide popup help throughout Mixworks, including detached panels. Saved for this workspace."},
+        {"new mix", "Start an empty mix after checking unsaved changes."},
+        {"open mix", "Choose a saved .mixworks arrangement to open."},
+        {"save mix", "Save the arrangement, automation and effects to a .mixworks file."},
+        {"recover unsaved mix", "Review available recovery snapshots before restoring an unsaved arrangement."},
+        {"add files to library", "Choose audio files to analyse and add to the library."},
+        {"import playlist", "Read a source playlist and import its available audio files."},
+        {"export mix as wav", "Render this arrangement to WAV with an optional effects tail."},
+        {"export source playlist", "Save a playlist referencing the source audio files in this mix."},
+        {"export track list", "Save a readable track list for this arrangement."},
+        {"exit mixworks", "Close Mixworks after checking unsaved changes."},
+        {"undo", "Undo the most recent musical edit."}, {"redo", "Reapply the last undone edit."},
+        {"split at playhead", "Split the selected segment into two segments at the current cursor."},
+        {"duplicate segment", "Add another copy of the selected segment to the arrangement."},
+        {"remove segment", "Remove the selected segment from the mix, keeping the original audio."},
+        {"reverse", "Toggle backwards playback of the selected segment."},
+        {"loop section", "Choose the source section and number of repetitions for the selected segment."},
+        {"automation", "Choose a curve, add or edit points, or configure automation recording."},
+        {"effect ending", "Set how long effect tails may continue after the last segment."},
+        {"tempo marker at playhead", "Add a project BPM target at the current mix cursor."},
+        {"snap to beat", "Align timeline edits to beats. Hold Alt during a drag to bypass snapping."},
+        {"label marker at playhead", "Name a location at the current mix cursor."},
+        {"edit selected label", "Change the selected timeline label's text."},
+        {"remove selected label", "Delete the selected timeline label."},
+        {"previous label", "Seek to the previous named timeline marker."},
+        {"next label", "Seek to the next named timeline marker."},
+        {"play / pause", "Start or pause playback at the current cursor."},
+        {"stop", "Stop playback and return the cursor to the beginning of the mix."},
+        {"return to start", "Move the playback cursor to the beginning of the mix."},
+        {"beatmatch / rebuild transitions", "Rebuild beat-aligned segment placement using the chosen transition settings."},
+        {"track bpm / key", "Review the selected source grid and audition or correct BPM, downbeat and key."},
+        {"re-analyse", "Choose which library sources to analyse again. Manual corrections are retained."},
+        {"selected tracks", "Re-analyse the selected library sources when playback and other operations have stopped."},
+        {"tracks needing analysis", "Analyse sources currently marked as needing analysis."},
+        {"all library tracks", "Re-analyse all sources in the library. This may take time."},
+        {"select tracks needing analysis", "Select library rows that need analysis without starting analysis."},
+        {"suggested energy sections", "Show approximate source energy sections on the timeline."},
+        {"master output / spectrum", "Open master EQ, width, saturation, monitoring and live spectrum."},
+        {"forge sparks", "Toggle optional molten sparks around the playing cursor and peak meters."},
+        {"forge motion", "Choose whether forge effects follow Windows motion preferences, animate, or stay steady."},
+        {"attract lighting", "Toggle decorative lighting around app controls."},
+        {"attract motion", "Choose whether attract lighting follows Windows, animates, or stays steady."},
+        {"follow windows", "Respect the Windows reduced-motion preference for this visual effect."},
+        {"animated", "Allow animation for this effect, independently of the Windows setting."},
+        {"steady", "Keep this effect still. No audio settings change."},
+        {"live desk on second monitor", "Detach the live desk so it can be moved to another display."},
+        {"dock live desk", "Return the live desk to the main window."},
+        {"transitions panel", "Show editing controls for the selected transition."},
+        {"attach transitions", "Return the Transitions panel to the main window."},
+        {"detach transitions", "Open the Transitions panel in its own movable window."},
+        {"controller panel", "Show live faders, paired pots and optional MIDI Learn."},
+        {"segment properties", "Show trims, duration, gain, looping and reverse for the selected segment."},
+        {"effects / vst3", "Show the plugin chain for the selected lane."},
+        {"midi keyboard", "Show the piano that plays the selected lane instrument."},
+        {"fit whole mix", "Fit the complete arrangement into the visible timeline."},
+        {"zoom in", "Show a shorter time span with more timeline detail."},
+        {"zoom out", "Show a longer time span in the timeline."},
+        {"display", "Choose the window mode, size and display."},
+        {"audio / midi settings", "Select audio devices, MIDI inputs and controller mappings."},
+        {"add vst3 effect / instrument", "Choose a VST3 plugin to insert on the selected lane."},
+        {"assign midi plugin controls", "Choose plugin parameters to control through MIDI and automation."},
+        {"scan music folder now", "Import new audio found in the configured Music folder."},
+        {"automatically scan music folder", "Toggle background discovery of new Music folder audio."},
+        {"stop current music scan", "Request the current Music scan to stop, keeping completed imports."},
+        {"apply", "Confirm these values and apply the change. Correct invalid entries first."},
+        {"ok", "Confirm these values and apply the change."},
+        {"cancel", "Close this dialog without applying pending changes."},
+        {"close", "Close this panel."},
+        {"make mix", "Generate a mix using the selected tracks, blend style and energy policy. Undo restores the previous mix."},
+        {"restore", "Restore the chosen recovery snapshot after checking the current mix."},
+        {"discard recovery", "Remove this recovery snapshot without restoring it."},
+        {"later", "Keep recovery available and return to the current mix."},
+        {"last segment", "Export through the end of the last segment, excluding any extra effects tail."},
+        {"include tail", "Export through the last segment plus the configured effects tail."},
+        {"set tail", "Choose how long effects may continue beyond the last segment."},
+        {"set loop", "Apply the chosen loop section length and repetition count."},
+        {"remove loop", "Return this segment to ordinary playback without repetitions."},
+        {"show curve", "Display the chosen parameter's automation curve for editing."},
+        {"save", "Save the named item using the values in this dialog."},
+        {"read selected curve", "Enable or bypass playback of the selected saved automation curve."},
+        {"point at playhead", "Enter an automation value at the current mix cursor."},
+        {"clear selected curve", "Remove all points from the selected saved automation curve. Undo restores them."},
+        {"choose effect control", "Choose a plugin parameter whose automation curve you want to edit."},
+        {"recording options", "Choose Read, Touch or Latch recording and arm the desired lane or master."},
+        {"touch", "Record movements while a control is touched, then return to the saved curve."},
+        {"latch", "Record a touched control and keep writing its last value until playback stops."},
+    };
+    for (const auto& entry : entries) if (command == entry.first) return entry.second;
+    return {};
+}
+}
+
+juce::String AlloyHints::textFor(juce::Component& component)
+{
+    for (auto* p = &component; p; p = p->getParentComponent())
+        if ((bool) p->getProperties()["mixworksExternalEditor"]) return {};
+    juce::String text;
+    for (auto* p = &component; p; p = p->getParentComponent())
+    {
+        if (auto* client = dynamic_cast<juce::TooltipClient*>(p)) text = client->getTooltip();
+        if (text.isNotEmpty()) break;
+        text = p->getProperties()["mixworksHint"].toString();
+        if (text.isNotEmpty()) break;
+        if (auto* button = dynamic_cast<juce::Button*>(p)) text = commandHint(button->getButtonText());
+        // JUCE popup rows expose their text through accessibility, including disabled rows.
+        else if (auto* handler = p->getAccessibilityHandler())
+            if (handler->getRole() == juce::AccessibilityRole::menuItem || handler->getRole() == juce::AccessibilityRole::ignored)
+            {
+                text = commandHint(handler->getTitle());
+                if (text.isEmpty() && handler->getRole() == juce::AccessibilityRole::menuItem && handler->getTitle().isNotEmpty())
+                    text = "Choose " + handler->getTitle() + ". Unavailable commands cannot be applied in the current state.";
+            }
+        if (text.isNotEmpty()) break;
+        // Text/value children of sliders and combos inherit their owner's help.
+        if (auto* bar = dynamic_cast<juce::ScrollBar*>(p))
+        { text = bar->isVertical() ? "Scroll to see more rows or controls." : "Scroll left or right to see more of the timeline."; break; }
+    }
+    if (text.isEmpty())
+    {
+        if (auto* editor = dynamic_cast<juce::TextEditor*>(&component))
+        {
+            const auto name = editor->getName();
+            text = editor->isReadOnly() ? "Read-only details. Select text to copy it."
+                : name.isNotEmpty() ? "Enter " + name + ". Apply or confirm the dialog to keep the change." : juce::String();
+        }
+        else if (auto* box = dynamic_cast<juce::ComboBox*>(&component))
+        {
+            const auto name = box->getTitle().isNotEmpty() ? box->getTitle() : box->getName();
+            if (name.isNotEmpty()) text = "Choose " + name + " from the available options.";
+        }
+        else if (auto* button = dynamic_cast<juce::Button*>(&component))
+        {
+            const auto name = button->getButtonText();
+            if (name == "Cancel" || name == "Close") text = "Close this dialog without applying pending changes.";
+            else if (name == "Apply" || name == "OK") text = "Confirm these values and apply the change. Invalid values must be corrected first.";
+        }
+    }
+    if (text.isNotEmpty() && !component.isEnabled())
+    {
+        auto reason = component.getProperties()["mixworksHintDisabled"].toString();
+        if (reason.isEmpty()) reason = "Unavailable in the current selection or operation. Finish the active operation and check the selection or lock state.";
+        text += "\n\n" + reason;
+    }
+    return text;
+}
+
+juce::String AlloyHints::getTipFor(juce::Component& component)
+{
+    if (!enabled || !juce::Process::isForegroundProcess() || !component.isShowing()
+        || component.isCurrentlyBlockedByAnotherModalComponent()
+        || juce::ModifierKeys::getCurrentModifiers().isAnyMouseButtonDown()
+        || dynamic_cast<AlloyLookAndFeel*>(&component.getLookAndFeel()) == nullptr) return {};
+    return textFor(component);
+}
+
 bool AlloyDial::keyPressed(const juce::KeyPress& key)
 {
     if (!isEnabled()) return false;

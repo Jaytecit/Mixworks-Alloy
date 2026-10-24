@@ -59,9 +59,74 @@ void runEditingTests(const std::function<void(bool, const juce::String&)>& check
     corrupted = juce::JSON::parse(saved); corrupted["clips"].getArray()->getReference(0).getDynamicObject()->setProperty("loopSpan", 1.0e-20); corrupted["clips"].getArray()->getReference(0).getDynamicObject()->setProperty("loopPhase", 0);
     check(engine.restoreProject(juce::JSON::toString(corrupted)).isNotEmpty(), "loop spans smaller than one source sample are rejected before playback");
     corrupted = juce::JSON::parse(saved); corrupted["media"].getArray()->getReference(1).getDynamicObject()->setProperty("file", report.getSiblingFile("absent-owned-test-audio.wav").getFullPathName());
-    check(engine.restoreProject(juce::JSON::toString(corrupted)).isNotEmpty() && engine.library.size() == 2, "missing unused-library audio preserves the current session transactionally");
+    check(engine.restoreProject(juce::JSON::toString(corrupted)).isEmpty() && engine.library.size() == 2
+          && engine.library[1]->id == "unused-fixture" && engine.library[1]->manualKey == 17
+          && engine.library[1]->file.getFileName() == "absent-owned-test-audio.wav" && engine.playbackReady(),
+          "unused missing audio cannot block playable clips or discard library metadata");
+    if (engine.project.clips.size() == 1)
+    {
+        auto secondClip = engine.project.clips[0]; secondClip.id = juce::Uuid().toString(); secondClip.start = secondClip.end();
+        engine.project.clips.push_back(secondClip);
+        const auto playable = report.getSiblingFile("A02-two-valid-clips.mixworks");
+        const auto opened = engine.saveProject(playable).isEmpty() && engine.restoreProject(playable.loadFileAsString()).isEmpty();
+        const auto exported = report.getSiblingFile("A02-two-valid-clips.wav"); const auto exportError = engine.exportWav(exported);
+        std::unique_ptr<juce::AudioFormatReader> validReader(engine.formats.createReaderFor(exported));
+        check(opened && engine.project.clips.size() == 2 && exportError.isEmpty() && validReader && validReader->lengthInSamples == 264600,
+            "two valid clips save, reopen and export six seconds despite an unused missing library source");
+    }
+    auto deferred = juce::JSON::parse(saved);
+    for (int i = 0; i < 358; ++i)
+    {
+        auto entry = juce::JSON::parse(juce::JSON::toString(deferred["media"].getArray()->getReference(1)));
+        entry.getDynamicObject()->setProperty("id", "deferred-" + juce::String(i));
+        entry.getDynamicObject()->setProperty("file", report.getSiblingFile("unavailable-" + juce::String(i) + ".wav").getFullPathName());
+        deferred["media"].getArray()->add(entry);
+    }
+    int sourceChecks = 0; juce::StringArray inspected;
+    auto staged = engine.prepareProject(juce::JSON::toString(deferred), [&](int, int, const auto& name, auto phase)
+    { if (phase == MediaReadStage::lookupAnalysis) { ++sourceChecks; inspected.addIfNotAlreadyThere(name); } });
+    check(staged.error.isEmpty() && staged.library.size() == 360 && staged.parsed.project.clips.size() == 1
+          && inspected.size() == 1 && sourceChecks == 2 && staged.library[0]->analysisFromCache
+          && !staged.library[1]->hasPlayback() && !staged.library.back()->hasPlayback(),
+          "arrangement readiness reads only required audio with 359 deferred catalogue entries and reuses valid analysis");
+    check(staged.error.isEmpty() && engine.commitProject(std::move(staged)).isEmpty() && engine.playbackReady()
+          && engine.captureProject()["media"].getArray()->size() == 360,
+          "all deferred catalogue identities survive transactional admission and capture");
+    auto required = juce::JSON::parse(saved);
+    const auto missingPath = report.getSiblingFile("required-missing.wav").getFullPathName();
+    required["media"].getArray()->getReference(0).getDynamicObject()->setProperty("file", missingPath);
+    const auto kept = juce::JSON::toString(engine.captureProject());
+    const auto requiredError = engine.restoreProject(juce::JSON::toString(required));
+    check(requiredError.contains(missingPath) && requiredError.containsIgnoreCase("missing")
+          && juce::JSON::toString(engine.captureProject()) == kept,
+          "required missing audio reports its full path and keeps the complete current document");
+    const auto failed = engine.prepareProject(juce::JSON::toString(required));
+    const auto located = relinkProjectSource(failed.parsed, media->id, media->file);
+    check(failed.failedSource && failed.failedSource->id == media->id && !located.isEmpty()
+          && engine.restoreProject(located).isEmpty() && engine.playbackReady()
+          && failed.parsed.document["media"].getArray()->getReference(0)["file"].toString() == missingPath,
+          "explicit relink retries the required source without mutating the failed document");
+    const auto keptAfterRelink = juce::JSON::toString(engine.captureProject());
+    const auto badAudio = report.getSiblingFile("required-corrupt.wav"); badAudio.replaceWithText("not audio");
+    required["media"].getArray()->getReference(0).getDynamicObject()->setProperty("file", badAudio.getFullPathName());
+    const auto corruptError = engine.restoreProject(juce::JSON::toString(required));
+    check(corruptError.contains(badAudio.getFullPathName()) && corruptError.containsIgnoreCase("corrupt")
+          && juce::JSON::toString(engine.captureProject()) == keptAfterRelink, "required corrupt audio fails atomically with its full path");
+    corrupted["media"].getArray()->getReference(1).getDynamicObject()->setProperty("file", badAudio.getFullPathName());
+    check(engine.restoreProject(juce::JSON::toString(corrupted)).isEmpty() && engine.playbackReady(),
+          "unused corrupt audio is deferred without rejecting the arrangement");
+    const auto unsupported = report.getSiblingFile("unsupported-source.bin"); unsupported.replaceWithText("not an audio format");
+    required["media"].getArray()->getReference(0).getDynamicObject()->setProperty("file", unsupported.getFullPathName());
+    const auto unsupportedBefore = juce::JSON::toString(engine.captureProject());
+    const auto unsupportedError = engine.restoreProject(juce::JSON::toString(required));
+    check(unsupportedError.containsIgnoreCase("Unsupported audio format") && unsupportedError.contains(unsupported.getFullPathName())
+        && juce::JSON::toString(engine.captureProject()) == unsupportedBefore, "unsupported required files remain distinct from missing and corrupt audio");
     auto cancelled = std::make_shared<std::atomic<bool>>(true);
     check(engine.prepareProject(saved, {}, cancelled).error.isNotEmpty() && engine.library.size() == 2, "cancelled session loading keeps the current session");
+    *cancelled = false;
+    const auto midCancelled = engine.prepareProject(saved, [&](int, int, const auto&, auto) { *cancelled = true; }, cancelled);
+    check(midCancelled.error.containsIgnoreCase("cancel") && !midCancelled.failedSource && engine.commitProject(midCancelled).isNotEmpty()
+        && juce::JSON::toString(engine.captureProject()) == unsupportedBefore, "mid-read cancellation cannot commit or request source relinking");
     for (int version : {1, 2})
     {
         auto legacy = juce::JSON::parse(saved); legacy.getDynamicObject()->setProperty("version", version); legacy["tracks"].getArray()->removeRange(4, trackCount - 4);

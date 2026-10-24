@@ -63,7 +63,7 @@ Fresh independent envelope-transfer measurements use the same method as the [v0.
 
 The edited Miracle render has isolated accepted outliers of −46 ms at clip-local 271.913 s, −35 ms at 237.695 s and +33 ms at 226.913 s. The new bar alignment changes the ramp placement and stretch trajectory. These are retained as an unresolved playback/measurement concern; the passing first-marker comparisons do not establish uniformly accurate stretching or subjective sound quality. The detector change does not modify the stretch engine.
 
-Listening exports: [automatic transition](../../.local/real-track-downbeat-v019/dropped-transition-mix.wav), [edited 128 BPM transition](../../.local/real-track-downbeat-v019/edited-transition-mix.wav). Full isolated stems remain beside them for investigating the later outliers.
+Maintenance note, 20 October 2026: disposable listening exports and isolated stems were removed in the user-authorised test cleanup. The numerical reports/measurements remain; [the removal manifest](../../.local/test-cleanup-final-20261020/result.json) records the cleanup. These historical audio examples must be regenerated before listening or repeating waveform measurements.
 
 Deployed: `out/releases/0.19.0-080a61cde616/Mixworks.exe`, SHA-256 `080a61cde6160bc0f5c2796b864cc965196fd0d8237e63693b3fe3cde036e154`. This is the exact executable used for the final suites and real renders. `Mixworks.cmd` selects it through the backed-up launcher; earlier releases remain available.
 

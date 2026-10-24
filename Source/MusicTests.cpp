@@ -28,26 +28,26 @@ juce::AudioBuffer<float> rhythm(double bpm, double phase, double seconds = 24)
         }
     return result;
 }
-juce::AudioBuffer<float> progression(int key, double tuning = 0, double harmonics = 0.18)
+juce::AudioBuffer<float> progression(int key, double tuning = 0, double harmonics = 0.18, double targetRate = rate)
 {
-    juce::AudioBuffer<float> audio(2, (int) (12 * rate)); audio.clear();
+    juce::AudioBuffer<float> audio(2, (int) (12 * targetRate)); audio.clear();
     const int roots[] {0, 5, 7, 0}; const double lengths[] {4, 2, 2, 4};
     double start = 0;
     for (int chord = 0; chord < 4; ++chord)
     {
         int third = key < 12 || chord == 2 ? 4 : 3;
         const int notes[] {48 + key % 12 + roots[chord], 60 + key % 12 + roots[chord], 60 + key % 12 + roots[chord] + third, 67 + key % 12 + roots[chord]};
-        for (int i = 0; i < (int) (lengths[chord] * rate); ++i)
+        for (int i = 0; i < (int) (lengths[chord] * targetRate); ++i)
         {
-            const double t = i / rate, envelope = std::min(1.0, t / 0.03) * std::min(1.0, (lengths[chord] - t) / 0.04);
+            const double t = i / targetRate, envelope = std::min(1.0, t / 0.03) * std::min(1.0, (lengths[chord] - t) / 0.04);
             double value = 0;
             for (int n = 0; n < 4; ++n)
             {
                 const double frequency = 440 * std::pow(2.0, (notes[n] - 69 + tuning / 100) / 12.0);
                 value += (n == 0 ? 0.18 : 0.1) * (std::sin(2 * juce::MathConstants<double>::pi * frequency * t) + harmonics * std::sin(4 * juce::MathConstants<double>::pi * frequency * t));
             }
-            audio.setSample(0, (int) (start * rate) + i, (float) (value * envelope));
-            audio.setSample(1, (int) (start * rate) + i, (float) (value * envelope));
+            audio.setSample(0, (int) (start * targetRate) + i, (float) (value * envelope));
+            audio.setSample(1, (int) (start * targetRate) + i, (float) (value * envelope));
         }
         start += lengths[chord];
     }
@@ -59,6 +59,70 @@ double frequency(const juce::AudioBuffer<float>& samples)
     for (int i = start; i < end; ++i) if (samples.getSample(0, i) <= 0 && samples.getSample(0, i + 1) > 0) ++crossings;
     return crossings * rate / (end - start);
 }
+}
+void runFocusedSignalTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
+{
+    MusicAnalysis previous; previous.bpm = 120; previous.beatOrigin = .213; previous.tempoConfidence = .9;
+    previous.downbeatOrigin = 2.213; previous.downbeatConfidence = .7; previous.downbeatMethod = "signal-structure";
+    auto chord = progression(0);
+    MusicAnalysis evidence;
+    const auto key = retryMusicAnalysis(chord, rate, previous, false, true, {}, &evidence);
+    check(key.key == 0 && key.focusedKey == 2 && key.bpm == previous.bpm && key.beatOrigin == previous.beatOrigin
+        && key.downbeatOrigin == previous.downbeatOrigin, "focused harmonic pass recovers authored C major and preserves the complete pulse/bar clock; candidate=" + juce::String(evidence.key) + " score=" + juce::String(evidence.keyConfidence, 4));
+    auto wrong = previous; wrong.key = 6; wrong.keyConfidence = .05;
+    const auto corrected = retryMusicAnalysis(chord, rate, wrong, false, true);
+    check(corrected.key == 0 && corrected.focusedKey == 2, "focused harmonic evidence can replace a weak wrong key; score=" + juce::String(corrected.keyConfidence, 4));
+    int acceptedKeys = 0;
+    for (int tonic = 0; tonic < 24; ++tonic)
+    {
+        auto music = progression(tonic);
+        const auto retry = retryMusicAnalysis(music, rate, previous, false, true);
+        acceptedKeys += retry.focusedKey == 2;
+        check(retry.key < 0 || retry.key == tonic, "focused harmonic pass agrees with authored " + keyNoteName(tonic) + " or abstains");
+    }
+    check(acceptedKeys >= 20, "focused harmonic recovery covers at least twenty authored major/minor keys: " + juce::String(acceptedKeys));
+    auto antiPhase = progression(17, 20, .7, 8000); antiPhase.applyGain(.1f); antiPhase.applyGain(1, 0, antiPhase.getNumSamples(), -1);
+    const auto anti = retryMusicAnalysis(antiPhase, 8000, previous, false, true);
+    const auto normalChord = analyseMusic(chord, rate), normalAnti = analyseMusic(antiPhase, 8000);
+    const auto values = [](const MusicAnalysis& a)
+    {
+        auto* value = new juce::DynamicObject(); value->setProperty("key", a.key); value->setProperty("keyConfidence", a.keyConfidence);
+        value->setProperty("tuningCents", a.tuningCents); value->setProperty("bpm", a.bpm); value->setProperty("tempoConfidence", a.tempoConfidence);
+        return juce::var(value);
+    };
+    auto* comparison = new juce::DynamicObject(); comparison->setProperty("cleanC_normal", values(normalChord)); comparison->setProperty("cleanC_focused", values(key));
+    comparison->setProperty("quietDetunedAntiphaseFminor8k_normal", values(normalAnti)); comparison->setProperty("quietDetunedAntiphaseFminor8k_focused", values(anti));
+    report.getSiblingFile("normal-focused-comparison.json").replaceWithText(juce::JSON::toString(juce::var(comparison)));
+    check(anti.key == 17 && std::abs(anti.tuningCents - 20) < 5, "focused key keeps detuned quiet antiphase harmony at 8 kHz; key=" + juce::String(anti.key) + " tuning=" + juce::String(anti.tuningCents, 3));
+    auto strong = previous; strong.key = 6; strong.keyConfidence = .8;
+    const auto kept = retryMusicAnalysis(chord, rate, strong, true, true);
+    check(kept.key == 6 && kept.bpm == 120 && kept.focusedRevision == 0, "strong automatic results are not silently replaced by a focused retry");
+    auto cancel = std::make_shared<std::atomic<bool>>(true);
+    const auto cancelled = retryMusicAnalysis(chord, rate, previous, false, true, cancel);
+    check(cancelled.key == -1 && cancelled.focusedRevision == 0, "cancelled focused work neither changes results nor records a completed attempt");
+    juce::AudioBuffer<float> silence(1, (int) (rate * 12)); silence.clear();
+    const auto silent = retryMusicAnalysis(silence, rate, previous, false, true);
+    check(silent.key == -1 && silent.focusedKey == 1 && !needsFocusedKey(silent), "silence stays unknown and an identical completed retry is skipped");
+    for (int i = 0; i < silence.getNumSamples(); ++i) silence.setSample(0, i, (float) (.3 * std::sin(2 * juce::MathConstants<double>::pi * 440 * i / rate)));
+    const auto tone = retryMusicAnalysis(silence, rate, previous, false, true);
+    check(tone.key == -1 && tone.focusedKey == 1, "a pitched tone is not promoted to a musical key by harmonic filtering");
+    juce::Random random(8123);
+    for (int i = 0; i < silence.getNumSamples(); ++i) silence.setSample(0, i, random.nextFloat() - .5f);
+    check(retryMusicAnalysis(silence, rate, previous, false, true).key == -1, "broadband noise stays unknown after harmonic filtering");
+    auto beat = rhythm(128, .173, 36); MusicAnalysis missing; missing.key = 7; missing.keyConfidence = .8;
+    const auto timing = retryMusicAnalysis(beat, rate, missing, true, false);
+    check(std::abs(timing.bpm - 128) < .02 && timing.focusedTempo == 2 && !timing.variableTempo
+        && timing.key == 7 && timing.keyConfidence == .8, "focused pulse retry recovers authored constant tempo without changing the key; bpm=" + juce::String(timing.bpm, 4));
+    // Musical material lies between every first-pass sample on this long source.
+    // A different sampling schedule, not a rerun of the same input windows, must recover it.
+    juce::AudioBuffer<float> sparse(1, 8000 * 360); sparse.clear();
+    const auto lowRateChord = progression(0, 0, .18, 8000);
+    for (int n = 0; n < 8; ++n) for (int i = 0; i < 12 * 8000; ++i)
+        sparse.setSample(0, (int) ((42.5 * n + 21) * 8000) + i, lowRateChord.getSample(0, i));
+    const auto normal = analyseMusic(sparse, 8000);
+    const auto recovered = retryMusicAnalysis(sparse, 8000, normal, false, true, {}, &evidence);
+    check(normal.key == -1 && recovered.key == 0 && recovered.focusedKey == 2,
+          "shifted windows recover authored harmony missed by the normal sampling budget; candidate=" + juce::String(evidence.key) + " score=" + juce::String(evidence.keyConfidence, 4));
 }
 void runMusicTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
@@ -197,11 +261,11 @@ void runMusicTests(const std::function<void(bool, const juce::String&)>& check, 
         check(engine.exportWav(wav).isEmpty(), "beatmatched PCM exports through production mixer");
     }
     Engine controller; auto originalMappings = controller.mappings; controller.mappings.clear(); controller.mappings.push_back({0xb0, 8, 71, {MidiActionKind::volume, 0}}); controller.beginControllerSetup();
-    check(controller.mappingSummary().contains("Fader 2"), "guided FLkey setup preserves the existing fader 1 assignment");
+    check(controller.mappingSummary().contains("Pot 1") && controller.mappingSummary().contains("volume-1  <-  CC 71"), "current guided setup starts at paired pots and preserves the existing fader 1 assignment");
     controller.testMidi(juce::MidiMessage::controllerEvent(8, 71, 127));
-    check(controller.mappingSummary().contains("Fader 2"), "repeated events from an assigned control do not fill the next wizard step");
+    check(controller.mappingSummary().contains("Pot 1") && controller.mappingSummary().contains("Already assigned to volume-1"), "repeated events from an assigned control explain the conflict without filling the next wizard step");
     controller.testMidi(juce::MidiMessage::controllerEvent(8, 72, 64));
-    check(controller.mappingSummary().contains("Fader 3") && controller.mappingSummary().contains("volume-2  <-  CC 72"), "guided FLkey setup advances after a distinct control");
+    check(controller.mappingSummary().contains("Pot 2") && controller.mappingSummary().contains("desk-pot-1  <-  CC 72"), "current guided setup advances after a distinct control");
     controller.beginLearn({}); controller.mappings = originalMappings;
 }
 }

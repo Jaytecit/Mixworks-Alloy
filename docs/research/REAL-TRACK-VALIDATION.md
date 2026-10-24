@@ -42,11 +42,7 @@ These measure displacement of recognizable source bass envelopes after stretchin
 
 The initial isolated-peak diagnostic also picked individual bass cycles and ambiguous events, producing unstable outliers. Its `audio-measurements.json` is retained as exploratory evidence and is **not an acceptance measurement**. The envelope-transfer method above avoids that interpretation error; it still does not supply human musical labels or evaluate every audio sample.
 
-Listening exports, rendered by the production mixer with 6 dB master headroom:
-
-- [Automatic 125→124 BPM transition](../../.local/real-track-workflow-20261017/dropped-transition-mix.wav)
-- [Moved transition points with a 128 BPM target](../../.local/real-track-workflow-20261017/edited-transition-mix.wav)
-- [Fixed 120 BPM comparison](../../.local/real-track-validation-20261017/fixed-120-mix.wav)
+Historical listening exports used the production mixer with 6 dB master headroom: automatic 125→124 BPM, moved points targeting 128 BPM, and fixed 120 BPM comparison. These disposable exports/stems were removed in the user-authorised 20 October 2026 test cleanup; numerical reports remain. See [the removal manifest](../../.local/test-cleanup-final-20261020/result.json). Regenerate these examples before listening or repeating waveform measurements.
 
 No human listening pass, live audio-device test or physical-controller test is claimed. Rendered audio and numerical measurements do not establish that the transition is musically phrased correctly.
 

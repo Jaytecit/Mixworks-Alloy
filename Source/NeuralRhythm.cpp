@@ -37,7 +37,8 @@ struct Model
         if (!stream.openedOk() || contentDigest(buffered) != modelSha256 || stream.getStatus().failed())
             throw std::runtime_error("The local rhythm model is missing or does not match this release.");
         Ort::SessionOptions options;
-        options.SetIntraOpNumThreads(3); options.SetInterOpNumThreads(1);
+        const int requestedThreads=juce::SystemStats::getEnvironmentVariable("MIXWORKS_ANALYSIS_THREADS",{}).getIntValue();
+        options.SetIntraOpNumThreads(requestedThreads==1 ? 1 : 3); options.SetInterOpNumThreads(1);
         // Retain the runtime's default arena and memory-pattern reuse across
         // equal-shaped context windows; model arithmetic and coverage stay fixed.
         options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);

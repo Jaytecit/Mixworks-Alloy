@@ -84,7 +84,9 @@ def main(argv=None):
             flags = ['--real-tracks-only', '--workflow-only' if args.workflow else '--analysis-only',
                      '--track-a', pair[0], '--track-b', pair[1]]
             result = dict(pair=pair, selectedPaths=selected, paddedLastSource=len(selected) == 1,
-                          **run_checks(args.exe.resolve(), flags, folder, timeout=600))
+                          # Research consumes decoded audio after the native child exits;
+                          # retain its measured heads and workflow renders deliberately.
+                          **run_checks(args.exe.resolve(), flags, folder, timeout=600, retain_audio=True))
             result['strictFailures'] = list(result['failures'])
             result['readinessFailures'] = []
             try:

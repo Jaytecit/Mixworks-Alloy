@@ -3,7 +3,42 @@
 
 namespace mixworks
 {
-void runTransitionNavigationTests(const std::function<void(bool, const juce::String&)>& check, const juce::File&)
+void runZoomHandleTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
+{
+    Workstation ui(false); ui.stopTimer(); ui.setSize(1250,900);
+    Project base; base.followTrackTempo = false; base.bpm = base.tempo.fallback = 120; base.snap = false;
+    auto media = std::make_shared<Media>(); media->sampleRate = 8000; media->samples.setSize(1,48*8000); media->samples.clear(); media->manualBpm = 120; media->name = "Zoomed transition anchors";
+    Clip clip; clip.media = media; clip.length = 48; clip.introAnchor = 4; clip.outroAnchor = 32;
+    base.clips.push_back(clip); base.transitionLinksKnown = true;
+    ui.engine.project = base; ui.selectedClip = clip.id; ui.timeline.pixelsPerSecond = 500; ui.refresh(); ui.viewport.setViewPosition(8000,0);
+    const auto json = [&] { return juce::JSON::toString(projectToJson(ui.engine.project)); };
+    const auto before = json();
+    const auto in = ui.timeline.offscreenAnchorBounds(clip,true), out = ui.timeline.offscreenAnchorBounds(clip,false);
+    check(!in.isEmpty() && !out.isEmpty() && in.getRight() < out.getX(),"zoomed view offers separate left IN and right OUT proxy tabs");
+    check(json() == before && ui.undoHistory.empty(),"zooming and displaying off-screen handles do not change real anchors");
+    const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+    auto event = [&](juce::Point<float> at,juce::Point<float> down,bool drag)
+    { return juce::MouseEvent(mouse,at,juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier|juce::ModifierKeys::altModifier),1,0,0,0,0,&ui.timeline,&ui.timeline,juce::Time::getCurrentTime(),down,juce::Time::getCurrentTime(),1,drag); };
+    for (bool intro : {true,false})
+    {
+        ui.engine.project = base; ui.selectedClip = clip.id; ui.undoHistory.clear(); ui.redoHistory.clear(); ui.refresh(); ui.viewport.setViewPosition(8000,0); ui.engine.position = 11.125;
+        const auto tab = ui.timeline.offscreenAnchorBounds(clip,intro); const auto down = tab.getCentre(), to = down.translated(intro ? 50.f : -50.f,0);
+        const auto hit = ui.timeline.anchorAt(down); check(hit && hit->first == clip.id && hit->second == intro,"proxy hit targets the correct real IN/OUT anchor");
+        ui.timeline.mouseDown(event(down,down,false)); check(json() == before,"grabbing the proxy does not jump its actual source anchor");
+        ui.timeline.mouseDrag(event(to,down,true)); ui.timeline.mouseUp(event(to,down,true));
+        const auto& changed = ui.engine.project.clips.front();
+        check(std::abs(changed.transitionTime(intro)-(clip.transitionTime(intro)+(intro ? .1 : -.1))) < 1.e-7 && ui.undoHistory.size() == 1 && ui.engine.position == 11.125,
+            "proxy drag adjusts actual anchor by pointer delta with one Undo and no seek");
+        ui.undo(false); check(json() == before,"Undo restores the complete off-screen anchor edit");
+    }
+    ui.engine.project = base; ui.refresh(); ui.viewport.setViewPosition(0,0);
+    const auto sameIn = ui.timeline.offscreenAnchorBounds(clip,true), sameOut = ui.timeline.offscreenAnchorBounds(clip,false);
+    check(!sameIn.isEmpty() && !sameOut.isEmpty() && !sameIn.intersects(sameOut),"two anchors off the same edge keep distinct reachable tabs");
+    ui.viewport.setViewPosition(8000,0);
+    auto capture = report.getSiblingFile("zoomed-in-out-handles.png").createOutputStream();
+    check(capture && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*capture),"capture visible zoomed IN/OUT edge tabs");
+}
+void runTransitionNavigationTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
     const auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p), juce::JSON::FormatOptions().withMaxDecimalPlaces(17)); };
     Project base; base.followTrackTempo = false; base.bpm = base.tempo.fallback = 120;
@@ -31,7 +66,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
     check(ui.selectedTransitionLength.getTooltip().contains("Relative major / minor"), "same wheel with another mode is described as relative keys");
     ui.engine.project.clips[1].media->manualKey = -1; ui.engine.project.clips[1].media->analysis.key = 6;
     ui.engine.project.clips[1].media->analysis.keyConfidence = .3; ui.refresh();
-    check(ui.selectedTransitionLength.getTooltip().contains("?") && ui.selectedTransitionLength.getTooltip().contains("Movement unknown"), "uncertain key stays visibly uncertain without a derived movement");
+    check(ui.selectedTransitionLength.getTooltip().contains("In: " + ui.keyText(*ui.engine.project.clips[1].media)) && !ui.selectedTransitionLength.getTooltip().contains("?") && ui.selectedTransitionLength.getTooltip().contains("Movement unknown"), "uncertain key stays visibly uncertain without a derived movement");
     ui.engine.project.clips[1].media->analysis.keyConfidence = .55; ui.refresh();
     check(ui.selectedTransitionLength.getTooltip().contains("Wheel +1") && !ui.selectedTransitionLength.getTooltip().contains("?"), "confirmed key and key formatting share the same owning confidence boundary");
     ui.engine.project.clips[1].media->analysis.key = -1; ui.refresh();
@@ -78,6 +113,45 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
     const auto clock = ui.engine.project.tempo; const auto rampBefore = ui.engine.project.transitionRange(*ui.engine.project.transitionFor(id));
     key(juce::KeyPress::rightKey, ctrl | alt); const auto rampAfter = ui.engine.project.transitionRange(*ui.engine.project.transitionFor(id));
     check(std::abs(clock.beatsAt(rampAfter.getStart()) - clock.beatsAt(rampBefore.getStart()) - 1) < 1e-7, "keyboard movement integrates one beat through a tempo ramp");
+    // Canvas editing must not invoke the explicit transition navigation seek.
+    const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+    auto event = [&](juce::Point<float> position, juce::Point<float> origin, bool drag)
+    { return juce::MouseEvent(mouse, position, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1, 0, 0, 0, 0, &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), origin, juce::Time::getCurrentTime(), 1, drag); };
+    for (bool playing : {false, true}) for (bool alreadySelected : {false, true})
+        for (auto edit : {Project::TransitionEdit::resizeStart, Project::TransitionEdit::resizeEnd, Project::TransitionEdit::moveWindow})
+        {
+            ui.engine.setPlaying(false); ui.engine.project = base; ui.engine.project.snap = false;
+            ui.selectedTransition = alreadySelected ? id : base.clips[2].id; ui.selectedClip = id;
+            ui.undoHistory.clear(); ui.redoHistory.clear(); ui.timeline.pixelsPerSecond = 30; ui.refresh();
+            ui.viewport.setViewPosition(16, 0); ui.engine.seek(6.125); ui.engine.setPlaying(playing);
+            const auto view = ui.viewport.getViewPosition(); const auto box = ui.timeline.transitionBounds(base.transitionLinks[0]);
+            const juce::Point<float> from {edit == Project::TransitionEdit::resizeStart ? box.getX() : edit == Project::TransitionEdit::resizeEnd ? box.getRight() : box.getCentreX(), box.getY() + 8};
+            const auto hit = ui.timeline.transitionAt(from);
+            check(hit && hit->first == id && hit->second == edit, "transport fixture hits the actual transition width/header control");
+            const auto original = json(ui.engine.project);
+            ui.timeline.mouseDown(event(from, from, false));
+            check(ui.selectedTransition == id && ui.engine.position == 6.125 && ui.engine.playing == playing && ui.viewport.getViewPosition() == view
+                && ui.undoHistory.empty() && json(ui.engine.project) == original,
+                "grabbing a transition width/header preserves playhead, playback, view and history: " + juce::String((int) edit) + "/" + juce::String((int) playing) + "/" + juce::String((int) alreadySelected));
+            const auto to = from.translated(edit == Project::TransitionEdit::resizeEnd ? -15.f : 15.f, 0);
+            ui.timeline.mouseDrag(event(to, from, true)); ui.timeline.mouseUp(event(to, from, true));
+            const auto range = ui.engine.project.transitionRange(*ui.engine.project.transitionFor(id));
+            check(std::abs(range.getStart() - (edit == Project::TransitionEdit::resizeEnd ? 8 : 8.5)) < 1e-7
+                && std::abs(range.getEnd() - (edit == Project::TransitionEdit::resizeStart ? 10 : edit == Project::TransitionEdit::resizeEnd ? 9.5 : 10.5)) < 1e-7
+                && ui.engine.position == 6.125 && ui.engine.playing == playing && ui.undoHistory.size() == 1,
+                "native width/header drag changes only its geometry with one Undo and no transport jump");
+            juce::AudioBuffer<float> output(2, 256);
+            ui.engine.audioDeviceIOCallbackWithContext(nullptr, 0, output.getArrayOfWritePointers(), 2, 256, {});
+            check(std::abs(ui.engine.position - (6.125 + (playing ? 256 / ui.engine.sampleRate.load() : 0))) < 1e-7,
+                "next device callback continues from the pre-grab playback clock");
+            ui.engine.setPlaying(false); const auto editedGeometry = json(ui.engine.project);
+            ui.undo(false); const bool restored = json(ui.engine.project) == original; ui.undo(true);
+            check(restored && json(ui.engine.project) == editedGeometry, "transition handle editing retains complete Undo/Redo");
+        }
+    ui.engine.setPlaying(false); ui.engine.project = base; ui.timeline.pixelsPerSecond = 30; ui.selectTransition(id, true);
+    check(ui.engine.position == 8, "explicit transition navigation still seeks to its start");
+    auto image = report.getSiblingFile("transition-width-transport.png").createOutputStream(); juce::PNGImageFormat png;
+    check(image && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()), *image), "capture transition width controls after transport-preserving editing");
     ui.engine.project = base; ui.selectTransition(id); ui.setSize(1000, 620);
     check(ui.selectedTransitionLength.getWidth() >= 100 && ui.transitionPresetForSelection.getWidth() >= 120,
         "compact transition panel keeps primary edits reachable without repeated track information");

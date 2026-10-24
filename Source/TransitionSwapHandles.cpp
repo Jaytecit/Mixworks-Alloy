@@ -7,8 +7,11 @@ namespace mixworks
 std::vector<Timeline::SwapHandle> Timeline::swapHandles() const
 {
     std::vector<SwapHandle> result;
-    const auto& project = owner.engine.project; const auto* link = project.transitionFor(owner.selectedTransition);
-    if (!link) return result;
+    const auto& project = owner.engine.project; const auto* selected = project.transitionFor(owner.selectedTransition);
+    for (const auto& pair : project.transitionLinks)
+    {
+    const auto* link = &pair;
+    if (selected ? link != selected : link->incoming != owner.selectedClip && link->outgoing != owner.selectedClip) continue;
     for (int band = 0; band < 4; ++band)
     {
         if (!owner.transitionCurveVisible(band)) continue;
@@ -20,9 +23,10 @@ std::vector<Timeline::SwapHandle> Timeline::swapHandles() const
             const auto* clip = project.clipFor(side == 0 ? link->outgoing : link->incoming); if (!clip || laneSize(clip->track) < 30) continue;
             const float x = (float) ((*times)[side] * pixelsPerSecond), y = laneY(clip->track, 54.f + band * 14);
             const float height = std::min(12.f, std::max(4.f, 14.f * laneSize(clip->track) / laneHeight - 2));
-            result.push_back({link->incoming, band, side == 1, !setting.has_value(), setting ? setting->mode : TransitionBandMode::swap,
+            result.push_back({link->incoming, band, side == 1, band == 1 && link->bassSwap.has_value(), setting ? setting->mode : TransitionBandMode::manual,
                 (*times)[side], {x - 10, y - height * .5f, 20, height}});
         }
+    }
     }
     return result;
 }
@@ -78,7 +82,7 @@ bool Timeline::continueSwapDrag(const juce::MouseEvent& event)
     const juce::ScopedLock guard(owner.engine.lock);
     const auto& handle = swapDrag->handle; const auto* link = owner.engine.project.transitionFor(handle.incoming);
     if (!link || (link->bassSwap.has_value() && handle.band == 1) != handle.legacy
-        || (!handle.legacy && (!link->bands[(size_t) handle.band] || link->bands[(size_t) handle.band]->mode != handle.mode)))
+        || (!handle.legacy && (link->bands[(size_t) handle.band] ? link->bands[(size_t) handle.band]->mode != handle.mode : handle.mode != TransitionBandMode::manual)))
     { owner.setStatus("The swap treatment changed. Release and drag its new handle."); return true; }
     const auto before = owner.engine.project.transitionSwapTimes(*link, handle.band); if (!before) return true;
     const double target = owner.engine.project.snappedTime(handle.time + (event.position.x - swapDrag->x) / pixelsPerSecond,
@@ -88,7 +92,7 @@ bool Timeline::continueSwapDrag(const juce::MouseEvent& event)
     const auto* next = candidate.transitionFor(handle.incoming); const auto after = next ? candidate.transitionSwapTimes(*next, handle.band) : std::nullopt;
     if (!after || std::abs((*after)[handle.incomingSide ? 1 : 0] - (*before)[handle.incomingSide ? 1 : 0]) < 1e-9) return true;
     if (!moved) { owner.remember(); moved = true; }
-    owner.engine.project = std::move(candidate); repaint();
+    owner.engine.project = std::move(candidate); owner.transitionNodeOptionsFor.clear(); owner.refreshTransitionUI(); repaint();
     owner.setStatus("Paired swap moved; both sides and their beat gap retained. Undo restores the gesture."); return true;
 }
 }

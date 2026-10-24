@@ -103,6 +103,35 @@ juce::AudioBuffer<float> constantFourFour(float kickGain, float snareGain, float
 }
 void runConstantFourFourTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    // Source construction owns the attack times. A correct BPM with a grid on
+    // the later rise/crest still mistimes cue jumps and generated transitions.
+    juce::Array<juce::var> attackRows;
+    for (const auto setting : {std::pair<double, double>{55, 0}, {55, .006}, {85, .012}, {110, .020}})
+    {
+        constexpr double rate = 44100, origin = .213, period = .48, seconds = 48;
+        juce::AudioBuffer<float> audio(2, (int) (rate * seconds)); audio.clear();
+        for (int n = 0; origin + n * period < seconds - .2; ++n)
+            for (int i = 0; i < (int) (.16 * rate); ++i)
+            {
+                const int frame = (int) std::round((origin + n * period) * rate) + i;
+                const double t = i / rate;
+                const double rise = setting.second > 0 ? std::min(1., t / setting.second) : 1.;
+                const double sample = std::sin(2 * pi * (setting.first * t - 100 * t * t)) * std::exp(-30 * t)
+                    * rise * (n % 4 == 0 ? .75 : .45);
+                const float value = (float) (std::trunc(sample * 30000) / 32768);
+                for (int ch = 0; ch < 2; ++ch) audio.addSample(ch, frame, value);
+            }
+        const auto analysis = analyseMusic(audio, rate);
+        const double phase = std::remainder(analysis.beatOrigin - origin, period);
+        const double endError = analysis.bpm > 0 ? std::remainder(analysis.beatOrigin + 96 * 60 / analysis.bpm - origin, period) : 1;
+        check(std::abs(analysis.bpm - 125) < .03 && std::abs(phase) < .003 && std::abs(endError) < .003,
+              "annotated attack " + juce::String(setting.first, 0) + " Hz / " + juce::String(setting.second * 1000, 0)
+              + " ms rise: phase " + juce::String(phase * 1000, 3) + " ms, late phase " + juce::String(endError * 1000, 3) + " ms");
+        auto* row = new juce::DynamicObject(); row->setProperty("frequency", setting.first); row->setProperty("riseSeconds", setting.second);
+        row->setProperty("bpm", analysis.bpm); row->setProperty("phaseMs", phase * 1000); row->setProperty("latePhaseMs", endError * 1000);
+        attackRows.add(juce::var(row));
+    }
+    report.getSiblingFile("attack-phase.json").replaceWithText(juce::JSON::toString(attackRows));
     for (const auto settings : {std::pair<bool, bool>{true, false}, {true, true}, {false, true}})
     {
         const double bpm = 123.4567, origin = 0.213;

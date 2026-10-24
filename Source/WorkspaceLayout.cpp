@@ -1,18 +1,20 @@
 #include "WorkspaceLayout.h"
 #include "AlloyLookAndFeel.h"
 #include <cstring>
+#include <limits>
+#include <cmath>
 
 namespace mixworks
 {
-void WorkspaceLayout::update(int width, int height, bool performanceDocked)
+void WorkspaceLayout::update(int width, int height, bool performanceDocked, bool editingDocked)
 {
     constexpr int margin = 12, divider = 10, headerWidth = 152;
     availableWidth = std::max(1, width - margin * 2 - divider * 2);
     const int panelMin = std::min(minimumPanelWidth, availableWidth / 4);
     const int centreMin = std::min(minimumCentreWidth, availableWidth - 2 * panelMin);
     const int budget = availableWidth - centreMin;
-    int left = juce::jlimit(panelMin, budget - panelMin, preferredLibraryWidth);
-    int right = juce::jlimit(panelMin, budget - panelMin, preferredInspectorWidth);
+    int left = libraryCollapsed ? 0 : juce::jlimit(panelMin, budget - (inspectorCollapsed ? 0 : panelMin), preferredLibraryWidth);
+    int right = inspectorCollapsed ? 0 : juce::jlimit(panelMin, budget - (libraryCollapsed ? 0 : panelMin), preferredInspectorWidth);
     if (left + right > budget)
     {
         const int extra = left + right - 2 * panelMin;
@@ -34,7 +36,10 @@ void WorkspaceLayout::update(int width, int height, bool performanceDocked)
     constexpr int compactDockHeight = 32 + 32 + 64; // Tabs, panel heading and a usable scrolling body below minimum window size.
     const int deckHeight = performanceDocked ? std::min(200, std::max(compactDockHeight, bodyBudget - controlledHeight)) : 32;
     maximumTimelineHeight = std::max(1, bodyBudget - deckHeight);
-    minimumTimelineHeight = std::min(maximumTimelineHeight, controlledHeight);
+    // Expanded Editing needs 336 px of controls plus its tabs and title.
+    // Other consoles retain their existing lane minimum. Musical clocks are untouched.
+    const int editingMinimum = std::max(trackCount * 24 + timelineScrollbarThickness, bodyBudget - 400);
+    minimumTimelineHeight = std::min(maximumTimelineHeight, editingDocked ? std::min(controlledHeight, editingMinimum) : controlledHeight);
     const int requestedHeight = preferredTimelineHeight > 0 ? preferredTimelineHeight
         : performanceDocked ? trackCount * laneHeight + timelineScrollbarThickness : maximumTimelineHeight;
     const int timelineHeight = juce::jlimit(minimumTimelineHeight, maximumTimelineHeight, requestedHeight);
@@ -88,12 +93,23 @@ void WorkspaceLayout::resizePanel(bool left, int requestedWidth)
 {
     const int other = left ? master.getWidth() : library.getWidth();
     const int maximum = std::max(minimumPanelWidth, availableWidth - other - minimumCentreWidth);
-    if (left) { preferredLibraryWidth = juce::jlimit(minimumPanelWidth, maximum, requestedWidth); preferredInspectorWidth = other; }
-    else { preferredInspectorWidth = juce::jlimit(minimumPanelWidth, maximum, requestedWidth); preferredLibraryWidth = other; }
+    if (left)
+    {
+        libraryCollapsed = requestedWidth <= minimumPanelWidth / 2;
+        if (!libraryCollapsed) preferredLibraryWidth = juce::jlimit(minimumPanelWidth, maximum, requestedWidth);
+        if (!inspectorCollapsed) preferredInspectorWidth = other;
+    }
+    else
+    {
+        inspectorCollapsed = requestedWidth <= minimumPanelWidth / 2;
+        if (!inspectorCollapsed) preferredInspectorWidth = juce::jlimit(minimumPanelWidth, maximum, requestedWidth);
+        if (!libraryCollapsed) preferredLibraryWidth = other;
+    }
 }
 namespace
 {
 // Bound settings reads; preserve unknown properties and malformed/newer files.
+juce::Result validateLayoutDocument(const juce::var&);
 juce::Result readDocument(const juce::File& file, juce::var& doc)
 {
     if (file.isSymbolicLink() || file.getSize() > 16384) return juce::Result::fail("Workspace preferences are unsupported; the file was kept.");
@@ -103,15 +119,35 @@ juce::Result readDocument(const juce::File& file, juce::var& doc)
     const auto* data = static_cast<const char*>(bytes.getData());
     if (bytes.getSize() == 0 || std::memchr(data, 0, bytes.getSize()) != nullptr || !juce::CharPointer_UTF8::isValidString(data, (int) bytes.getSize())) return juce::Result::fail("Invalid workspace preferences encoding; the file was kept.");
     auto parsed = juce::JSON::parse(juce::String::fromUTF8(data, (int) bytes.getSize()), doc);
-    if (parsed.failed() || !doc.isObject() || !doc["format"].isString() || doc["format"].toString() != "mixworks-workspace" || !doc["version"].isInt() || (int) doc["version"] != 1
+    if (parsed.failed()) return juce::Result::fail("Invalid workspace preferences JSON; file was kept.");
+    return validateLayoutDocument(doc);
+}
+juce::Result validateLayoutDocument(const juce::var& doc)
+{
+    if (!doc.isObject() || !doc["format"].isString() || doc["format"].toString() != "mixworks-workspace" || !doc["version"].isInt() || (int) doc["version"] != 1
         || !doc["libraryWidth"].isInt() || !doc["inspectorWidth"].isInt() || (int) doc["libraryWidth"] < WorkspaceLayout::minimumPanelWidth || (int) doc["inspectorWidth"] < WorkspaceLayout::minimumPanelWidth
         || (doc.hasProperty("monitorMuted") && !doc["monitorMuted"].isBool())
+        || (doc.hasProperty("inspectorCollapsed") && !doc["inspectorCollapsed"].isBool())
+        || (doc.hasProperty("libraryCollapsed") && !doc["libraryCollapsed"].isBool())
+        || (doc.hasProperty("gridBrightness") && (!(doc["gridBrightness"].isDouble() || doc["gridBrightness"].isInt()) || !std::isfinite((double) doc["gridBrightness"]) || (double) doc["gridBrightness"] < 0 || (double) doc["gridBrightness"] > 1))
+        || (doc.hasProperty("toolPage") && (!doc["toolPage"].isInt() || (int) doc["toolPage"] < 0 || (int) doc["toolPage"] > 2))
+        || (doc.hasProperty("editingDetached") && !doc["editingDetached"].isBool())
+        || (doc.hasProperty("popupHints") && !doc["popupHints"].isBool())
         || (doc.hasProperty("followPlayhead") && !doc["followPlayhead"].isBool())
         || (doc.hasProperty("forgeEffects") && !doc["forgeEffects"].isBool())
         || (doc.hasProperty("forgeMotion") && (!doc["forgeMotion"].isInt() || (int) doc["forgeMotion"] < 0 || (int) doc["forgeMotion"] > 2))
         || (doc.hasProperty("visibleLanes") && (!doc["visibleLanes"].isInt() || (int) doc["visibleLanes"] < 1 || (int) doc["visibleLanes"] > 8))
         || (doc.hasProperty("timelineHeight") && (!doc["timelineHeight"].isInt() || (int) doc["timelineHeight"] < 0 || (int) doc["timelineHeight"] > 16384)))
         return juce::Result::fail("Unidentified workspace preferences were kept unchanged.");
+    if (doc.hasProperty("editingWindowBounds"))
+    {
+        const auto* bounds = doc["editingWindowBounds"].getArray();
+        if (!bounds || bounds->size() != 4) return juce::Result::fail("Invalid Editing window bounds; workspace preferences were kept.");
+        for (const auto& value : *bounds) if (!value.isInt() || (int) value < -65536 || (int) value > 65536)
+            return juce::Result::fail("Invalid Editing window bounds; workspace preferences were kept.");
+        if ((int) (*bounds)[2] < 640 || (int) (*bounds)[2] > 7680 || (int) (*bounds)[3] < 360 || (int) (*bounds)[3] > 2160)
+            return juce::Result::fail("Invalid Editing window size; workspace preferences were kept.");
+    }
     if (doc.hasProperty("laneScales"))
     {
         const auto* values = doc["laneScales"].getArray();
@@ -120,21 +156,63 @@ juce::Result readDocument(const juce::File& file, juce::var& doc)
             if (!(value.isDouble() || value.isInt()) || !std::isfinite((double) value) || (double) value < 0 || (double) value > 2)
                 return juce::Result::fail("Invalid lane size; workspace preferences were kept.");
     }
+    if (doc.hasProperty("consoleOrder"))
+    {
+        const auto* order = doc["consoleOrder"].getArray();
+        if (!order || order->size() != 3) return juce::Result::fail("Invalid console order; workspace was kept.");
+        std::array<bool, 3> seen {};
+        for (const auto& page : *order)
+        { if (!page.isInt() || (int) page < 0 || (int) page > 2 || seen[(size_t) (int) page]) return juce::Result::fail("Invalid console order; workspace was kept."); seen[(size_t) (int) page] = true; }
+    }
     return juce::Result::ok();
 }
-}
-juce::Result readWorkspacePreferences(const juce::File& file, WorkspaceLayout& layout)
+void decodeLayoutDocument(const juce::var& doc, WorkspaceLayout& layout)
 {
-    if (!file.exists() && !file.isSymbolicLink()) return juce::Result::ok();
-    juce::var doc; auto result = readDocument(file, doc); if (result.failed()) return result;
     layout.preferredLibraryWidth = (int) doc["libraryWidth"]; layout.preferredInspectorWidth = (int) doc["inspectorWidth"];
     layout.monitorMuted = doc.hasProperty("monitorMuted") && (bool) doc["monitorMuted"];
+    layout.inspectorCollapsed = doc.hasProperty("inspectorCollapsed") && (bool) doc["inspectorCollapsed"];
+    layout.libraryCollapsed = doc.hasProperty("libraryCollapsed") && (bool) doc["libraryCollapsed"];
+    layout.gridBrightness = doc.hasProperty("gridBrightness") ? (double) doc["gridBrightness"] : 0.45;
+    layout.toolPage = doc.hasProperty("toolPage") ? (int) doc["toolPage"] : 0;
+    layout.editingDetached = doc.hasProperty("editingDetached") && (bool) doc["editingDetached"];
+    layout.editingWindowBounds = {};
+    if (const auto* bounds = doc["editingWindowBounds"].getArray())
+        layout.editingWindowBounds = {(int) (*bounds)[0], (int) (*bounds)[1], (int) (*bounds)[2], (int) (*bounds)[3]};
+    layout.popupHints = !doc.hasProperty("popupHints") || (bool) doc["popupHints"];
+    if (doc["workMode"].isInt() && (int)doc["workMode"]>=0 && (int)doc["workMode"]<=1) layout.workMode=(int)doc["workMode"];
+    if (doc["privateDeviceType"].isString() && doc["privateDeviceName"].isString()) { layout.privateDeviceType=doc["privateDeviceType"].toString(); layout.privateDeviceName=doc["privateDeviceName"].toString(); }
+    if (doc["privateFirstChannel"].isInt() && (int)doc["privateFirstChannel"]>=-1 && (int)doc["privateFirstChannel"]<256) layout.privateFirstChannel=(int)doc["privateFirstChannel"];
+    if ((doc["privateLevel"].isDouble() || doc["privateLevel"].isInt()) && std::isfinite((double)doc["privateLevel"]) && (double)doc["privateLevel"]>=0 && (double)doc["privateLevel"]<=1) layout.privateLevel=(float)doc["privateLevel"];
     layout.followPlayhead = doc.hasProperty("followPlayhead") && (bool) doc["followPlayhead"];
     layout.forgeEffects = doc.hasProperty("forgeEffects") && (bool) doc["forgeEffects"];
     layout.forgeMotion = doc.hasProperty("forgeMotion") ? (int) doc["forgeMotion"] : 0;
     layout.laneScale.fill(1);
     if (const auto* sizes = doc["laneScales"].getArray()) for (int i = 0; i < trackCount; ++i) layout.laneScale[(size_t) i] = (double) (*sizes)[i];
     layout.preferredTimelineHeight = doc.hasProperty("timelineHeight") ? (int) doc["timelineHeight"] : 0;
+    layout.consoleOrder = {0, 1, 2};
+    if (const auto* order = doc["consoleOrder"].getArray()) for (int i = 0; i < 3; ++i) layout.consoleOrder[(size_t) i] = (int) (*order)[i];
+}
+juce::var layoutDocument(const WorkspaceLayout& layout)
+{
+    auto* root = new juce::DynamicObject(); root->setProperty("format", "mixworks-workspace"); root->setProperty("version", 1); juce::var doc(root);
+    root->setProperty("libraryCollapsed", layout.libraryCollapsed);
+    root->setProperty("workMode",layout.workMode); root->setProperty("privateDeviceType",layout.privateDeviceType); root->setProperty("privateDeviceName",layout.privateDeviceName);
+    root->setProperty("privateFirstChannel",layout.privateFirstChannel); root->setProperty("privateLevel",layout.privateLevel);
+    juce::Array<juce::var> sizes; for (const double scale : layout.laneScale) sizes.add(scale); const juce::var laneSizes(sizes);
+    juce::var editingBounds;
+    if (!layout.editingWindowBounds.isEmpty()) editingBounds = juce::var(juce::Array<juce::var> {layout.editingWindowBounds.getX(), layout.editingWindowBounds.getY(), layout.editingWindowBounds.getWidth(), layout.editingWindowBounds.getHeight()});
+    auto* object = doc.getDynamicObject(); object->setProperty("inspectorCollapsed", layout.inspectorCollapsed); object->setProperty("popupHints", layout.popupHints); object->setProperty("gridBrightness", layout.gridBrightness); object->setProperty("followPlayhead", layout.followPlayhead); object->setProperty("forgeMotion", layout.forgeMotion); object->setProperty("forgeEffects", layout.forgeEffects); object->setProperty("libraryWidth", layout.preferredLibraryWidth); object->setProperty("inspectorWidth", layout.preferredInspectorWidth); object->setProperty("visibleLanes", layout.visibleLaneCount); object->setProperty("monitorMuted", layout.monitorMuted); object->setProperty("laneScales", laneSizes); object->setProperty("timelineHeight", layout.preferredTimelineHeight);
+    object->setProperty("toolPage", layout.toolPage); object->setProperty("editingDetached", layout.editingDetached);
+    if (editingBounds.isVoid()) object->removeProperty("editingWindowBounds"); else object->setProperty("editingWindowBounds", editingBounds);
+    juce::Array<juce::var> order; for (int page : layout.consoleOrder) order.add(page); object->setProperty("consoleOrder", order);
+    return doc;
+}
+}
+juce::Result readWorkspacePreferences(const juce::File& file, WorkspaceLayout& layout)
+{
+    if (!file.exists() && !file.isSymbolicLink()) return juce::Result::ok();
+    juce::var doc; auto result = readDocument(file, doc); if (result.failed()) return result;
+    decodeLayoutDocument(doc, layout);
     return juce::Result::ok();
 }
 juce::Result writeWorkspacePreferences(const juce::File& file, const WorkspaceLayout& layout)
@@ -145,15 +223,82 @@ juce::Result writeWorkspacePreferences(const juce::File& file, const WorkspaceLa
     juce::var doc;
     if (file.exists() || file.isSymbolicLink()) { auto result = readDocument(file, doc); if (result.failed()) return result; }
     else { auto* object = new juce::DynamicObject(); object->setProperty("format", "mixworks-workspace"); object->setProperty("version", 1); doc = juce::var(object); }
-    juce::Array<juce::var> sizes; for (const double scale : layout.laneScale) sizes.add(scale); const juce::var laneSizes(sizes);
-    if (doc["followPlayhead"] == juce::var(layout.followPlayhead) && doc["forgeMotion"] == juce::var(layout.forgeMotion) && doc["forgeEffects"] == juce::var(layout.forgeEffects) && doc["timelineHeight"] == juce::var(layout.preferredTimelineHeight) && doc["laneScales"] == laneSizes && doc["libraryWidth"] == juce::var(layout.preferredLibraryWidth) && doc["inspectorWidth"] == juce::var(layout.preferredInspectorWidth) && doc["visibleLanes"] == juce::var(layout.visibleLaneCount) && doc["monitorMuted"] == juce::var(layout.monitorMuted)) return juce::Result::ok();
-    auto* object = doc.getDynamicObject(); object->setProperty("followPlayhead", layout.followPlayhead); object->setProperty("forgeMotion", layout.forgeMotion); object->setProperty("forgeEffects", layout.forgeEffects); object->setProperty("libraryWidth", layout.preferredLibraryWidth); object->setProperty("inspectorWidth", layout.preferredInspectorWidth); object->setProperty("visibleLanes", layout.visibleLaneCount); object->setProperty("monitorMuted", layout.monitorMuted); object->setProperty("laneScales", laneSizes); object->setProperty("timelineHeight", layout.preferredTimelineHeight);
+    const auto before = doc.clone();
+    const auto known = layoutDocument(layout);
+    for (const auto& property : known.getDynamicObject()->getProperties()) doc.getDynamicObject()->setProperty(property.name, property.value);
+    if (!known.hasProperty("editingWindowBounds")) doc.getDynamicObject()->removeProperty("editingWindowBounds");
+    if (juce::JSONUtils::deepEqual(before, doc)) return juce::Result::ok();
     const auto text = juce::JSON::toString(doc);
     if (text.getNumBytesAsUTF8() > 16384) return juce::Result::fail("Workspace preferences exceed the 16 KiB budget; the file was kept.");
     auto result = file.getParentDirectory().createDirectory(); if (result.failed()) return result;
     if (file.existsAsFile() && !file.copyFileTo(file.getSiblingFile(file.getFileName() + ".bak").getNonexistentSibling())) return juce::Result::fail("Cannot back up workspace preferences.");
     juce::TemporaryFile temporary(file);
     if (!temporary.getFile().replaceWithText(text, false, false, "\n") || !temporary.overwriteTargetFileWithTemporary()) return juce::Result::fail("Cannot save workspace preferences.");
+    return juce::Result::ok();
+}
+namespace
+{
+juce::var windowBounds(const juce::Rectangle<int>& r)
+{ return juce::Array<juce::var> {r.getX(), r.getY(), r.getWidth(), r.getHeight()}; }
+juce::Result decodeNamedDocument(const juce::var& doc, NamedWorkspace& destination)
+{
+    const auto core = validateLayoutDocument(doc); if (core.failed()) return core;
+    const auto fail = [] { return juce::Result::fail("Unsupported named workspace layout. The current workspace was kept."); };
+    if (!doc["namedLayoutVersion"].isInt() || (int) doc["namedLayoutVersion"] != 1 || !doc["layoutName"].isString()) return fail();
+    NamedWorkspace candidate; candidate.name = doc["layoutName"].toString().trim();
+    if (candidate.name.isEmpty() || candidate.name.length() > 64) return fail();
+    for (auto c : candidate.name) if (c < 32 || c == 127) return fail();
+    const auto number = [](const juce::var& v) { return (v.isDouble() || v.isInt()) && std::isfinite((double) v); };
+    if (!doc["inspectorPage"].isInt() || (int) doc["inspectorPage"] < 1 || (int) doc["inspectorPage"] > 2
+        || !doc["browserPage"].isInt() || (int) doc["browserPage"] < 0 || (int) doc["browserPage"] > 1
+        || !number(doc["zoom"]) || (double) doc["zoom"] < .1 || (double) doc["zoom"] > WorkspaceLayout::maximumTimelineZoom
+        || !doc["viewX"].isInt() || (int) doc["viewX"] < 0 || (int) doc["viewX"] > std::numeric_limits<int>::max() / 4
+        || !doc["viewY"].isInt() || (int) doc["viewY"] < 0 || (int) doc["viewY"] > std::numeric_limits<int>::max() / 4) return fail();
+    decodeLayoutDocument(doc, candidate.layout);
+    candidate.inspectorPage = (int) doc["inspectorPage"]; candidate.browserPage = (int) doc["browserPage"];
+    candidate.zoom = (double) doc["zoom"]; candidate.view = {(int) doc["viewX"], (int) doc["viewY"]};
+    const auto* windows = doc["consoles"].getArray(); if (!windows || windows->size() != 3) return fail();
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto& window = (*windows)[i]; if (!window.isObject() || !window["detached"].isBool()) return fail();
+        candidate.detached[(size_t) i] = (bool) window["detached"];
+        if (!candidate.detached[(size_t) i]) continue;
+        const auto* bounds = window["bounds"].getArray(); if (!bounds || bounds->size() != 4) return fail();
+        for (const auto& n : *bounds) if (!n.isInt() || (int) n < -65536 || (int) n > 65536) return fail();
+        if ((int) (*bounds)[2] < 640 || (int) (*bounds)[2] > 7680 || (int) (*bounds)[3] < 360 || (int) (*bounds)[3] > 2160) return fail();
+        candidate.windows[(size_t) i] = {(int) (*bounds)[0], (int) (*bounds)[1], (int) (*bounds)[2], (int) (*bounds)[3]};
+    }
+    candidate.layout.editingDetached = candidate.detached[2]; candidate.layout.editingWindowBounds = candidate.windows[2];
+    destination = std::move(candidate); return juce::Result::ok();
+}
+}
+juce::Result readNamedWorkspace(const juce::File& file, NamedWorkspace& destination)
+{
+    juce::var doc; const auto result = readDocument(file, doc); if (result.failed()) return result;
+    return decodeNamedDocument(doc, destination);
+}
+juce::Result writeNamedWorkspace(const juce::File& file, const NamedWorkspace& preset)
+{
+    juce::InterProcessLock lock("mixworks-named-workspace-" + juce::String(file.getFullPathName().toLowerCase().hashCode64()));
+    if (!lock.enter(100)) return juce::Result::fail("The named workspace is in use.");
+    struct Unlock { juce::InterProcessLock& lock; ~Unlock() { lock.exit(); } } unlock {lock};
+    if (file.exists() || file.isSymbolicLink() || file.getParentDirectory().isSymbolicLink()) return juce::Result::fail("Choose a new workspace layout file. Existing files were kept.");
+    auto doc = layoutDocument(preset.layout); auto* object = doc.getDynamicObject();
+    object->removeProperty("monitorMuted"); object->removeProperty("editingDetached"); object->removeProperty("editingWindowBounds");
+    object->setProperty("namedLayoutVersion", 1); object->setProperty("layoutName", preset.name);
+    object->setProperty("inspectorPage", preset.inspectorPage); object->setProperty("browserPage", preset.browserPage);
+    object->setProperty("zoom", preset.zoom); object->setProperty("viewX", preset.view.x); object->setProperty("viewY", preset.view.y);
+    juce::Array<juce::var> consoles;
+    for (int i = 0; i < 3; ++i)
+    { auto* window = new juce::DynamicObject(); window->setProperty("detached", preset.detached[(size_t) i]); if (preset.detached[(size_t) i]) window->setProperty("bounds", windowBounds(preset.windows[(size_t) i])); consoles.add(juce::var(window)); }
+    object->setProperty("consoles", consoles);
+    NamedWorkspace validated; auto result = decodeNamedDocument(doc, validated); if (result.failed()) return result;
+    const auto text = juce::JSON::toString(doc, false, 17);
+    if (text.getNumBytesAsUTF8() > 16384) return juce::Result::fail("Named workspace exceeds the 16 KiB budget.");
+    result = file.getParentDirectory().createDirectory(); if (result.failed()) return result;
+    juce::TemporaryFile temporary(file);
+    if (!temporary.getFile().replaceWithText(text, false, false, "\n") || file.exists() || !temporary.overwriteTargetFileWithTemporary())
+        return juce::Result::fail("Cannot save this named workspace. Existing layouts were kept.");
     return juce::Result::ok();
 }
 TimelineSplitter::TimelineSplitter()
@@ -205,11 +350,12 @@ void PanelSplitter::mouseDrag(const juce::MouseEvent& e)
 { if (dragging) setValue(startValue + (e.getScreenX() - startX) * (isLeft ? 1 : -1), juce::sendNotificationSync); }
 void PanelSplitter::mouseUp(const juce::MouseEvent&) { dragging = false; repaint(); }
 void PanelSplitter::mouseDoubleClick(const juce::MouseEvent&)
-{ if (isEnabled()) setValue(isLeft ? WorkspaceLayout::defaultLibraryWidth : WorkspaceLayout::defaultInspectorWidth, juce::sendNotificationSync); }
+{ if (isEnabled()) { if (restore) restore(); else setValue(isLeft ? WorkspaceLayout::defaultLibraryWidth : WorkspaceLayout::defaultInspectorWidth, juce::sendNotificationSync); } }
 bool PanelSplitter::keyPressed(const juce::KeyPress& key)
 {
     if (!isEnabled()) return false;
-    if (key == juce::KeyPress::homeKey) { setValue(isLeft ? WorkspaceLayout::defaultLibraryWidth : WorkspaceLayout::defaultInspectorWidth, juce::sendNotificationSync); return true; }
+    if (key == juce::KeyPress::endKey) { setValue(0, juce::sendNotificationSync); return true; }
+    if (key == juce::KeyPress::homeKey || key == juce::KeyPress::returnKey) { if (restore) restore(); else setValue(isLeft ? WorkspaceLayout::defaultLibraryWidth : WorkspaceLayout::defaultInspectorWidth, juce::sendNotificationSync); return true; }
     if (key.getKeyCode() == juce::KeyPress::leftKey || key.getKeyCode() == juce::KeyPress::rightKey)
     { setValue(getValue() + (key.getKeyCode() == juce::KeyPress::rightKey ? 1 : -1) * (isLeft ? 1 : -1) * (key.getModifiers().isShiftDown() ? 1 : 10), juce::sendNotificationSync); return true; }
     return false;

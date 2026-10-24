@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "EffectTail.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include <cmath>
 #include <limits>
@@ -12,14 +13,15 @@ juce::Result Engine::planWavExport(const juce::File& file, WavExportOptions opti
     if (!file.getParentDirectory().isDirectory() || file.isDirectory()) return juce::Result::fail("Choose an existing output folder and a file name.");
     if (!playbackReady()) return juce::Result::fail("Audio is still preparing or unavailable. Wait for the source checks before exporting.");
     const auto latency = pluginLatencyError(); if (latency.isNotEmpty()) return juce::Result::fail(latency);
-    WavExportPlan candidate; candidate.sampleRate = sampleRate; candidate.arrangementEnd = project.duration();
-    candidate.tailSeconds = options.includeTail ? project.effectTailSeconds : 0;
+    WavExportPlan candidate; candidate.sampleRate = sampleRate; candidate.arrangementStart = project.playbackStart(); candidate.arrangementEnd = project.duration();
+    candidate.tailSeconds = options.includeTail ? effectAudibleEnd(*this) - project.duration() : 0;
+    if (replayTake) { candidate.arrangementStart=0; candidate.arrangementEnd=replayTake->frames/replayTake->sampleRate; candidate.tailSeconds=0; }
     if (!std::isfinite(candidate.arrangementEnd) || candidate.arrangementEnd <= 0) return juce::Result::fail("Add audio to the timeline before exporting.");
     if (!std::isfinite(candidate.sampleRate) || candidate.sampleRate <= 0 || candidate.sampleRate > std::numeric_limits<juce::uint32>::max()
         || candidate.sampleRate != std::round(candidate.sampleRate)) return juce::Result::fail("WAV export needs a supported integer sample rate.");
     if (!std::isfinite(candidate.tailSeconds) || candidate.tailSeconds < 0 || candidate.arrangementEnd + candidate.tailSeconds > 1.0e9)
         return juce::Result::fail("The effect-tail window is outside the supported mix timeline.");
-    const double frames = std::ceil((candidate.arrangementEnd + candidate.tailSeconds) * candidate.sampleRate - 1.0e-6);
+    const double frames = std::ceil((candidate.arrangementEnd - candidate.arrangementStart + candidate.tailSeconds) * candidate.sampleRate - 1.0e-6);
     constexpr juce::int64 headerBudget = 4096, bytesPerFrame = 6; // PCM24 stereo; JUCE promotes long WAVs to RF64.
     if (!std::isfinite(frames) || frames <= 0 || frames > (double) ((std::numeric_limits<juce::int64>::max() - headerBudget) / bytesPerFrame))
         return juce::Result::fail("The planned WAV exceeds the file-size budget.");
@@ -34,38 +36,60 @@ juce::Result Engine::planWavExport(const juce::File& file, WavExportOptions opti
 }
 std::unique_ptr<Engine> Engine::createExportRenderer(juce::String& error, const std::shared_ptr<std::atomic<bool>>& cancelled)
 {
-    const juce::ScopedLock guard(lock);
-    bool hasPlugins = false; eachPlugin([&](auto&) { hasPlugins = true; });
-    if (hasPlugins && !juce::MessageManager::getInstance()->isThisTheMessageThread())
-    { error = "Prepare export processors on the message thread."; return {}; }
-    if (!playbackReady()) { error = "Wait for all source audio before preparing export."; return {}; }
-    error = pluginLatencyError(); if (error.isNotEmpty()) return {};
-    auto copy = std::make_unique<Engine>(juce::File(), false); copy->offlineRenderer = true;
-    copy->sampleRate = sampleRate.load(); copy->blockSize = blockSize; copy->prepareBuffers(blockSize); copy->midiCollector.reset(copy->sampleRate.load());
-    copy->project = project; copy->library = library; copy->tempo = tempo.load();
-    auto chain = [&](const std::vector<std::unique_ptr<PluginSlot>>& source, std::vector<std::unique_ptr<PluginSlot>>& target)
+    struct Snapshot { juce::PluginDescription description; juce::String id; bool bypass=false; juce::MemoryBlock state; };
+    using Chain=std::vector<Snapshot>;
+    std::array<Chain,trackCount> laneSnapshots;
+    std::map<juce::String,Chain> trackSnapshots;
+    std::map<juce::String,juce::String> owners;
+    auto copy=std::make_unique<Engine>(juce::File(),false); copy->offlineRenderer=true;
     {
-        for (const auto& slot : source)
+        const juce::ScopedLock guard(lock);
+        bool hasPlugins=false; eachPlugin([&](auto&) { hasPlugins=true; });
+        if (hasPlugins && !juce::MessageManager::getInstance()->isThisTheMessageThread()) { error="Prepare export processors on the message thread."; return {}; }
+        if (!playbackReady()) { error="Wait for all source audio before preparing export."; return {}; }
+        error=pluginLatencyError(); if (error.isNotEmpty()) return {};
+        copy->sampleRate=sampleRate.load(); copy->blockSize=blockSize; copy->project=project; copy->library=library; copy->tempo=tempo.load();
+        auto capture=[&](const auto& source,Chain& destination)
         {
-            if (cancelled && *cancelled) { error = "Export preparation cancelled."; return false; }
-            std::unique_ptr<PluginSlot> cloned; error = copy->clonePlugin(*slot, cloned); if (error.isNotEmpty()) return false;
-            cloned->id = slot->id; target.push_back(std::move(cloned));
+            for (const auto& slot:source)
+            {
+                Snapshot snapshot; snapshot.description=slot->description; snapshot.id=slot->id; snapshot.bypass=slot->bypass;
+                slot->processor->getStateInformation(snapshot.state);
+                if (snapshot.state.getSize()>(size_t)std::numeric_limits<int>::max()) { error="Plugin state is too large."; return false; }
+                destination.push_back(std::move(snapshot));
+            }
+            return true;
+        };
+        for (int lane=0;lane<trackCount;++lane) if (!capture(plugins[(size_t)lane],laneSnapshots[(size_t)lane])) return {};
+        for (const auto& clip:project.clips)
+        {
+            const auto id=effectsIdentity(clip.effects); owners[clip.id]=id;
+            if (!trackSnapshots.count(id) && !capture(clip.effects->plugins,trackSnapshots[id])) return {};
+        }
+    }
+    // Instantiation can be slow. It must never hold the programme render lock
+    // while preparing an independent headphone comparison or export.
+    copy->prepareBuffers(copy->blockSize); copy->midiCollector.reset(copy->sampleRate.load());
+    auto instantiate=[&](const Chain& source,auto& destination)
+    {
+        for (const auto& snapshot:source)
+        {
+            if (cancelled && *cancelled) { error="Export preparation cancelled."; return false; }
+            std::unique_ptr<PluginSlot> slot; error=copy->instantiate(snapshot.description,slot); if (error.isNotEmpty()) return false;
+            slot->processor->setStateInformation(snapshot.state.getData(),(int)snapshot.state.getSize()); slot->id=snapshot.id; slot->bypass=snapshot.bypass;
+            destination.push_back(std::move(slot));
         }
         return true;
     };
-    for (int lane = 0; lane < trackCount; ++lane) if (!chain(plugins[(size_t) lane], copy->plugins[(size_t) lane])) return {};
-    std::map<std::shared_ptr<ClipEffects>, std::shared_ptr<ClipEffects>, std::owner_less<std::shared_ptr<ClipEffects>>> effects;
-    for (auto& clip : copy->project.clips)
+    for (int lane=0;lane<trackCount;++lane) if (!instantiate(laneSnapshots[(size_t)lane],copy->plugins[(size_t)lane])) return {};
+    std::map<juce::String,std::shared_ptr<ClipEffects>> effects;
+    for (auto& clip:copy->project.clips)
     {
-        auto found = effects.find(clip.effects);
-        if (found == effects.end())
-        {
-            auto cloned = makeClipEffects(); if (!chain(clip.effects->plugins, cloned->plugins)) return {};
-            found = effects.emplace(clip.effects, std::move(cloned)).first;
-        }
-        clip.effects = found->second;
+        const auto& id=owners.at(clip.id);
+        if (!effects.count(id)) { auto cloned=makeClipEffects(); cloned->id=id; if (!instantiate(trackSnapshots.at(id),cloned->plugins)) return {}; effects.emplace(id,std::move(cloned)); }
+        clip.effects=effects.at(id);
     }
-    copy->prepareClipProcessing(); error = copy->pluginLatencyError(); if (error.isNotEmpty()) return {}; return copy;
+    copy->prepareClipProcessing(); error=copy->pluginLatencyError(); if (error.isNotEmpty()) return {}; return copy;
 }
 WavExportResult Engine::writeWav(const juce::File& file, WavExportOptions options,
                                const std::shared_ptr<std::atomic<bool>>& cancelled, const WavExportProgress& progress)
@@ -100,7 +124,9 @@ WavExportResult Engine::writeWav(const juce::File& file, WavExportOptions option
     {
         if (cancelled && *cancelled) return stop();
         const int frames = (int) std::min<juce::int64>(blockSize, result.plan.frames - offset);
-        position = offset / result.plan.sampleRate; render(mixBuffer, frames, position, midi);
+        position = result.plan.arrangementStart + offset / result.plan.sampleRate;
+        if (replayTake) { renderTake(takeBuffer,frames,position); mixBuffer.makeCopyOf(takeBuffer,true); }
+        else render(mixBuffer, frames, position, midi);
         if (latencyBlocked) { const auto issue = pluginLatencyError(); return fail(issue.isNotEmpty() ? issue : "Plugin latency changed during export. The destination was kept."); }
         for (int channel = 0; channel < 2; ++channel) for (int frame = 0; frame < frames; ++frame)
             if (!std::isfinite(mixBuffer.getSample(channel, frame))) return fail("Rendered audio contains non-finite samples. The destination was kept.");

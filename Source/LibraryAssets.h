@@ -5,7 +5,8 @@ namespace mixworks
 {
 struct LibraryAssets
 {
-    juce::String title, artist, album;
+    juce::String title, artist, album, genre;
+    bool genreRead = false;
     juce::Image cover;
     juce::File coverSource;
     bool audioThumbnail = false;
@@ -14,4 +15,5 @@ struct LibraryAssets
 };
 // Disk/handler access: call on a worker. Never looks up artwork on the web.
 LibraryAssets readLibraryAssets(const juce::File& audio);
+juce::String readLibraryGenre(const juce::File& audio);
 }

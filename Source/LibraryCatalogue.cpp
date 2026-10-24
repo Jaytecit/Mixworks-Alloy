@@ -1,4 +1,5 @@
 #include "LibraryCatalogue.h"
+#include "SourceSectionStore.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include <set>
 #include <map>
@@ -13,8 +14,10 @@ juce::var snapshotJson(const Media& media)
     auto result = juce::var(new juce::DynamicObject()); auto* object = result.getDynamicObject();
     object->setProperty("path", media.file.getFullPathName()); object->setProperty("id", media.id); object->setProperty("name", media.name);
     object->setProperty("modified", (juce::int64) media.sourceModified); object->setProperty("record", analysisRecordToJson(media.analysisRecord(), true));
+    object->setProperty("sectionTemplate",sourceSectionsToJson(media.sectionTemplate));
     object->setProperty("analysisModified", (juce::int64) media.analysisFileModified); object->setProperty("analysisBytes", (juce::int64) media.analysisFileBytes);
     object->setProperty("title", media.assets.title); object->setProperty("artist", media.assets.artist); object->setProperty("album", media.assets.album);
+    if (media.assets.genreRead) object->setProperty("genre", media.assets.genre);
     object->setProperty("coverSource", media.assets.coverSource == juce::File() ? juce::String() : media.assets.coverSource.getFullPathName()); object->setProperty("audioThumbnail", media.assets.audioThumbnail);
     juce::MemoryOutputStream png;
     if (media.assets.cover.isValid() && media.assets.cover.getWidth() <= 64 && media.assets.cover.getHeight() <= 64)
@@ -33,10 +36,17 @@ std::shared_ptr<Media> parseSnapshot(const juce::var& value)
     media->analysisFileModified = (int64_t) value["analysisModified"]; media->analysisFileBytes = (int64_t) value["analysisBytes"];
     media->analysis = std::move(record.record->analysis); media->peaks = std::move(record.record->peaks); media->waveformRms = std::move(record.record->waveformRms);
     media->analysisVersion = record.record->revision;
+    media->energy = std::move(record.record->energy);
     if (!record.reusableAutomatic) media->analysisCacheWarning = "Saved beat analysis awaits a detector refresh; playback checks it before use.";
     media->manualBpm = record.record->manualBpm; media->manualBeatOrigin = record.record->manualBeatOrigin; media->manualKey = record.record->manualKey; media->analysisFromCache = true;
+    if (value.hasProperty("sectionTemplate") && readSourceSectionsJson(value["sectionTemplate"],media->duration(),media->sectionTemplate).failed()) return {};
     for (auto key : {"title", "artist", "album", "coverSource"}) if (!value[key].isString() || value[key].toString().length() > 32768) return {};
     media->assets.title = value["title"].toString(); media->assets.artist = value["artist"].toString(); media->assets.album = value["album"].toString();
+    if (value.hasProperty("genre"))
+    {
+        if (!value["genre"].isString() || value["genre"].toString().length() > 2048) return {};
+        media->assets.genre = value["genre"].toString(); media->assets.genreRead = true;
+    }
     const auto coverSource = value["coverSource"].toString(); if (coverSource.isNotEmpty()) { if (!juce::File::isAbsolutePath(coverSource)) return {}; media->assets.coverSource = juce::File(coverSource); }
     if (!value["audioThumbnail"].isBool()) return {}; media->assets.audioThumbnail = (bool) value["audioThumbnail"];
     if (value.hasProperty("coverPng"))
