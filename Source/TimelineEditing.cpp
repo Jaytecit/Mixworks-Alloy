@@ -20,7 +20,11 @@ juce::PopupMenu Workstation::timelineMenu(double time, int track)
         && pendingTempo <= 0 && !tempoPreparationPending && !engine.project.hasPendingPlacement()
         && !engine.recordingAutomation() && engine.automationRecordMode == AutomationRecordMode::read;
     item(TimelineAction::repeatSelection, "Repeat selected audio...", {}, selectionReady);
-    item(TimelineAction::addTransition, "Add Transition", {}, selectionReady && !editSelection.range);
+    const bool transitionReady = editable && !engine.rehearsalActive() && !engine.exporting
+        && pendingTempo <= 0 && !tempoPreparationPending && timelineLoads.empty()
+        && !engine.project.hasPendingPlacement() && !engine.recordingAutomation()
+        && engine.automationRecordMode == AutomationRecordMode::read;
+    item(TimelineAction::addTransition, "Add Transition", {}, transitionReady && !editSelection.range);
     item(TimelineAction::unlinkSelection, "Unlink / move independently", {}, selectionReady && !editSelection.range
         && std::any_of(engine.project.transitionLinks.begin(), engine.project.transitionLinks.end(), [&](const auto& link)
         { return editSelection.clips.empty() ? link.incoming == selectedClip || link.outgoing == selectedClip
@@ -62,6 +66,7 @@ juce::PopupMenu Workstation::timelineMenu(double time, int track)
     menu.addSeparator(); item(TimelineAction::split, "Split Segment at Cursor", "S", editable && time > clip->start && time < clip->end());
     item(TimelineAction::reverse, "Reverse", {}, editable); menu.addSeparator();
     item(TimelineAction::tweaks, "Tweaks / BPM, key and downbeat...", "Ctrl+W", editable);
+    item(TimelineAction::harmonise, "Harmonise by ear...", {}, clip != nullptr && !busy && !engine.exporting);
     item(TimelineAction::settings, "Adjust Segment Settings...", "Ctrl+T", clip != nullptr);
     menu.addSeparator(); item(TimelineAction::downbeat, "Set first downbeat here (4/4)", {}, editable && time >= clip->start && time < clip->end());
     return menu;
@@ -93,8 +98,6 @@ void Workstation::addTimelineAutomation(AutomationTarget target, double time, in
     const bool selectedCurve = automationLane() == (int) target && engine.selectedTrack == track;
     auto address = selectedCurve ? displayedAddress(track) : target == AutomationTarget::plugin ? pluginLane
         : AutomationAddress {target == AutomationTarget::master ? -1 : track, target};
-    if (!selectedCurve && target != AutomationTarget::master && address.clipId.isEmpty() && engine.controlClip(track)) address.clipId = selectedClip;
-    if (!selectedCurve && target != AutomationTarget::master && address.clipId.isEmpty()) { setStatus("Select a segment to add automation."); return; }
     insertAutomationNode(address, time);
 }
 void Workstation::performTimelineAction(TimelineAction action, double time, int track)
@@ -135,6 +138,7 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             return;
         }
         case TimelineAction::stems: if (clip) { if (clip->stems) showStemMenu(clip->id, -1, time); else splitStems(clip->media->id, false); } return;
+        case TimelineAction::harmonise: showHarmoniseByEar(); return;
         case TimelineAction::sectionBoundary:
             if (clip && clip->track == track) timeline.addSectionBoundary(clip->id, time);
             return;
@@ -193,7 +197,7 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (placed.failed()) { setStatus(placed.getErrorMessage()); return; }
             remember();
             { const juce::ScopedLock guard(engine.lock); engine.project = std::move(candidate); }
-            selectedTransition = selectedClip = incoming; selectedStem = -1; selectedAutomationTarget = band;
+            selectedTransition = selectedClip = incoming; selectedStem = -1; selectedAutomationTarget = band; automationClip = selectedClip;
             transitionCurveShown[(size_t)band] = true; if (transitionCurveOnlyBand >= 0) transitionCurveOnlyBand = band;
             transitionNodeOptionsFor.clear(); selectTrack(engine.project.clipFor(incoming)->track); refresh();
             setStatus("Swap placed as regular nodes. Drag either paired handle horizontally, or edit its nodes individually. Undo restores the previous shape.");
@@ -209,7 +213,7 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (paired.failed()) { setStatus(paired.getErrorMessage()); return; }
             if (pairing.changed) { remember(); engine.project = std::move(candidate); }
             if (selectedTransition != pairing.incoming) engine.endTransitionRehearsal();
-            selectedTransition = pairing.incoming; selectedAutomationTarget = (int) AutomationTarget::bass;
+            selectedTransition = pairing.incoming; selectedAutomationTarget = (int) AutomationTarget::bass; automationClip = selectedClip;
             setStatus(pairing.changed ? "Bass swap paired from the nearest full cut. Both B handles now move together; Undo restores the previous curve."
                 : "This full bass cut is already paired."); refresh(); return;
         }
@@ -220,7 +224,9 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (!automationEditable(address)) { setStatus("Automation is unavailable, busy or locked."); return; }
             auto candidate = engine.project; auto* curve = materialiseAutomation(candidate,address); if (!curve || curve->points.empty()) return;
             if (action == TimelineAction::curveRead) curve->enabled = !curve->enabled;
-            else { candidate.automationEdited(address, AutomationEdit::clearCurve); *curve = {}; }
+            else { candidate.automationEdited(address, AutomationEdit::clearCurve); *curve = {};
+                if (address.clipId.isEmpty() && address.track >= 0 && (int) address.target < trackAutomationCount)
+                    candidate.laneHandles.erase(address.track * trackAutomationCount + (int) address.target); }
             engine.setAutomationRecordMode(AutomationRecordMode::read); remember(); const juce::ScopedLock guard(engine.lock);
             engine.project = std::move(candidate);
             refresh(); return;
@@ -278,7 +284,7 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
         case TimelineAction::split: engine.seek(engine.project.snappedTime(time, engine.project.snap)); splitClip(); break;
         case TimelineAction::reverse: reverseButton.triggerClick(); break;
         case TimelineAction::tweaks: editAnalysis(); break;
-        case TimelineAction::settings: showInspectorPage(0); refresh(); clipSliders[0].grabKeyboardFocus(); break;
+        case TimelineAction::settings: showInspectorPage(0); showEditingPage(1); refresh(); clipSliders[0].grabKeyboardFocus(); break;
         case TimelineAction::downbeat: if (clip) setDownbeatAnchor(clip->id, time - clip->start); break;
         case TimelineAction::loopStart:
             if (!clip || clip->media->sourceDetailsPending || time < clip->start || time >= clip->end()) return;

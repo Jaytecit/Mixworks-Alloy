@@ -10,7 +10,7 @@ Inherit RULES. Scope tooling/rights/app/research/docs/assets and all cross-cutti
 
 ### MW-R02 — Bridge isolation and exactly-once admission survive failure
 - Contract/source: PromoControl/Main, alloy_bridge.py/verify-bridge.py, docs/DEVELOPMENT-BRIDGE.md protocol1.
-- Cases/procedure: fresh root/protocol/PID/capabilities, all supported commands and argument endpoints, invalid token/time/replay/64KiB size, path escapes/links/hardlinks/claimed request/no response, same-root lease, read-only status while busy, timeout after claim/crash, restart same versus changed candidate.
+- Cases/procedure: fresh root/protocol/PID/capabilities, all supported commands and argument endpoints, invalid token/time/replay/64 KiB size, path escapes/links/hardlinks/claimed request/no response, same-root lease, read-only status while busy, timeout after claim/crash, restart same versus changed candidate.
 - Pass/oracle: one admitted action per request, atomic response/history, no out-of-root reads/writes or production caches/MIDI, no blind mutation retry. Token omitted from shareable command log; diagnostics don't leak it. Client result checked against actual state/output, asynchronous acknowledgement alone insufficient.
 - Evidence/mode/severity: client/harness + verify-bridge native/live via run_checks, sanitized wire/claim/state/identity logs and inspected screenshots; static + automated/integration; P0 for isolation breach, otherwise P1.
 
@@ -22,7 +22,7 @@ Inherit RULES. Scope tooling/rights/app/research/docs/assets and all cross-cutti
 
 ### MW-R04 — Clean build and package derive from the identified snapshot
 - Contract/source: CMakeLists/build.ps1/fetch-analysis/deploy.ps1; project0.55.64 and README build claims.
-- Cases/procedure: read-only preflight pins/tools/disk, then explicitly scheduled clean Release x64 build and optional test fixtures; compiler failures/warnings, version RC regeneration, missing model/runtime, test flag OFF/ON. Build below normal with `--parallel 1` and `_CL_ /MP1`; do not invoke current build.ps1's `--parallel 3` default unchanged.
+- Cases/procedure: read-only preflight pins/tools/disk/memory, then explicitly scheduled clean Release x64 build and optional test fixtures; compiler failures/warnings, version RC regeneration, missing model/runtime, test flag OFF/ON. Build below normal with `--parallel 1` and `_CL_ /MP1`; inspect the effective policy of build.ps1 and its children (ra01 repairs the earlier parallel3 default).
 - Pass/oracle: source archive and all compile inputs, toolchain/SDK/config/patch/dependency hashes bind output; version/resource metadata agree. Actionable warnings triaged, no accidental dev path or test fixture required by ordinary package. Bit-reproducibility not promised: independent rebuild content differences explained (timestamps/signing etc.), functional/asset identity retained.
 - Evidence/mode/severity: full build logs, input/output/build-environment manifests and exact command, independent package manifest; build/manual inspect; P1.
 
@@ -46,7 +46,7 @@ Inherit RULES. Scope tooling/rights/app/research/docs/assets and all cross-cutti
 
 ### MW-R08 — Sustained use and capacity are bounded, explicit checkpoint work
 - Contract/source: SourceStreaming/LongSession tests, capacity_fixture90min, max prepared/decoded budgets, RF64 and take limits.
-- Cases/procedure: **only with explicit capacity/stress checkpoint authorization**: W-large3h plan, existing90min stereo44.1k fixture (238,140,000frames;1,428,840,044bytes),30min playback/edit session,60min repeated lifecycle/resource observation,20 open/close cycles; optional >4GiB RF64 live/offline recording with computed disk/time budget. Record overruns/temperature/responsiveness and stop condition.
+- Cases/procedure: **only with explicit capacity/stress checkpoint authorization**: W-large3h plan, existing90min stereo44.1k fixture (238,140,000frames;1,428,840,044bytes),30min playback/edit session,60min repeated lifecycle/resource observation,20 open/close cycles; optional >4 GiB RF64 live/offline recording with computed disk/time budget. Record overruns/temperature/responsiveness and stop condition.
 - Pass/oracle: approved capacity envelope and memory/disk bounds, no crash/leak trend/unbounded queues or missed deadlines, expected final frame/header/sample markers; limits refuse before exhaustion. Repeating large copies or old stress-unguarded binaries prohibited. Capacity not a claim of all possible plugin/library combinations.
 - Evidence/mode/severity: authorization/workload/host, resource time series, file/frames/retention and lifecycle outcomes; scheduled runtime/hardware; P1. Current policy defers this rule; no automatic execution.
 
@@ -58,6 +58,7 @@ Inherit RULES. Scope tooling/rights/app/research/docs/assets and all cross-cutti
 
 ### MW-R10 — Distribution rights and notices clear the exact package
 - Contract/source: LICENSE, docs/LICENSING.md and THIRD-PARTY-NOTICES; no agreements accepted by agent.
+- Additional commercial scope (2 November2026): close the relevant items in docs/commercial/CLEARANCE-REGISTER.csv, including extracted Synesthesia helpers/original scene content, compiled recovered AUFTAKT research, visual Python/native-codec runtime rights, published profile data, artwork/fonts and branding. External installation or download-on-demand is not itself clearance; preserve research and historical-publication evidence. The assessment and exact-package technical hashes do not substitute for professional rights review.
 - Cases/procedure: exact source/runtime/model/plugin/font/icon/sample package manifest; owner-provided JUCE entitlement, ASIO distribution choice/Steinberg agreement evidence, SoundTouch static relinking/object/source/debugging requirements or separate licence; Beat This/ONNX/PocketFFT/r8brain/codec and optional Demucs/Torch/CUDA/weight/transitive terms. Verify actual selected modules, not generic product names.
 - Pass/oracle: documented qualified rights review and required notices/source/relink artifacts for every distributed component, consistent with proprietary Personal Beta terms. Unknown weight licence/entitlement stays BLOCKED; working installed runtime not clearance. Separate technical acceptance from permission to publish, and require explicit user publication authorization.
 - Evidence/mode/severity: exact package/SBOM, dated entitlement/clearance references and notice/relink manifest (sensitive agreements retained privately); owner/licensing review + static packaging; P1 mandatory public release blocker.

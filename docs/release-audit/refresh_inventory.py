@@ -23,6 +23,7 @@ GROUPS = {
     'data': ('current-format state, identity and recovery', 'MW-D01 MW-D02 MW-D03 MW-D04 MW-D05 MW-D06 MW-D07', 'round-trip; parser fault/identity tests; independent saved-state review'),
     'stems': ('optional worker, external assets and stem playback', 'MW-S01 MW-S02 MW-S03 MW-S04 MW-S05 MW-S06', 'worker harness, independent PCM/hash validation and listening'),
     'arrange': ('ordering, energy/section policy and rehearsal', 'MW-O01 MW-O02 MW-O03 MW-O04 MW-O05', 'constraint oracle; seeded plan/diff; runtime and musical listening'),
+    'visuals': ('visual scene planning, image input and native output', 'MW-V01 MW-V02 MW-V03 MW-U01 MW-U05 MW-D01 MW-R02 MW-R03 MW-R04 MW-R06 MW-R09', 'complete schedule and handover oracle; save/reopen; actual scene/output pixels; lifecycle/errors'),
     'export': ('offline render and exchange outputs', 'MW-X01 MW-X02 MW-X03 MW-X04 MW-X05 MW-X06', 'independent decoder, null/duration analysis; failure and UI'),
     'tooling': ('build, verification, isolation and release support', 'MW-R02 MW-R03 MW-R04 MW-R05 MW-R06 MW-R07 MW-R08 MW-R09', 'inspect scripts; focused Python harness; manifests and failure injection'),
     'rights': ('third-party integration/provenance and release rights', 'MW-R03 MW-R04 MW-R10', 'exact dependency/asset identities, notices and clearance record'),
@@ -43,6 +44,8 @@ def classify(path):
     name = Path(path).stem
     if path.startswith('docs/') or path.endswith('.md'):
         return 'docs'
+    if path.startswith('scripts/visual_') or path.startswith('scripts/verify_visual_'):
+        return 'visuals'
     if path.startswith('scripts/') or path.startswith('tests/test_') or path in ('CMakeLists.txt', 'Mixworks.cmd', '.gitignore'):
         return 'tooling'
     if path.startswith('tests/'):
@@ -61,19 +64,21 @@ def classify(path):
         return 'performance'
     if name.startswith(('Midi',)):
         return 'midi'
-    if name.startswith(('Analysis', 'Neural', 'Rhythm', 'GridCorrection', 'BeatGrid', 'MusicTests', 'TargetedAnalysis', 'DownbeatReferences', 'RealTrack')):
+    if name.startswith(('Analysis', 'Neural', 'Rhythm', 'GridCorrection', 'BeatGrid', 'MusicTests', 'TargetedAnalysis', 'DownbeatReferences', 'RealTrack', 'EarTool', 'HarmonyEar', 'KeyEar', 'RetryReview')):
         return 'analysis'
+    if name.startswith(('Visual', 'SceneLane')):
+        return 'visuals'
     if name.startswith(('Library', 'MusicScanner', 'Import')):
         return 'library'
     if name.startswith(('WavExport', 'ExportTests', 'Playlist')):
         return 'arrange' if name.startswith('PlaylistTransition') else 'export'
     if name.startswith(('Model', 'Recovery', 'Pcm', 'ContentDigest')):
         return 'data'
-    if name.startswith(('Engine', 'ElasticAudio', 'Mastering', 'Spectrum', 'PeakMeter', 'OutputPeaks', 'PluginLatency', 'Latency', 'EffectTail', 'SourceStreaming', 'PlaybackCache', 'LongSession')):
+    if name.startswith(('Engine', 'ElasticAudio', 'OriginalAudio', 'Mastering', 'Spectrum', 'PeakMeter', 'OutputPeaks', 'PluginLatency', 'Latency', 'EffectTail', 'SourceStreaming', 'PlaybackCache', 'LongSession')):
         return 'audio'
     if name.startswith(('Tempo', 'Timeline', 'Transition', 'Beatmatch', 'Placement', 'Editing', 'TrackOwnership', 'Automation', 'AudioSlip', 'BarNavigation', 'ArrangementInsertion', 'EditSelection', 'PresetNode', 'Hotcue', 'SourceSection', 'SectionUI')):
         return 'time'
-    if name.startswith(('Alloy', 'Workstation', 'Workspace', 'ToolPanel', 'Attract')):
+    if name.startswith(('Alloy', 'Workstation', 'Workspace', 'ToolPanel', 'Attract', 'UiClarity', 'UiMessages')):
         return 'ui'
     if name.startswith(('PromoControl', 'SelfTest', 'VerificationMetrics', 'FusionWorkflow')):
         return 'tooling'

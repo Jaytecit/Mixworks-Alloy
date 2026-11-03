@@ -57,6 +57,18 @@ class Smoke:
                 call('add', index=index)
                 state = client.ready(min(90, remaining()))
             check(len(state['library']) == 2 and len(state['clips']) == 2, 'real imports and timeline additions')
+            # Ordinary Add deliberately leaves tracks independent. Declare the
+            # transition in this saved fixture before testing its treatment.
+            fixture = Path(call('save', name='independent-tracks')['path'])
+            document = json.loads(fixture.read_text(encoding='utf-8-sig'))
+            document['clips'][1]['start'] = 12
+            document['transitionLinks'] = [dict(outgoing=document['clips'][0]['id'],
+                incoming=document['clips'][1]['id'], frame=[12, 24], locked=False, muteOutside=False,
+                filter=dict(mode='none', strength=0), alternatives=[None, None, None])]
+            write_json(root/'sessions/linked-fixture.mixworks', document)
+            call('open', name='linked-fixture')
+            linked = client.ready(min(90, remaining()))
+            check(abs(linked['clips'][1]['start']-12)<.001, 'explicit linked fixture opened')
             call('select_transition', index=1)
             state = call('transition_preset', index=2)['state']
             check(bool(state['selectedTransition']), 'actual selected transition accepts built-in treatment')

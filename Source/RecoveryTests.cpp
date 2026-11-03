@@ -1,4 +1,8 @@
 #include "Workstation.h"
+#include <juce_cryptography/juce_cryptography.h>
+#if JUCE_WINDOWS
+#include <windows.h>
+#endif
 
 namespace mixworks
 {
@@ -55,7 +59,140 @@ void runRecoveryTests(const std::function<void(bool, const juce::String&)>& chec
     const auto foreign = root.getChildFile(juce::Uuid().toString()); foreign.createDirectory(); foreign.getChildFile("current.json").replaceWithText(first);
     check(!RecoveryStore::claim(foreign, error) && RecoveryStore::scan(root).empty() && foreign.getChildFile("current.json").exists(), "a UUID folder without an owner record remains foreign and untouched");
 
+    // Tiny source-bound current-format arrangement and take. Playback-purpose
+    // loading computes identity without detector/model or device work.
+    const auto original = root.getChildFile("source.wav"), moved = root.getChildFile("located.wav"), wrong = root.getChildFile("different.wav");
+    auto writeAudio = [&](const juce::File& file, float value)
+    {
+        juce::AudioBuffer<float> audio(2, 1600);
+        for (int i = 0; i < 1600; ++i) { audio.setSample(0, i, value); audio.setSample(1, i, -value); }
+        juce::WavAudioFormat format; std::unique_ptr<juce::OutputStream> stream = file.createOutputStream();
+        auto writer = format.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(8000).withNumChannels(2).withBitsPerSample(24));
+        return writer && writer->writeFromAudioSampleBuffer(audio, 0, 1600);
+    };
+    check(writeAudio(original, .125f) && writeAudio(wrong, .25f), "write two dimension-matched, independently tagged tiny relink sources");
+    Engine source; auto loaded = readMedia(source.formats, original, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::playback);
+    check(loaded.media && loaded.media->analysisSource.sha256.length() == 64, "playback preparation binds the fixture to its actual source hash");
+    if (!loaded.media) return;
+    source.library = {loaded.media}; source.project.masterDb = 0; Clip sourceClip; sourceClip.media = loaded.media; sourceClip.length = .2;
+    source.project.clips = {sourceClip};
+    const auto snapshot = source.captureProject();
+    PerformanceTake take; take.name = "Relocated take"; take.initial = snapshot.clone(); take.sampleRate = 8000; take.frames = 800; take.state = TakeState::complete;
+    take.masterWav = root.getChildFile("export-kept.wav").getFullPathName();
+    TakeEvent event; event.kind = TakeEventKind::project; event.frame = 64; event.sequence = 1; event.payload = snapshot.clone(); take.events.push_back(event);
+    source.project.performanceTakes = {take};
+    const auto saved = juce::JSON::toString(source.captureProject(), false, 17);
+    const auto savedFile = root.getChildFile("missing-source.mixworks");
+    check(savedFile.replaceWithText(saved) && original.moveFileTo(moved), "save current arrangement and take before moving its source");
+    const auto failed = source.prepareProject(saved);
+    check(failed.failedSource && failed.error.contains(original.getFullPathName()), "missing required source identifies the owned file before relinking");
+    const auto wrongDocument = relinkProjectSource(failed.parsed, loaded.media->id, wrong);
+    const auto correctDocument = relinkProjectSource(failed.parsed, loaded.media->id, moved);
+    const auto keptSource = juce::JSON::toString(source.captureProject());
+    check(source.restoreProject(wrongDocument).contains("source changed") && juce::JSON::toString(source.captureProject()) == keptSource,
+        "Locate refuses different audio even with identical rate, channels and length, preserving the active document");
+    const auto relocated = juce::JSON::parse(correctDocument);
+    auto bound = [&](const juce::var& document)
+    {
+        return document["media"][0]["file"].toString() == moved.getFullPathName()
+            && document["sourceBindings"][0]["path"].toString() == moved.getFullPathName()
+            && document["sourceBindings"][0]["sha256"].toString() == loaded.media->analysisSource.sha256;
+    };
+    check(bound(relocated) && bound(relocated["performanceTakes"][0]["initial"])
+        && bound(relocated["performanceTakes"][0]["events"][0]["payload"]), "relink keeps source identity in the arrangement, take initial state and later project event");
+    check(relocated["performanceTakes"][0]["masterWav"].toString() == take.masterWav
+        && juce::JSON::toString(failed.parsed.document, false, 17) == saved, "relink leaves the failed document and exported-take destination unchanged");
+    check(source.restoreProject(correctDocument).isEmpty() && source.playbackReady(), "exact moved source reopens through normal transactional admission");
+    Engine replay;
+    check(replay.restoreProject(juce::JSON::toString(relocated["performanceTakes"][0]["initial"])).isEmpty()
+        && replay.restoreProject(juce::JSON::toString(relocated["performanceTakes"][0]["events"][0]["payload"])).isEmpty(), "relocated take initial and later snapshots independently prepare without the old path");
+    replay.prepareRender(8000, 64); juce::AudioBuffer<float> pcm(2, 64); juce::MidiBuffer midi; replay.render(pcm, 64, 0, midi);
+    bool exact = true; for (int i = 0; i < 64; ++i) exact = exact && std::abs(pcm.getSample(0, i) - .125f) < 1.e-6f && std::abs(pcm.getSample(1, i) + .125f) < 1.e-6f;
+    check(exact, "relocated saved-take snapshot renders the independent stereo PCM oracle");
+
     Workstation ui(false); ui.stopTimer(); ui.recoveryRoot = root; ui.recoveryOffered = true;
+    ui.setSize(1250, 800);
+    auto capture = [&](juce::Component* component, const juce::String& name)
+    {
+        auto stream = report.getSiblingFile(name + ".png").createOutputStream(); juce::PNGImageFormat png;
+        check(component && stream && png.writeImageToStream(component->createComponentSnapshot(component->getLocalBounds()), *stream), "capture owned " + name);
+    };
+    auto pump = []
+    {
+        const auto until = juce::Time::getMillisecondCounterHiRes() + 25;
+        do
+        {
+           #if JUCE_WINDOWS
+            MSG message; while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+           #endif
+            juce::Thread::sleep(1);
+        } while (juce::Time::getMillisecondCounterHiRes() < until);
+    };
+    auto await = [&](const std::function<bool()>& ready, const juce::String& name)
+    {
+        const auto until = juce::Time::getMillisecondCounterHiRes() + 5000;
+        while (!ready() && juce::Time::getMillisecondCounterHiRes() < until) pump();
+        check(ready(), name); return ready();
+    };
+    auto complete = [&](int answer)
+    {
+        auto* modal = juce::Component::getCurrentlyModalComponent(); check(modal != nullptr, "owned open/relink dialog exists before completion");
+        if (modal) modal->exitModalState(answer); pump();
+    };
+    std::function<juce::FileBrowserComponent*(juce::Component*)> browser = [&](juce::Component* component) -> juce::FileBrowserComponent*
+    {
+        if (auto* b = dynamic_cast<juce::FileBrowserComponent*>(component)) return b;
+        if (component) for (auto* child : component->getChildren()) if (auto* b = browser(child)) return b;
+        return nullptr;
+    };
+    const auto kept = juce::JSON::toString(ui.engine.captureProject());
+    const auto currentSession = ui.sessionFile; const auto historySize = ui.undoHistory.size();
+    auto unchangedMix = [&]
+    {
+        return juce::JSON::toString(ui.engine.captureProject()) == kept && !ui.dirty && ui.sessionFile == currentSession
+            && ui.undoHistory.size() == historySize && savedFile.loadFileAsString() == saved;
+    };
+    auto openMissing = [&]
+    {
+        ui.openProjectFile(savedFile);
+        return await([&] { return juce::Component::getCurrentlyModalComponent() != nullptr; }, "missing-source preparation reaches an explicit native decision");
+    };
+    if (openMissing())
+    {
+        capture(juce::Component::getCurrentlyModalComponent(), "missing-source-choice"); complete(0);
+        check(!ui.busy && unchangedMix(), "Cancel missing-source decision preserves current mix, file, dirty state and Undo");
+    }
+    if (openMissing())
+    {
+        complete(1); check(browser(juce::Component::getCurrentlyModalComponent()) != nullptr, "Locate opens the real source chooser"); complete(0);
+        check(!ui.busy && unchangedMix(), "Cancel Locate keeps the current mix and original saved document");
+    }
+    auto locate = [&](const juce::File& file)
+    {
+        if (!openMissing()) return;
+        complete(1); auto* b = browser(juce::Component::getCurrentlyModalComponent());
+        check(b != nullptr, "Locate chooser exposes the owned filename field");
+        if (b) { b->setRoot(file.getParentDirectory()); b->setFileName(file.getFileName()); }
+        complete(1);
+        await([&] { return !ui.busy; }, "relink preparation completes within its functional deadline");
+    };
+    locate(wrong);
+    capture(&ui, "relink-identity-error");
+    check(unchangedMix() && ui.getProperties()["lastMessageDetails"].toString().contains("source changed")
+        && ui.getProperties()["lastMessageDetails"].toString().contains(wrong.getFullPathName())
+        && ui.status.contains("original file") && ui.status.contains("again") && !ui.status.contains(wrong.getFullPathName()),
+        "native wrong-source retry shows the recovery action, retains full path details and preserves the mix");
+    locate(moved);
+    check(ui.engine.project.clips.size() == 1 && ui.engine.project.clips[0].media->file == moved && ui.dirty
+        && ui.sessionFile == savedFile && ui.status.contains("Save to keep the new file location"), "native exact-source retry opens successfully and requires explicit save");
+    check(savedFile.loadFileAsString() == saved, "successful Locate does not overwrite the saved arrangement automatically");
+    const auto relocatedFile = root.getChildFile("relocated.mixworks");
+    check(ui.saveSessionFile(relocatedFile) && !ui.dirty, "Save As durably keeps the relocated arrangement and take");
+    Engine reopened; const auto reopenedError = reopened.restoreProject(relocatedFile.loadFileAsString());
+    check(reopenedError.isEmpty() && reopened.project.clips.size() == 1 && reopened.project.performanceTakes.size() == 1
+        && bound(reopened.project.performanceTakes[0].initial), "independent saved-file reopen retains relocated take identity");
+    await([&] { return ui.recoveryJobs == 0; }, "recovery cleanup finishes before owned UI teardown");
+    ui.newSession();
     ui.recoveryStore = RecoveryStore::create(root, error);
     ui.engine.project.name = "Recovered UI mix"; ui.engine.project.masterDb = -11; ui.engine.project.labels.push_back({juce::Uuid().toString(), 3.25, "Keep my cue"});
     ui.engine.project.masterAutomation.enabled = true; ui.engine.project.masterAutomation.setPoint(0, -8); ui.engine.project.masterAutomation.setPoint(10, -2);
@@ -79,6 +216,7 @@ void runRecoveryTests(const std::function<void(bool, const juce::String&)>& chec
             ui.engine.project = Project(); ui.engine.project.name = "Current mix"; ui.dirty = false;
             ui.offerRecovery(); auto* dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
             check(dialog != nullptr, "closed-window snapshot opens the explicit Restore / Discard / Later dialog: " + ui.status);
+            capture(dialog, "recovery-choice");
             if (dialog) dialog->exitModalState(0); phase = 1;
         }
         else if (phase == 1)
@@ -123,5 +261,7 @@ void runRecoveryTests(const std::function<void(bool, const juce::String&)>& chec
         }
     };
     poll.startTimer(20); juce::MessageManager::getInstance()->runDispatchLoop();
+
+
 }
 }

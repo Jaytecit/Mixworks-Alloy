@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "key": "original/posterised-mirage",
+  "title": "Posterised Mirage",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original nested feedback equations and shading; no reference shader/FX code copied.",
+  "family": "nested-feedback",
+  "variant": 4,
+  "study": "thresholder",
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "type": "speed",
+      "label": "Feedback evolution rate"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.85,
+      "type": "continuous",
+      "label": "Fresh image injection (zero holds captured image)"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.42,
+      "type": "continuous"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous",
+      "label": "Colour-driven deformation"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous",
+      "label": "Capture detail"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous",
+      "label": "Pigment palette"
+    },
+    "symmetry": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 7
+    },
+    "orbit": {
+      "min": 0,
+      "max": 1,
+      "default": 0.2,
+      "type": "continuous"
+    },
+    "focusX": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "focusY": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "colourR": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourG": {
+      "min": 0,
+      "max": 1,
+      "default": 0.82,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourB": {
+      "min": 0,
+      "max": 1,
+      "default": 0.68,
+      "type": "colour",
+      "group": "tint"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "pulse"
+    },
+    "mode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 4
+    },
+    "mirror": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "toggle",
+      "steps": 2
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous",
+      "label": "Image framing"
+    },
+    "imageRotation": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "imageIndex": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "counter"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.85,
+      "type": "continuous",
+      "label": "Pigment persistence"
+    }
+  },
+  "passSchema": 2,
+  "passes": [
+    {
+      "id": "pigment",
+      "shader": "feedback.glsl",
+      "size": [
+        512,
+        288
+      ],
+      "format": "rgba16f",
+      "state": true,
+      "semantic": "posterised-mirage-premultiplied-pigment-v1",
+      "history": true,
+      "inputs": [
+        {
+          "pass": "pigment",
+          "frame": "previous"
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "inputs": [
+        {
+          "pass": "pigment",
+          "frame": "current"
+        }
+      ]
+    }
+  ],
+  "motionProfile": "Contained selective capture with finite pigment trails and colour-driven circulation; no shared beat reversal",
+  "audioMapping": {
+    "bass": "Opens capture threshold; attacks replenish selected regions and reopen dark gaps",
+    "mid": "Persistent local shear",
+    "treble": "Capture attacks and edge circulation"
+  },
+  "mediaRole": "selective-pigment-capture",
+  "stateContract": {
+    "owner": "scene clip/revision/generation",
+    "semantic": "posterised-mirage-premultiplied-pigment-v1",
+    "transfer": "compatible semantic copy or explicit incoming adapter; no raw cross-semantic blend",
+    "tickHz": 60
+  }
+}

@@ -1,4 +1,5 @@
 #include "PrivatePreparation.h"
+#include "ElasticAudio.h"
 namespace mixworks
 {
 juce::Result PrivatePreparation::prepareTrack(const juce::String& id) { return prepare(id,false); }
@@ -57,6 +58,7 @@ void PrivatePreparation::prepareToPlay(int size,double rate)
 }
 void PrivatePreparation::getNextAudioBlock(const juce::AudioSourceChannelInfo& info)
 {
+    OriginalAudio::Realtime realtimeReads;
     info.clearActiveBufferRegion(); const juce::ScopedTryLock guard(mutex);
     if (!guard.isLocked() || !renderer || !playing) return;
     if (sourceAudition)
@@ -69,6 +71,7 @@ void PrivatePreparation::getNextAudioBlock(const juce::AudioSourceChannelInfo& i
     {
         if (position>=end) { if (!loop) { playing=false; break; } position=begin; renderer->resetPlugins(); }
         const int count=std::min({info.numSamples-done,renderer->preparedBlockSize(),(int)std::max(1.,std::ceil((end-position)*outputRate))});
+        if (!renderer->requestPlayback(position.load(), count)) return;
         juce::MidiBuffer midi; renderer->playing=true; renderer->position=position.load(); renderer->render(buffer,count,position,midi);
         for (int ch=0;ch<std::min(2,info.buffer->getNumChannels());++ch) info.buffer->copyFrom(ch,info.startSample+done,buffer,ch,0,count);
         position=position+count/outputRate; done+=count;

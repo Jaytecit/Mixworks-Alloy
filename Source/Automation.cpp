@@ -155,7 +155,8 @@ bool Engine::playbackReady() const
 }
 bool Engine::sourceAudioReady() const
 {
-    return std::all_of(project.clips.begin(), project.clips.end(), [](const auto& c) { return c.prepared || c.media->hasPlayback(); });
+    return std::all_of(project.clips.begin(), project.clips.end(), [](const auto& c) { return (c.prepared || c.media->hasPlayback()) && (!c.media->original || !c.media->original->failed())
+        && (!c.stems || std::all_of(c.stems->sources.begin(),c.stems->sources.end(),[](const auto& m) { return !m->original || !m->original->failed(); })); });
 }
 void Engine::advanceAutomation(double time)
 {
@@ -174,14 +175,14 @@ void Engine::advanceAutomation(double time)
 bool Engine::setControlValue(const AutomationAddress& address, float value)
 {
     auto target = address;
-    if (target.target != AutomationTarget::master && target.clipId.isEmpty() && controlClip(target.track)) target.clipId = selectedClip;
+    if (target.target == AutomationTarget::plugin && target.clipId.isEmpty() && controlClip(target.track)) target.clipId = selectedClip;
     return setControlValueAt(target, value, position.load(), playing.load());
 }
 bool Engine::setControlValueAt(const AutomationAddress& input, float value, double time, bool running)
 {
     const juce::ScopedLock guard(lock);
     auto address = input;
-    if (address.target != AutomationTarget::master && address.clipId.isEmpty() && controlClip(address.track)) address.clipId = selectedClip;
+    if (address.target == AutomationTarget::plugin && address.clipId.isEmpty() && controlClip(address.track)) address.clipId = selectedClip;
     if (exporting || !std::isfinite(value) || !std::isfinite(time) || project.automationLocked(address)) return false;
     if (address.target != AutomationTarget::master && (address.track < 0 || address.track >= trackCount)) return false;
     auto* parameter = address.target == AutomationTarget::plugin ? parameterFor(address) : nullptr;

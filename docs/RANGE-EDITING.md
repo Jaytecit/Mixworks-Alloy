@@ -12,15 +12,17 @@ The0.55.43 editing increment adds direct audio ranges and segment groups to the 
 
 ## Select audio
 
-Open the lower **Editing** console and scroll to the segment controls. Turn on **Range tool**, choose **Drag range**, and drag over a segment waveform. Selection highlights the chosen interval without seeking, changing audio or adding Undo. Drag backwards if convenient. Snap uses the existing beat subdivision; Alt bypasses it. Shift-drag keeps its existing audio-slip meaning.
+Open **Editing → Audio edits**. **Select audio** starts active and **Free drag** is the default: drag over a waveform to highlight any length, without global Snap changing the endpoints. Selection dragging does not seek, change audio or add Undo. Drag backwards if convenient. A single waveform click places the cut/paste cursor; press **S** or **Split at playhead** to slice there after clearing any range/group.
+
+Choose **Snap drag to beats** to use the existing beat subdivision for selection; Alt bypasses it. In **Move tracks**, Shift-drag on the waveform temporarily selects audio. Shift at the distinct header movement handle retains audio slip. Ordinary header dragging moves the track in either tool.
 
 Choose **1 beat**, **1 bar**, **8 bars**, **16 bars** or **32 bars** to select that musical length with a waveform click. Bar choices use the current constant-tempo4/4 project grid. **Exact range...** accepts start/end project seconds relative to musical zero, including available preroll. The summary identifies segment count, interval and duration.
 
-Ranges belong to the selected segments. They do not silently include other simultaneous lanes. To select the same range on several segments, select that group first, enable Range tool, then drag on a member. Audio outside each source's available/audible span is excluded from Copy.
+Ranges belong to the selected segments. They do not silently include other simultaneous lanes. To select the same range on several segments, select that group first, enable **Select audio**, then drag on a member. Audio outside each source's available/audible span is excluded from Copy.
 
 ## Select several segments
 
-With Range tool off, **Ctrl-click** adds/removes a segment. **Select all** in Editing or **Ctrl+A** on the timeline selects every placed segment. A highlighted member remains the active owner for explicit individual-parameter tools. **Clear selection** or **Escape** clears the group/range; Escape during an active range drag restores the preceding selection. Text editors retain their own Ctrl+A.
+With **Move tracks** selected, **Ctrl-click** adds/removes a segment. **More edits → Select all tracks** or **Ctrl+A** on the timeline selects every placed segment. A highlighted member remains the active owner for explicit individual-parameter tools. **Clear selection** or **Escape** clears the group/range; Escape during an active range drag restores the preceding selection. Text editors retain their own Ctrl+A.
 
 Selection is transient: it is absent from saved mixes and musical Undo. Undo/Redo, another owner or a new document clears stale selection. Group movement retains the moved selection; other edits may clear or replace it. Selecting a node switches to that node's owner; node Delete remains a node action.
 
@@ -47,7 +49,7 @@ To move independent pieces together later, Ctrl-click them with Range off and dr
 
 ## Move a selected group (0.55.54)
 
-With Range tool off, Ctrl-click the segments to select them, then drag the waveform body of a selected member. The outlined destination previews the whole group; release applies one move and one Undo. Escape cancels the preview and keeps the selection. Returning to the starting position makes no edit. Existing node, cue, transition and header handles keep their own actions.
+With **Move tracks** selected, Ctrl-click the segments to select them, then drag the waveform body of a selected member. The outlined destination previews the whole group; release applies one move and one Undo. Escape cancels the preview and keeps the selection. Returning to the starting position makes no edit. Existing node, cue, transition and header handles keep their own actions.
 
 All members move by the same time and lane displacement. Snap rounds that displacement from the grabbed member's original alignment; Alt bypasses Snap. Original source spans, slip, reverse, loops, source automation and complete internal transition links travel together. The playhead, project tempo, session markers and lane/master automation stay in place. Moving to different mixer lanes uses those destination lanes' processing.
 

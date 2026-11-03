@@ -19,7 +19,7 @@ juce::Result Workstation::applyEffectTail(double seconds)
 void Workstation::configureEffectTail(std::function<void()> after)
 {
     if (busy) return;
-    auto* dialog = new juce::AlertWindow("Effect ending", "Reported effect tails finish automatically. Set a longer minimum for effects that do not report their duration. Use 0 for automatic endings.", juce::MessageBoxIconType::NoIcon, this);
+    auto* dialog = new juce::AlertWindow("Effect ending", "Choose how long echoes and other effects can finish after the music ends. Use 0 for automatic endings.", juce::MessageBoxIconType::NoIcon, this);
     dialog->addTextEditor("seconds", juce::String(engine.project.effectTailSeconds, 6), "Minimum seconds");
     dialog->addButton("Apply", 1, juce::KeyPress(juce::KeyPress::returnKey)); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, after](int answer)

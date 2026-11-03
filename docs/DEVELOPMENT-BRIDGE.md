@@ -17,13 +17,18 @@ The bridge starts a separate application with isolated analysis, audio preparati
 Prerequisites: Python 3.11 or newer (standard library only) and a trusted local build containing `--dev-control`. Existing build prerequisites are described in the [app README](../README.md). From the repository root in PowerShell:
 
 ```powershell
-cmake --build build --config Release --target Mixworks --parallel 3
+./scripts/build.ps1
+$candidateExe = (Get-Content build/mixworks-Release.path -Raw).Trim()
 python scripts/alloy_bridge.py init .local/bdev1
-python scripts/alloy_bridge.py start .local/bdev1 --exe "build/detection-Release/Mixworks Alloy.exe"
+python scripts/alloy_bridge.py start .local/bdev1 --exe $candidateExe
 python scripts/alloy_bridge.py call .local/bdev1 status
 ```
 
 Choose a fresh root name each time you change the candidate. `init` refuses an existing directory. The launcher rejects old binaries lacking the bridge markers before they can interpret the new flag as an ordinary production launch. This is a compatibility check, not executable signature verification.
+
+The build script uses one build worker, MSVC `/MP1` and below-normal priority,
+then restores its caller's environment and priority. Schedule the build at a useful checkpoint; do not overlap it with tests. Numeric
+RAM guards were removed; stop owned work only if actual responsiveness worsens.
 
 The launcher copies the executable to `root/bundle/Mixworks.exe` and hard-links the matching model/runtime on the same volume. It records their SHA-256 identities in `evidence/bundle.json`; keep canonical linked assets intact. This permits rebuilding without replacing the running executable. A stopped root can restart with the **same** candidate; a different candidate requires a fresh root. Sessions are loaded explicitly with `open`, even after restarting an existing root.
 
@@ -71,7 +76,7 @@ All indices are zero-based except built-in preset IDs. Successful replies contai
 
 | Command | Arguments and behaviour |
 | --- | --- |
-| `status` | No arguments. Available while busy. Returns version, protocolVersion, root, PID, capabilities, dirty/busy/playing/ready, position (seconds), status, selection, library, clips, lane controls, dimensions, peak and timestamp. |
+| `status` | No arguments. Available while busy. Returns version, protocolVersion, root, PID, capabilities, dirty/busy/playing/ready, position (seconds), status, selection, library, clips, lane controls, dimensions, peak, monitorMuted, audibleEnd, visual delivery facts and timestamp. |
 | `import` | Absolute `path` to existing WAV/FLAC/AIFF/MP3/OGG below owned `audio/`. Asynchronous: wait and check library. |
 | `add` | Library `index`. Asynchronous: wait and verify clips. |
 | `correct_source` | Library `index`, `bpm` (40–300), `downbeat` (source seconds, 0–10800). Applies a real correction in the isolated store. |
@@ -97,6 +102,16 @@ All indices are zero-based except built-in preset IDs. Successful replies contai
 | `close` | Requires clean, idle state. Stops transport and schedules normal app exit after writing the response. |
 
 Names allow ASCII letters, numbers, hyphens and underscores, maximum 96 characters; omit extensions. Lane values in `state.lanes` are manual values, not the complete automation curves or effective values during automated playback. Query capabilities rather than assuming future commands exist. Unsupported actions still need appropriate native tests or UI/hardware interaction.
+
+`state.visuals` is read-only: `validFrame`, `status`, the renderer's `frame` facts,
+`paintedFrames`, `lastPaintMs`, `maxGapMs`, and `gapHistogramCeilMs`. Paint counts
+deduplicate the same delivered image across preview and output. Histogram keys
+are upward-rounded integer milliseconds between distinct paints during playback;
+pause/clock-generation changes break the interval. Counters are cumulative for
+the scene lane lifetime, so subtract snapshots for a measured section. The last
+paint timestamp uses the native monotonic clock. Open a visible visual view before
+measuring; these facts establish native paints, not physical display scanout.
+`frame.position` and `frame.scenes` identify the actual rendered musical moment.
 
 `timing` reports the application's coordinate mapping; it is not independent onset truth. Compare it with annotated source samples and `audio_probe` when investigating timing. Each PCM probe starts a fresh renderer without preceding filter/plugin history; it verifies offline sample timing, not continuous effect tails, physical device latency or listening acceptance. Movement commands test model paths; native mouse tests remain necessary for gesture handling.
 

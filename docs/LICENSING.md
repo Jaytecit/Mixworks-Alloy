@@ -13,6 +13,34 @@ remain applicable, as explained in [GitHub's licensing guidance](https://docs.gi
 No public installer, binary release or commercial permission is granted by
 merely publishing this source. Existing local builds remain local test artifacts.
 
+## Commercial clearance assessment - 2 November 2026
+
+The [commercial assessment and action register](commercial/README.md) extend the
+prerequisites below. Jay confirms no permissions beyond personal use and no
+shared binaries. The earlier inspected local candidate also contains an extracted
+Synesthesia GLSL helper, reads original installed scenes with mixed/unknown
+terms, and compiles recovered AUFTAKT research code (its recovered model is not
+bundled). These are additional unresolved provenance/rights issues; they are not
+cleared by purchasing a framework licence or by retaining attribution alone.
+
+The owned visual runtime introduced in local V.0.55.67 replaces that renderer.
+The current 0.55.68 library contains 122 owned compositions and one attributed
+CC0-derived Beats in 4D shader. Its unknown-licence
+tanh approximation is replaced with GLSL's built-in function. Installed scene
+scripts, descriptors, thumbnails, textures and extracted Synesthesia helpers are
+excluded from the activated package. Python and the selected rendering libraries
+are bundled separately with their notices; video decoding remains disabled.
+Private reference evidence and previous local releases are retained, not shipped
+as part of this candidate. This visual replacement does not resolve recovered
+AUFTAKT provenance or the other public-distribution prerequisites below.
+
+The assessment identifies native/transitive notice gaps, static SoundTouch
+relinking materials, optional model/runtime rights, branding and commercial-sale
+requirements. It records technical observations and professional-review tasks,
+not a legal opinion. Existing local development previews remain untouched.
+Public distribution remains blocked until the exact intended package and all
+relevant rights are qualified. No agreements were accepted or vendors contacted.
+
 ## Public beta release prerequisites
 
 | Dependency | Observed local terms and build | Before distributing a restrictive beta |

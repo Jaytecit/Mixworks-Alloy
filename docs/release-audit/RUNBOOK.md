@@ -16,7 +16,7 @@ Per-run layout (not committed): `source/` ZIP+manifest+patch; `identity.json`; `
 
 ## Build without violating the responsiveness override
 
-`scripts/build.ps1` currently fetches/configures and builds `--parallel 3`; CMake enables MSVC `/MP`. Do not run that default for this audit. Inspect/prepare already-authorized dependencies using build/fetch pins, then use an ordinary below-normal child with one MSBuild worker and `/MP1`. No overlapping build/test. The following illustrates a scheduled **build**, not a command to run in discovery:
+`scripts/build.ps1` now fetches/configures and builds with one worker, MSVC `/MP1` and below-normal priority, restoring caller settings afterwards (ra01 repair of DISC-D02). CMake's general `/MP` setting remains, so direct builds must still append `/MP1`. Inspect dependencies and available memory/disk before scheduling a build; no overlapping build/test. The following illustrates the equivalent explicit child-launch policy:
 
 ```python
 # Save as a local owned driver; launch only at a scheduled build checkpoint.
@@ -64,7 +64,7 @@ assert result['exit'] == 0 and result['complete'] and not result['errors']
 assert not result.get('artifactRetention', {}).get('errors')
 ```
 
-Use actual source selectors; list of **22 named gate suites** from verification.py: rhythm-reliability, beat-grid, placement, tempo, tempo-browser, track-ownership, analysis-refresh, grid-correction, rhythm-decoder, library-assets, playback-cache, source-streaming, timeline-editing, alloy, window, fusion-workflows, mastering, export, latency, core, missing-model, corrupt-model. Core has no `--core-only`; missing/corrupt use `--neural-unavailable-only` with deliberately different owned bundles.
+Use actual source selectors; list of **23 named gate suites** from verification.py: rhythm-reliability, beat-grid, placement, tempo, tempo-browser, track-ownership, split-effects, analysis-refresh, grid-correction, rhythm-decoder, library-assets, playback-cache, source-streaming, timeline-editing, alloy, window, fusion-workflows, mastering, export, latency, core, missing-model, corrupt-model. Core has no `--core-only`; missing/corrupt use `--neural-unavailable-only` with deliberately different owned bundles.
 
 The current SelfTest has additional early-return selectors, inventoried in CLI CSV. Explicitly map/include performance-take, targeted-analysis, import-scan, grid-attack, cache-settings, independent-timeline, unlink, edit-selection, library-preview, zoom-handles, transition-swaps, audio-ui, markers, stems, live-hotcues, promo-control, musical-energy, auto-arrange, native-picker, long-navigation/long-session/long-open, analysis-cache, real-tracks, constant-four-four, split-effects, preset-nodes, cache-reopen and others only where present. Inspect exact dispatch and nested run calls; no claim all are absent from core/alloy or all needed as duplicate runs. Deduplicate by actual executed checks and required paths, not selector name alone. Performance-take currently accepts `--plugin <finite-delay-VST3>`; verify source expectation before selecting plugin flags. Never invent unsupported `--section-only` or `--midi-only` flags.
 
@@ -83,7 +83,7 @@ These commands are not interchangeable with product runtime acceptance. Some har
 
 ## Bridge and actual UI
 
-Read [DEVELOPMENT-BRIDGE](../DEVELOPMENT-BRIDGE.md) in full before use. Its quick-start `--parallel 3` build example is superseded by AGENTS. Use a trusted current candidate, fresh short root; `start` copies exe and shares matching canonical model/runtime assets:
+Read [DEVELOPMENT-BRIDGE](../DEVELOPMENT-BRIDGE.md) in full before use. Its repaired quick start uses the safe build script and generated executable path. Use a trusted current candidate, fresh short root; `start` copies exe and shares matching canonical model/runtime assets:
 
 ```powershell
 python scripts/alloy_bridge.py init .local/ra-b01
@@ -139,10 +139,12 @@ Only when the user explicitly requests a final release-verification checkpoint i
 python scripts/verify-analysis.py --exe "<frozen-bundle>/Mixworks.exe" --output .local/ra-final01 --receipt .local/ra-final01/receipt.json --include-stress
 ```
 
-This command requires built gain/delay/latency VSTs, installed Vital, substantial disk headroom and the90min capacity fixture; it runs sequentially, including missing/corrupt-model variants. `--receipt` requires `--include-stress`; do not drop stress and call the result complete. Existing22-suite gate may contain superseded defaults; inspect independently and supplement current new-feature paths. Never weaken receipt validators or reuse another executable's results to force acceptance. Full gate is necessary at final checkpoint, insufficient for hardware/listening/package/rights/whole-audit PASS.
+This command requires built gain/delay/latency VSTs, installed Vital, substantial disk headroom and the90min capacity fixture; it runs sequentially, including missing/corrupt-model variants. `--receipt` requires `--include-stress`; do not drop stress and call the result complete. Revised23-suite gate may contain superseded defaults; inspect independently and supplement current new-feature paths. Never weaken receipt validators or reuse another executable's results to force acceptance. Full gate is necessary at final checkpoint, insufficient for hardware/listening/package/rights/whole-audit PASS.
 
 Read deploy.ps1 and current receipt schema before local staging. Its `-VerificationManifest <receipt> -VerifyOnly` validates a candidate; actual staging is separate, retains launcher/bundle backups and never starts the app. Scoped receipt is valid only for its stated allowlist/scope and accepted full baseline; it is not a fresh full regression. This framework makes no deployment request. Public binaries remain blocked by R10 even after technical checks.
 
 ## Failure and report procedure
 
 Record original failure immutably, minimize owned reproduction, compare independent requirement/oracle, classify confirmed defect versus suspicion versus requirement gap. Future authorized local fixes include regression reproduction and proportionate verification; current discovery includes no app fixes. Use [templates/result.json](templates/result.json) per rule/candidate. A BLOCKED subcase keeps whole rule BLOCKED, a confirmed failed subcase FAIL; partial passing cases never upgrade whole rule. Final report lists each status, unresolved defect/ambiguity, environment/fixture coverage and package/source identity, with public distribution clearance separately stated. Preserve source/evidence independently of commits and update exact continuation in STATUS/HANDOVER.
+
+Current ra06 policy: split-effects uses the finite-delay primary module, ordinary ownership uses gain. Complete receipts reject unreviewed conditional options, including catalogue-reopen child coverage. The revised23-suite gate has not run; other supplemental cases still need independent review.

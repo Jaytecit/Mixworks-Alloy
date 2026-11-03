@@ -96,13 +96,13 @@ void runRealTrackTests(const std::function<void(bool, const juce::String&)>& che
         {
             const auto warmStarted = juce::Time::getMillisecondCounterHiRes(); auto warm = timedRead(warmStages);
             warmMs = juce::Time::getMillisecondCounterHiRes() - warmStarted;
-            check(warm.media && warm.media->analysisFromCache && warm.media->decodedFromCache
-                && warm.media->analysisSource == media->analysisSource, "warm real loading reuses preserved analysis and decoded PCM");
+            check(warm.media && warm.media->analysisFromCache && warm.media->original && !warm.media->cache
+                && warm.media->analysisSource == media->analysisSource, "warm real loading reuses preserved analysis and original audio");
         }
         if (cachedAtLoad && !bandControls)
         {
             juce::AudioBuffer<float> decoded(media->channels(), media->frames());
-            for (int ch = 0; ch < media->channels(); ++ch) decoded.copyFrom(ch, 0, media->channelData(ch), media->frames());
+            for (int ch = 0; ch < media->channels(); ++ch) for (int i = 0; i < media->frames(); ++i) decoded.setSample(ch, i, media->sample(ch, i));
             media->analysis = analyseMusic(decoded, media->sampleRate);
         }
         // Test automatic results independently of any saved user correction.
@@ -278,15 +278,15 @@ void runRealTrackTests(const std::function<void(bool, const juce::String&)>& che
         juce::Array<juce::var> reopenedCaches;
         for (const auto& clip : restored.project.clips)
         {
-            cacheHit &= clip.media->analysisFromCache && clip.media->decodedFromCache && (!clip.prepared || clip.prepared->fromDiskCache);
+            cacheHit &= clip.media->analysisFromCache && clip.media->original && !clip.media->cache && !clip.prepared;
             auto* state = new juce::DynamicObject(); state->setProperty("source", clip.media->file.getFullPathName());
-            state->setProperty("analysisHit", clip.media->analysisFromCache); state->setProperty("decodedHit", clip.media->decodedFromCache);
+            state->setProperty("analysisHit", clip.media->analysisFromCache); state->setProperty("originalFile", clip.media->original != nullptr);
             state->setProperty("tempoHit", clip.prepared && clip.prepared->fromDiskCache);
             if (clip.prepared) { state->setProperty("tempoWarning", clip.prepared->cacheWarning); if (clip.prepared->cache) state->setProperty("tempoFile", clip.prepared->cache->file.getFullPathName()); }
             reopenedCaches.add(juce::var(state));
         }
         root->setProperty("reopenedCaches", reopenedCaches);
-        check(cacheHit, "real session reopen reuses analysis, decoded audio and applicable tempo caches");
+        check(cacheHit, "real session reopen reuses analysis and streams originals without decoded or prepared copies");
         Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940); ui.engine.project = project;
         ui.timeline.pixelsPerSecond = 16; ui.selectTransition(id, true);
         auto image = output.getChildFile("independent-real-transition.png").createOutputStream(); juce::PNGImageFormat png;

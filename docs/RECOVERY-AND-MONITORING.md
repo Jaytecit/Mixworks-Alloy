@@ -4,6 +4,13 @@ The Mute checkbox beside MASTER OUTPUT silences the device's speakers/headphones
 
 Mixworks checks for unsaved recovery snapshots when a window starts. File → Recover unsaved mix opens the same choice later. Restore loads through the normal session/audio/plugin preparation workflow; the restored mix is marked unsaved. Later keeps both your current mix and the recovery. Discard recovery removes those recovery generations. A damaged latest generation can fall back to its previous valid snapshot. Missing audio, unavailable plugins and Cancel preserve the current project and the source recovery.
 
+When locating a moved source, choose the original recording. Saved source hashes
+and dimensions remain attached to the new location, including saved-take snapshots;
+a different recording is refused. Successful Locate marks the mix unsaved so you
+can explicitly keep the new location. Cancelling or failing Locate preserves the
+current mix and the saved arrangement. The focused ua15 recovery/relink evidence
+is recorded in the [audit checkpoint](release-audit/UA15-RECOVERY-RELINK-20261101.md).
+
 A dirty mix is snapshotted every 30 seconds while paused and ready. Snapshot capture waits during playback, recording, rehearsal, import, export, pending audio or tempo preparation and save dialogs. Plugin state serialization may block, so this first implementation deliberately waits for a pause rather than periodically interrupting audio. Continuous live-performance crash coverage remains unfinished. Pause after an important take and save normally; a snapshot is not a replacement for a session save.
 
 Each window owns its own UUID recovery folder and holds an operating-system lease. Other running windows are excluded. Two generations use temporary-file replacement, validated session data and a checksum. The original recovered record stays leased until a session save or durable successor snapshot succeeds. Save, New, a successful different-session open and an accepted clean close clear this window's recovery. A small owner record stays behind; unrelated files are preserved.

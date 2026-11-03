@@ -6,6 +6,13 @@ out/
 *.mixworks.bak
 __pycache__/
 .impeccable/
+# User-populated visual media; never part of the application source licence.
+visuals/original/Sprites/*
+!visuals/original/Sprites/README.md
+visuals/original/Backgrounds/*
+!visuals/original/Backgrounds/README.md
+visuals/original/Video/*
+!visuals/original/Video/README.md
 # User audio, exports, recovered libraries and transport credentials.
 *.wav
 *.mp3
@@ -20,3 +27,7 @@ __pycache__/
 *.obj
 .env
 .env.*
+
+# Original user artwork stays local; application reference thumbnails are separate.
+/Martooni.png
+/Martooni1.png

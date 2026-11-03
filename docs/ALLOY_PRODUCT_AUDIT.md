@@ -1,3 +1,5 @@
+> Dated audit/repair record. Baseline findings and pending labels below describe their original checkpoint. Use the [0.55.64 request register](REQUEST-STATUS-20261024.md) for reconciled delivery and the [active audit status](release-audit/STATUS.md) for current release qualification. Do not treat historical failures as current confirmed defects.
+
 # Mixworks Alloy product audit — 21 October 2026
 
 Method: dual-agent Impeccable assessment (A: `/root/design_critique`; B: `/root/technical_audit`), supplemented by primary-agent source tracing and operation of the native application.

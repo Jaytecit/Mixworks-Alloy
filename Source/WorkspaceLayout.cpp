@@ -32,23 +32,29 @@ void WorkspaceLayout::update(int width, int height, bool performanceDocked, bool
     overview = {centreX, bodyTop, timelineWidth, 28};
     const int timelineY = overview.getBottom() + 2 + timeRulerHeight + labelHeight;
     const int bodyBudget = bodyBottom - timelineY - tempoStripHeight - 8;
-    const int controlledHeight = trackCount * minimumLaneHeight + timelineScrollbarThickness;
+    const int controlledHeight = trackCount * minimumLaneHeight + timelineScrollbarThickness + visualLaneHeight;
     constexpr int compactDockHeight = 32 + 32 + 64; // Tabs, panel heading and a usable scrolling body below minimum window size.
-    const int deckHeight = performanceDocked ? std::min(200, std::max(compactDockHeight, bodyBudget - controlledHeight)) : 32;
+    // Editing must reserve its complete workflow before applying the ordinary
+    // lane minimum, otherwise smaller windows push the primary actions offscreen.
+    const int deckHeight = !performanceDocked ? 32 : editingDocked
+        ? std::min(240, std::max(compactDockHeight, bodyBudget - trackCount * 40 - visualLaneHeight - timelineScrollbarThickness))
+        : std::min(200, std::max(compactDockHeight, bodyBudget - controlledHeight));
     maximumTimelineHeight = std::max(1, bodyBudget - deckHeight);
-    // Expanded Editing needs 336 px of controls plus its tabs and title.
+    // Editing pages share a compact audio workflow; expand vertically for precise fields when wanted.
     // Other consoles retain their existing lane minimum. Musical clocks are untouched.
-    const int editingMinimum = std::max(trackCount * 24 + timelineScrollbarThickness, bodyBudget - 400);
+    const int editingMinimum = std::max(trackCount * 24 + timelineScrollbarThickness + visualLaneHeight, bodyBudget - 400);
     minimumTimelineHeight = std::min(maximumTimelineHeight, editingDocked ? std::min(controlledHeight, editingMinimum) : controlledHeight);
     const int requestedHeight = preferredTimelineHeight > 0 ? preferredTimelineHeight
-        : performanceDocked ? trackCount * laneHeight + timelineScrollbarThickness : maximumTimelineHeight;
+        : performanceDocked ? trackCount * laneHeight + timelineScrollbarThickness + visualLaneHeight : maximumTimelineHeight;
     const int timelineHeight = juce::jlimit(minimumTimelineHeight, maximumTimelineHeight, requestedHeight);
     // Overall height changes equalise lanes; lane-edge edits apply within that height.
-    if (!timeline.isEmpty() && timelineHeight != timeline.getHeight()) laneScale.fill(1);
-    defaultLaneHeight = std::max(1, (timelineHeight - timelineScrollbarThickness) / trackCount);
+    if (!timeline.isEmpty() && timelineHeight != timeline.getHeight() + visualLaneHeight) laneScale.fill(1);
+    defaultLaneHeight = std::max(1, (timelineHeight - visualLaneHeight - timelineScrollbarThickness) / trackCount);
     headers = {centreX, timelineY, headerWidth, timelineHeight}; timeline = {headers.getRight() + 4, timelineY, std::max(1, timelineWidth - headerWidth - 4), timelineHeight};
+    visualHeader = headers.removeFromBottom(std::min(visualLaneHeight, headers.getHeight() / 2));
+    visuals = timeline.removeFromBottom(visualHeader.getHeight());
     ruler = {timeline.getX(), timelineY - timeRulerHeight - labelHeight, timeline.getWidth(), timeRulerHeight + labelHeight};
-    tempo = {timeline.getX(), timeline.getBottom(), timeline.getWidth(), tempoStripHeight};
+    tempo = {timeline.getX(), visuals.getBottom(), timeline.getWidth(), tempoStripHeight};
     peakPanel = {centreX + timelineWidth + 8, bodyTop, peakPanelWidth, tempo.getBottom() - bodyTop};
     timelineDivider = {centreX, tempo.getBottom(), centreWidth, 8};
     performance = {centreX, tempo.getBottom() + 8, centreWidth, bodyBottom - tempo.getBottom() - 8};
@@ -231,7 +237,13 @@ juce::Result writeWorkspacePreferences(const juce::File& file, const WorkspaceLa
     const auto text = juce::JSON::toString(doc);
     if (text.getNumBytesAsUTF8() > 16384) return juce::Result::fail("Workspace preferences exceed the 16 KiB budget; the file was kept.");
     auto result = file.getParentDirectory().createDirectory(); if (result.failed()) return result;
-    if (file.existsAsFile() && !file.copyFileTo(file.getSiblingFile(file.getFileName() + ".bak").getNonexistentSibling())) return juce::Result::fail("Cannot back up workspace preferences.");
+    if (file.existsAsFile())
+    {
+        const auto backup = file.getSiblingFile(file.getFileName() + ".previous");
+        if (backup.isSymbolicLink()) return juce::Result::fail("Linked workspace backups are unsupported.");
+        juce::TemporaryFile previous(backup);
+        if (!file.copyFileTo(previous.getFile()) || !previous.overwriteTargetFileWithTemporary()) return juce::Result::fail("Cannot back up workspace preferences.");
+    }
     juce::TemporaryFile temporary(file);
     if (!temporary.getFile().replaceWithText(text, false, false, "\n") || !temporary.overwriteTargetFileWithTemporary()) return juce::Result::fail("Cannot save workspace preferences.");
     return juce::Result::ok();

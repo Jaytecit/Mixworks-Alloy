@@ -25,21 +25,41 @@ juce::Result readTake(const juce::var& value, PerformanceTake& out)
 {
     auto fail=[] { return juce::Result::fail("Invalid performance take; the current session was kept."); };
     auto number=[](const juce::var& x,double lo,double hi) { return (x.isInt()||x.isInt64()||x.isDouble()) && std::isfinite((double)x) && (double)x>=lo && (double)x<=hi; };
-    if (!value.isObject() || !value["initial"].isObject() || value["initial"].hasProperty("performanceTakes")
+    auto counter=[](const juce::var& x,juce::int64 maximum)
+    {
+        // Compare integer variants as integers: converting the upper bound to
+        // double rounds INT64_MAX/2 up and previously admitted an extra frame.
+        if (x.isInt() || x.isInt64()) return (juce::int64)x>=0 && (juce::int64)x<=maximum;
+        if (!x.isDouble()) return false;
+        const auto n=(double)x;
+        return std::isfinite(n) && n>=0 && n<std::ldexp(1.,63) && std::trunc(n)==n && (juce::int64)n<=maximum;
+    };
+    auto snapshot=[](const juce::var& document)
+    {
+        // parseProject validates structure only, without decoding media or
+        // loading plugins. Forbid takes before calling it to prevent recursion.
+        return document.isObject() && !document.hasProperty("performanceTakes")
+            && parseProject(juce::JSON::toString(document)).error.isEmpty();
+    };
+    if (!value.isObject()
         || !value["id"].isString() || value["id"].toString().isEmpty() || value["id"].toString().length()>512
         || !value["name"].isString() || value["name"].toString().length()>1024 || !value["issue"].isString() || value["issue"].toString().length()>4096
         || !value["masterWav"].isString() || !value["complete"].isBool() || !value["state"].isInt() || !number(value["state"],0,(int)TakeState::complete) || !number(value["sampleRate"],8000,768000)
-        || !number(value["initialPosition"],0,1.e9) || !number(value["frames"],0,INT64_MAX/2)
+        || !number(value["initialPosition"],0,1.e9) || !counter(value["frames"],INT64_MAX/2)
         || !value["events"].isArray() || value["events"].size()>(int)PerformanceTake::maximumEvents) return fail();
+    if (!snapshot(value["initial"])) return fail();
     PerformanceTake take; take.id=value["id"].toString(); take.name=value["name"].toString(); take.initial=value["initial"];
     take.sampleRate=(double)value["sampleRate"]; take.initialPosition=(double)value["initialPosition"]; take.frames=(int64_t)value["frames"];
     take.complete=(bool)value["complete"]; take.issue=value["issue"].toString(); take.masterWav=value["masterWav"].toString(); take.state=TakeState::complete;
     if ((int)value["state"]!=(int)TakeState::complete) { take.complete=false; take.issue="Recovered interrupted take: the recorded prefix is retained. Recording was not resumed automatically."; }
     int64_t lastFrame=-1,lastSequence=-1;
+    int projectSnapshots=0;
     for (const auto& item : *value["events"].getArray())
     {
-        if (!item.isObject() || !number(item["frame"],0,(double)take.frames) || !number(item["sequence"],0,1.e12)
-            || !item["kind"].isInt() || !number(item["kind"],0,(int)TakeEventKind::midi)
+        if (!item.isObject() || !counter(item["frame"],take.frames) || !counter(item["sequence"],1000000000000LL)
+            // pluginState and midi are reserved and have no replay handler.
+            // Refuse them rather than silently omit part of a saved performance.
+            || !item["kind"].isInt() || !number(item["kind"],0,(int)TakeEventKind::project)
             || !item["lane"].isInt() || !number(item["lane"],-1,3) || !item["control"].isInt() || !number(item["control"],0,7)
             || !item["stem"].isInt() || !number(item["stem"],-1,3) || !number(item["value"],-1.e9,1.e9) || !number(item["sourcePosition"],0,1.e9)) return fail();
         for (const char* key : {"owner","slot","parameter"}) if (!item[key].isString() || item[key].toString().length()>4096) return fail();
@@ -53,7 +73,7 @@ juce::Result readTake(const juce::var& value, PerformanceTake& out)
         if ((e.kind==TakeEventKind::transport || e.kind==TakeEventKind::mute || e.kind==TakeEventKind::solo) && e.value!=0 && e.value!=1) return fail();
         if (e.kind==TakeEventKind::seek && e.value<0) return fail();
         if (e.kind==TakeEventKind::tempo && (e.value<20 || e.value>400)) return fail();
-        if ((e.kind==TakeEventKind::project || e.kind==TakeEventKind::pluginState) && !e.payload.isObject()) return fail();
+        if (e.kind==TakeEventKind::project && (++projectSnapshots>64 || !snapshot(e.payload))) return fail();
         take.events.push_back(std::move(e));
     }
     out=std::move(take); return juce::Result::ok();

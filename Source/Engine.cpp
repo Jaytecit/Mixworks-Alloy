@@ -146,7 +146,7 @@ Clip* Engine::controlClip(int track)
     auto* c = project.clipFor(selectedClip); return c && c->track == track ? c : nullptr;
 }
 const Clip* Engine::controlClip(int track) const { return const_cast<Engine*>(this)->controlClip(track); }
-TrackSettings& Engine::controlSettings(int track) { auto* c = controlClip(track); return c ? project.effectSettings(*c) : project.tracks[(size_t) track]; }
+TrackSettings& Engine::controlSettings(int track) { return project.tracks[(size_t) track]; }
 TrackSettings& Engine::controlEffectSettings(int track) { auto* c = controlClip(track); return c ? project.effectSettings(*c) : project.tracks[(size_t)track]; }
 std::vector<std::unique_ptr<PluginSlot>>& Engine::pluginChain(int track)
 {
@@ -279,7 +279,7 @@ void Engine::stop()
     libraryPreviewSource = nullptr; ++libraryPreviewGeneration;
     serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
     finishAutomation(); automationRecordMode = AutomationRecordMode::read; replayShifts.clear(); cancelPreparedLaunch();
-    playing = false; position = project.playbackStart(); deviceClockValid = false; keyboard.allNotesOff(0); resetPlugins();
+    playing = false; position = project.playbackStart(); ++visualClockRevision; deviceClockValid = false; keyboard.allNotesOff(0); resetPlugins();
 }
 void Engine::seek(double seconds)
 {
@@ -289,7 +289,7 @@ void Engine::seek(double seconds)
     serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
     finishAutomation();
     for (auto& shift:replayShifts) shift.second=0;
-    position = std::max(0.0, seconds); deviceClockValid = false; resetPlugins();
+    position = std::max(0.0, seconds); ++visualClockRevision; deviceClockValid = false; resetPlugins();
 }
 void Engine::prepareClipProcessing()
 {
@@ -518,7 +518,9 @@ bool Engine::renderClipAudio(const Project& source, const Clip& clip, int frames
                 const auto& media = stems ? clip.stems->sources[(size_t) s] : clip.media;
                 const int available = prepared ? prepared->frames() : media->frames();
                 if (index >= available) continue;
-                const auto* samples = prepared ? prepared->channelData(sourceChannel) : media->channelData(sourceChannel);
+                const float a = prepared ? prepared->channelData(sourceChannel)[index] : media->sample(sourceChannel, index);
+                const int next = std::min(index + 1, available - 1);
+                const float b = prepared ? prepared->channelData(sourceChannel)[next] : media->sample(sourceChannel, next);
                 float level = 1;
                 if (stems)
                 {
@@ -526,7 +528,7 @@ bool Engine::renderClipAudio(const Project& source, const Clip& clip, int frames
                     const float db = settings.valueAt(AutomationTarget::volume, sourceTime), pan = settings.valueAt(AutomationTarget::pan, sourceTime);
                     level = (db <= -60 ? 0.f : juce::Decibels::decibelsToGain(db)) * std::min(1.f, ch == 0 ? 1 - pan : 1 + pan);
                 }
-                interpolated += (samples[index] + fraction * (samples[std::min(index + 1, available - 1)] - samples[index])) * level;
+                interpolated += (a + fraction * (b - a)) * level;
             }
             sourceBuffer.addSample(ch, i, interpolated * gain);
         }
@@ -555,25 +557,25 @@ void Engine::render(juce::AudioBuffer<float>& output, int frames, double at, juc
         return clip.pendingPlacement == PendingPlacement::none && clip.stems && clip.stemsEnabled
             && std::any_of(clip.stemControls.begin(), clip.stemControls.end(), [](const auto& controls) { return controls.solo; });
     };
-    // Stem Solo owns the whole timeline, not just the four children of a clip.
-    // Keep the mask independent of the current playhead, like ordinary lane Solo.
+    // Stem Solo isolates sections only within their own lane. Ordinary lane
+    // mute/solo remains independent; other lanes keep their audio and effects.
     std::array<bool, trackCount> stemSoloLanes {};
-    bool anyStemSolo = false;
     for (const auto& clip : source.clips) if (stemSolo(clip))
-    { anyStemSolo = true; stemSoloLanes[(size_t) clip.track] = true; }
+        stemSoloLanes[(size_t) clip.track] = true;
+    const auto stemAudible = [&](const Clip& clip) { return !stemSoloLanes[(size_t) clip.track] || stemSolo(clip); };
     for (auto& buffer : trackBuffers) buffer.clear(0, frames);
     for (const auto& group : source.clips)
     {
         if (source.effectOwner(group) != &group) continue;
         if (std::none_of(source.clips.begin(), source.clips.end(), [&](const auto& member)
-            { return member.effects == group.effects && member.pendingPlacement == PendingPlacement::none && (!anyStemSolo || stemSolo(member)); })) continue;
+            { return member.effects == group.effects && member.pendingPlacement == PendingPlacement::none && stemAudible(member); })) continue;
         const bool inserted = true; // Built-in controls and VSTs share one continuous original-track bus.
         effectBuffer.clear(0, frames);
         for (const auto& clip : source.clips)
         {
             if (pausedTake) continue; // Keep processing the shared returns with silent input.
             if (clip.effects != group.effects || clip.pendingPlacement != PendingPlacement::none) continue;
-            if (anyStemSolo && !stemSolo(clip)) continue;
+            if (!stemAudible(clip)) continue;
             auto* voice = liveVoices && at >= 0 ? liveVoiceFor(clip.id) : nullptr;
             auto add = [&](int offset, int count, double mapped)
             {
@@ -696,9 +698,7 @@ void Engine::render(juce::AudioBuffer<float>& output, int frames, double at, juc
         }
         else equalizers[(size_t) track].process(buffer, 0, frames, sr, settings.eqDb);
         for (int i = 0; i < frames; ++i) cutoffFilters[(size_t) track].process(buffer, i, 1, sr, automationValueIn(source, {track, AutomationTarget::cutoff}, at < 0 ? -1 : at + i / sr));
-        // Gate after lane effects too: a different lane's tails/instrument must
-        // not leak into a stem solo. Stem Solo takes precedence over lane Solo.
-        const bool muted = settings.mute || (anyStemSolo ? !stemSoloLanes[(size_t) track] : anySolo && !settings.solo);
+        const bool muted = settings.mute || (anySolo && !settings.solo);
         const float gain = muted ? 0.0f : juce::Decibels::decibelsToGain(settings.gainDb);
         // Centre-unity balance law. Identical in live and offline rendering.
         const float left = gain * std::min(1.0f, 1.0f - settings.pan), right = gain * std::min(1.0f, 1.0f + settings.pan);
@@ -744,8 +744,54 @@ bool Engine::hasLibraryPreview(juce::AudioSource& source)
     const juce::ScopedLock guard(lock);
     return libraryPreviewSource == &source && !exporting;
 }
+bool Engine::requestPlayback(double at, int frames)
+{
+    streamBuffering = false;
+    bool ready = true, failed = false;
+    const auto admit = [&](const Clip& clip, double position)
+    {
+        ready = requestOriginalClip(clip, position, .25, .35 + frames / sampleRate.load()) && ready;
+        failed = failed || (clip.media->original && clip.media->original->failed());
+        if (clip.stems && clip.stemsEnabled) for (const auto& stem : clip.stems->sources)
+            failed = failed || (stem->original && stem->original->failed());
+    };
+    for (const auto& clip : project.clips)
+    {
+        const auto* voice = liveVoiceFor(clip.id); const auto replay = replayShifts.find(clip.id);
+        const double shift = voice && voice->status.active ? voice->shift : replay != replayShifts.end() ? replay->second : 0.;
+        if (clip.end() <= at + shift || clip.start >= at + shift + frames / sampleRate.load()) continue;
+        admit(clip, at + shift);
+    }
+    // A queued project/cue may become active partway through this callback.
+    // Admit its destination before rendering any part of the block.
+    for (const auto& clip : project.clips)
+        if (const auto* voice = liveVoiceFor(clip.id); voice && voice->status.state == LiveHotcueState::pending
+            && voice->status.boundary < at + frames / sampleRate.load())
+            admit(clip, voice->destination);
+    if (queuedProgramme && !queuedProgrammeCommitted && queuedProgrammeBoundary < at + frames / sampleRate.load())
+        for (const auto& clip : queuedProgramme->clips)
+        {
+            const double shift = clip.id == queuedProgrammeEvent.owner ? queuedProgrammeEvent.value : 0.;
+            admit(clip, at + shift);
+        }
+    if (failed) { streamFailed = true; playing = false; deviceClockValid = false; return false; }
+    if (!ready) { streamBuffering = true; ++streamWaitCallbacks; deviceClockValid = false; return false; }
+    for (const auto& clip : project.clips)
+    {
+        const auto* voice = liveVoiceFor(clip.id); const auto replay = replayShifts.find(clip.id);
+        const double shift = voice && voice->status.active ? voice->shift : replay != replayShifts.end() ? replay->second : 0.;
+        requestOriginalClip(clip, at + shift, .25, 1.);
+        if (voice && voice->status.state == LiveHotcueState::pending)
+            requestOriginalClip(clip, voice->destination, .25, .5);
+    }
+    if (queuedProgramme && !queuedProgrammeCommitted)
+        for (const auto& clip : queuedProgramme->clips)
+            requestOriginalClip(clip, at + (clip.id == queuedProgrammeEvent.owner ? queuedProgrammeEvent.value : 0.), .25, 1.);
+    return true;
+}
 void Engine::audioDeviceIOCallbackWithContext(const float* const*, int, float* const* outputs, int outputChannels, int frames, const juce::AudioIODeviceCallbackContext&)
 {
+    OriginalAudio::Realtime realtimeReads;
     struct Measure
     {
         AudioCallbackDiagnostics& diagnostics;
@@ -762,11 +808,13 @@ void Engine::audioDeviceIOCallbackWithContext(const float* const*, int, float* c
     auto& midi = callbackMidi; midi.clear(); midiCollector.removeNextBlockOfMessages(midi, frames); keyboard.processNextMidiBuffer(midi, 0, frames, true);
     const bool running = playing.load(); const double at = position.load();
     serviceLiveHotcues();
+    if (running && !gridAudition.active() && !rehearsalActive() && !takeAudition && !requestPlayback(at, frames)) return;
     if (rehearsalActive() || gridAudition.active()) { cancelScheduledPause(ScheduledPauseReason::unavailable); cancelLiveHotcues(ScheduledPauseReason::unavailable,true); }
     const auto deliverMonitor = [&]
     {
         outputPeaks.push(mixBuffer, frames);
         spectrum.push(mixBuffer, frames, sampleRate.load());
+        visualSpectrum.push(mixBuffer, frames, sampleRate.load());
         if (!monitorMuted.load()) for (int ch = 0; ch < std::min(2, outputChannels); ++ch)
             if (outputs[ch]) juce::FloatVectorOperations::copy(outputs[ch], mixBuffer.getReadPointer(ch), frames);
         if (privatePreviewSource && privatePreviewFirstChannel>=2 && privatePreviewFirstChannel+1<outputChannels)
@@ -1027,7 +1075,7 @@ PreparedProject Engine::prepareProject(const juce::String& text, const ProjectPr
                 if (!binding["sha256"].isString() || !binding["frames"].isInt() || (!binding["sampleRate"].isDouble() && !binding["sampleRate"].isInt())) { result.error="Invalid saved source identity."; return result; }
                 const auto expected=binding["sha256"].toString();
                 if (expected.isNotEmpty() && (expected!=loaded.media->analysisSource.sha256 || (int)binding["frames"]!=loaded.media->frames() || (double)binding["sampleRate"]!=loaded.media->sampleRate))
-                { result.error="A source changed since this arrangement/take was saved: "+reference.path+". The saved performance and current session were kept."; return result; }
+                { result.error="That file differs from the saved audio. Locate the original file and open the mix again.\nA source changed since this arrangement/take was saved: "+reference.path+". The saved performance and current session were kept."; return result; }
             }
         }
         loaded.media->id = reference.id; loaded.media->name = reference.name; loaded.media->manualBpm = reference.bpm;
@@ -1135,12 +1183,13 @@ juce::String Engine::commitProject(PreparedProject prepared)
     const juce::ScopedLock guard(lock);
     serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
     liveHotcueVoices.clear(); // Document commit is message-thread-owned; no runtime state crosses Open.
+    endTakeAudition();
     finishAutomation(); automationRecordMode = AutomationRecordMode::read; automationArmed.fill(false); masterAutomationArmed = false;
     if (workMode==WorkMode::recordPerform) { automationRecordMode=AutomationRecordMode::write; automationArmed.fill(true); masterAutomationArmed=true; }
     endTransitionRehearsal();
     playing = false; position = 0; deviceClockValid = false; keyboard.allNotesOff(0);
     masterClipped = false; masterPeak = masterInputPeak = 0;
-    project = std::move(result.project); position = project.playbackStart(); tempo = project.bpm; library = std::move(prepared.library); plugins = std::move(stagedPlugins); gainSnapResetPending = true;
+    project = std::move(result.project); ++visualClockRevision; position = project.playbackStart(); tempo = project.bpm; library = std::move(prepared.library); plugins = std::move(stagedPlugins); gainSnapResetPending = true;
     masterEqualizer.reset();
     for (auto& eq : equalizers) eq.reset(); for (auto& filter : cutoffFilters) filter.reset(); prepareClipProcessing();
     return {};
@@ -1354,7 +1403,6 @@ bool Engine::applyGainControl(const ControlEvent& event, AutomationAddress addre
 {
     if (!std::isfinite(db) || !std::isfinite(event.inputMs)) return false;
     if (gainSnapResetPending.exchange(false)) gainSnapGestures.assign(trackCount * 4 + 1, {});
-    if (address.target != AutomationTarget::master && controlClip(address.track)) address.clipId = selectedClip;
     if (project.automationLocked(address)) return false;
     const auto index = address.target == AutomationTarget::master ? 0 : 1 + address.track * 4 + (int) address.target;
     if (index < 0 || index >= (int) gainSnapGestures.size()) return false;

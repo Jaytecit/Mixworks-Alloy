@@ -93,7 +93,13 @@ void GridAudition::render(juce::AudioBuffer<float>& output, int frames, double r
 {
     output.clear();
     if (!running || !media || !std::isfinite(rate) || rate <= 0) return;
-    const float* channels[2] {media->channelData(0), media->channelData(std::min(1, media->channels() - 1))};
+    if (media->original)
+    {
+        if (!media->original->request((int)(cursor * media->sampleRate),
+            (int)std::min(double(media->frames()), (cursor + frames / rate) * media->sampleRate + 2))) return;
+        media->original->request((int)(cursor * media->sampleRate),
+            (int)std::min(double(media->frames()), (cursor + 1.) * media->sampleRate));
+    }
     for (int i = 0; i < std::min(frames, output.getNumSamples()); ++i)
     {
         if (cursor >= media->duration()) { running = false; break; }
@@ -101,7 +107,7 @@ void GridAudition::render(juce::AudioBuffer<float>& output, int frames, double r
         const int first = juce::jlimit(0, media->frames() - 1, (int) sample), next = std::min(first + 1, media->frames() - 1);
         const float fraction = (float) (sample - first), click = clickOn ? grid.clickAt(cursor) : 0;
         for (int ch = 0; ch < std::min(2, output.getNumChannels()); ++ch)
-            output.setSample(ch, i, (sourceOn ? (channels[ch][first] + fraction * (channels[ch][next] - channels[ch][first])) * gain : 0) + click);
+            output.setSample(ch, i, (sourceOn ? (media->sample(std::min(ch, media->channels()-1), first) + fraction * (media->sample(std::min(ch, media->channels()-1), next) - media->sample(std::min(ch, media->channels()-1), first))) * gain : 0) + click);
         cursor += 1 / rate;
     }
 }

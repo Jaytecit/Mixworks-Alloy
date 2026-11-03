@@ -1,8 +1,17 @@
 param([switch]$TestPlugin, [string]$VerificationManifest)
 $ErrorActionPreference = 'Stop'
 $workspacePath = Split-Path -Parent $PSScriptRoot
+$buildProcess = [System.Diagnostics.Process]::GetCurrentProcess()
+$previousPriority = $buildProcess.PriorityClass
+$previousCompilerOptions = $env:_CL_
+$previousBuildParallelism = $env:CMAKE_BUILD_PARALLEL_LEVEL
 Push-Location -LiteralPath $workspacePath
 try {
+    # Child tools inherit this priority. Keep both MSBuild and MSVC compilation
+    # sequential, including when the caller has enabled parallel compilation.
+    $buildProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal
+    $env:_CL_ = ($previousCompilerOptions + ' /MP1').Trim()
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = '1'
     & (Join-Path $PSScriptRoot 'fetch-analysis.ps1')
     $dependencyPath = Join-Path $workspacePath '.local\deps\JUCE'
     $expectedCommit = 'ea77444750de45e036e0279bb0291144bf8e3688'
@@ -24,8 +33,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
     $targets = @('Mixworks')
     if ($TestPlugin) { $targets += 'MixworksTestGain_VST3', 'MixworksTestDelay_VST3', 'MixworksTestLatency_VST3' }
-    cmake --build build --config Release --target @targets --parallel 3
+    cmake --build build --config Release --target @targets --parallel 1
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     if ($VerificationManifest) { & (Join-Path $PSScriptRoot 'deploy.ps1') -VerificationManifest $VerificationManifest }
     else { Write-Host 'Build ready. Verify this executable, then deploy.ps1 with its VerificationManifest. The launcher was kept.' }
-} finally { Pop-Location }
+} finally {
+    $env:_CL_ = $previousCompilerOptions
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = $previousBuildParallelism
+    try { $buildProcess.PriorityClass = $previousPriority }
+    finally { $buildProcess.Dispose(); Pop-Location }
+}

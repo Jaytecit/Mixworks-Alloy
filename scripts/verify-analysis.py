@@ -6,7 +6,7 @@ import shutil
 from capacity_fixture import ensure_capacity_fixture
 from test_artifacts import require_space
 
-from verification import REGRESSION_SUITES, bundle_identity, create_receipt, plugin_identity, run_checks, write_json
+from verification import REGRESSION_SUITES, bundle_identity, create_receipt, plugin_identity, regression_module_arguments, run_checks, write_json
 
 
 def main(argv=None):
@@ -38,7 +38,7 @@ def main(argv=None):
         summary['capacityFixture'] = ensure_capacity_fixture(workspace / '.local/long-session-26')
         for suite in REGRESSION_SUITES:
             target = exe
-            flags = ['--plugin', str(plugin), '--delay-plugin', str(delay), '--latency-plugin', str(latency)]
+            flags = regression_module_arguments(suite, native_plugins)
             if suite in ('missing-model', 'corrupt-model'):
                 bundle = args.output / (suite + '-bundle')
                 bundle.mkdir()
@@ -50,9 +50,7 @@ def main(argv=None):
                 flags = ['--neural-unavailable-only']
             elif suite == 'source-streaming':
                 flags = ['--source-streaming-only', '--capacity-fixture', summary['capacityFixture']['path']]
-            elif suite == 'core':
-                flags += ['--instrument', str(instrument)]
-            else:
+            elif suite != 'core':
                 flags.insert(0, '--' + suite + '-only')
             result = dict(name=suite, **run_checks(target, flags, args.output / suite, cwd=workspace,
                                                 include_stress=args.include_stress))

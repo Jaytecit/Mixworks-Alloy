@@ -1,3 +1,5 @@
+> Dated audit/repair record. Baseline findings and pending labels below describe their original checkpoint. Use the [0.55.64 request register](REQUEST-STATUS-20261024.md) for reconciled delivery and the [active audit status](release-audit/STATUS.md) for current release qualification. Do not treat historical failures as current confirmed defects.
+
 # Alloy audit coverage and interface inventory — 21 October 2026
 
 Read with [findings](ALLOY_PRODUCT_AUDIT.md) and [repair batches](ALLOY_REMEDIATION_PLAN.md). Target: native Windows **0.55.12**, analysis 9, session 27; exact candidate/source hashes in [identity.json](../.local/product-audit-20261021/identity.json).

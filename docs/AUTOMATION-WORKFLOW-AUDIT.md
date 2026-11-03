@@ -1,3 +1,5 @@
+> Dated audit/repair record. Baseline findings and pending labels below describe their original checkpoint. Use the [0.55.64 request register](REQUEST-STATUS-20261024.md) for reconciled delivery and the [active audit status](release-audit/STATUS.md) for current release qualification. Do not treat historical failures as current confirmed defects.
+
 # Timeline parameter automation audit — 21 October 2026
 
 The workflow is fragmented. Filter lacks the insertion shortcut/menu parity of EQ and volume; FX introduces another selection process; enablement and recording states are spread across menus and the Controller console. Existing node/curve improvements do not close these discovery gaps.

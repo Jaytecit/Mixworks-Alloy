@@ -1,0 +1,297 @@
+{
+  "schema": 1,
+  "key": "original/microbial-mosaic",
+  "title": "Microbial Mosaic",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original state equations and shading by Mixworks; retained technique study, no reference code or assets copied.",
+  "family": "gray-scott",
+  "variant": 5,
+  "study": "sprinkles",
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous",
+      "label": "Surface light"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "speed",
+      "label": "Reaction rate"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous",
+      "label": "Ridge palette"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.54,
+      "type": "continuous",
+      "label": "Erosion balance"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.15,
+      "type": "continuous",
+      "label": "Refraction"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous",
+      "label": "Relief"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.59,
+      "type": "continuous",
+      "label": "Surface palette"
+    },
+    "symmetry": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 7
+    },
+    "orbit": {
+      "min": 0,
+      "max": 1,
+      "default": 0.38,
+      "type": "continuous"
+    },
+    "focusX": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "focusY": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "colourR": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourG": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourB": {
+      "min": 0,
+      "max": 1,
+      "default": 0.78,
+      "type": "colour",
+      "group": "tint"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "pulse",
+      "label": "Attack response"
+    },
+    "mode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.3333,
+      "type": "choice",
+      "steps": 4
+    },
+    "mirror": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "toggle",
+      "steps": 2
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous"
+    },
+    "imageRotation": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "imageIndex": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "counter"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.8,
+      "type": "continuous",
+      "label": "Image feeding"
+    }
+  },
+  "passSchema": 2,
+  "passes": [
+    {
+      "id": "react0",
+      "shader": "reaction.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "gray-scott-uv-v1",
+      "history": false,
+      "inputs": [
+        {
+          "pass": "react5",
+          "frame": "previous"
+        }
+      ]
+    },
+    {
+      "id": "react1",
+      "shader": "reaction.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "gray-scott-uv-v1",
+      "history": false,
+      "inputs": [
+        {
+          "pass": "react0",
+          "frame": "current"
+        }
+      ]
+    },
+    {
+      "id": "react2",
+      "shader": "reaction.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "gray-scott-uv-v1",
+      "history": false,
+      "inputs": [
+        {
+          "pass": "react1",
+          "frame": "current"
+        }
+      ]
+    },
+    {
+      "id": "react3",
+      "shader": "reaction.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "gray-scott-uv-v1",
+      "history": false,
+      "inputs": [
+        {
+          "pass": "react2",
+          "frame": "current"
+        }
+      ]
+    },
+    {
+      "id": "react4",
+      "shader": "reaction.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "gray-scott-uv-v1",
+      "history": false,
+      "inputs": [
+        {
+          "pass": "react3",
+          "frame": "current"
+        }
+      ]
+    },
+    {
+      "id": "react5",
+      "shader": "reaction.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "gray-scott-uv-v1",
+      "history": true,
+      "inputs": [
+        {
+          "pass": "react4",
+          "frame": "current"
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "inputs": [
+        {
+          "pass": "react5",
+          "frame": "current"
+        }
+      ]
+    }
+  ],
+  "motionProfile": "Image-led colonies grow, split and erode on a coarse contiguous reaction grid; saturated concentration ridges",
+  "audioMapping": {
+    "bass": "Survival balance; attacks erode local patches",
+    "mid": "Nutrient replenishment",
+    "treble": "Attacks feed organism in image-defined regions"
+  },
+  "mediaRole": "reaction-seed-feed",
+  "stateContract": {
+    "owner": "scene clip/revision/generation",
+    "transfer": "compatible semantic copy or explicit incoming adapter; no raw cross-semantic blend",
+    "reset": "seek/revision/generation",
+    "tickHz": 60
+  }
+}

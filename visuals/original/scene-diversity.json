@@ -1,0 +1,846 @@
+{
+  "schema": 1,
+  "scenes": [
+    {
+      "key": "original/crosswoven-silk",
+      "title": "Crosswoven Silk",
+      "group": "Woven strata",
+      "topology": 0,
+      "composition": "Interleaving strips, bowed lanes, radial fan and oblique basket; alternating over-under depth",
+      "musicalResponse": "Bass advances warp; mids move weft; treble turns nested image windows",
+      "closestNeighbours": [
+        "Bowed Tapestry",
+        "Fanwoven Canopy",
+        "Basketlight Atrium"
+      ],
+      "paletteHue": 0.0,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/bowed-tapestry",
+      "title": "Bowed Tapestry",
+      "group": "Woven strata",
+      "topology": 1,
+      "composition": "Interleaving strips, bowed lanes, radial fan and oblique basket; alternating over-under depth",
+      "musicalResponse": "Bass advances warp; mids move weft; treble turns nested image windows",
+      "closestNeighbours": [
+        "Crosswoven Silk",
+        "Fanwoven Canopy",
+        "Basketlight Atrium"
+      ],
+      "paletteHue": 0.211,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/fanwoven-canopy",
+      "title": "Fanwoven Canopy",
+      "group": "Woven strata",
+      "topology": 2,
+      "composition": "Interleaving strips, bowed lanes, radial fan and oblique basket; alternating over-under depth",
+      "musicalResponse": "Bass advances warp; mids move weft; treble turns nested image windows",
+      "closestNeighbours": [
+        "Crosswoven Silk",
+        "Bowed Tapestry",
+        "Basketlight Atrium"
+      ],
+      "paletteHue": 0.422,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/basketlight-atrium",
+      "title": "Basketlight Atrium",
+      "group": "Woven strata",
+      "topology": 3,
+      "composition": "Interleaving strips, bowed lanes, radial fan and oblique basket; alternating over-under depth",
+      "musicalResponse": "Bass advances warp; mids move weft; treble turns nested image windows",
+      "closestNeighbours": [
+        "Crosswoven Silk",
+        "Bowed Tapestry",
+        "Fanwoven Canopy"
+      ],
+      "paletteHue": 0.633,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/accordion-quay",
+      "title": "Accordion Quay",
+      "group": "Folded architecture",
+      "topology": 0,
+      "composition": "Linear folding terraces, radial fan, zigzag ridges and separated upper/lower sails",
+      "musicalResponse": "Mids advance folds; bass changes their profile; treble traces folds",
+      "closestNeighbours": [
+        "Concertina Sun",
+        "Zigzag Escarpment",
+        "Divided Sails"
+      ],
+      "paletteHue": 0.137,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/concertina-sun",
+      "title": "Concertina Sun",
+      "group": "Folded architecture",
+      "topology": 1,
+      "composition": "Linear folding terraces, radial fan, zigzag ridges and separated upper/lower sails",
+      "musicalResponse": "Mids advance folds; bass changes their profile; treble traces folds",
+      "closestNeighbours": [
+        "Accordion Quay",
+        "Zigzag Escarpment",
+        "Divided Sails"
+      ],
+      "paletteHue": 0.348,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/zigzag-escarpment",
+      "title": "Zigzag Escarpment",
+      "group": "Folded architecture",
+      "topology": 2,
+      "composition": "Linear folding terraces, radial fan, zigzag ridges and separated upper/lower sails",
+      "musicalResponse": "Mids advance folds; bass changes their profile; treble traces folds",
+      "closestNeighbours": [
+        "Accordion Quay",
+        "Concertina Sun",
+        "Divided Sails"
+      ],
+      "paletteHue": 0.5589999999999999,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/divided-sails",
+      "title": "Divided Sails",
+      "group": "Folded architecture",
+      "topology": 3,
+      "composition": "Linear folding terraces, radial fan, zigzag ridges and separated upper/lower sails",
+      "musicalResponse": "Mids advance folds; bass changes their profile; treble traces folds",
+      "closestNeighbours": [
+        "Accordion Quay",
+        "Concertina Sun",
+        "Zigzag Escarpment"
+      ],
+      "paletteHue": 0.77,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/lantern-orchard",
+      "title": "Lantern Orchard",
+      "group": "Lantern instruments",
+      "topology": 0,
+      "composition": "Staggered orchard, long suspended chains, circular bouquet and wavy crowns",
+      "musicalResponse": "Bass carries lanterns; mids sway rows; treble rotates nested charts",
+      "closestNeighbours": [
+        "Pendant Chains",
+        "Luminous Bouquet",
+        "Crown Procession"
+      ],
+      "paletteHue": 0.274,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/pendant-chains",
+      "title": "Pendant Chains",
+      "group": "Lantern instruments",
+      "topology": 1,
+      "composition": "Staggered orchard, long suspended chains, circular bouquet and wavy crowns",
+      "musicalResponse": "Bass carries lanterns; mids sway rows; treble rotates nested charts",
+      "closestNeighbours": [
+        "Lantern Orchard",
+        "Luminous Bouquet",
+        "Crown Procession"
+      ],
+      "paletteHue": 0.485,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/luminous-bouquet",
+      "title": "Luminous Bouquet",
+      "group": "Lantern instruments",
+      "topology": 2,
+      "composition": "Staggered orchard, long suspended chains, circular bouquet and wavy crowns",
+      "musicalResponse": "Bass carries lanterns; mids sway rows; treble rotates nested charts",
+      "closestNeighbours": [
+        "Lantern Orchard",
+        "Pendant Chains",
+        "Crown Procession"
+      ],
+      "paletteHue": 0.696,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/crown-procession",
+      "title": "Crown Procession",
+      "group": "Lantern instruments",
+      "topology": 3,
+      "composition": "Staggered orchard, long suspended chains, circular bouquet and wavy crowns",
+      "musicalResponse": "Bass carries lanterns; mids sway rows; treble rotates nested charts",
+      "closestNeighbours": [
+        "Lantern Orchard",
+        "Pendant Chains",
+        "Luminous Bouquet"
+      ],
+      "paletteHue": 0.907,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/turning-facades",
+      "title": "Turning Facades",
+      "group": "Kinetic shutters",
+      "topology": 0,
+      "composition": "Rotating square panels, polar iris, diagonal shutters and sliding horizontal gates",
+      "musicalResponse": "Mids turn panels; bass opens windows; treble articulates edge inlays",
+      "closestNeighbours": [
+        "Iris Workshop",
+        "Chevron Windows",
+        "Counterweight Gates"
+      ],
+      "paletteHue": 0.41100000000000003,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/iris-workshop",
+      "title": "Iris Workshop",
+      "group": "Kinetic shutters",
+      "topology": 1,
+      "composition": "Rotating square panels, polar iris, diagonal shutters and sliding horizontal gates",
+      "musicalResponse": "Mids turn panels; bass opens windows; treble articulates edge inlays",
+      "closestNeighbours": [
+        "Turning Facades",
+        "Chevron Windows",
+        "Counterweight Gates"
+      ],
+      "paletteHue": 0.622,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/chevron-windows",
+      "title": "Chevron Windows",
+      "group": "Kinetic shutters",
+      "topology": 2,
+      "composition": "Rotating square panels, polar iris, diagonal shutters and sliding horizontal gates",
+      "musicalResponse": "Mids turn panels; bass opens windows; treble articulates edge inlays",
+      "closestNeighbours": [
+        "Turning Facades",
+        "Iris Workshop",
+        "Counterweight Gates"
+      ],
+      "paletteHue": 0.833,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/counterweight-gates",
+      "title": "Counterweight Gates",
+      "group": "Kinetic shutters",
+      "topology": 3,
+      "composition": "Rotating square panels, polar iris, diagonal shutters and sliding horizontal gates",
+      "musicalResponse": "Mids turn panels; bass opens windows; treble articulates edge inlays",
+      "closestNeighbours": [
+        "Turning Facades",
+        "Iris Workshop",
+        "Chevron Windows"
+      ],
+      "paletteHue": 0.04400000000000004,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/porcelain-breakers",
+      "title": "Porcelain Breakers",
+      "group": "Porcelain tide",
+      "topology": 0,
+      "composition": "Scalloped breakers, polar shell fans, diagonal ridges and nested circular bowls",
+      "musicalResponse": "Bass carries ridges; mids shift material; treble traces crests",
+      "closestNeighbours": [
+        "Shell Amphitheatre",
+        "Crosscurrent Ceramic",
+        "Scalloped Basin"
+      ],
+      "paletteHue": 0.548,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/shell-amphitheatre",
+      "title": "Shell Amphitheatre",
+      "group": "Porcelain tide",
+      "topology": 1,
+      "composition": "Scalloped breakers, polar shell fans, diagonal ridges and nested circular bowls",
+      "musicalResponse": "Bass carries ridges; mids shift material; treble traces crests",
+      "closestNeighbours": [
+        "Porcelain Breakers",
+        "Crosscurrent Ceramic",
+        "Scalloped Basin"
+      ],
+      "paletteHue": 0.759,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/crosscurrent-ceramic",
+      "title": "Crosscurrent Ceramic",
+      "group": "Porcelain tide",
+      "topology": 2,
+      "composition": "Scalloped breakers, polar shell fans, diagonal ridges and nested circular bowls",
+      "musicalResponse": "Bass carries ridges; mids shift material; treble traces crests",
+      "closestNeighbours": [
+        "Porcelain Breakers",
+        "Shell Amphitheatre",
+        "Scalloped Basin"
+      ],
+      "paletteHue": 0.97,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/scalloped-basin",
+      "title": "Scalloped Basin",
+      "group": "Porcelain tide",
+      "topology": 3,
+      "composition": "Scalloped breakers, polar shell fans, diagonal ridges and nested circular bowls",
+      "musicalResponse": "Bass carries ridges; mids shift material; treble traces crests",
+      "closestNeighbours": [
+        "Porcelain Breakers",
+        "Shell Amphitheatre",
+        "Crosscurrent Ceramic"
+      ],
+      "paletteHue": 0.18100000000000005,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/contour-archipelago",
+      "title": "Contour Archipelago",
+      "group": "Contour terraces",
+      "topology": 0,
+      "composition": "Moving terraced islands, split fault, radial basin and carved river valley",
+      "musicalResponse": "Bass advances terraces; mids deform basin; treble lights local slopes",
+      "closestNeighbours": [
+        "Faultline Steps",
+        "Terraced Caldera",
+        "Meander Valley"
+      ],
+      "paletteHue": 0.685,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/faultline-steps",
+      "title": "Faultline Steps",
+      "group": "Contour terraces",
+      "topology": 1,
+      "composition": "Moving terraced islands, split fault, radial basin and carved river valley",
+      "musicalResponse": "Bass advances terraces; mids deform basin; treble lights local slopes",
+      "closestNeighbours": [
+        "Contour Archipelago",
+        "Terraced Caldera",
+        "Meander Valley"
+      ],
+      "paletteHue": 0.896,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/terraced-caldera",
+      "title": "Terraced Caldera",
+      "group": "Contour terraces",
+      "topology": 2,
+      "composition": "Moving terraced islands, split fault, radial basin and carved river valley",
+      "musicalResponse": "Bass advances terraces; mids deform basin; treble lights local slopes",
+      "closestNeighbours": [
+        "Contour Archipelago",
+        "Faultline Steps",
+        "Meander Valley"
+      ],
+      "paletteHue": 0.10699999999999998,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/meander-valley",
+      "title": "Meander Valley",
+      "group": "Contour terraces",
+      "topology": 3,
+      "composition": "Moving terraced islands, split fault, radial basin and carved river valley",
+      "musicalResponse": "Bass advances terraces; mids deform basin; treble lights local slopes",
+      "closestNeighbours": [
+        "Contour Archipelago",
+        "Faultline Steps",
+        "Terraced Caldera"
+      ],
+      "paletteHue": 0.31800000000000006,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/stained-turbine",
+      "title": "Stained Turbine",
+      "group": "Stained rotors",
+      "topology": 0,
+      "composition": "Segmented rotor, paired gears, tilted ellipse and five-lobed off-centre petals",
+      "musicalResponse": "Mids turn sectors; bass transports rings; treble turns material inlays",
+      "closestNeighbours": [
+        "Twin Escapement",
+        "Orbital Dial",
+        "Eccentric Petals"
+      ],
+      "paletteHue": 0.8220000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/twin-escapement",
+      "title": "Twin Escapement",
+      "group": "Stained rotors",
+      "topology": 1,
+      "composition": "Segmented rotor, paired gears, tilted ellipse and five-lobed off-centre petals",
+      "musicalResponse": "Mids turn sectors; bass transports rings; treble turns material inlays",
+      "closestNeighbours": [
+        "Stained Turbine",
+        "Orbital Dial",
+        "Eccentric Petals"
+      ],
+      "paletteHue": 0.03300000000000014,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/orbital-dial",
+      "title": "Orbital Dial",
+      "group": "Stained rotors",
+      "topology": 2,
+      "composition": "Segmented rotor, paired gears, tilted ellipse and five-lobed off-centre petals",
+      "musicalResponse": "Mids turn sectors; bass transports rings; treble turns material inlays",
+      "closestNeighbours": [
+        "Stained Turbine",
+        "Twin Escapement",
+        "Eccentric Petals"
+      ],
+      "paletteHue": 0.244,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/eccentric-petals",
+      "title": "Eccentric Petals",
+      "group": "Stained rotors",
+      "topology": 3,
+      "composition": "Segmented rotor, paired gears, tilted ellipse and five-lobed off-centre petals",
+      "musicalResponse": "Mids turn sectors; bass transports rings; treble turns material inlays",
+      "closestNeighbours": [
+        "Stained Turbine",
+        "Twin Escapement",
+        "Orbital Dial"
+      ],
+      "paletteHue": 0.45500000000000007,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/ribbon-switchyard",
+      "title": "Ribbon Switchyard",
+      "group": "Ribbon routes",
+      "topology": 0,
+      "composition": "Crossing lanes, winding parallel routes, diagonal overpasses and polar junctions",
+      "musicalResponse": "Bass transports lanes; mids drive cross traffic; treble animates stitched inlays",
+      "closestNeighbours": [
+        "Velvet Meanders",
+        "Overpass Weave",
+        "Radial Interchange"
+      ],
+      "paletteHue": 0.9590000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/velvet-meanders",
+      "title": "Velvet Meanders",
+      "group": "Ribbon routes",
+      "topology": 1,
+      "composition": "Crossing lanes, winding parallel routes, diagonal overpasses and polar junctions",
+      "musicalResponse": "Bass transports lanes; mids drive cross traffic; treble animates stitched inlays",
+      "closestNeighbours": [
+        "Ribbon Switchyard",
+        "Overpass Weave",
+        "Radial Interchange"
+      ],
+      "paletteHue": 0.17000000000000015,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/overpass-weave",
+      "title": "Overpass Weave",
+      "group": "Ribbon routes",
+      "topology": 2,
+      "composition": "Crossing lanes, winding parallel routes, diagonal overpasses and polar junctions",
+      "musicalResponse": "Bass transports lanes; mids drive cross traffic; treble animates stitched inlays",
+      "closestNeighbours": [
+        "Ribbon Switchyard",
+        "Velvet Meanders",
+        "Radial Interchange"
+      ],
+      "paletteHue": 0.381,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/radial-interchange",
+      "title": "Radial Interchange",
+      "group": "Ribbon routes",
+      "topology": 3,
+      "composition": "Crossing lanes, winding parallel routes, diagonal overpasses and polar junctions",
+      "musicalResponse": "Bass transports lanes; mids drive cross traffic; treble animates stitched inlays",
+      "closestNeighbours": [
+        "Ribbon Switchyard",
+        "Velvet Meanders",
+        "Overpass Weave"
+      ],
+      "paletteHue": 0.5920000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/diamond-channels",
+      "title": "Diamond Channels",
+      "group": "Crystal flotilla",
+      "topology": 0,
+      "composition": "Diamond fleets, rectangular barges, radial fleet and angled asymmetric sails",
+      "musicalResponse": "Bass drives fleet travel; mids shift channels; treble turns internal images",
+      "closestNeighbours": [
+        "Offset Barges",
+        "Crystal Regatta",
+        "Zigzag Sails"
+      ],
+      "paletteHue": 0.09600000000000009,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/offset-barges",
+      "title": "Offset Barges",
+      "group": "Crystal flotilla",
+      "topology": 1,
+      "composition": "Diamond fleets, rectangular barges, radial fleet and angled asymmetric sails",
+      "musicalResponse": "Bass drives fleet travel; mids shift channels; treble turns internal images",
+      "closestNeighbours": [
+        "Diamond Channels",
+        "Crystal Regatta",
+        "Zigzag Sails"
+      ],
+      "paletteHue": 0.30700000000000016,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/crystal-regatta",
+      "title": "Crystal Regatta",
+      "group": "Crystal flotilla",
+      "topology": 2,
+      "composition": "Diamond fleets, rectangular barges, radial fleet and angled asymmetric sails",
+      "musicalResponse": "Bass drives fleet travel; mids shift channels; treble turns internal images",
+      "closestNeighbours": [
+        "Diamond Channels",
+        "Offset Barges",
+        "Zigzag Sails"
+      ],
+      "paletteHue": 0.518,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/zigzag-sails",
+      "title": "Zigzag Sails",
+      "group": "Crystal flotilla",
+      "topology": 3,
+      "composition": "Diamond fleets, rectangular barges, radial fleet and angled asymmetric sails",
+      "musicalResponse": "Bass drives fleet travel; mids shift channels; treble turns internal images",
+      "closestNeighbours": [
+        "Diamond Channels",
+        "Offset Barges",
+        "Crystal Regatta"
+      ],
+      "paletteHue": 0.7290000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/lenticular-hall",
+      "title": "Lenticular Hall",
+      "group": "Optical instruments",
+      "topology": 0,
+      "composition": "Tall cylindrical lenses, spherical instruments, triangular prisms and full-frame focal rings",
+      "musicalResponse": "Mids translate lenses; bass moves focal planes; treble animates nested projections",
+      "closestNeighbours": [
+        "Glass Instruments",
+        "Prism Cabinet",
+        "Focus Ripples"
+      ],
+      "paletteHue": 0.2330000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/glass-instruments",
+      "title": "Glass Instruments",
+      "group": "Optical instruments",
+      "topology": 1,
+      "composition": "Tall cylindrical lenses, spherical instruments, triangular prisms and full-frame focal rings",
+      "musicalResponse": "Mids translate lenses; bass moves focal planes; treble animates nested projections",
+      "closestNeighbours": [
+        "Lenticular Hall",
+        "Prism Cabinet",
+        "Focus Ripples"
+      ],
+      "paletteHue": 0.4440000000000002,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/prism-cabinet",
+      "title": "Prism Cabinet",
+      "group": "Optical instruments",
+      "topology": 2,
+      "composition": "Tall cylindrical lenses, spherical instruments, triangular prisms and full-frame focal rings",
+      "musicalResponse": "Mids translate lenses; bass moves focal planes; treble animates nested projections",
+      "closestNeighbours": [
+        "Lenticular Hall",
+        "Glass Instruments",
+        "Focus Ripples"
+      ],
+      "paletteHue": 0.655,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/focus-ripples",
+      "title": "Focus Ripples",
+      "group": "Optical instruments",
+      "topology": 3,
+      "composition": "Tall cylindrical lenses, spherical instruments, triangular prisms and full-frame focal rings",
+      "musicalResponse": "Mids translate lenses; bass moves focal planes; treble animates nested projections",
+      "closestNeighbours": [
+        "Lenticular Hall",
+        "Glass Instruments",
+        "Prism Cabinet"
+      ],
+      "paletteHue": 0.8660000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/coral-fans",
+      "title": "Coral Fans",
+      "group": "Growing relief",
+      "topology": 0,
+      "composition": "Branching fans, staggered fern bed, horizontal roots and radial anemone field",
+      "musicalResponse": "Bass bends stems; mids move branching tips; treble articulates image cells",
+      "closestNeighbours": [
+        "Fern Conservatory",
+        "River Roots",
+        "Anemone Crown"
+      ],
+      "paletteHue": 0.3700000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/fern-conservatory",
+      "title": "Fern Conservatory",
+      "group": "Growing relief",
+      "topology": 1,
+      "composition": "Branching fans, staggered fern bed, horizontal roots and radial anemone field",
+      "musicalResponse": "Bass bends stems; mids move branching tips; treble articulates image cells",
+      "closestNeighbours": [
+        "Coral Fans",
+        "River Roots",
+        "Anemone Crown"
+      ],
+      "paletteHue": 0.5810000000000002,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/river-roots",
+      "title": "River Roots",
+      "group": "Growing relief",
+      "topology": 2,
+      "composition": "Branching fans, staggered fern bed, horizontal roots and radial anemone field",
+      "musicalResponse": "Bass bends stems; mids move branching tips; treble articulates image cells",
+      "closestNeighbours": [
+        "Coral Fans",
+        "Fern Conservatory",
+        "Anemone Crown"
+      ],
+      "paletteHue": 0.792,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/anemone-crown",
+      "title": "Anemone Crown",
+      "group": "Growing relief",
+      "topology": 3,
+      "composition": "Branching fans, staggered fern bed, horizontal roots and radial anemone field",
+      "musicalResponse": "Bass bends stems; mids move branching tips; treble articulates image cells",
+      "closestNeighbours": [
+        "Coral Fans",
+        "Fern Conservatory",
+        "River Roots"
+      ],
+      "paletteHue": 0.0030000000000001137,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/rain-pavilion",
+      "title": "Rain Pavilion",
+      "group": "Falling curtains",
+      "topology": 0,
+      "composition": "Layered vertical falls, short stepped cascades, diagonal rain and convergent columns",
+      "musicalResponse": "Bass advances droplets; mids bend curtains; treble animates their material",
+      "closestNeighbours": [
+        "Cascade Staircase",
+        "Slanting Monsoon",
+        "Convergent Falls"
+      ],
+      "paletteHue": 0.5070000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/cascade-staircase",
+      "title": "Cascade Staircase",
+      "group": "Falling curtains",
+      "topology": 1,
+      "composition": "Layered vertical falls, short stepped cascades, diagonal rain and convergent columns",
+      "musicalResponse": "Bass advances droplets; mids bend curtains; treble animates their material",
+      "closestNeighbours": [
+        "Rain Pavilion",
+        "Slanting Monsoon",
+        "Convergent Falls"
+      ],
+      "paletteHue": 0.7180000000000002,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/slanting-monsoon",
+      "title": "Slanting Monsoon",
+      "group": "Falling curtains",
+      "topology": 2,
+      "composition": "Layered vertical falls, short stepped cascades, diagonal rain and convergent columns",
+      "musicalResponse": "Bass advances droplets; mids bend curtains; treble animates their material",
+      "closestNeighbours": [
+        "Rain Pavilion",
+        "Cascade Staircase",
+        "Convergent Falls"
+      ],
+      "paletteHue": 0.929,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/convergent-falls",
+      "title": "Convergent Falls",
+      "group": "Falling curtains",
+      "topology": 3,
+      "composition": "Layered vertical falls, short stepped cascades, diagonal rain and convergent columns",
+      "musicalResponse": "Bass advances droplets; mids bend curtains; treble animates their material",
+      "closestNeighbours": [
+        "Rain Pavilion",
+        "Cascade Staircase",
+        "Slanting Monsoon"
+      ],
+      "paletteHue": 0.14000000000000012,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/paper-amphitheatre",
+      "title": "Paper Amphitheatre",
+      "group": "Paper theatre",
+      "topology": 0,
+      "composition": "Scalloped stage layers, angular mountain wings, dense cloud cutouts and polar fans",
+      "musicalResponse": "Bass advances layers; mids reshape silhouette; treble turns small inlays",
+      "closestNeighbours": [
+        "Mountain Wings",
+        "Cloud Proscenium",
+        "Revolving Fans"
+      ],
+      "paletteHue": 0.6440000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/mountain-wings",
+      "title": "Mountain Wings",
+      "group": "Paper theatre",
+      "topology": 1,
+      "composition": "Scalloped stage layers, angular mountain wings, dense cloud cutouts and polar fans",
+      "musicalResponse": "Bass advances layers; mids reshape silhouette; treble turns small inlays",
+      "closestNeighbours": [
+        "Paper Amphitheatre",
+        "Cloud Proscenium",
+        "Revolving Fans"
+      ],
+      "paletteHue": 0.8550000000000002,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/cloud-proscenium",
+      "title": "Cloud Proscenium",
+      "group": "Paper theatre",
+      "topology": 2,
+      "composition": "Scalloped stage layers, angular mountain wings, dense cloud cutouts and polar fans",
+      "musicalResponse": "Bass advances layers; mids reshape silhouette; treble turns small inlays",
+      "closestNeighbours": [
+        "Paper Amphitheatre",
+        "Mountain Wings",
+        "Revolving Fans"
+      ],
+      "paletteHue": 0.06600000000000028,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/revolving-fans",
+      "title": "Revolving Fans",
+      "group": "Paper theatre",
+      "topology": 3,
+      "composition": "Scalloped stage layers, angular mountain wings, dense cloud cutouts and polar fans",
+      "musicalResponse": "Bass advances layers; mids reshape silhouette; treble turns small inlays",
+      "closestNeighbours": [
+        "Paper Amphitheatre",
+        "Mountain Wings",
+        "Cloud Proscenium"
+      ],
+      "paletteHue": 0.27700000000000014,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/mosaic-kiln",
+      "title": "Mosaic Kiln",
+      "group": "Mosaic relief",
+      "topology": 0,
+      "composition": "Staggered bricks, diagonal rhombi, hexagonal scales and independently turning stamps",
+      "musicalResponse": "Bass lifts courses; mids turn or raise tiles; treble illuminates bevels",
+      "closestNeighbours": [
+        "Rhombus Foundry",
+        "Enamel Scales",
+        "Spinning Stamps"
+      ],
+      "paletteHue": 0.7810000000000001,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/rhombus-foundry",
+      "title": "Rhombus Foundry",
+      "group": "Mosaic relief",
+      "topology": 1,
+      "composition": "Staggered bricks, diagonal rhombi, hexagonal scales and independently turning stamps",
+      "musicalResponse": "Bass lifts courses; mids turn or raise tiles; treble illuminates bevels",
+      "closestNeighbours": [
+        "Mosaic Kiln",
+        "Enamel Scales",
+        "Spinning Stamps"
+      ],
+      "paletteHue": 0.9920000000000002,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/enamel-scales",
+      "title": "Enamel Scales",
+      "group": "Mosaic relief",
+      "topology": 2,
+      "composition": "Staggered bricks, diagonal rhombi, hexagonal scales and independently turning stamps",
+      "musicalResponse": "Bass lifts courses; mids turn or raise tiles; treble illuminates bevels",
+      "closestNeighbours": [
+        "Mosaic Kiln",
+        "Rhombus Foundry",
+        "Spinning Stamps"
+      ],
+      "paletteHue": 0.2030000000000003,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    },
+    {
+      "key": "original/spinning-stamps",
+      "title": "Spinning Stamps",
+      "group": "Mosaic relief",
+      "topology": 3,
+      "composition": "Staggered bricks, diagonal rhombi, hexagonal scales and independently turning stamps",
+      "musicalResponse": "Bass lifts courses; mids turn or raise tiles; treble illuminates bevels",
+      "closestNeighbours": [
+        "Mosaic Kiln",
+        "Rhombus Foundry",
+        "Enamel Scales"
+      ],
+      "paletteHue": 0.41400000000000015,
+      "status": "Reference and three moving samples visually inspected; artistic acceptance pending"
+    }
+  ],
+  "reviewEvidence": ".local/scene-expansion-20261103/tour-04..06; final contour/paper tours; looks-final and looks-surface-final"
+}

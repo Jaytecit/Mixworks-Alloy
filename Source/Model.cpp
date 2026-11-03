@@ -12,7 +12,7 @@ namespace mixworks
 bool PreparedClipGeometry::operator==(const PreparedClipGeometry& other) const
 {
     if (source != other.source || offset != other.offset || length != other.length || rate != other.rate || loopSpan != other.loopSpan
-        || loopPhase != other.loopPhase || sourceBpm != other.sourceBpm || reversed != other.reversed) return false;
+        || loopPhase != other.loopPhase || sourceBpm != other.sourceBpm || reversed != other.reversed || pitchSemitones != other.pitchSemitones) return false;
     return tempo == other.tempo;
 }
 double TempoMap::bpmAt(double time) const
@@ -245,6 +245,7 @@ void Clip::applyPlacement(const Clip& source)
     fadeIn = source.fadeIn; fadeOut = source.fadeOut; introAnchor = source.introAnchor; outroAnchor = source.outroAnchor;
     tempoMap = source.tempoMap; tempoSourceBpm = source.tempoSourceBpm; prepared = source.prepared; preparedOffset = source.preparedOffset;
     elasticPlayback = source.elasticPlayback; elasticSource = source.elasticSource; pendingPlacement = source.pendingPlacement;
+    pitchSemitones = source.pitchSemitones;
 }
 juce::Result Clip::alignAnchorTo(bool intro, double seconds)
 {
@@ -379,7 +380,7 @@ WaveformRange pcmRange(const float* const* data, int channels, int frames, doubl
 }
 void Media::prepareWaveformBody()
 {
-    if (!hasPlayback()) return;
+    if (!hasPlayback() || original) return;
     const int bucket = std::max(1, frames() / 4000);
     waveformRms.clear(); waveformRms.reserve((size_t) ((frames() + bucket - 1) / bucket));
     const float* data[2] {channelData(0), channels() > 1 ? channelData(1) : nullptr};
@@ -391,7 +392,13 @@ WaveformRange Media::waveformRange(double begin, double end) const
     begin = juce::jlimit(0.0, duration(), begin); end = juce::jlimit(begin, duration(), end);
     if (end <= begin) return {};
     const int bucket = std::max(1, frames() / 4000);
-    if (hasPlayback() && (peaks.empty() || (end - begin) * sampleRate <= bucket * 2))
+    if (original && (end - begin) * sampleRate <= bucket * 2)
+    {
+        WaveformRange result;
+        result.ready = original->waveformRange((int)std::floor(begin * sampleRate), (int)std::ceil(end * sampleRate), result.peak, result.rms);
+        return result;
+    }
+    if (!original && hasPlayback() && (peaks.empty() || (end - begin) * sampleRate <= bucket * 2))
     {
         const float* data[2] {channelData(0), channels() > 1 ? channelData(1) : nullptr};
         return pcmRange(data, channels(), frames(), begin * sampleRate, end * sampleRate);
@@ -431,7 +438,7 @@ WaveformRange Clip::waveformRange(double begin, double end) const
     const double a = loopPosition(loopPhase + from, loopSpan), span = to - from;
     if (a + span <= loopSpan) return peak(a, a + span);
     WaveformRange result; double energy = 0;
-    auto add = [&](WaveformRange value, double weight) { result.peak = std::max(result.peak, value.peak); energy += value.rms * (double) value.rms * weight; };
+    auto add = [&](WaveformRange value, double weight) { result.ready = result.ready && value.ready; result.peak = std::max(result.peak, value.peak); energy += value.rms * (double) value.rms * weight; };
     const double tail = loopSpan - a, remaining = span - tail;
     add(peak(a, loopSpan), tail);
     const double cycles = std::floor(remaining / loopSpan), head = remaining - cycles * loopSpan;
@@ -530,12 +537,12 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
     const bool libraryMatches = libraryRecord && libraryRecord->source == m->analysisSource;
     if (libraryMatches && mode != AnalysisCacheMode::refresh)
     {
-        if (!saved && libraryRecord->revision == analysisRevision && libraryRecord->analysis.rhythmIssue.isEmpty()
-            && libraryRecord->analysis.rhythmMethod != "unavailable") saved = *libraryRecord;
+        if (!saved && libraryRecord->revision == analysisRevision
+            && ((libraryRecord->analysis.rhythmIssue.isEmpty() && libraryRecord->analysis.rhythmMethod != "unavailable")
+                || (libraryRecord->analysis.rhythmMethod == "bounded-scan" && bytes > 256LL * 1024 * 1024))) saved = *libraryRecord;
         else if (saved && saved->waveformRms.empty()) saved->waveformRms = libraryRecord->waveformRms;
         if (saved && !saved->energy.complete() && libraryRecord->energy.complete()) saved->energy = libraryRecord->energy;
     }
-    auto& store = PcmStore::shared(); const auto pcmKey = PcmStore::decodedKey(m->analysisSource);
     const bool playback = purpose == MediaReadPurpose::playback;
     const bool energyUpgrade = purpose == MediaReadPurpose::energyAnalysis && saved && !saved->energy.complete();
     const bool focused = mode == AnalysisCacheMode::focused;
@@ -546,31 +553,23 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
     // A manually reviewed bar anchor also protects its automatic pulse/BPM.
     const bool retryTempo = focused && protectedBpm <= 0 && protectedOrigin < 0 && (!baseline || needsFocusedTempo(*baseline));
     const bool retryKey = focused && protectedKey < 0 && (!baseline || needsFocusedKey(*baseline));
-    const bool needsPcm = playback || !saved || energyUpgrade || retryTempo || retryKey;
-    if (needsPcm) m->cache = store.read(pcmKey, m->sampleRate, channels, (int) reader->lengthInSamples, mode != AnalysisCacheMode::readOnly);
-    m->decodedFromCache = m->cache != nullptr;
-    if (m->cache && progress) progress(MediaReadStage::savedAudio);
-    if (stopped()) return {{}, "Audio loading cancelled."};
-    if (!m->cache && needsPcm)
+    // Decode only the one-time analysis input, never a retained playback copy.
+    // Large recordings remain playable through the original-file stream.
+    const bool pendingTiming = saved && saved->analysis.attackTimingRevision < 1 && protectedBpm <= 0 && protectedOrigin < 0
+        && !saved->analysis.variableTempo && saved->analysis.tempoConfidence >= .2 && m->duration() >= 6;
+    const bool analysisWanted = !saved || energyUpgrade || retryTempo || retryKey || pendingTiming;
+    const bool needsPcm = analysisWanted && bytes <= 256LL * 1024 * 1024;
+    if (needsPcm)
     {
         if (progress) progress(MediaReadStage::decode);
-        if (bytes > maxDecodedBytes)
-        {
-            juce::String error;
-            m->cache = AudioCache::decode(*reader, channels, (int) reader->lengthInSamples, error, cancelled);
-            if (!m->cache) return {{}, file.getFileName() + ": " + error};
-            m->playbackCacheWarning = "Large source uses temporary mapped PCM; reopening decodes it again.";
-        }
-        else
-        {
-            m->samples.setSize(channels, (int) reader->lengthInSamples);
-            if (!reader->read(&m->samples, 0, m->samples.getNumSamples(), 0, true, true)) return { {}, "Audio read failed: " + file.getFullPathName() };
-        }
+        m->samples.setSize(channels, (int) reader->lengthInSamples);
+        if (!reader->read(&m->samples, 0, m->samples.getNumSamples(), 0, true, true))
+            return {{}, "Audio read failed: " + file.getFullPathName()};
     }
     if (stopped()) return {{}, "Audio loading cancelled."};
     if (progress) progress(MediaReadStage::waveform);
     const int frames = (int) reader->lengthInSamples, bucketSize = std::max(1, frames / 4000);
-    for (int pos = 0; !saved && pos < frames; pos += bucketSize)
+    for (int pos = 0; needsPcm && !saved && pos < frames; pos += bucketSize)
     {
         if (stopped()) return {{}, "Audio loading cancelled."};
         float peak = 0;
@@ -596,15 +595,39 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
         m->energy = std::move(saved->energy);
         m->manualBpm = saved->manualBpm; m->manualBeatOrigin = saved->manualBeatOrigin; m->manualKey = saved->manualKey; m->analysisFromCache = true;
     }
-    else { if (progress) progress(MediaReadStage::analyse); m->analysis = analyseMusic(m->audioView(), m->sampleRate, cancelled); }
+    else if (needsPcm) { if (progress) progress(MediaReadStage::analyse); m->analysis = analyseMusic(m->audioView(), m->sampleRate, cancelled); }
+    else
+    {
+        m->analysis.rhythmMethod = "bounded-scan";
+        m->analysis.rhythmIssue = "Automatic analysis exceeds the bounded scan workspace. Original-file playback is available.";
+        // Long-source display data is computed in bounded chunks without a PCM file.
+        juce::AudioBuffer<float> chunk(channels, std::min(65536, bucketSize));
+        for (int64_t pos = 0; pos < frames; pos += bucketSize)
+        {
+            if (stopped()) return {{}, "Audio loading cancelled."};
+            float peak = 0; double power = 0; int samples = 0;
+            for (int64_t offset = pos; offset < std::min<int64_t>(frames, pos + bucketSize); offset += chunk.getNumSamples())
+            {
+                const int count = (int)std::min<int64_t>(chunk.getNumSamples(), std::min<int64_t>(frames, pos + bucketSize) - offset);
+                if (!reader->read(&chunk, 0, count, offset, true, true)) return {{}, "Audio read failed: " + file.getFullPathName()};
+                for (int ch = 0; ch < channels; ++ch) for (int i = 0; i < count; ++i)
+                {
+                    const float value = chunk.getSample(ch, i);
+                    if (!std::isfinite(value)) return {{}, "Non-finite audio sample in " + file.getFileName()};
+                    peak = std::max(peak, std::abs(value)); power += double(value) * value; ++samples;
+                }
+            }
+            m->peaks.push_back(peak); m->waveformRms.push_back(float(std::sqrt(power / std::max(1, samples))));
+        }
+    }
     if (libraryMatches) { m->manualBpm = libraryRecord->manualBpm; m->manualBeatOrigin = libraryRecord->manualBeatOrigin; m->manualKey = libraryRecord->manualKey; }
-    if (retryTempo || retryKey)
+    if (needsPcm && (retryTempo || retryKey))
     {
         if (progress) progress(MediaReadStage::analyse);
         m->analysis = retryMusicAnalysis(m->audioView(), m->sampleRate, m->analysis, retryTempo, retryKey, cancelled);
         m->analysisFromCache = false;
     }
-    const bool refinedTiming = playback && needsPcm && refineAttackTiming(m->audioView(), m->sampleRate, m->analysis, m->manualBpm, m->manualBeatOrigin, cancelled);
+    const bool refinedTiming = needsPcm && refineAttackTiming(m->audioView(), m->sampleRate, m->analysis, m->manualBpm, m->manualBeatOrigin, cancelled);
     const bool newEnergy = needsPcm && !m->energy.complete();
     if (newEnergy)
     {
@@ -614,14 +637,11 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
     if (stopped()) return {{}, "Audio loading cancelled."};
     if (m->analysisSource.sha256.isNotEmpty() && audioDigest(file) != m->analysisSource.sha256) return { {}, "Audio changed while being read: " + file.getFullPathName() + ". Import it again." };
     if (needsPcm && m->waveformRms.empty()) m->prepareWaveformBody();
-    if (m->analysis.rhythmIssue.isNotEmpty() && !focused) m->analysisCacheWarning = m->analysis.rhythmIssue;
+    if (m->analysis.rhythmIssue.isNotEmpty() && m->analysis.rhythmMethod != "bounded-scan" && !focused) m->analysisCacheWarning = m->analysis.rhythmIssue;
     else if (mode != AnalysisCacheMode::readOnly && (!saved || retryTempo || retryKey || refinedTiming || cached.legacyLocation || (newEnergy && m->energy.complete()))) m->analysisCacheWarning = writeAnalysisRecord(file, m->analysisRecord());
     if (progress) progress(MediaReadStage::cache);
-    if (!m->cache && needsPcm && mode != AnalysisCacheMode::readOnly) m->cache = store.write(pcmKey, m->sampleRate, m->samples, m->playbackCacheWarning);
-    juce::String error; if (playback && !m->cache) m->cache = AudioCache::create(m->samples, error);
-    if (playback && !m->cache) return { {}, file.getFileName() + ": " + error };
-    m->samples.setSize(0, 0); // The OS pages retained PCM from disk; library size no longer reserves full decoded RAM.
-    if (!playback) m->cache.reset(); // Catalogue entries retain facts/waveforms, not pinned PCM or temporary playback files.
+    m->samples.setSize(0, 0); m->cache.reset();
+    if (playback) m->original = std::make_shared<OriginalAudio>(file, m->sampleRate, channels, frames);
     const auto recordFile = analysisRecordInputFile(file); m->analysisFileModified = recordFile.getLastModificationTime().toMilliseconds(); m->analysisFileBytes = recordFile.getSize();
     const auto sections = readSourceSectionRecord(m->analysisSource); m->sectionTemplate = sections.markers; m->sectionTemplateError = sections.error;
     return { m, {} };
@@ -979,6 +999,7 @@ juce::Result Project::closeTimeRange(double begin, double end, const juce::Strin
         for (auto p = right; p != original.points.end(); ++p)
         { auto shifted = *p; shifted.time = fold(p->time); curve.points.push_back(shifted); }
     };
+    for (auto& [key, state] : candidate.laneHandles) { state.generatedPoints.clear(); for (auto& seed : state.seeds) seed.second.clear(); }
     spliceCurve(candidate.masterAutomation);
     for (auto& settings : candidate.tracks)
     {
@@ -1055,6 +1076,13 @@ double Project::automationSessionTime(const AutomationAddress& address, double t
 }
 void Project::automationEdited(const AutomationAddress& address, AutomationEdit edit, double removedSourceTime)
 {
+    if (address.clipId.isEmpty() && address.target != AutomationTarget::master && address.target != AutomationTarget::plugin)
+        if (curve(address))
+        {
+            auto& state = laneHandles[address.track * trackAutomationCount + (int) address.target];
+            state.generatedPoints.clear();
+            for (auto& seed : state.seeds) seed.second.clear();
+        }
     if (address.stem >= 0) return;
     if (address.target == AutomationTarget::bass) if (auto* c = clipFor(address.clipId)) c->automaticBass = false;
     if (address.target == AutomationTarget::bass && edit != AutomationEdit::change) for (auto& link : transitionLinks)
@@ -1063,6 +1091,53 @@ void Project::automationEdited(const AutomationAddress& address, AutomationEdit 
             const size_t side = link.outgoing == address.clipId ? 0 : 2;
             if (edit == AutomationEdit::clearCurve || std::abs((*link.bassSwap)[side] - removedSourceTime) < 1e-7
                 || std::abs((*link.bassSwap)[side + 1] - removedSourceTime) < 1e-7) link.bassSwap.reset();
+        }
+}
+void Project::updateLaneHandles()
+{
+    auto grid = tempo; grid.fallback = bpm;
+    for (int lane = 0; lane < trackCount; ++lane)
+        for (int target = 0; target < trackAutomationCount; ++target)
+        {
+            auto& curve = tracks[(size_t) lane].automation[(size_t) target];
+            const auto manual = tracks[(size_t) lane].manualValue((AutomationTarget) target);
+            auto& state = laneHandles[lane * trackAutomationCount + target];
+            if (std::any_of(state.generatedPoints.begin(), state.generatedPoints.end(), [&](double time)
+                { return std::none_of(curve.points.begin(), curve.points.end(), [&](const auto& point) { return point.time == time; }); })) state = {};
+            auto desired = state.seeds;
+            for (auto it = desired.begin(); it != desired.end();)
+                if (std::none_of(clips.begin(), clips.end(), [&](const auto& clip) { return clip.track == lane && clip.id == it->first; })) it = desired.erase(it);
+                else ++it;
+            for (const auto& clip : clips) if (clip.track == lane && clip.length > 0 && clip.pendingPlacement == PendingPlacement::none)
+            {
+                const auto found = desired.find(clip.id);
+                if (found != desired.end() && found->second.empty()) continue;
+                const double begin = clip.start, end = clip.end();
+                const double a = grid.beatsAt(begin), b = grid.beatsAt(end), middle = (a + b) / 2;
+                desired[clip.id] = {begin, grid.timeAtBeat(std::min(a + 32, middle)), grid.timeAtBeat(std::max(b - 32, middle)), end};
+            }
+            const bool neutral = curve.points.size() == state.generatedPoints.size();
+            if (neutral) for (auto& point : curve.points) point.value = manual;
+            if (desired == state.seeds) continue;
+            // Removing untouched subdivisions restores the original bend before redividing it.
+            for (size_t i = 0; i < curve.points.size();)
+                if (state.generatedPoints.count(curve.points[i].time))
+                {
+                    if (i > 0 && i + 1 < curve.points.size())
+                        curve.points[i - 1].bend = juce::jlimit(-1., 1., curve.points[i - 1].bend + curve.points[i].bend);
+                    curve.points.erase(curve.points.begin() + (ptrdiff_t) i);
+                }
+                else ++i;
+            state.generatedPoints.clear(); state.seeds = std::move(desired);
+            for (const auto& seed : state.seeds) for (double time : seed.second)
+            {
+                time = juce::jlimit(0., 1.e9, time);
+                if (std::any_of(curve.points.begin(), curve.points.end(), [&](const auto& point) { return std::abs(point.time - time) < 1.e-6; })) continue;
+                const auto value = curve.interpolatedValue(time, manual);
+                const int index = curve.setPoint(time, value);
+                curve.points[(size_t) index].value = value; // Preserve exact sampled gain-space values, including -60 dB.
+                state.generatedPoints.insert(time);
+            }
         }
 }
 AutomationCurve* Project::curve(const AutomationAddress& address)
@@ -1108,20 +1183,38 @@ void Project::setManualValue(const AutomationAddress& address, float value)
 
 namespace
 {
-juce::var curveToJson(const AutomationCurve& curve)
+juce::var curveToJson(const AutomationCurve& curve, const LaneHandleState* handles = nullptr)
 {
     auto* lane = new juce::DynamicObject(); juce::Array<juce::var> points; lane->setProperty("enabled", curve.enabled);
     for (const auto& point : curve.points) { auto* node = new juce::DynamicObject(); node->setProperty("time", point.time); node->setProperty("value", point.value); if (point.bend != 0) node->setProperty("bend", point.bend); if (point.exponential) node->setProperty("exponential", true); if (point.gainSpace) node->setProperty("gainSpace", true); points.add(juce::var(node)); }
-    lane->setProperty("points", points); return juce::var(lane);
+    lane->setProperty("points", points);
+    if (handles && !handles->seeds.empty())
+    {
+        juce::Array<juce::var> seeds, generated;
+        for (const auto& seed : handles->seeds)
+        {
+            auto* item = new juce::DynamicObject(); item->setProperty("clip", seed.first);
+            juce::Array<juce::var> times; for (double time : seed.second) times.add(time);
+            item->setProperty("times", times); seeds.add(juce::var(item));
+        }
+        for (double time : handles->generatedPoints) generated.add(time);
+        lane->setProperty("laneSeeds", seeds); lane->setProperty("laneGeneratedPoints", generated);
+    }
+    return juce::var(lane);
 }
-juce::var controlsToJson(const TrackSettings& t)
+juce::var controlsToJson(const TrackSettings& t, const Project* project = nullptr, int track = -1)
 {
     auto* obj = new juce::DynamicObject(); obj->setProperty("gainDb", t.gainDb); obj->setProperty("pan", t.pan);
     juce::Array<juce::var> eq, controls, lanes;
     obj->setProperty("filterCutoff", t.filterCutoff);
     for (auto value : t.eqDb) eq.add(value); obj->setProperty("eqDb", eq);
     auto* automation = new juce::DynamicObject();
-    for (int n = 0; n < trackAutomationCount; ++n) automation->setProperty(automationId((AutomationTarget) n), curveToJson(t.automation[(size_t) n]));
+    for (int n = 0; n < trackAutomationCount; ++n)
+    {
+        const LaneHandleState* handles = nullptr;
+        if (project) if (auto it = project->laneHandles.find(track * trackAutomationCount + n); it != project->laneHandles.end()) handles = &it->second;
+        automation->setProperty(automationId((AutomationTarget) n), curveToJson(t.automation[(size_t) n], handles));
+    }
     obj->setProperty("automation", juce::var(automation));
     for (const auto& c : t.pluginControls) { auto* item = new juce::DynamicObject(); item->setProperty("insert", c.insert); item->setProperty("parameterId", c.parameterId); controls.add(juce::var(item)); }
     obj->setProperty("pluginControls", controls);
@@ -1161,6 +1254,8 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
 {
     auto* root = new juce::DynamicObject();
     root->setProperty("format", "mixworks-session"); root->setProperty("version", projectVersion);
+    root->setProperty("visualScenes", visualScenesToJson(p.visualScenes));
+    root->setProperty("visualImage", p.visualImage);
     root->setProperty("name", p.name); root->setProperty("bpm", p.bpm); root->setProperty("masterDb", p.masterDb); root->setProperty("snap", p.snap);
     root->setProperty("snapDivision", p.snapDivision);
     root->setProperty("timelineOrigin", p.tempo.origin);
@@ -1211,7 +1306,7 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
     juce::Array<juce::var> tracks, clips;
     for (const auto& t : p.tracks)
     {
-        auto data = controlsToJson(t); auto* obj = data.getDynamicObject();
+        auto data = controlsToJson(t, &p, (int) (&t - p.tracks.data())); auto* obj = data.getDynamicObject();
         obj->setProperty("name", t.name); obj->setProperty("mute", t.mute); obj->setProperty("solo", t.solo);
         obj->setProperty("plugins", juce::Array<juce::var>()); tracks.add(data);
     }
@@ -1229,6 +1324,7 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
         auto* obj = new juce::DynamicObject(); obj->setProperty("id", c.id); obj->setProperty("mediaId", c.media->id); obj->setProperty("track", c.track);
         obj->setProperty("reversed", c.reversed); obj->setProperty("loopSpan", c.loopSpan); obj->setProperty("loopPhase", c.loopPhase);
         obj->setProperty("rate", c.rate); obj->setProperty("beatmatched", c.beatmatched);
+        obj->setProperty("pitchSemitones", c.pitchSemitones);
         obj->setProperty("tempoSourceBpm", p.followTrackTempo && c.beatmatched && c.tempoMap ? c.tempoSourceBpm : 0);
         obj->setProperty("elasticPlayback", c.elasticPlayback);
         obj->setProperty("start", c.start); obj->setProperty("offset", c.offset); obj->setProperty("length", c.length); obj->setProperty("audioSlip", c.audioSlip);
@@ -1287,7 +1383,7 @@ bool number(const juce::var& v, double low, double high)
     if (!(v.isDouble() || v.isInt() || v.isInt64())) return false;
     const double n = (double) v; return std::isfinite(n) && n >= low && n <= high;
 }
-bool parseCurve(const juce::var& lane, AutomationCurve& curve, juce::Range<float> range, bool legacyDb)
+bool parseCurve(const juce::var& lane, AutomationCurve& curve, juce::Range<float> range, bool legacyDb, LaneHandleState* handles = nullptr)
 {
     auto* points = lane["points"].getArray();
     if (!lane.isObject() || !lane["enabled"].isBool() || !points) return false;
@@ -1301,6 +1397,25 @@ bool parseCurve(const juce::var& lane, AutomationCurve& curve, juce::Range<float
         if (point.hasProperty("gainSpace") && (!point["gainSpace"].isBool() || ((bool) point["gainSpace"] && range.getStart() != -60))) return false;
         previous = (double) point["time"]; curve.points.push_back({previous, (float) value, point.hasProperty("bend") ? (double) point["bend"] : 0, (bool) point["exponential"], (bool) point["gainSpace"]});
     }
+    if (lane.hasProperty("laneSeeds") || lane.hasProperty("laneGeneratedPoints"))
+    {
+        const auto* seeds = lane["laneSeeds"].getArray(); const auto* generated = lane["laneGeneratedPoints"].getArray();
+        if (!handles || !seeds || !generated) return false;
+        for (const auto& seed : *seeds)
+        {
+            const auto id = seed["clip"].toString(); const auto* times = seed["times"].getArray();
+            if (!seed["clip"].isString() || id.isEmpty() || !times || (times->size() != 0 && times->size() != 4) || handles->seeds.count(id)) return false;
+            auto& result = handles->seeds[id]; double last = -1;
+            for (const auto& time : *times) { if (!number(time, 0, 1.e9) || (double) time < last) return false; result.push_back(last = (double) time); }
+        }
+        for (const auto& time : *generated)
+        {
+            if (!number(time, 0, 1.e9) || !handles->generatedPoints.insert((double) time).second
+                || std::none_of(curve.points.begin(), curve.points.end(), [&](const auto& point) { return point.time == (double) time; })
+                || std::none_of(handles->seeds.begin(), handles->seeds.end(), [&](const auto& seed)
+                    { return std::find(seed.second.begin(), seed.second.end(), (double) time) != seed.second.end(); })) return false;
+        }
+    }
     return true;
 }
 bool parseFilterControl(const juce::var& t, TrackSettings& target, int version)
@@ -1310,10 +1425,10 @@ bool parseFilterControl(const juce::var& t, TrackSettings& target, int version)
     if (!number(value, version >= 27 ? -1 : 20, version >= 27 ? 1 : 20000)) return false;
     target.filterCutoff = version >= 27 ? (float) value : lowPassToCutoff((float) value); return true;
 }
-bool parseControlCurve(const juce::var& automation, AutomationCurve& curve, AutomationTarget target, int version, bool legacyDb = false)
+bool parseControlCurve(const juce::var& automation, AutomationCurve& curve, AutomationTarget target, int version, bool legacyDb = false, LaneHandleState* handles = nullptr)
 {
     if (target != AutomationTarget::cutoff || version >= 27)
-        return parseCurve(automation[automationId(target)], curve, automationRange(target), legacyDb);
+        return parseCurve(automation[automationId(target)], curve, automationRange(target), legacyDb, handles);
     if (!parseCurve(automation["low-pass"], curve, {20, 20000}, false)) return false;
     for (auto& point : curve.points) point.value = lowPassToCutoff(point.value);
     return true;
@@ -1360,16 +1475,29 @@ juce::String relinkProjectSource(const ProjectResult& parsed, const juce::String
     const auto found = std::find_if(parsed.media.begin(), parsed.media.end(), [&](const auto& media) { return media.id == mediaId; });
     if (found == parsed.media.end()) return {};
     auto document = parsed.document.clone(); bool changed = false;
-    if (auto* media = document["media"].getArray())
+    const auto path = replacement.getFullPathName();
+    auto relocate = [&](juce::var& snapshot)
     {
-        for (auto& entry : *media) if (entry["id"].toString() == mediaId)
-        { entry.getDynamicObject()->setProperty("file", replacement.getFullPathName()); changed = true; }
-    }
-    else if (auto* clips = document["clips"].getArray())
-    {
-        for (auto& clip : *clips) if (clip["file"].toString() == found->path)
-        { clip.getDynamicObject()->setProperty("file", replacement.getFullPathName()); changed = true; }
-    }
+        if (auto* media = snapshot["media"].getArray())
+            for (auto& entry : *media) if (entry["file"].toString() == found->path)
+            { entry.getDynamicObject()->setProperty("file", path); changed = true; }
+        // Keep the saved hash/dimensions attached to the relocated path. Otherwise
+        // prepareProject cannot find the binding and accepts unrelated audio.
+        if (auto* bindings = snapshot["sourceBindings"].getArray())
+            for (auto& binding : *bindings) if (binding["path"].toString() == found->path)
+                binding.getDynamicObject()->setProperty("path", path);
+    };
+    relocate(document);
+    // Takes own independent current-format snapshots. Move only references to
+    // this source; export destinations and unrelated media stay as authored.
+    if (auto* takes = document["performanceTakes"].getArray())
+        for (auto& take : *takes)
+        {
+            auto initial = take["initial"]; relocate(initial);
+            if (auto* events = take["events"].getArray())
+                for (auto& event : *events) if ((int)event["kind"] == (int)TakeEventKind::project)
+                { auto payload = event["payload"]; relocate(payload); }
+        }
     return changed ? juce::JSON::toString(document, false, 17) : juce::String();
 }
 ProjectResult parseProject(const juce::String& text)
@@ -1381,6 +1509,17 @@ ProjectResult parseProject(const juce::String& text)
     const auto& d = r.document;
     if (d["format"].toString() != "mixworks-session" || !d["version"].isInt() || (int) d["version"] < 1 || (int) d["version"] > projectVersion)
         return fail("This is not a supported Mixworks session. Fusion .mmp files are not yet supported.");
+    if ((int)d["version"] >= 45 || d.hasProperty("visualImage"))
+    {
+        if (!d["visualImage"].isString() || (d["visualImage"].toString().isNotEmpty() && !juce::File::isAbsolutePath(d["visualImage"].toString())))
+        { r.error = "Invalid visual image reference."; return r; }
+        r.project.visualImage = d["visualImage"].toString();
+    }
+    if ((int)d["version"] >= 43 || d.hasProperty("visualScenes"))
+    {
+        const auto scenes = readVisualScenes(d["visualScenes"], r.project.visualScenes);
+        if (scenes.failed()) return fail(scenes.getErrorMessage());
+    }
     if ((int) d["version"] == 24)
     {
         auto* saved = d["tracks"].getArray();
@@ -1499,7 +1638,7 @@ ProjectResult parseProject(const juce::String& text)
             if (!t["automation"].isObject()) return fail("Invalid track automation.");
             for (int n = 0; n < (extendedAutomation ? ((int) d["version"] >= 23 ? trackAutomationCount : 5) : 4); ++n)
             {
-                if (!parseControlCurve(t["automation"], target.automation[(size_t) n], (AutomationTarget) n, (int) d["version"], !extendedAutomation))
+                if (!parseControlCurve(t["automation"], target.automation[(size_t) n], (AutomationTarget) n, (int) d["version"], !extendedAutomation, &r.project.laneHandles[i * trackAutomationCount + n]))
                     return fail("Invalid automation points: check time ordering, value type and parameter range.");
             }
         }
@@ -1670,6 +1809,11 @@ ProjectResult parseProject(const juce::String& text)
         {
             if (!number(c["rate"], 0.05, 20) || !c["beatmatched"].isBool()) return fail("Invalid beatmatching settings.");
             clip.rate = (double) c["rate"]; clip.beatmatched = (bool) c["beatmatched"];
+        }
+        if ((int) d["version"] >= 42)
+        {
+            if (!number(c["pitchSemitones"], -6.5, 6.5)) return fail("Invalid segment pitch adjustment.");
+            clip.pitchSemitones = (double) c["pitchSemitones"];
         }
         if ((int) d["version"] >= 13)
         {

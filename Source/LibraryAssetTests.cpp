@@ -59,6 +59,12 @@ void runLibraryAssetTests(const std::function<void(bool, const juce::String&)>& 
         const auto backup = index.getSiblingFile("library.json.bak"); backup.replaceWithText("existing backup");
         check(rememberLibraryCatalogue(index, sources).isEmpty() && readLibraryCatalogue(index).files.size() == sources.size() && juce::JSON::parse(index)["extension"].toString() == "keep me"
               && backup.loadFileAsString() == "existing backup", "catalogue updates merge tracks, retain unknown fields and preserve existing backups");
+        const auto boundedIndex = root.getChildFile("bounded-library.json"); bool bounded = true;
+        for (int n=0;n<12;++n) bounded &= rememberLibraryCatalogue(boundedIndex,{root.getChildFile("remembered-"+juce::String(n)+".wav")}).isEmpty();
+        const auto previousIndex = boundedIndex.getSiblingFile("bounded-library.json.previous");
+        check(bounded && readLibraryCatalogue(boundedIndex).files.size()==12 && readLibraryCatalogue(previousIndex).files.size()==11
+            && root.findChildFiles(juce::File::findFiles,false,"bounded-library*").size()==2,
+            "repeated catalogue saves retain only current and immediately previous snapshots");
         const auto before = index.loadFileAsString(); check(rememberLibraryCatalogue(index, sources).isEmpty() && index.loadFileAsString() == before, "repeated catalogue registration is idempotent");
         const auto offline = root.getChildFile("offline.wav"); rememberLibraryCatalogue(index, {offline}); rememberLibraryCatalogue(index, sources);
         check(readLibraryCatalogue(index).files.contains(offline), "unavailable tracks are retained in the catalogue for a later reconnect");

@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "RetryReview.h"
 #include <set>
 
 namespace mixworks
@@ -52,9 +53,9 @@ void Workstation::reanalyseTracks(int scope, bool focused, std::vector<std::shar
     if (targets.empty()) targets = analysisTargets(scope);
     const int selected = (int) targets.size();
     if (focused) targets.erase(std::remove_if(targets.begin(), targets.end(), [](const auto& m) { return !canRetryAnalysis(*m); }), targets.end());
-    if (targets.empty()) { setStatus(focused ? "No untried weak BPM/key results in the selection. Manual values are protected." : "No songs selected for re-analysis."); return; }
-    setBusy(true); setStatus(focused ? "Retrying weak BPM/key results. Manual corrections and arrangements are retained."
-                                   : "Re-analysing automatic BPM, key and downbeat. Manual corrections and arrangements are retained.");
+    if (targets.empty()) { setStatus(focused ? "No tracks need another retry. Review remaining failures in Source corrections." : "Select tracks to analyse first."); return; }
+    setBusy(true); setStatus(focused ? "Retrying BPM and key. Your manual corrections will be kept."
+                                   : "Checking BPM, beat one and key. Your manual corrections will be kept.");
     auto cancelled = std::make_shared<std::atomic<bool>>(false); importCancellation = cancelled;
     importProgress.begin((int) targets.size()); importProgress.setReanalysis(focused);
     auto safe = juce::Component::SafePointer<Workstation>(this);
@@ -80,18 +81,23 @@ void Workstation::reanalyseTracks(int scope, bool focused, std::vector<std::shar
                 improved += (a.focusedTempo == 2 && needsFocusedTempo(record.analysis)) || (a.focusedKey == 2 && needsFocusedKey(record.analysis));
             }
             ++processed;
+            juce::var review;
             if (focused)
             {
+                review = retryReviewRow(*previous, result.media.get(), result.error);
+                const auto saved = saveRetryReview(review); review.getDynamicObject()->setProperty("volatile", saved.failed());
                 juce::var row(new juce::DynamicObject()); auto* e=row.getDynamicObject(); e->setProperty("source",previous->file.getFullPathName()); e->setProperty("before",analysisRecordToJson(record));
                 if (result.media) { e->setProperty("after",analysisRecordToJson(result.media->analysisRecord())); e->setProperty("decision",result.media->analysis.retryEvidence); }
                 else e->setProperty("failure",result.error); evidence.add(row);
                 if (retryReport.getParentDirectory().createDirectory().wasOk()) retryReport.replaceWithText(juce::JSON::toString(evidence),false,false,"\n");
             }
-            juce::MessageManager::callAsync([safe, cancelled, previous, fresh = std::move(result.media)]
+            juce::MessageManager::callAsync([safe, cancelled, previous, review, fresh = std::move(result.media)]
             {
                 if (!safe || safe->importCancellation != cancelled) return;
                 if (fresh)
                 {
+                    clearRetryError(*fresh, true, safe.getComponent());
+                    if (fresh->analysisCacheWarning.isEmpty()) clearRetryError(*fresh, false, safe.getComponent());
                     const juce::ScopedLock guard(safe->engine.lock); std::set<Media*> updated;
                     auto update = [&](const std::shared_ptr<Media>& media)
                     {
@@ -107,6 +113,12 @@ void Workstation::reanalyseTracks(int scope, bool focused, std::vector<std::shar
                     safe->dirty = true; safe->markCatalogueChanged(); safe->refresh();
                 }
                 safe->importProgress.finishFile();
+                if (review.isObject())
+                {
+                    publishRetryResult(*safe, review); const auto message = retryResultText(review);
+                    safe->importProgress.showResult(message);
+                    safe->setStatus(message + ((bool) review["volatile"] ? " Retry list could not be saved." : juce::String()));
+                }
             });
         }
         juce::MessageManager::callAsync([safe, cancelled, processed, total = (int) targets.size(), failures, focused, improved, skipped]
@@ -114,13 +126,17 @@ void Workstation::reanalyseTracks(int scope, bool focused, std::vector<std::shar
             if (!safe || safe->importCancellation != cancelled) return;
             safe->importProgress.setVisible(false); safe->importCancellation.reset(); safe->setBusy(false); safe->refresh();
             safe->setStatus(juce::String(processed < total ? "Analysis stopped. " : "Re-analysis complete. ") + juce::String(processed - failures.size()) + " refreshed; " + juce::String(failures.size()) + " failed. Manual corrections and arrangements retained.");
-            if (focused) safe->setStatus(juce::String(processed < total ? "Retry stopped. " : "Focused retry complete. ")
-                + juce::String(improved) + " improved; " + juce::String(processed - failures.size() - improved) + " unchanged; "
-                + juce::String(skipped) + " skipped; " + juce::String(failures.size()) + " failed. Uncertain results still need review.");
+            if (focused)
+            {
+                auto sources = safe->engine.library; for (const auto& c : safe->engine.project.clips) sources.push_back(c.media);
+                const auto remaining = retryIssues(sources, safe->getProperties()["focusedRetryRows"]);
+                safe->setStatus(juce::String(processed < total ? "Retry stopped. " : "Retry complete. ") + juce::String((int) remaining.size())
+                    + " tracks need review in Source corrections.");
+            }
             if (std::any_of(safe->engine.project.clips.begin(), safe->engine.project.clips.end(), [](const auto& clip)
                 { return clip.tempoSourceBpm > 0 && clip.media->manualBpm <= 0 && std::abs(clip.tempoSourceBpm - clip.media->bpm()) > 0.01; }))
-                safe->setStatus(safe->status + " Beatmatch applies refreshed tempos to this mix.");
-            if (!failures.isEmpty()) safe->fail(failures.joinIntoString("\n"));
+                safe->setStatus(safe->status + " Apply source corrections to update the mix.");
+            if (!focused && !failures.isEmpty()) safe->fail(failures.joinIntoString("\n"));
         });
     });
 }

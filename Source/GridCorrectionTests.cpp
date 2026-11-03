@@ -11,8 +11,362 @@
 
 namespace mixworks
 {
+void runGridAlignmentTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
+{
+    // Small authored PCM; no detector, hardware device, Workstation, production store or tempo worker.
+    auto engine = std::make_unique<Engine>(report.getSiblingFile("alignment-midi.json"), false);
+    auto media = std::make_shared<Media>(); media->name = "Manual alignment / authored 128 BPM";
+    media->file = report.getSiblingFile("alignment-source.wav"); media->sampleRate = 1000;
+    media->samples.setSize(1, 90000); media->samples.clear();
+    for (int i = 0; i < media->frames(); ++i)
+    {
+        const double beat = (i / media->sampleRate - 8.0) * 128 / 60;
+        const double phase = beat - std::floor(beat);
+        media->samples.setSample(0, i, (float) (.65 * std::exp(-phase * 50) * std::sin(i * .35)));
+    }
+    { juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> stream = media->file.createOutputStream();
+      auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(1000).withNumChannels(1).withBitsPerSample(24));
+      check(writer && writer->writeFromAudioSampleBuffer(media->samples, 0, media->frames()), "write tiny owned alignment fixture"); }
+    media->analysisSource = {audioDigest(media->file), media->file.getSize(), 1000, media->frames(), 1};
+    media->analysis.bpm = 120; media->analysis.beatOrigin = .213; media->analysis.tempoConfidence = .9;
+    media->analysis.key = 5; media->analysis.keyConfidence = .8; media->manualKey = 5;
+    media->prepareWaveformBody();
+    const auto digest = audioDigest(media->file);
+    engine->library.push_back(media); Clip clip; clip.media = media; clip.start = 3; clip.length = 30; engine->project.clips = {clip};
+    const auto document = juce::JSON::toString(projectToJson(engine->project), true, 17);
+    int commits = 0; bool rebuilt = false;
+    auto editor = std::make_unique<GridCorrectionEditor>(*engine, media, "", [&](const SourceCorrection& value, bool rebuild)
+    {
+        ++commits; rebuilt = rebuild;
+        const auto result = engine->correctSource(media, value); if (result.failed()) return result;
+        const auto error = writeAnalysisRecord(media->file, media->analysisRecord());
+        return error.isEmpty() ? juce::Result::ok() : juce::Result::fail(error);
+    });
+    editor->stopTimer();
+    check(editor->page==4 && editor->setPoint[0].isVisible() && !editor->setPoint[1].isEnabled()
+        && !editor->setPoint[2].isEnabled() && !editor->bpm.isVisible() && !editor->tempoPage.isVisible()
+        && !editor->save.isEnabled(), "A/B/C is the first screen; later steps and save wait for measured marks");
+    check(editor->sourceAudio.getToggleState() && !editor->click.getToggleState(), "locating downbeats starts with source audio alone; grid click is an explicit check");
+    {
+        const auto captureSimple = [&](const juce::String& name)
+        { auto out = report.getSiblingFile(name + ".png").createOutputStream(); juce::PNGImageFormat png;
+          check(out && png.writeImageToStream(editor->createComponentSnapshot(editor->getLocalBounds()), *out), "capture simple fixed-marker workflow / " + name); };
+        captureSimple("grid-simple-start");
+        const auto initial = editor->gridEdit();
+        const auto gesture = [&](juce::Point<float> point, juce::Point<float> origin, bool moved, bool fine = false)
+        { return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
+            juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | (fine ? juce::ModifierKeys::shiftModifier : 0)),
+            1, 0, 0, 0, 0, editor.get(), editor.get(), juce::Time::getCurrentTime(), origin, juce::Time::getCurrentTime(), 1, moved); };
+        for (double at : {0., 8., 89.999})
+        { editor->setCursor(at, false); check(std::abs(editor->xAtTime(at) - editor->waveform.getX() - editor->waveform.getWidth() * .5) < .001,
+            "selection stays beneath fixed centre marker, including source edges"); }
+        editor->setCursor(8, false);
+        engine->gridAudition.start(media, editor->draft.grid(*media), 8, true, false, -12);
+        juce::AudioBuffer<float> audition(2, 100); engine->gridAudition.render(audition, 100, 1000);
+        editor->setPoint[0].onClick();
+        check(std::abs(editor->points[0] - 8.1) < 1.e-8 && !engine->gridAudition.active(), "Set captures the actual playing source clock and pauses audition");
+        editor->undoGrid.onClick();
+        editor->setCursor(8, false); editor->setPoint[0].onClick();
+        check(editor->points[0] == 8 && editor->draft.downbeat == 8 && editor->setPoint[1].isEnabled() && !editor->setPoint[2].isEnabled(), "Set A pins a source downbeat and enables B only");
+        editor->zoom.setSelectedId(6, juce::sendNotificationSync);
+        const auto beforeNavigation = editor->gridEdit(); const auto history = editor->gridUndo.size();
+        const auto from = editor->waveform.getCentre().toFloat(); const auto to = from.translated(40, 0);
+        editor->mouseDown(gesture(from, from, false)); editor->mouseDrag(gesture(to, from, true)); editor->mouseUp(gesture(to, from, true));
+        check(std::abs(editor->cursor.getValue() - 8 + 40 * .25 / editor->waveform.getWidth()) < 1.e-8
+            && editor->gridEdit() == beforeNavigation && editor->gridUndo.size() == history,
+            "simple waveform drag navigates under marker without moving saved marks, grid or history");
+        const auto beforeFine = editor->cursor.getValue();
+        editor->mouseDown(gesture(from, from, false)); editor->mouseDrag(gesture(to, from, true, true)); editor->mouseUp(gesture(to, from, true, true));
+        check(std::abs(editor->cursor.getValue() - beforeFine + 4 * .25 / editor->waveform.getWidth()) < 1.e-8, "Shift navigation is one tenth speed");
+        const auto beforeEscape = editor->cursor.getValue();
+        editor->mouseDown(gesture(from, from, false)); editor->mouseDrag(gesture(to, from, true)); editor->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
+        check(editor->cursor.getValue() == beforeEscape && editor->gridEdit() == beforeNavigation, "Escape restores navigation without changing marks");
+        editor->setCursor(38, false); editor->setPoint[1].onClick();
+        check(editor->points[1] == 38 && editor->barsAB.getValue() == 15 && !editor->countsConfirmed.getToggleState(), "B suggests a bar count from prior tempo without claiming it is confirmed");
+        editor->barsAB.setValue(16, juce::sendNotificationSync);
+        check(editor->draft.bpm == 128 && editor->points[0] == 8 && editor->points[1] == 38, "correcting A/B bar count gives independent 128 BPM while retaining both marks");
+        editor->setCursor(68, false); editor->setPoint[2].onClick();
+        check(editor->barsBC.getValue() == 16 && editor->points[2] == 68 && !editor->save.isEnabled(), "C suggests later count; confirmation is required before saving");
+        editor->countsConfirmed.setToggleState(true, juce::sendNotificationSync);
+        check(editor->simpleAligned() && editor->save.isEnabled() && editor->simpleResult.getText().contains("0.0 ms"), "three authored downbeats agree on a constant 128 BPM grid");
+        editor->setCursor(8, false); captureSimple("grid-simple-aligned");
+        editor->zoom.setSelectedId(5, juce::sendNotificationSync); editor->setCursor(38, false); captureSimple("grid-simple-overview");
+        editor->zoom.setSelectedId(6, juce::sendNotificationSync);
+        editor->setCursor(68.12, false); editor->setPoint[2].onClick(); editor->countsConfirmed.setToggleState(true, juce::sendNotificationSync);
+        check(!editor->save.isEnabled() && !editor->simpleAligned() && editor->draft.bpm == 128
+            && editor->simpleResult.getText().contains("120.0 ms"), "inconsistent C exposes drift without bending the A/B grid");
+        editor->save.onClick();
+        check(commits == 0 && !editor->closed, "a mismatched simple measurement cannot commit even if its save handler is invoked");
+        captureSimple("grid-simple-mismatch");
+        editor->undoGrid.onClick(); check(!editor->countsConfirmed.getToggleState(), "Undo restores C confirmation independently");
+        editor->undoGrid.onClick(); check(editor->points[2] == 68 && editor->simpleAligned(), "Undo restores earlier C, bar counts and confirmation as one mark edit");
+        editor->barsBC.setValue(15, juce::sendNotificationSync);
+        check(!editor->countsConfirmed.getToggleState() && !editor->save.isEnabled(), "bar recount invalidates confirmation");
+        editor->undoGrid.onClick();
+        editor->visitPoint[0].onClick(); check(editor->cursor.getValue() == 8, "Go to A returns its exact source position under the centre marker");
+        const auto prior = editor->gridEdit(); editor->setCursor(7, false); editor->setPoint[1].onClick();
+        check(editor->gridEdit() == prior, "out-of-order B preserves all existing marks and measurements");
+        editor->setCursor(9, false); editor->setPoint[0].onClick();
+        check(editor->points[1] < 0 && editor->points[2] < 0 && !editor->save.isEnabled(), "replacing A clears later marks and their confirmation");
+        editor->undoGrid.onClick();
+        editor->advancedPage.onClick(); const auto priorAdvanced = editor->gridEdit(); editor->later.onClick(); editor->simplePage.onClick();
+        check(!editor->simpleAligned() && !editor->save.isEnabled(), "advanced grid changes cannot leave a stale successful A/B/C result");
+        editor->undoGrid.onClick(); check(editor->gridEdit() == priorAdvanced && editor->simpleAligned(), "Undo restores the validated grid across simple and Advanced views");
+        editor->precision.setSelectedId(2, juce::dontSendNotification); const auto beforeArrow = editor->cursor.getValue();
+        editor->keyPressed(juce::KeyPress(juce::KeyPress::rightKey));
+        check(std::abs(editor->cursor.getValue() - beforeArrow - .001) < 1.e-8 && editor->simpleAligned(),
+            "simple arrow navigation stays at 1 ms even after Advanced selected 10 ms grid edits");
+        editor->precision.setSelectedId(1, juce::dontSendNotification);
+        editor->restoreGrid(initial); editor->gridUndo.clear(); editor->gridRedo.clear();
+        check(commits == 0 && engine->project.clips[0].start == 3, "all simple mark edits and navigation leave source records and arrangement untouched");
+    }
+    editor->tempoPage.onClick();
+    check(editor->page==0 && editor->bpm.isVisible() && editor->tap.isVisible() && !editor->phase.isVisible()
+        && !editor->key.isVisible() && !editor->analysisDetails.isVisible(), "guided tempo view hides exact timing, keys and diagnostics");
+    const auto openingDraft=editor->gridEdit();
+    editor->beatPage.onClick();
+    check(editor->beatOne.isVisible() && editor->barLater.isVisible() && !editor->bars.isVisible() && !editor->bpm.isVisible(), "beat-one page exposes alignment and bar accent only");
+    editor->checkPage.onClick();
+    check(editor->bars.isVisible() && editor->matchB.isVisible() && !editor->phase.isVisible() && !editor->beatOne.isVisible(), "drift page exposes counted later-beat measurement");
+    check(editor->gridEdit()==openingDraft && editor->gridUndo.empty(), "changing guide pages does not edit musical facts or create Undo");
+    check(!editor->spacing.isEnabled() && !editor->goB.isEnabled(), "spacing requires a chosen downbeat anchor");
+    editor->beatPage.onClick();
+    editor->setCursor(8); editor->beatOne.onClick();
+    check(editor->draft.downbeat == 8 && editor->secondAnchor() == 40 && editor->bars.getValue() == 16,
+          "A pins any known downbeat and B identifies bar17 sixteen bars later");
+    editor->checkPage.onClick(); editor->setCursor(38); editor->matchB.onClick();
+    check(editor->draft.bpm == 128 && editor->calculated,
+          "independent oracle: 16 authored 4/4 bars in30 seconds calculate128 BPM");
+    check(editor->draft.downbeat == 8 && std::abs(editor->draft.grid(*media).timeAtBeat(-4) - 6.125) < 1.e-8,
+          "spacing keeps A fixed and extends bar phase backwards");
+    editor->beatPage.onClick(); const auto aligned=editor->draft.grid(*media);
+    editor->barLater.onClick();
+    check(std::abs(editor->draft.downbeat-8-60.0/128)<1e-7 && editor->draft.bpm==128
+        && std::abs(std::remainder(editor->draft.grid(*media).beatAt(30)-aligned.beatAt(30),1.0))<1e-7,
+        "changing the bar accent preserves the pulse everywhere and leaves BPM unchanged");
+    editor->undoGrid.onClick();
+    check(editor->draft.downbeat==8, "bar accent adjustment is reversible as one grid edit");
+    editor->advancedPage.onClick();
+    check(editor->phase.isVisible() && editor->key.isVisible() && editor->analysisDetails.isVisible(), "Advanced retains the existing precise controls");
+    editor->key.setSelectedId(15, juce::dontSendNotification); editor->changed();
+    editor->bars.setValue(8, juce::sendNotificationSync);
+    check(editor->draft.bpm == 64 && std::abs(editor->secondAnchor() - 38) < 1.e-8,
+          "correcting B bar identity preserves its measured source position and recalculates BPM");
+    editor->undoGrid.onClick();
+    check(editor->draft.bpm == 128 && editor->bars.getValue() == 16 && editor->draft.key == 13,
+          "Undo restores grid spacing and bar count without undoing a key correction");
+    editor->redoGrid.onClick(); check(editor->draft.bpm == 64, "Redo restores calculated spacing");
+    editor->undoGrid.onClick();
+    const auto beforeBad = editor->gridEdit();
+    for (double at : {8.0, 7.0, 8.001, 91.0, std::numeric_limits<double>::quiet_NaN()})
+        check(!editor->alignSecond(at) && editor->gridEdit() == beforeBad, "invalid or out-of-range B retains the previous grid");
+    editor->bars.setValue(1, juce::sendNotificationSync);
+    check(editor->bars.getValue() == 16 && editor->gridEdit() == beforeBad, "invalid bar recount rolls back atomically");
+    editor->precision.setSelectedId(2, juce::dontSendNotification); editor->later.onClick();
+    check(std::abs(editor->draft.downbeat - 8.01) < 1.e-8 && editor->draft.bpm == 128,
+          "visible10 ms precision shifts the whole grid without changing BPM");
+    editor->earlier.onClick(); editor->precision.setSelectedId(1, juce::dontSendNotification);
+    const auto atB = editor->secondAnchor(); editor->wider.onClick();
+    check(std::abs(editor->secondAnchor() - atB - .001) < .00002 && editor->draft.downbeat == 8 && editor->draft.bpm < 128,
+          "Wider moves B by1 ms while A stays pinned");
+    editor->narrower.onClick(); check(std::abs(editor->draft.bpm - 128) < .0001, "Narrower reverses the precision spacing adjustment");
+    editor->goB.onClick(); editor->zoom.setSelectedId(5, juce::sendNotificationSync);
+    const auto event = [&](juce::Point<float> point, juce::Point<float> down, bool dragged, bool right = false, bool fine = false)
+    {
+        return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
+            juce::ModifierKeys((right ? juce::ModifierKeys::rightButtonModifier : juce::ModifierKeys::leftButtonModifier)
+                | (fine ? juce::ModifierKeys::shiftModifier : 0)),
+            1, 0, 0, 0, 0, editor.get(), editor.get(), juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
+    };
+    const auto drag = [&](int handle, double delta)
+    {
+        const double at = handle == 1 ? editor->draft.downbeat : editor->secondAnchor();
+        const auto from = editor->handleBounds(at, handle).getCentre();
+        const auto to = from.translated((float) (delta * editor->waveform.getWidth() / std::min(editor->viewSpan, media->duration())), 0);
+        editor->mouseDown(event(from, from, false)); editor->mouseDrag(event(to, from, true)); editor->mouseUp(event(to, from, true));
+    };
+    auto history = editor->gridUndo.size(); const double a = editor->draft.downbeat;
+    drag(1, 1.5);
+    check(std::abs(editor->draft.downbeat - a - 1.5) < 1.e-5 && std::abs(editor->draft.bpm - 128) < .0001,
+          "native A label drag moves the grid without changing BPM");
+    check(editor->gridUndo.size() == history + 1, "one completed drag creates one grid Undo entry");
+    editor->undoGrid.onClick(); check(std::abs(editor->draft.downbeat - 8) < 1.e-5, "Undo restores an entire A drag");
+    const double b = editor->secondAnchor(); history = editor->gridUndo.size();
+    drag(2, 2);
+    check(std::abs(editor->secondAnchor() - b - 2) < .00003 && std::abs(editor->draft.downbeat - 8) < 1.e-5
+          && std::abs(editor->draft.bpm - 120) < .0001, "native B label drag compacts or stretches around pinned A and calculates BPM");
+    check(editor->gridUndo.size() == history + 1, "B drag coalesces into one Undo entry");
+    editor->undoGrid.onClick();
+    auto from = editor->handleBounds(editor->secondAnchor(), 2).getCentre(), to = from.translated(20, 0);
+    const auto beforeEscape = editor->gridEdit(); history = editor->gridUndo.size();
+    editor->mouseDown(event(from, from, false)); editor->mouseDrag(event(to, from, true));
+    check(editor->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)) && editor->gridEdit() == beforeEscape,
+          "Escape cancels a live drag and restores its original draft");
+    editor->mouseUp(event(to, from, true)); check(editor->gridUndo.size() == history, "cancelled drag does not create Undo history");
+    editor->mouseDown(event(from, from, false, true)); editor->mouseDrag(event(to, from, true, true)); editor->mouseUp(event(to, from, true, true));
+    check(editor->gridEdit() == beforeEscape, "right button cannot start a grid drag");
+    editor->beatPage.onClick(); editor->zoom.setSelectedId(6, juce::sendNotificationSync);
+    check(editor->viewSpan == .25, "250 ms zoom exposes sub-millisecond waveform alignment");
+    auto waveformDrag = [&](float pixels, bool fine, bool cancel)
+    {
+        editor->setCursor(editor->draft.downbeat, false);
+        const auto origin = juce::Point<float>(editor->xAtTime(editor->draft.downbeat), (float)editor->waveform.getY() + 100);
+        const auto target = origin.translated(pixels, 0);
+        editor->mouseDown(event(origin, origin, false, false, fine));
+        editor->mouseDrag(event(target, origin, true, false, fine));
+        if (cancel) editor->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
+        editor->mouseUp(event(target, origin, true, false, fine));
+    };
+    const double sampleAnchor = editor->draft.downbeat, programmeCursor = engine->position;
+    const double secondsPerPixel = .25 / editor->waveform.getWidth(); history = editor->gridUndo.size();
+    waveformDrag(20, false, false);
+    check(std::abs(editor->draft.downbeat - sampleAnchor + 20 * secondsPerPixel) < 1.e-7 && editor->draft.bpm == 128,
+        "dragging waveform right moves its audio beneath the fixed grid without changing BPM");
+    check(std::abs(editor->xAtTime(editor->draft.downbeat) - .35 * editor->waveform.getWidth() - editor->waveform.getX()) < .001
+        && editor->cursor.getValue() == sampleAnchor && engine->position == programmeCursor,
+        "waveform drag keeps the grid stationary onscreen and never seeks source or programme audio");
+    check(editor->gridUndo.size() == history + 1, "waveform alignment is one reversible grid edit");
+    editor->undoGrid.onClick(); check(editor->draft.downbeat == sampleAnchor, "Undo restores waveform phase adjustment");
+    waveformDrag(20, true, false);
+    check(std::abs(editor->draft.downbeat - sampleAnchor + 2 * secondsPerPixel) < 1.e-7 && sampleAnchor - editor->draft.downbeat < .001,
+        "Shift waveform dragging provides a sub-millisecond tenth-speed adjustment");
+    { auto out = report.getSiblingFile("grid-waveform-fine-drag.png").createOutputStream(); juce::PNGImageFormat png;
+      check(out && png.writeImageToStream(editor->createComponentSnapshot(editor->getLocalBounds()), *out), "capture fine waveform drag and 4/4 colour legend"); }
+    editor->undoGrid.onClick();
+    history = editor->gridUndo.size(); editor->setCursor(sampleAnchor, false); const auto priorView = editor->viewStart;
+    waveformDrag(-20, true, true);
+    check(editor->draft.downbeat == sampleAnchor && editor->viewStart == priorView && editor->gridUndo.size() == history,
+        "Escape cancels waveform phase and viewport movement without adding Undo");
+    editor->setCursor(sampleAnchor, false);
+    const auto fineOrigin = juce::Point<float>(editor->xAtTime(sampleAnchor), (float)editor->waveform.getY() + 100);
+    editor->mouseDown(event(fineOrigin, fineOrigin, false));
+    editor->mouseDrag(event(fineOrigin.translated(10, 0), fineOrigin, true));
+    editor->mouseDrag(event(fineOrigin.translated(20, 0), fineOrigin, true, false, true));
+    editor->mouseUp(event(fineOrigin.translated(20, 0), fineOrigin, true, false, true));
+    check(std::abs(editor->draft.downbeat - sampleAnchor + 11 * secondsPerPixel) < 1.e-7,
+        "enabling Shift during a waveform drag changes sensitivity without a phase jump");
+    editor->undoGrid.onClick();
+    editor->setCursor(sampleAnchor, false);
+    const auto bodyPoint = juce::Point<float>(editor->xAtTime(sampleAnchor + .02), (float)editor->waveform.getY() + 100);
+    editor->mouseDown(event(bodyPoint, bodyPoint, false));
+    check(editor->cursor.getValue() == sampleAnchor, "waveform press defers audition until click or drag is known");
+    editor->mouseUp(event(bodyPoint, bodyPoint, false));
+    check(std::abs(editor->cursor.getValue() - sampleAnchor - .02) < 1.e-7 && editor->draft.downbeat == sampleAnchor,
+        "waveform click retains source audition positioning without editing the grid");
+    const auto gridBeforeZoom = editor->gridEdit();
+    editor->zoom.setSelectedId(7, juce::sendNotificationSync); check(editor->viewSpan == .05, "50 ms zoom is available");
+    editor->zoom.setSelectedId(8, juce::sendNotificationSync); check(editor->viewSpan == .01 && editor->gridEdit() == gridBeforeZoom, "10 ms zoom preserves musical timing and draft history");
+    editor->advancedPage.onClick(); editor->zoom.setSelectedId(5, juce::sendNotificationSync);
+    {
+        auto detected = media->catalogueCopy(); detected->manualBpm = 0; detected->manualBeatOrigin = -1;
+        detected->analysis.bpm = 128; detected->analysis.beatOrigin = detected->analysis.downbeatOrigin = 8;
+        auto automaticEditor = std::make_unique<GridCorrectionEditor>(*engine, detected, "", [](const auto&, bool) { return juce::Result::ok(); });
+        automaticEditor->stopTimer(); automaticEditor->beatPage.onClick(); automaticEditor->zoom.setSelectedId(6, juce::sendNotificationSync); automaticEditor->setCursor(8, false);
+        const auto origin = juce::Point<float>(automaticEditor->xAtTime(8), (float)automaticEditor->waveform.getY() + 100);
+        auto autoEvent = [&](juce::Point<float> point, bool moved)
+        {
+            return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
+                juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier),
+                1, 0, 0, 0, 0, automaticEditor.get(), automaticEditor.get(), juce::Time::getCurrentTime(), origin, juce::Time::getCurrentTime(), 1, moved);
+        };
+        automaticEditor->mouseDown(autoEvent(origin, false)); automaticEditor->mouseDrag(autoEvent(origin.translated(20, 0), true)); automaticEditor->mouseUp(autoEvent(origin.translated(20, 0), true));
+        check(std::abs(automaticEditor->draft.downbeat - 8 + 2 * secondsPerPixel) < 1.e-7 && automaticEditor->draft.bpm == 0
+            && automaticEditor->draft.grid(*detected).bpm == 128, "fine waveform drag works directly from detected beat one without overriding detected BPM");
+        automaticEditor->undoGrid.onClick();
+        check(automaticEditor->draft.downbeat == -1 && automaticEditor->phase.getText().isEmpty(), "Undo restores a detected grid without leaving a manual correction");
+    }
+    editor->spacing.setToggleState(true, juce::dontSendNotification);
+    const auto ruler = juce::Point<float>(editor->xAtTime(23), (float) editor->waveform.getY() + 54);
+    editor->mouseDown(event(ruler, ruler, false)); editor->mouseUp(event(ruler, ruler, false));
+    check(editor->bars.getValue() == 8 && !editor->calculated, "spacing ruler selects a different later bar as B without changing BPM");
+    editor->undoGrid.onClick();
+    editor->moveGrid.setToggleState(true, juce::dontSendNotification); editor->keyPressed(juce::KeyPress(juce::KeyPress::rightKey));
+    check(std::abs(editor->draft.downbeat - 8.001) < 1.e-5, "keyboard precision moves the grid in Move grid mode");
+    editor->undoGrid.onClick(); editor->spacing.setToggleState(true, juce::dontSendNotification);
+    editor->keyPressed(juce::KeyPress(juce::KeyPress::rightKey));
+    check(editor->draft.downbeat == 8 && editor->draft.bpm < 128, "keyboard precision spaces B around pinned A in Adjust spacing mode");
+    editor->undoGrid.onClick();
+    editor->revertGrid.onClick();
+    check(editor->draft.bpm == 0 && editor->draft.downbeat == -1 && editor->draft.key == 13,
+          "Revert grid restores opening timing while preserving the key draft");
+    editor->undoGrid.onClick(); check(editor->draft.bpm == 128 && editor->draft.downbeat == 8, "Revert grid itself is undoable");
+    editor->automatic.onClick(); check(editor->draft.key == 13, "Detected grid never clears the key correction"); editor->undoGrid.onClick();
+    editor->phase.setText(juce::String(editor->cursor.getMaximum(), 8), false); editor->changed(); editor->later.onClick();
+    check(editor->validDraft && editor->draft.downbeat < media->duration(), "precision at source end cannot round the anchor outside audio");
+    editor->undoGrid.onClick();
+    editor->bpm.setText("120..2", false); editor->changed();
+    check(!editor->save.isEnabled() && !editor->spacing.isEnabled() && !editor->wider.isEnabled(), "malformed input disables saving and alignment gestures");
+    editor->undoGrid.onClick(); editor->alignSecond(38);
+    check(commits == 0 && media->manualBpm == 0 && media->manualBeatOrigin == -1 && media->manualKey == 5
+          && document == juce::JSON::toString(projectToJson(engine->project), true, 17),
+          "all grid drafts leave source corrections and the existing timeline untouched");
+    editor->goB.onClick(); editor->zoom.setSelectedId(4, juce::sendNotificationSync);
+    const auto capture = [&](const juce::String& name)
+    {
+        auto stream = report.getSiblingFile(name + ".png").createOutputStream(); juce::PNGImageFormat png;
+        check(stream && png.writeImageToStream(editor->createComponentSnapshot(editor->getLocalBounds()), *stream), "capture actual alignment editor / " + name);
+    };
+    capture("grid-alignment-B"); editor->zoom.setSelectedId(5, juce::sendNotificationSync); capture("grid-alignment-overview");
+    for (int page=0;page<3;++page)
+    {
+        editor->selectPage(page); capture("grid-guide-"+juce::String(page+1));
+        check(editor->waveform.getHeight()>=250 && editor->getLocalBounds().contains(editor->save.getBounds()), "guided page keeps waveform and save visible without scrolling");
+    }
+    editor->simplePage.onClick();
+    editor->setCursor(8, false); editor->setPoint[0].onClick();
+    editor->setCursor(38, false); editor->setPoint[1].onClick(); editor->barsAB.setValue(16, juce::sendNotificationSync);
+    editor->setCursor(68, false); editor->setPoint[2].onClick(); editor->barsBC.setValue(16, juce::sendNotificationSync);
+    editor->countsConfirmed.setToggleState(true, juce::sendNotificationSync);
+    check(editor->simpleAligned() && editor->save.isEnabled(), "final source save uses the completed simple A/B/C workflow");
+    const auto finishModal=[&](int answer)
+    {
+        auto* modal=juce::Component::getCurrentlyModalComponent(); check(modal!=nullptr,"rebuild consequence confirmation is visible");
+        if (modal) modal->exitModalState(answer);
+        for (int i=0;i<10;++i)
+        {
+           #if JUCE_WINDOWS
+            MSG message; while (PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+           #endif
+            juce::Thread::sleep(2);
+        }
+    };
+    editor->rebuild.onClick(); finishModal(0);
+    check(commits==0 && !editor->closed, "cancelling rebuild confirmation keeps draft and mix unchanged");
+    editor->save.onClick();
+    const auto saved = readAnalysisRecord(media->file, media->analysisSource);
+    check(commits == 1 && !rebuilt && saved.record && saved.record->manualBpm == 128 && saved.record->manualBeatOrigin == 8 && saved.record->manualKey == 13,
+          "Save source corrections persists calculated BPM and anchor through the existing source-record format");
+    check(engine->project.clips[0].start == 3 && engine->project.clips[0].length == 30, "save source only preserves timeline placement and duration");
+    editor.reset();
+    auto reopened = std::make_unique<GridCorrectionEditor>(*engine, media, "", [](const SourceCorrection&, bool) { return juce::Result::fail("owned failure"); });
+    check(reopened->draft.bpm == 128 && reopened->draft.downbeat == 8 && reopened->draft.key == 13, "reopened editor starts from saved timing and key");
+    reopened->advancedPage.onClick(); reopened->later.onClick(); reopened->save.onClick();
+    check(!reopened->closed && reopened->draft.downbeat > 8 && media->manualBeatOrigin == 8, "failed save retains the unsaved alignment draft");
+    reopened->cancel.onClick(); check(reopened->closed && media->manualBeatOrigin == 8, "Cancel discards alignment without modifying saved source facts");
+    auto undetected = media->catalogueCopy(); undetected->analysis.bpm = 0; undetected->manualBpm = 0; undetected->manualBeatOrigin = -1;
+    auto manual = std::make_unique<GridCorrectionEditor>(*engine, undetected, "", [](const SourceCorrection&, bool) { return juce::Result::ok(); });
+    manual->setCursor(8); manual->beatOne.onClick();
+    check(manual->bars.isEnabled() && !manual->spacing.isEnabled(), "missing detected BPM still allows a manual bar count before B is known");
+    manual->bars.setValue(8, juce::sendNotificationSync); manual->setCursor(23); manual->matchB.onClick();
+    check(manual->draft.bpm == 128 && manual->draft.downbeat == 8 && manual->spacing.isEnabled(),
+          "two exact manual downbeats calculate BPM without any detected tempo");
+    manual->bpm.setText({}, false); manual->phase.setText({}, false); manual->changed();
+    check(!manual->draft.grid(*undetected).hasPulse(), "simple manual measurement starts with no detected or supplied tempo");
+    manual->setCursor(8, false); manual->setPoint[0].onClick(); manual->setCursor(23, false); manual->setPoint[1].onClick();
+    manual->barsAB.setValue(8, juce::sendNotificationSync); manual->setCursor(38, false); manual->setPoint[2].onClick();
+    manual->countsConfirmed.setToggleState(true, juce::sendNotificationSync);
+    check(manual->simpleAligned() && manual->draft.bpm == 128, "simple three-point correction also works without a detected tempo");
+    int rebuildRequests=0;
+    auto confirm=std::make_unique<GridCorrectionEditor>(*engine,media,"",[&](const SourceCorrection&,bool rebuild)
+    { if (rebuild) ++rebuildRequests; return juce::Result::ok(); });
+    confirm->advancedPage.onClick();
+    confirm->rebuild.onClick(); finishModal(1);
+    check(rebuildRequests==1 && confirm->closed, "explicit rebuild confirmation commits exactly once");
+    check(audioDigest(media->file) == digest, "dragging, precision, saving and Cancel leave original audio bytes unchanged");
+}
 void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    runGridAlignmentTests(check, report);
     const auto hasItem = [](const juce::PopupMenu& menu, int id)
     {
         for (juce::PopupMenu::MenuItemIterator it(menu, true); it.next();)
@@ -201,6 +555,7 @@ void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>
     auto* editor = dynamic_cast<GridCorrectionEditor*>(ui.gridWindow->getContentComponent());
     check(editor && ui.gridWindow->isVisible(), "BPM / Key opens the native source-grid correction window");
     if (!editor) return;
+    editor->advancedPage.onClick();
     bool fineTempo = false, rebuildAction = false;
     for (auto* child : editor->getChildren())
     { fineTempo |= child->getName() == "Increase source tempo by 0.01 BPM"; rebuildAction |= child->getName() == "Save corrections and rebuild timeline"; }
@@ -229,6 +584,7 @@ void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>
     check(!ui.engine.gridAudition.active() && !ui.gridWindow->isVisible() && media->manualBeatOrigin == -1 && media->manualBpm == 0,
           "Cancel closes monitoring and discards corrections without changing source facts");
     ui.editAnalysis(media->id); editor = dynamic_cast<GridCorrectionEditor*>(ui.gridWindow->getContentComponent());
+    editor->advancedPage.onClick();
     editor->bpm.setText("130.5", false); editor->phase.setText("0.213", false); editor->key.setSelectedId(5, juce::dontSendNotification);
     editor->changed(); editor->save.onClick(); ui.workers.removeAllJobs(false, 10000);
     auto record = readAnalysisRecord(media->file, media->analysisSource);
@@ -241,6 +597,7 @@ void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>
     if (!isolated) return;
     check(recordFile.moveFileTo(recordBackup) && recordFile.createDirectory().wasOk(), "temporarily block this fixture's analysis-record path");
     ui.editAnalysis(media->id); editor = dynamic_cast<GridCorrectionEditor*>(ui.gridWindow->getContentComponent());
+    editor->advancedPage.onClick();
     editor->bpm.setText("140", false); editor->changed(); editor->save.onClick(); ui.workers.removeAllJobs(false, 10000);
     check(ui.gridWindow->isVisible() && media->manualBpm == 130.5 && media->manualBeatOrigin == 0.213,
           "failed source-record write keeps the draft open and rolls back the unsaved correction");
@@ -253,9 +610,23 @@ void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>
           && ui.engine.project.clips[0].start == before.start && ui.engine.project.clips[0].length == before.length,
           "reopening retains the correction separately from the original arranged source clock");
     ui.editAnalysis(media->id); editor = dynamic_cast<GridCorrectionEditor*>(ui.gridWindow->getContentComponent());
+    editor->advancedPage.onClick();
     check(editor && editor->draft.bpm == 130.5 && editor->draft.key == 3, "reopened source editor shows saved BPM and key");
     editor->bpm.setText("129.99", false); editor->phase.setText("0.125", false); editor->changed();
+    const double preApplyClock = ui.engine.project.clips[0].tempoSourceBpm;
+    check(editor->rebuild.getButtonText() == "Save + rebuild mix..." && editor->rebuild.isEnabled(),
+          "review explicitly names the save and whole-mix rebuild action");
     editor->rebuild.onClick();
+    auto* rebuildConfirmation=juce::Component::getCurrentlyModalComponent();
+    check(rebuildConfirmation!=nullptr,"whole-mix rebuild requires consequence confirmation");
+    if (rebuildConfirmation) rebuildConfirmation->exitModalState(1);
+    for (int i=0;i<10;++i)
+    {
+       #if JUCE_WINDOWS
+        MSG message; while (PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+       #endif
+        juce::Thread::sleep(2);
+    }
     const double deadline = juce::Time::getMillisecondCounterHiRes() + 30000;
     while (ui.busy && juce::Time::getMillisecondCounterHiRes() < deadline)
     {
@@ -269,6 +640,14 @@ void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>
           "save-and-rebuild applies the corrected source clock to the actual timeline");
     check(std::abs(ui.engine.project.tempo.bpmAt(0) - 129.99) < 1e-8,
           "save-and-rebuild updates the timeline beat grid from the corrected source tempo");
+    const auto& appliedClip = ui.engine.project.clips[0];
+    check(std::abs(std::remainder(ui.engine.project.gridClock().beatsAt(appliedClip.start + appliedClip.firstDownbeatTime()), 4.0)) < 1.e-6,
+          "Apply places the corrected source downbeat on a shared arrangement bar boundary");
+    ui.undo(false);
+    check(ui.engine.project.clips[0].tempoSourceBpm == preApplyClock && ui.engine.project.clips[0].media->manualBpm == 129.99,
+          "Undo restores the previous arrangement clock while keeping the saved source correction");
+    ui.undo(true);
+    check(ui.engine.project.clips[0].tempoSourceBpm == 129.99, "Redo reinstates arrangement retiming");
     const auto rebuiltSession = report.getSiblingFile("rebuilt.mixworks");
     check(ui.engine.saveProject(rebuiltSession).isEmpty() && ui.engine.restoreProject(rebuiltSession.loadFileAsString()).isEmpty()
           && std::abs(ui.engine.project.clips[0].tempoSourceBpm - 129.99) < 1e-8,

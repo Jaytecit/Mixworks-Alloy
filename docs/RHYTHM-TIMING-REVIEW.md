@@ -1,3 +1,5 @@
+> Historical timing assessment,19 October 2026. Current attack/grid refinements through 0.55.61, retry revision3 and unresolved independent accuracy are summarized in the [request register](REQUEST-STATUS-20261024.md). The numerical controls and old analysis/session revisions below belong to their recorded candidates.
+
 # Timing changes and grid review
 
 ## Desired-outcome assessment — 19 October 2026

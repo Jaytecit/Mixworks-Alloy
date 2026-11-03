@@ -1,3 +1,5 @@
+> Dated audit/repair record. Baseline findings and pending labels below describe their original checkpoint. Use the [0.55.64 request register](REQUEST-STATUS-20261024.md) for reconciled delivery and the [active audit status](release-audit/STATUS.md) for current release qualification. Do not treat historical failures as current confirmed defects.
+
 # Alloy editing system audit — 22 October 2026
 
 Alloy already has most core transition and automation tools described in the DJ.Studio report. Its largest remaining editing gaps are **direct audio-range editing, reusable samples, movable effect regions and real stem editing**. Improve those workflows instead of replacing the current node editor or rebuilding the selected-transition console.
@@ -53,7 +55,7 @@ The [Stem Separation guide](https://help.dj.studio/en/articles/9112447-stem-sepa
 | ED05 | Medium | `trackCount=4`; overlays use ordinary lanes. Treating every stem as another mixer track would exhaust this model and affect controller assumptions | EP04/EP08: child lanes/internal voices |
 | ED06 | Medium | Paste and Duplicate refuse whenever any transition is locked because they may add tempo points. This is conservative scope, not proven corruption; safe disjoint edits need clock/lock proof | EP03 |
 | ED07 | Medium | TransitionLink stores bands/filter/alternatives/lock, without pair tempo policy or effect families. Inspector labels alone would misrepresent capability | EP06 |
-| ED08 | Medium | Older sections of `TIMELINE-EDITING.md` describe invented endpoints and800px/s; `TRANSITION-PRESETS.md` describes generated/manual layering and early formats. Newer preset guide/handover correctly describe ordinary nodes and1600px/s | EP01 |
+| ED08 | Medium | Older sections of `TIMELINE-EDITING.md` describe invented endpoints and800 px/s; `TRANSITION-PRESETS.md` describes generated/manual layering and early formats. Newer preset guide/handover correctly describe ordinary nodes and1600 px/s | EP01 |
 | ED09 | Medium | Native/bridge results do not prove the complete human journey, audible boundaries/tails, separation quality or physical MIDI/ASIO. Inspected captures are retained fixtures | EP01/EP09 |
 
 This audit found structural/workflow gaps and documentation drift. It did not reproduce a new crash, corrupt save or audible defect, and does not turn historical failures into current bugs.

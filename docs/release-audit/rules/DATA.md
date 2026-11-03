@@ -64,7 +64,7 @@ Inherit RULES, F-DATA/F-STEM. Current-format roundtrips are mandatory; old-sessi
 
 ### MW-S04 — Timeline stems share parent clock and intended control scope
 - Contract/source: StemMixing/Model, stem rows/Editing owner selector; volume/pan automation only, parent chain processes sum.
-- Cases/procedure: four known tagged test stems, level/pan/mute/solo all branches, exclusive whole-timeline stem solo across overlapping same/different lanes; parent mute/lane solo/original switch; split/slip/reverse/loop/tempo/trim/move and nodes; save/reopen/export.
+- Cases/procedure: four known tagged test stems, level/pan/mute/solo all branches, exclusive same-lane stem solo with unchanged other lanes, independent simultaneous lane selections and continuous effects; parent mute/lane solo/original switch; split/slip/reverse/loop/tempo/trim/move and nodes; save/reopen/export.
 - Pass/oracle: independent stem-sum/source-index/gain oracle within2e-6 float; source clocks never reanalysed per stem; solo excludes other timeline sections and original bypass restores intended parent audio. Only declared controls independently process stems, one Undo, neutral new versus preserved existing settings.
 - Evidence/mode/severity: route/clock and PCM matrix, current JSON roundtrip and native row/owner actions; automated + manual/listening; P1.
 

@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "key": "original/velvet-current",
+  "title": "Velvet Current",
+  "author": "Mixworks / Jay with AI assistance",
+  "created": "2026-11-02",
+  "source": "Original Mixworks analytic GLSL, authored 2026-11-02; no external shaders/helpers/textures.",
+  "licence": "Original application material: repository Personal Beta Licence pending commercial terms.",
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.8
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35
+    }
+  },
+  "passSchema": 1,
+  "passes": [
+    {
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba16f",
+      "id": "light"
+    },
+    {
+      "inputs": [
+        "light"
+      ],
+      "shader": "bloom-x.glsl",
+      "scale": 0.25,
+      "format": "rgba16f",
+      "id": "bloomx"
+    },
+    {
+      "inputs": [
+        "bloomx"
+      ],
+      "shader": "bloom-y.glsl",
+      "scale": 0.25,
+      "format": "rgba16f",
+      "id": "bloomy"
+    },
+    {
+      "inputs": [
+        "light",
+        "bloomy"
+      ],
+      "shader": "finish.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "id": "finish"
+    }
+  ],
+  "motionProfile": "EDM 120\u2013160 BPM; band-weighted alternating beat/subdivision motion",
+  "audioMapping": {
+    "bass": "Reversing liquid folds and bounded currents",
+    "mid": "Counter-rotating flow and local shear",
+    "treble": "Fine ripple and contour advection"
+  }
+}

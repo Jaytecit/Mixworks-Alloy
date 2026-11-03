@@ -517,7 +517,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         keys.search.setText({}, false); keys.librarySortColumn = 3; keys.librarySortForward = true; keys.filterLibrary();
         check(keys.visibleMedia == std::vector<int>({3, 2, 0, 1, 4}), "note sorting preserves pitch identity and keeps unknown keys last");
         const auto tooltip = keys.libraryTable.getCellTooltip(2, 3);
-        check(tooltip.contains("Gb minor") && tooltip.contains("m means minor"), "key-cell hint explains the compact major/minor notation");
+        check(tooltip.contains("Gb minor") && tooltip.contains("Check it by ear"), "key-cell hint gives a short listening action");
         keys.keyDisplay.setSelectedId(2, juce::sendNotificationSync);
         check(keys.visibleMedia == std::vector<int>({2, 3, 0, 1, 4}) && keys.keyText(*keys.engine.library[0]) == "11A",
             "switching to Camelot immediately re-sorts the key column using its displayed wheel identity");
@@ -592,17 +592,16 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         {
             Media media; media.analysis.key = 18; media.analysis.keyConfidence = scores[n];
             check(Workstation::keyEvidenceLevel(media) == expected[n], "key evidence handles score boundary / invalid case " + juce::String((int) n));
-            check(Workstation::keyEvidenceHint(media).contains("not calibrated accuracy"), "key evidence never represents a probability case " + juce::String((int) n));
+            check(!Workstation::keyEvidenceHint(media).contains("%") && !Workstation::keyEvidenceHint(media).contains("evidence score"), "key help uses a plain status instead of raw scores " + juce::String((int) n));
         }
         Media missing; missing.analysis.keyConfidence = 1;
-        check(Workstation::keyEvidenceText(missing) == "0", "a strong stored score cannot invent a missing key");
+        check(Workstation::keyEvidenceText(missing) == "Unknown", "a strong stored score cannot invent a missing key");
         missing.analysis.key = 24;
         check(Workstation::keyEvidenceLevel(missing) == 0, "out-of-range key remains explicitly unknown");
         missing.manualKey = 6;
-        check(Workstation::keyEvidenceText(missing) == "0" && Workstation::keyEvidenceHint(missing).contains("no automatic rating")
-            && Workstation::keyEvidenceHint(missing).contains("1.000000"), "manual override stays unranked and exposes retained original evidence");
+        check(Workstation::keyEvidenceText(missing) == "Manual" && Workstation::keyEvidenceHint(missing).contains("Your chosen key"), "manual override has a plain source label");
         missing.manualKey = -1; missing.analysis.key = 6; missing.analysis.keyConfidence = std::numeric_limits<double>::quiet_NaN();
-        check(Workstation::keyEvidenceHint(missing).contains("unavailable / invalid"), "invalid score is explained rather than rendered as nan or an accuracy claim");
+        check(Workstation::keyEvidenceText(missing) == "Review" && !Workstation::keyEvidenceHint(missing).contains("nan"), "invalid score asks for review without technical detail");
         for (int n = 0; n < 5; ++n)
         {
             auto media = std::make_shared<Media>(); media->name = "Evidence " + juce::String(n); media->analysis.key = n == 0 ? -1 : 18;
@@ -622,8 +621,8 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
             "ascending confidence order matches numbered levels without ranking manual correction as excellent");
         auto& header = evidence.libraryTable.table.getHeader();
         check(header.getIndexOfColumnId(7, true) == header.getIndexOfColumnId(2, true) + 1, "confidence follows Time in the requested library order");
-        check(evidence.libraryTable.getCellTooltip(0, 7).contains("0.100000") && evidence.libraryTable.getCellTooltip(1, 7).contains("0.15")
-            && evidence.libraryTable.getCellTooltip(4, 3).contains("manual key override"), "actual confidence/key cells disclose raw evidence, thresholds and manual origin");
+        check(evidence.libraryTable.getCellTooltip(0, 7).contains("Suggested key") && evidence.libraryTable.getCellTooltip(1, 7).contains("Key found")
+            && evidence.libraryTable.getCellTooltip(4, 3).contains("Your chosen key"), "key cells give short review guidance and manual origin");
         for (int mode : {0, 1, 2})
         {
             evidence.engine.project.keyDisplay = mode;
@@ -722,7 +721,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
     check(writeWorkspacePreferences(preference, settings).wasOk(), "workspace preferences write an identified local record");
     auto doc = juce::JSON::parse(preference); doc.getDynamicObject()->setProperty("futureSetting", "keep me"); preference.replaceWithText(juce::JSON::toString(doc));
     const auto before = preference.loadFileAsString(); settings.preferredLibraryWidth = 420;
-    check(writeWorkspacePreferences(preference, settings).wasOk() && preference.getSiblingFile("workspace.json.bak").loadFileAsString() == before
+    check(writeWorkspacePreferences(preference, settings).wasOk() && preference.getSiblingFile("workspace.json.previous").loadFileAsString() == before
           && juce::JSON::parse(preference)["futureSetting"].toString() == "keep me", "width changes preserve unknown settings and create a backup");
     const auto modified = preference.getLastModificationTime();
     check(writeWorkspacePreferences(preference, settings).wasOk() && preference.getLastModificationTime() == modified, "unchanged workspace preferences are idempotent");
@@ -1000,7 +999,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         auto* row = tableInterface ? tableInterface->getRowHandler(0) : nullptr;
         check(row && row->getTitle().contains("Deep Current") && row->getTitle().contains("BPM 120.00")
             && row->getTitle().contains("key ") && row->getTitle().contains("artist Alloy interface test fixture")
-            && row->getTitle().contains("CONF 0"), "native Library row announces actual song, artist, BPM, key and ordinal confidence");
+            && row->getTitle().contains("key check Manual"), "native Library row announces actual song, artist, BPM, key and review status");
         ui.showBrowserPage(1); ui.refresh();
         tableHandler = ui.playlistTable.table.getAccessibilityHandler();
         tableInterface = tableHandler ? tableHandler->getTableInterface() : nullptr;

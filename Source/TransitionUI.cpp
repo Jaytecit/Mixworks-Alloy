@@ -4,9 +4,21 @@
 
 namespace mixworks
 {
+namespace
+{
+// Linking already-prepared tracks changes their controls, not their placement or
+// prepared audio. Keep insertion's other admission rules without stopping Play.
+bool canAddPreparedTransition(const Engine& engine, bool preparationOrBusy)
+{
+    return !preparationOrBusy && !engine.exporting && !engine.rehearsalActive()
+        && !engine.project.hasPendingPlacement() && engine.automationRecordMode == AutomationRecordMode::read
+        && !engine.recordingAutomation();
+}
+}
 void Workstation::addSelectedTransition(const juce::String& outgoing, const juce::String& incoming)
 {
-    if (!canInsertArrangement() || editSelection.range) { setStatus("Stop playback and select whole tracks before adding a transition."); return; }
+    if (!canAddPreparedTransition(engine, busy || pendingTempo > 0 || tempoPreparationPending || !timelineLoads.empty()) || editSelection.range)
+    { setStatus("Select whole tracks and finish preparation, export or automation recording before adding a transition. Normal playback can continue."); return; }
     engine.flushMidiControls();
     const juce::ScopedLock guard(engine.lock);
     auto candidate = engine.project;
@@ -14,11 +26,15 @@ void Workstation::addSelectedTransition(const juce::String& outgoing, const juce
     if (result.failed()) { setStatus(result.getErrorMessage()); return; }
     remember(); engine.project = std::move(candidate); selectedTransition = selectedClip = incoming;
     transitionNodeOptionsFor.clear(); showToolPage(1); refresh();
-    setStatus("Transition added. Drag either bound anywhere inside both tracks. Outside audio stays audible unless muted.");
+    const auto* added = engine.project.transitionFor(incoming);
+    setStatus("Transition added: " + engine.project.clipFor(outgoing)->media->libraryTitle() + " -> "
+        + engine.project.clipFor(incoming)->media->libraryTitle() + " at " + timeText(engine.project.transitionRange(*added).getStart())
+        + ". Playback position kept; outside audio stays audible unless muted.");
 }
 void Workstation::chooseAddTransition()
 {
-    if (!canInsertArrangement() || editSelection.range) { setStatus("Stop playback and select whole tracks before adding a transition."); return; }
+    if (!canAddPreparedTransition(engine, busy || pendingTempo > 0 || tempoPreparationPending || !timelineLoads.empty()) || editSelection.range)
+    { setStatus("Select whole tracks and finish preparation, export or automation recording before adding a transition. Normal playback can continue."); return; }
     auto ids = editSelection.clips;
     if (ids.empty() && currentClip()) ids.push_back(selectedClip);
     if (ids.empty() || ids.size() > 2) { setStatus("Select one track, or Ctrl-select two overlapping tracks, then Add Transition."); return; }
@@ -69,7 +85,7 @@ void Workstation::initialiseTransitionUI()
     transitionDefaultsLabel.setText("Defaults", juce::dontSendNotification);
     transitionBody.addAndMakeVisible(transitionDefaultsLabel);
     transitionBody.addAndMakeVisible(addTransitionButton); transitionBody.addAndMakeVisible(transitionMuteOutside);
-    addTransitionButton.setTooltip("Link two overlapping tracks without moving them. Ctrl-select two, or select one and choose its partner. Ordinary placement stays independent.");
+    addTransitionButton.setTooltip("Link two ready, overlapping tracks while stopped or playing, without moving them or the playhead. Ctrl-select two, or select one and choose its partner.");
     addTransitionButton.onClick = [this] { chooseAddTransition(); };
     transitionMuteOutside.setTooltip("For this pair, silence the incoming track before the frame and the outgoing track after it. Off keeps exterior audio and its automation. Saved with the mix; one Undo.");
     transitionMuteOutside.onClick = [this]
@@ -122,7 +138,7 @@ void Workstation::initialiseTransitionUI()
         position.setTooltip("Position of this band's swap inside the transition, measured through the mix beat map.");
         for (auto* combo : {&mode, &strength, &gap, &position}) combo->onChange = [this, band] { if (!refreshing) changeSelectedTransitionBand((int) band); };
     }
-    const juce::String shortcuts = "Alt + Left/Right: navigate. Ctrl + Alt + Left/Right: move frame. Shift + Alt + Left/Right: resize end. Alt + L: lock/unlock.";
+    const juce::String shortcuts = "Alt + Left/Right: navigate (seeks only while stopped). Ctrl + Alt + Left/Right: move frame. Shift + Alt + Left/Right: resize end. Alt + L: lock/unlock.";
     previousTransition.setTooltip(shortcuts); nextTransition.setTooltip(shortcuts);
     transitionBody.addAndMakeVisible(transitionAdvanced);
     transitionBody.addChildComponent(transitionAdvancedBody);
@@ -223,7 +239,7 @@ void Workstation::changeSelectedTransitionFilter()
         remember(); engine.project = std::move(candidate);
         setStatus("Filter applied.");
     }
-    selectedClip = selectedTransition; selectedAutomationTarget = (int) AutomationTarget::cutoff;
+    selectedClip = selectedTransition; selectedAutomationTarget = (int) AutomationTarget::cutoff; automationClip = selectedClip;
     refresh();
 }
 void Workstation::changeSelectedTransitionBand(int band)
@@ -249,7 +265,7 @@ void Workstation::changeSelectedTransitionBand(int band)
         remember(); engine.project = std::move(candidate);
         setStatus("Preset applied.");
     }
-    selectedClip = selectedTransition; selectedAutomationTarget = band; selectedStem = -1;
+    selectedClip = selectedTransition; selectedAutomationTarget = band; selectedStem = -1; automationClip = selectedClip;
     transitionCurveShown[index] = true; if (transitionCurveOnlyBand >= 0) transitionCurveOnlyBand = band;
     selectTrack(engine.project.clipFor(selectedClip)->track);
     refresh();
@@ -262,7 +278,7 @@ void Workstation::selectTransition(const juce::String& incoming, bool focus)
     if (focus)
     {
         const auto range = engine.project.transitionRange(*link);
-        engine.seek(range.getStart());
+        if (!engine.playing) engine.seek(range.getStart());
         viewport.setViewPosition(std::max(0, (int) ((range.getStart() - 2) * timeline.pixelsPerSecond)),
             std::max(0, timeline.laneTop(std::min(engine.project.clipFor(link->outgoing)->track, engine.project.clipFor(incoming)->track))));
     }
@@ -299,7 +315,7 @@ void Workstation::changeSelectedTransition(std::optional<double> bars, std::opti
         : "Selected transition updated. Other segment positions and the tempo map were kept.");
     if (preset && *preset == TransitionPreset::bassSwap)
     {
-        selectedClip = selectedTransition; selectedAutomationTarget = 1; selectedStem = -1;
+        selectedClip = selectedTransition; selectedAutomationTarget = 1; selectedStem = -1; automationClip = selectedClip;
         transitionCurveShown[1] = true; if (transitionCurveOnlyBand >= 0) transitionCurveOnlyBand = 1;
         transitionNodeOptionsFor.clear(); selectTrack(engine.project.clipFor(selectedClip)->track);
     }
@@ -311,7 +327,8 @@ void Workstation::refreshTransitionUI()
     if (!link || (selectedClip != link->incoming && selectedClip != link->outgoing)) { selectedTransition.clear(); link = nullptr; }
     const bool protectedTracks = link && (engine.project.clipTransitionLocked(link->outgoing) || engine.project.clipTransitionLocked(link->incoming));
     const bool editable = link && !protectedTracks && !busy && !engine.project.hasPendingPlacement();
-    addTransitionButton.setEnabled(canInsertArrangement() && currentClip() && !editSelection.range);
+    addTransitionButton.setEnabled(canAddPreparedTransition(engine, busy || pendingTempo > 0 || tempoPreparationPending || !timelineLoads.empty())
+        && currentClip() && !editSelection.range);
     transitionMuteOutside.setEnabled(editable && canInsertArrangement());
     transitionMuteOutside.setToggleState(link && link->muteOutside,juce::dontSendNotification);
     refreshTransitionRehearsalUI(editable);

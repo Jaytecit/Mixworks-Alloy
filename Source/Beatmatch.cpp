@@ -8,6 +8,7 @@
 #include <limits>
 #include <map>
 #include <set>
+#include <tuple>
 #include <juce_cryptography/juce_cryptography.h>
 
 namespace mixworks
@@ -24,7 +25,7 @@ void configureStretch(soundtouch::SoundTouch& processor, const Media& media)
     processor.setSetting(SETTING_SEEKWINDOW_MS, 15);
     processor.setSetting(SETTING_OVERLAP_MS, 8);
 }
-juce::String preparedKey(const Media& media, double rate, const PreparedClipGeometry* geometry = nullptr)
+juce::String preparedKey(const Media& media, double rate, const PreparedClipGeometry* geometry = nullptr, double pitch = 0)
 {
     const auto source = PcmStore::decodedKey(media.analysisSource); if (source.isEmpty()) return {};
     juce::MemoryOutputStream stream; stream.writeString("Mixworks SoundTouch 2.4.0 F32 / revision 2 / sequence 40 seek 15 overlap 8"); stream.writeString(source); stream.writeDouble(rate); stream.writeBool(geometry != nullptr);
@@ -33,6 +34,8 @@ juce::String preparedKey(const Media& media, double rate, const PreparedClipGeom
         stream.writeDouble(geometry->offset); stream.writeDouble(geometry->length); stream.writeDouble(geometry->loopSpan); stream.writeDouble(geometry->loopPhase); stream.writeDouble(geometry->sourceBpm); stream.writeBool(geometry->reversed);
         for (const auto& point : geometry->tempo) { stream.writeDouble(point.time); stream.writeDouble(point.bpm); stream.writeBool(point.ramp); }
     }
+    // Preserve every existing zero-pitch cache identity. Pitched PCM has its own key.
+    if (pitch != 0) { stream.writeString("segment pitch / v1"); stream.writeDouble(pitch); }
     return juce::SHA256(stream.getData(), stream.getDataSize()).toHexString();
 }
 void storePreparation(PreparedAudio& audio, const juce::String& key, double sampleRate)
@@ -48,23 +51,24 @@ void storePreparation(PreparedAudio& audio, const juce::String& key, double samp
     if (audio.cache) audio.samples.setSize(0, 0);
 }
 }
-StretchResult stretchAudio(const Media& media, double rate, int64_t available)
+StretchResult stretchAudio(const Media& media, double rate, int64_t available, double pitch)
 {
     if (!media.hasPlayback()) return {{}, "Source playback audio must be loaded before tempo preparation."};
     if (!std::isfinite(rate) || rate <= 0) return { {}, "Invalid tempo ratio." };
-    if (std::abs(rate - 1) < 1.0e-8) return {};
+    if (!std::isfinite(pitch) || std::abs(pitch) > 6.5) return {{}, "Keep segment pitch between -6.5 and +6.5 semitones."};
+    if (std::abs(rate - 1) < 1.0e-8 && pitch == 0) return {};
     const double frames = std::round(media.frames() / rate);
     const int channels = media.channels();
     if (!std::isfinite(frames) || frames < 1 || frames >= std::numeric_limits<int>::max() || frames * channels * sizeof(float) > maxPreparedBytes)
         return { {}, "Preparing this single track requires more than 1 GiB or has an invalid duration. Trim or split its source into shorter files." };
-    auto result = std::make_shared<PreparedAudio>(); result->rate = rate;
-    const auto key = preparedKey(media, rate);
+    auto result = std::make_shared<PreparedAudio>(); result->rate = rate; result->pitchSemitones = pitch;
+    const auto key = preparedKey(media, rate, nullptr, pitch);
     result->cache = PcmStore::shared().read(key, media.sampleRate, channels, (int) frames);
     if (result->cache) { result->fromDiskCache = true; return {result, {}}; }
     if (frames * channels * sizeof(float) > available)
         return { {}, "Tempo preparation cannot allocate more PCM within the 1 GiB RAM budget. Check free cache disk space; earlier preparations could not be moved to disk." };
     result->samples.setSize(channels, (int) frames); result->samples.clear();
-    soundtouch::SoundTouch processor; configureStretch(processor, media); processor.setTempo(rate);
+    soundtouch::SoundTouch processor; configureStretch(processor, media); processor.setTempo(rate); processor.setPitchSemiTones(pitch);
     constexpr int block = 2048;
     std::vector<float> input((size_t) block * channels), output((size_t) block * channels); int written = 0;
     auto drain = [&]
@@ -80,7 +84,7 @@ StretchResult stretchAudio(const Media& media, double rate, int64_t available)
     for (int start = 0; start < media.frames(); start += block)
     {
         const int count = std::min(block, media.frames() - start);
-        for (int ch = 0; ch < channels; ++ch) for (int i = 0; i < count; ++i) input[(size_t) i * channels + ch] = media.channelData(ch)[start + i];
+        for (int ch = 0; ch < channels; ++ch) for (int i = 0; i < count; ++i) input[(size_t) i * channels + ch] = media.sample(ch, start + i);
         processor.putSamples(input.data(), (unsigned) count); drain();
     }
     processor.flush(); drain();
@@ -90,13 +94,14 @@ StretchResult stretchAudio(const Media& media, double rate, int64_t available)
 }
 namespace
 {
-using CacheKey = std::pair<const Media*, double>;
+using CacheKey = std::tuple<const Media*, double, double>;
 juce::String prepareClipSource(Clip& clip, std::map<CacheKey, std::shared_ptr<const PreparedAudio>>& cache, int64_t& used)
 {
-    const CacheKey key {clip.media.get(), clip.rate};
+    const CacheKey key {clip.media.get(), clip.rate, clip.pitchSemitones};
     if (auto it = cache.find(key); it != cache.end()) { clip.prepared = it->second; return {}; }
-    if (clip.prepared && std::abs(clip.prepared->rate - clip.rate) < 1.0e-8) { cache[key] = clip.prepared; return {}; }
-    auto result = stretchAudio(*clip.media, clip.rate, maxPreparedBytes - used);
+    if (clip.prepared && !clip.prepared->clipLocal && std::abs(clip.prepared->rate - clip.rate) < 1.0e-8
+        && clip.prepared->pitchSemitones == clip.pitchSemitones) { cache[key] = clip.prepared; return {}; }
+    auto result = stretchAudio(*clip.media, clip.rate, maxPreparedBytes - used, clip.pitchSemitones);
     if (result.error.isNotEmpty()) return result.error;
     clip.prepared = result.audio; cache[key] = result.audio;
     if (result.audio) used += result.audio->residentBytes();
@@ -104,6 +109,13 @@ juce::String prepareClipSource(Clip& clip, std::map<CacheKey, std::shared_ptr<co
  }
 juce::String prepareClip(Clip& clip, std::map<CacheKey, std::shared_ptr<const PreparedAudio>>& cache, int64_t& used)
 {
+    if (clip.media->original)
+    {
+        clip.prepared.reset(); clip.stemPrepared = {}; clip.preparedOffset = 0;
+        clip.elasticPlayback = clip.tempoMap != nullptr || std::abs(clip.rate - 1.) > 1.e-8 || clip.pitchSemitones != 0;
+        clip.elasticSource = clip.elasticPlayback ? std::make_shared<const ElasticSource>(clip) : nullptr;
+        return {};
+    }
     auto error = prepareClipSource(clip, cache, used); if (error.isNotEmpty()) return error;
     if (clip.stems) for (int s = 0; s < stemCount; ++s)
     {
@@ -183,19 +195,22 @@ juce::String prepareVariableClip(Clip& clip, int64_t& used)
     PreparedClipGeometry geometry {clip.media, clip.offset, clip.length, clip.rate, clip.loopSpan, clip.loopPhase,
         clip.tempoSourceBpm > 0 ? clip.tempoSourceBpm : media.bpm(), clip.reversed, {}};
     geometry.tempo = clip.tempoMap->localPoints(clip.start, clip.end());
+    geometry.pitchSemitones = clip.pitchSemitones;
     if (clip.prepared && clip.prepared->clipLocal && clip.preparedOffset == 0 && clip.prepared->geometry == geometry) return {};
     const double frames = std::round(clip.length * media.sampleRate);
     if (!std::isfinite(frames) || frames < 1 || frames >= std::numeric_limits<int>::max() || frames * channels * sizeof(float) > maxPreparedBytes)
         return "Preparing this single tempo-ramp segment requires more than 1 GiB or has an invalid duration. Trim or split the segment into shorter sections.";
     auto audio = std::make_shared<PreparedAudio>(); audio->clipLocal = true; audio->rate = clip.rate;
+    audio->pitchSemitones = clip.pitchSemitones;
     audio->geometry = std::move(geometry);
-    const auto key = preparedKey(media, clip.rate, &audio->geometry);
+    const auto key = preparedKey(media, clip.rate, &audio->geometry, clip.pitchSemitones);
     audio->cache = PcmStore::shared().read(key, media.sampleRate, channels, (int) frames);
     if (audio->cache) { audio->fromDiskCache = true; clip.prepared = audio; clip.preparedOffset = 0; return {}; }
     if (frames * channels * sizeof(float) > maxPreparedBytes - used)
         return "Tempo preparation cannot allocate more PCM within the 1 GiB RAM budget. Check free cache disk space; earlier preparations could not be moved to disk.";
     audio->samples.setSize(channels, (int) frames); audio->samples.clear();
     soundtouch::SoundTouch processor; configureStretch(processor, media);
+    processor.setPitchSemiTones(clip.pitchSemitones);
     constexpr int block = 128;
     std::vector<float> input((size_t) block * channels), output((size_t) block * channels); int written = 0;
     auto drain = [&]
@@ -225,7 +240,7 @@ juce::String prepareVariableClip(Clip& clip, int64_t& used)
             source = clip.offset + (clip.reversed ? clip.sourceSpan() - source : source);
             const double position = juce::jlimit(0.0, (double) (media.frames() - 1), source * media.sampleRate - (clip.reversed ? 1.0 : 0.0));
             const int index = (int) position; const float fraction = (float) (position - index);
-            for (int ch = 0; ch < channels; ++ch) { const auto* data = media.channelData(ch); input[(size_t) i * channels + ch] = data[index] + fraction * (data[std::min(index + 1, media.frames() - 1)] - data[index]); }
+            for (int ch = 0; ch < channels; ++ch) { const float a = media.sample(ch, index); input[(size_t) i * channels + ch] = a + fraction * (media.sample(ch, std::min(index + 1, media.frames() - 1)) - a); }
         }
         processor.putSamples(input.data(), (unsigned) count); drain();
     }
@@ -453,6 +468,13 @@ namespace
 {
 juce::String prepareMappedPlayback(Clip& clip, std::map<CacheKey, std::shared_ptr<const PreparedAudio>>& cache, int64_t& used)
 {
+    if (clip.media->original)
+    {
+        clip.prepared.reset(); clip.stemPrepared = {}; clip.preparedOffset = 0;
+        clip.elasticPlayback = clip.tempoMap != nullptr || std::abs(clip.rate - 1.) > 1.e-8 || clip.pitchSemitones != 0;
+        clip.elasticSource = clip.elasticPlayback ? std::make_shared<const ElasticSource>(clip) : nullptr;
+        return {};
+    }
     bool variable = false;
     if (clip.tempoMap)
     {

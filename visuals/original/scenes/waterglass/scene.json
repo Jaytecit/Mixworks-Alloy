@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "key": "original/waterglass",
+  "title": "Waterglass",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original purpose-built scene prototype, 2 November 2026. No reference source or assets bundled.",
+  "family": "hand-authored",
+  "variant": 3,
+  "study": "waterly",
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "speed",
+      "meaning": "Liquid evolution speed"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous",
+      "meaning": "Submerged artwork visibility"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.45,
+      "type": "continuous",
+      "meaning": "Liquid fold scale"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.4,
+      "type": "continuous",
+      "meaning": "Refraction strength (bounded screen displacement)"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "type": "continuous",
+      "meaning": "Fine caustic ridges"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous",
+      "meaning": "Indigo/cyan mineral balance"
+    },
+    "symmetry": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 7
+    },
+    "orbit": {
+      "min": 0,
+      "max": 1,
+      "default": 0.4,
+      "type": "continuous"
+    },
+    "focusX": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus",
+      "meaning": "Optical field horizontal centre"
+    },
+    "focusY": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus",
+      "meaning": "Optical field vertical centre"
+    },
+    "colourR": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourG": {
+      "min": 0,
+      "max": 1,
+      "default": 0.82,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourB": {
+      "min": 0,
+      "max": 1,
+      "default": 0.78,
+      "type": "colour",
+      "group": "tint"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "pulse",
+      "meaning": "Bass caustic impulse"
+    },
+    "mode": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "choice",
+      "steps": 4
+    },
+    "mirror": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "toggle",
+      "steps": 2
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous"
+    },
+    "imageRotation": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "imageIndex": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "counter"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous"
+    }
+  },
+  "passSchema": 1,
+  "passes": [
+    {
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba16f",
+      "id": "light"
+    },
+    {
+      "inputs": [
+        "light"
+      ],
+      "shader": "bloom-x.glsl",
+      "scale": 0.25,
+      "format": "rgba16f",
+      "id": "bloomx"
+    },
+    {
+      "inputs": [
+        "bloomx"
+      ],
+      "shader": "bloom-y.glsl",
+      "scale": 0.25,
+      "format": "rgba16f",
+      "id": "bloomy"
+    },
+    {
+      "inputs": [
+        "light",
+        "bloomy"
+      ],
+      "shader": "finish.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "id": "finish"
+    }
+  ],
+  "mediaRole": "screen-refraction",
+  "audioMapping": {
+    "bass": "Alternating kick-driven cross-currents and wave fronts",
+    "mid": "Reversing vortex shear and rigid artwork movement",
+    "treble": "Fine ripple advection"
+  },
+  "motionProfile": "EDM 120\u2013160 BPM; band-weighted alternating beat/subdivision motion"
+}

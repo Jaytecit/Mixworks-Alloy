@@ -14,12 +14,14 @@
 #include "EditSelection.h"
 #include "StemJobs.h"
 #include "LibraryPreview.h"
+#include "SceneLane.h"
 
 namespace mixworks
 {
 struct AutoArrangementOptions;
 struct ArrangementInsertion;
 class Workstation;
+class GridCorrectionEditor;
 class TimelineAccessItem;
 enum class TimelineAction
 {
@@ -27,7 +29,7 @@ enum class TimelineAction
     loopStart, loopEnd, split, reverse, tweaks, settings, downbeat, tempo,
     curveRead, curvePoint, curveClear, choosePlugin, recordOff, recordTouch, recordLatch, armAutomation, pairBassSwap,
     filter, rippleDelete, closeGap, insertBefore, insertAfter, sectionBoundary, stems, repeatSelection, cropSelection, replaceSelection,
-    placeVolumeSwap, placeBassSwap, placeMidSwap, placeTrebleSwap, unlinkSelection, addTransition, removePiece
+    placeVolumeSwap, placeBassSwap, placeMidSwap, placeTrebleSwap, unlinkSelection, addTransition, removePiece, harmonise
 };
 class TempoStrip final : public juce::Component, public juce::SettableTooltipClient
 {
@@ -82,6 +84,7 @@ public:
     void begin(int totalFiles);
     void showFile(const juce::String&, MediaReadStage);
     void finishFile();
+    void showResult(const juce::String& text) { getProperties().set("focusedLastResult", text); latestResult.setText(text, juce::dontSendNotification); }
     void setCounts(int completedFiles, int totalFiles);
     void tick();
     void requestStop();
@@ -89,7 +92,7 @@ public:
     void showExportProgress(juce::int64 frames);
     juce::TextButton cancel { "Stop import" };
 private:
-    juce::Label heading, file, stage, detail;
+    juce::Label heading, file, stage, detail, latestResult;
     double fraction = 0, startedAt = 0;
     juce::ProgressBar bar { fraction };
     int completed = 0, total = 0;
@@ -102,13 +105,16 @@ public:
     void setAutoArrangement() { heading.setText("Auto Arrange", juce::dontSendNotification); file.setText("Matching library tracks", juce::dontSendNotification); stage.setText("Choosing tracks by key and BPM", juce::dontSendNotification); fraction = -1; cancel.setButtonText("Cancel arrangement"); stopMessage = "Cancelling arrangement. Your current mix will be kept."; }
     void setAutoMixPreparation(int count) { completed = total = count; fraction = -1; stage.setText("Preparing mix audio and transitions...", juce::dontSendNotification); tick(); }
     void setReanalysis(bool focused = false) { heading.setText(focused ? "Focused BPM / key retry" : "Re-analysing tracks", juce::dontSendNotification); file.setText("Starting analysis...", juce::dontSendNotification); cancel.setButtonText("Stop analysis"); stopMessage = "Stopping analysis. Completed results and all manual corrections will be kept."; }
-    void setRehearsal() { heading.setText("Preparing A / B / C rehearsal", juce::dontSendNotification); file.setText("Rendering saved transition alternatives", juce::dontSendNotification); stage.setText("Session effects / matched RMS", juce::dontSendNotification); cancel.setButtonText("Cancel rehearsal"); stopMessage = "Cancelling rehearsal. Your session will be kept."; }
+    void setRehearsal() { heading.setText("Preparing A / B / C comparison", juce::dontSendNotification); file.setText("Preparing saved blends", juce::dontSendNotification); stage.setText("Matching listening levels", juce::dontSendNotification); cancel.setButtonText("Cancel comparison"); stopMessage = "Cancelling comparison. Your mix will be kept."; }
 };
 class TimelineAccessItem;
 class TimelineHeader final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     TimelineHeader(Workstation&, bool overview);
+    void resized() override;
+    std::optional<double> alignmentGuide; // View-only reference, independent of transport and saved music.
+    juce::TextButton guideButton {"Guide"};
     void paint(juce::Graphics&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -123,6 +129,8 @@ public:
 private:
     Workstation& owner;
     bool overview;
+    bool draggingGuide = false;
+    void placeGuide(const juce::MouseEvent&);
     std::vector<std::unique_ptr<TimelineAccessItem>> accessibleMarkers;
     float grabOffset = 0;
     int zoomEdge = 0;
@@ -261,6 +269,7 @@ private:
     void paintDropPreview(juce::Graphics&);
     friend class Workstation;
     friend void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend void runEditingWorkflowTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runUnlinkTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     bool beginEditSelection(const juce::MouseEvent&);
     bool continueEditSelection(const juce::MouseEvent&);
@@ -492,6 +501,7 @@ public:
     friend void runTempoBrowserTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
     friend void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend void runUiClarityTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runRecoveryTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runMasteringTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     juce::String& selectedClip = engine.selectedClip;
@@ -537,6 +547,11 @@ public:
     void fail(const juce::String&);
     Clip* currentClip();
 private:
+    friend void runVisualArrangementTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend class SceneLane;
+    friend class SceneBrowser;
+    friend void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    std::unique_ptr<SceneLane> sceneLane;
     std::shared_ptr<StemJob> stemJob;
     juce::String stemSourceName, stemSourceId;
     void attachStems(const juce::String& sourceId, const juce::File&);
@@ -573,6 +588,8 @@ private:
     ToolPanel editingPanel {editingViewport, "Editing"};
     void initialiseEditing();
     void layoutEditing();
+    void showEditingPage(int);
+    void showEditingMore();
     void restoreEditingWorkspace();
     void trackEditingWorkspace();
     juce::ComboBox automationOwner, automationParameter, automationMode;
@@ -713,6 +730,10 @@ private:
     juce::TextButton editingSelect {"Select segment..."}, editingCut {"Cut"}, editingCopy {"Copy"}, editingPaste {"Paste at playhead"};
     juce::TextButton editingRipple {"Ripple delete segment"}, editingCloseGap {"Close gap before segment"};
     juce::ToggleButton editingRange {"Range tool"};
+    juce::TextButton editingAudioPage {"Audio edits"}, editingSettingsPage {"Fades & timing"}, editingAutomationPage {"Automation"};
+    juce::TextButton editingMove {"Move tracks"}, editingSplit {"Split at playhead"}, editingDelete {"Delete"}, editingMore {"More edits..."};
+    juce::Label editingHint;
+    int editingPage = 0;
     juce::TextButton editingRangeTime {"Exact range..."}, editingAll {"Select all"}, editingClear {"Clear selection"};
     juce::TextButton editingRepeat {"Repeat..."}, editingCrop {"Crop to range"}, editingReplace {"Replace..."};
     juce::TextButton editingUnlink {"Unlink"};
@@ -733,6 +754,7 @@ private:
     double transitionOverlapBeats() const { constexpr double beats[] {0, 16, 32, 64, 128, 256}; return beats[transitionIndex]; }
     juce::ComboBox waveformMode;
     int selectedAutomationTarget = -1;
+    juce::String automationClip; // Explicit per-track transition/effect scope; ordinary controls use the lane.
     AutomationAddress pluginLane { -1, AutomationTarget::plugin };
     juce::ToggleButton snapButton { "Snap to beat" };
     juce::Slider tempoSlider, masterSlider;
@@ -773,6 +795,7 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::DialogWindow> settingsWindow;
     std::unique_ptr<juce::DialogWindow> gridWindow;
+    std::unique_ptr<juce::DialogWindow> earWindow;
     juce::File sessionFile;
     std::vector<Project> undoHistory, redoHistory;
     std::vector<int> visibleMedia;
@@ -879,6 +902,7 @@ private:
     void chooseImport();
     void chooseSave(std::function<void()> onSaved = {}, bool useSessionFile = false);
     bool saveSessionFile(const juce::File&);
+    void confirmChangedDestination(const juce::File& chosen, const juce::File& destination, std::function<void(bool)>);
     void chooseOpen();
     void chooseExport(int take = -1);
     void chooseExportEnd(const juce::File&);
@@ -916,6 +940,7 @@ private:
     bool performSelectionAction(TimelineAction, double time, int track, int repeatCopies = 0);
     void replaceSelectedAudio(bool commit = false);
     friend void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend void runEditingWorkflowTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runUnlinkTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     juce::String loopStartClip;
     double loopStartSource = 0;
@@ -933,6 +958,9 @@ private:
     bool correctionFromLibrary = true; // Last active source-selection surface, outside musical state.
     juce::String analysisSelectionId();
     void editAnalysis(std::optional<juce::String> sourceId = {});
+    void showKeyByEar(const std::shared_ptr<Media>&, std::shared_ptr<const Media>, GridCorrectionEditor*);
+    void showHarmoniseByEar();
+    friend void runEarToolTests(const std::function<void(bool,const juce::String&)>&, const juce::File&);
     juce::Result applySourceCorrection(const std::shared_ptr<Media>&, const SourceCorrection&, bool rebuildTimeline = false);
     void setDownbeatAnchor(const juce::String& clipId, double localTime);
     void saveAnalysisCorrection(const std::shared_ptr<Media>&);

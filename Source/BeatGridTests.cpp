@@ -1,6 +1,8 @@
 #include "Workstation.h"
 #include "Beatmatch.h"
 #include "AutoArrangement.h"
+#include "GridCorrectionUI.h"
+#include "WaveformDetailCache.h"
 #include <cmath>
 
 namespace mixworks
@@ -8,6 +10,146 @@ namespace mixworks
 void runBeatGridTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report, const juce::File& reference)
 {
     const auto args = juce::StringArray::fromTokens(juce::JUCEApplicationBase::getCommandLineParameters(), true);
+    if (args.contains("--waveform-alignment-only"))
+    {
+        // Authored original-file playback, not the in-memory PCM path covered by
+        // older waveform tests. No detector, audio device or timing benchmark.
+        constexpr int sr = 8000, count = sr * 160, bucket = count / 4000;
+        const std::array<int, 3> onsets {590, 480590, 1148590};
+        auto media = std::make_shared<Media>(); media->name = "Known sample onsets / streamed original";
+        media->file = report.getSiblingFile("waveform-original.wav"); media->sampleRate = sr;
+        juce::AudioBuffer<float> audio(1, count); audio.clear();
+        media->peaks.assign(4000, 0); media->waveformRms.assign(4000, 0);
+        for (int first : onsets) for (int i = first; i < first + 8; ++i)
+        { audio.setSample(0, i, .8f); media->peaks[(size_t)(i / bucket)] = .8f; }
+        for (int i : {OriginalAudio::blockFrames - 1, OriginalAudio::blockFrames})
+        { audio.setSample(0, i, .5f); media->peaks[(size_t)(i / bucket)] = .5f; }
+        { juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> stream = media->file.createOutputStream();
+          auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(sr).withNumChannels(1).withBitsPerSample(24));
+          check(writer && writer->writeFromAudioSampleBuffer(audio, 0, count), "write bounded original with three independent sample-stamped transients"); }
+        audio.setSize(0, 0);
+        const auto digest = audioDigest(media->file);
+        media->analysisSource = {digest, media->file.getSize(), sr, count, 1};
+        media->manualBpm = 120; media->manualBeatOrigin = onsets[0] / double(sr);
+        media->original = std::make_shared<OriginalAudio>(media->file, sr, 1, count);
+        const auto cold = media->waveformRange(.06, .062);
+        check(!cold.ready && cold.peak == 0, "cold waveform detail queues without presenting an inaccurate overview peak");
+        auto uiOwner = std::make_unique<Workstation>(false); auto& ui = *uiOwner; ui.stopTimer(); ui.setSize(1250, 800);
+        Clip clip; clip.media = media; clip.length = media->duration(); ui.engine.project.clips = {clip}; ui.refresh();
+        const auto document = juce::JSON::toString(projectToJson(ui.engine.project));
+        auto catalogue = media->catalogueCopy();
+        auto editor = std::make_unique<GridCorrectionEditor>(ui.engine, catalogue, "", [](const auto&, bool) { return juce::Result::ok(); });
+        editor->stopTimer(); editor->setPlaybackMedia(media); editor->selectPage(1); editor->zoom.setSelectedId(1, juce::sendNotificationSync);
+        check(editor->draft.downbeat == media->manualBeatOrigin, "opening source grid retains the full saved sample-position precision");
+        auto awaitRange = [&](const std::function<WaveformRange()>& query)
+        {
+            auto range = query(); const auto deadline = juce::Time::getMillisecondCounterHiRes() + 5000;
+            while (!range.ready && juce::Time::getMillisecondCounterHiRes() < deadline) { juce::Thread::sleep(1); range = query(); }
+            return range;
+        };
+        auto saveImage = [&](const juce::Image& image, const juce::String& name)
+        {
+            auto stream = report.getSiblingFile(name + ".png").createOutputStream(); juce::PNGImageFormat png;
+            check(stream && png.writeImageToStream(image, *stream), "capture " + name);
+        };
+        for (int first : onsets)
+        {
+            const double at = first / double(sr);
+            check(std::abs(media->original->sample(0, first) - .8f) < 1.e-6f, "independent original sample confirms authored transient at " + juce::String(first));
+            const auto before = awaitRange([&] { return media->waveformRange(at - .004, at - .002); });
+            const auto after = awaitRange([&] { return media->waveformRange(at + .003, at + .005); });
+            const auto transient = awaitRange([&] { return media->waveformRange(at, at + .0005); });
+            check(before.ready && after.ready && before.peak == 0 && after.peak == 0,
+                "zoomed original waveform cannot smear a transient into neighbouring silence / " + juce::String(first));
+            check(transient.ready && transient.peak > .79f, "zoomed original waveform retains the actual transient / " + juce::String(first));
+            editor->cursor.setValue(at + .1, juce::dontSendNotification); editor->viewStart = std::max(0.0, at - .4);
+            auto image = editor->createComponentSnapshot(editor->getLocalBounds());
+            const auto deadline = juce::Time::getMillisecondCounterHiRes() + 5000;
+            while (editor->waveformDetailPending && juce::Time::getMillisecondCounterHiRes() < deadline)
+            { juce::Thread::sleep(5); image = editor->createComponentSnapshot(editor->getLocalBounds()); }
+            check(!editor->waveformDetailPending, "bounded background waveform detail becomes ready / " + juce::String(first));
+            const int x = juce::roundToInt(editor->xAtTime(at - .008));
+            const int y = editor->waveform.getCentreY() + 24 - (editor->waveform.getHeight() - 104) / 4;
+            check(image.getPixelAt(x, y) == colour::panel, "source editor shows silence before the sample-aligned marker / " + juce::String(first));
+            const int sampleX = juce::roundToInt(editor->waveform.getX() + (first / double(sr) - editor->viewStart) * editor->waveform.getWidth() / editor->viewSpan);
+            const auto marker = (first - onsets[0]) % (sr * 2) == 0 ? colour::orange : juce::Colour(0xff63808c);
+            check(image.getPixelAt(sampleX, y) == marker, "painted 4/4 marker occupies the independently authored sample column / " + juce::String(first));
+            saveImage(image, "waveform-source-" + juce::String(first));
+        }
+        editor->zoom.setSelectedId(8, juce::sendNotificationSync); editor->setCursor(onsets[0] / double(sr), false);
+        saveImage(editor->createComponentSnapshot(editor->getLocalBounds()), "waveform-source-10ms");
+        const auto boundary = awaitRange([&]
+        {
+            WaveformRange range;
+            range.ready = media->original->waveformRange(OriginalAudio::blockFrames - 2, OriginalAudio::blockFrames + 2, range.peak, range.rms);
+            return range;
+        });
+        check(boundary.ready && std::abs(boundary.peak - .5f) < 1.e-7 && std::abs(boundary.rms - std::sqrt(.125)) < 1.e-7,
+            "sample detail across a streaming block boundary has independently known peak and RMS");
+        check(media->waveformRange(0, .3).ready && media->waveformRange(0, .3).peak > .79f,
+            "wide views retain the compact source overview");
+        auto differentRows = [&](const juce::Image& image, int a, int b)
+        {
+            int different = 0;
+            // Compare only waveform pixels: the lower area deliberately includes
+            // an IN/OUT label, beat numbers and a four-pixel-wide downbeat flag.
+            const auto bounds = ui.timeline.clipBounds(ui.engine.project.clips[0]);
+            for (int y = (int)bounds.getY() + 32; y < std::min(image.getHeight(), (int)bounds.getBottom() - 30); ++y)
+                if (image.getPixelAt(a, y) != image.getPixelAt(b, y)) ++different;
+            return different;
+        };
+        for (double scale : {200., 800.})
+        {
+            ui.timeline.pixelsPerSecond = scale; ui.refresh();
+            const auto image = ui.timeline.createComponentSnapshot({0, 0, 700, Timeline::rulerHeight + 132});
+            const double at = onsets[0] / double(sr);
+            const int silent = Clip::gridPixel(at + .05, scale);
+            check(differentRows(image, Clip::gridPixel(at - .008, scale), silent) == 0, "timeline original waveform does not precede the true onset at scale " + juce::String(scale));
+            check(differentRows(image, Clip::gridPixel(at, scale), silent) > 3, "timeline waveform retains the true onset at its source grid marker / " + juce::String(scale));
+            saveImage(image, "waveform-timeline-" + juce::String((int)scale));
+        }
+        clip.offset = .02; clip.start = 3;
+        const double local = onsets[0] / double(sr) - clip.offset;
+        check(clip.waveformRange(local - .004, local - .002).peak == 0 && clip.waveformRange(local, local + .0005).peak > .79f,
+            "trimmed and moved original uses the same sample clock for waveform detail");
+        clip.length -= clip.offset; clip.reversed = true;
+        const double reverse = clip.length - (onsets[0] / double(sr) - clip.offset);
+        check(clip.waveformRange(reverse + .002, reverse + .004).peak == 0 && clip.waveformRange(reverse - .0005, reverse).peak > .79f,
+            "reversed original detail retains exact source position and neighbouring silence");
+        check(audioDigest(media->file) == digest && media->manualBeatOrigin == onsets[0] / double(sr)
+            && document == juce::JSON::toString(projectToJson(ui.engine.project)), "waveform review preserves original bytes, saved grid and timeline geometry");
+        saveImage(ui.createComponentSnapshot(ui.getLocalBounds()), "waveform-workspace-version");
+        // Deterministic contention/eviction substitute, without a capacity run:
+        // exact display measurements must survive unavailable future PCM reads.
+        WaveformDetailCache cache(2);
+        int reads=0; bool available=false; float peak=1,rms=1;
+        const auto measure=[&](float& p,float& r) { ++reads; if(!available) return false; p=.75f; r=.25f; return true; };
+        check(!cache.query(10,100,110,peak,rms,measure) && peak==0 && rms==0, "pending detail is not remembered as silence");
+        available=true;
+        check(cache.query(10,100,110,peak,rms,measure) && peak==.75f && rms==.25f && reads==2,
+              "pending column retries and retains its measured peak and RMS");
+        available=false;
+        check(cache.query(10,100,110,peak,rms,measure) && peak==.75f && rms==.25f && reads==2,
+              "repaint keeps measured detail when the PCM reader becomes unavailable");
+        check(!cache.query(10,101,110,peak,rms,measure) && !cache.query(11,100,110,peak,rms,measure),
+              "changed sample interval and new source identity never reuse stale columns");
+        available=true; cache.query(10,110,120,peak,rms,measure); cache.query(10,100,110,peak,rms,measure);
+        cache.query(10,120,130,peak,rms,measure); available=false;
+        check(cache.query(10,100,110,peak,rms,measure) && !cache.query(10,110,120,peak,rms,measure),
+              "bounded summary cache retains recent columns and retries an evicted interval");
+        const int first=onsets[0]; float p=0,r=0;
+        const auto originalDetail=awaitRange([&] {
+            WaveformRange value; value.ready=media->original->waveformRange(first,first+8,p,r); value.peak=p; value.rms=r; return value;
+        });
+        check(originalDetail.ready && originalDetail.peak>.79f, "original waveform path supplies exact cached detail");
+        { OriginalAudio::Realtime callback;
+          check(!media->original->waveformRange(first,first+8,p,r), "display cache is not admitted to the audio callback"); }
+        media->original->failure=true;
+        check(!media->original->waveformRange(first,first+8,p,r) && p==0 && r==0,
+              "failed source does not hide behind previously measured display detail");
+        media->original->failure=false;
+        return;
+    }
     if (args.contains("--grid-attack-only"))
     {
         constexpr int sr = 22050, seconds = 24;
@@ -84,10 +226,10 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
                 check(aligned, "actual Auto Arrange hydrates saved analysis and rebuilds its shortlist on refined timing: " + ui.status.replaceCharacters("\r\n", "  "));
                 juce::AudioFormatManager formats; formats.registerBasicFormats(); int analysed = 0;
                 const auto warm = readMedia(formats, file, [&](MediaReadStage stage) { if (stage == MediaReadStage::analyse) ++analysed; });
-                check(warm.media && warm.media->decodedFromCache && warm.media->analysisFromCache && analysed == 0
+                check(warm.media && warm.media->original && !warm.media->cache && warm.media->analysisFromCache && analysed == 0
                       && warm.media->analysis.attackTimingRevision == 1 && warm.media->analysis.key == old.key
                       && warm.media->manualBeatOrigin == -1 && warm.media->analysisSource == stale->analysisSource,
-                      "subsequent loads reuse refined analysis and cached audio without neural analysis or loss of source identity");
+                      "subsequent loads reuse refined analysis and original audio without neural analysis or loss of source identity");
             }
         }
         Project visual;

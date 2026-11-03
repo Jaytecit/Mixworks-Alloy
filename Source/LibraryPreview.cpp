@@ -81,7 +81,7 @@ void LibraryPreview::stop()
 {
     stopTimer(); engine.detachLibraryPreview(transport);
     engine.detachPrivatePreview(transport);
-    if (preparedSource) engine.detachPrivatePreview(*preparedSource);
+    if (preparedSource) { engine.detachLibraryPreview(*preparedSource); engine.detachPrivatePreview(*preparedSource); }
     ++generation; loading = false;
     if (device) { device->stop(); device->close(); device.reset(); }
     // The callback is detached: setSource clears transport playback directly.
@@ -156,7 +156,11 @@ void LibraryPreview::toggle(const juce::File& file, const juce::String& id)
 void LibraryPreview::timerCallback()
 {
     if (device && (!device->isPlaying() || device->getLastError().isNotEmpty())) { stop(); notify("Headphone output failed. Private playback stopped; audience routing was kept."); return; }
-    if (preparedSource) return;
+    if (preparedSource)
+    {
+        if (!privateOutput && !engine.hasLibraryPreview(*preparedSource)) stop();
+        return;
+    }
     if (!loading && ((!privateOutput && !engine.hasLibraryPreview(transport)) || !transport.isPlaying())) stop();
 }
 void LibraryPreview::changeListenerCallback(juce::ChangeBroadcaster* changed)
@@ -172,7 +176,7 @@ void LibraryPreview::chooseOutput(juce::Component& parent, std::function<void()>
 {
     stop(); const auto choices = outputs();
     auto* dialog = new juce::AlertWindow("Library preview output",
-        "Audience output is channels 1-2. Choose an independent stereo pair or a separate headphones device while stopped. Private audio never falls back to the audience output. Select the headphones' actual hardware route.",juce::MessageBoxIconType::NoIcon,&parent);
+        "Choose a separate headphones output while playback is stopped. Private listening never falls back to the audience speakers.",juce::MessageBoxIconType::NoIcon,&parent);
     juce::StringArray names;
     for (const auto& choice : choices) names.add(choice.name + (choice.firstChannel>=2 ? " / channels "+juce::String(choice.firstChannel+1)+"-"+juce::String(choice.firstChannel+2) : " (" + choice.type + ")"));
     dialog->addComboBox("output",names,"Headphones output");
@@ -199,6 +203,14 @@ void LibraryPreview::setLevel(float value)
 juce::Result LibraryPreview::playPrepared(juce::AudioSource& audio,const juce::String& id)
 {
     stop();
+    if (!privateOutput)
+    {
+        if (engine.workMode == WorkMode::recordPerform) return juce::Result::fail("Choose a private headphones route in Record/Perform.");
+        const auto request = engine.requestLibraryPreview();
+        audio.prepareToPlay(engine.preparedBlockSize(), engine.sampleRate.load());
+        if (!engine.startLibraryPreview(audio, request)) return juce::Result::fail("Preview unavailable: transport or export state changed.");
+        preparedSource = &audio; source = id; startTimerHz(20); return juce::Result::ok();
+    }
     if (!privateOutput || !configured() || !allowed(output)) return juce::Result::fail("Configure an explicit private headphone route before private playback.");
     preparedSource=&audio; source=id;
     if (output.firstChannel>=2)

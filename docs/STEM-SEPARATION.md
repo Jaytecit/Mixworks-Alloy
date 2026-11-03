@@ -28,31 +28,32 @@ attached; the original track remains available. Saved mixes still use their
 explicit asset references and are not silently replaced from the cache.
 
 Click **Stems** inside a segment to expand/collapse its four rows. Each row has a
-**Solo** button: it silences other timeline sections, including overlapping
-sections on the same lane. Clicking another stem's Solo switches exclusively to
-that stem; clicking the active Solo again restores the mix. Enabling Solo also
-enables stem playback and unmutes that stem. Each change has one Undo. The row
-menu offers the same **Solo only this stem (whole timeline)** action.
+**Solo** button: it isolates that stem within its lane, including silencing
+other sections on the same lane. Every other lane keeps its existing sound and
+Solo selection. Clicking another stem on the same lane switches exclusively to
+that stem; clicking the active Solo restores that lane. Enabling Solo also enables
+stem playback and unmutes that stem. Each change has one Undo. The row menu offers
+**Solo this stem on this lane**.
 
-Stem Solo takes precedence over lane Solo; parent levels, automation, effects
-and lane Mute still apply. It is a saved mix control, so exports also follow it.
-Outside the soloed segment's time span, the other sections stay silent. Switching
-to **Play original track** bypasses that segment's stem controls, including Solo;
-switching back restores them. Separation quality and the stem files are unchanged.
+Ordinary lane Mute/Solo, parent levels, automation and effects still apply. Solo
+preserves continuous effect histories; it does not reset other lanes or master
+processors. It is saved and used by export. Outside the selected segment's span,
+only its lane stays silent. **Play original track** bypasses that segment's stem
+controls, including Solo; switching back restores them.
 
 Click a row's label for level/pan, mute, or volume/pan automation. Automation uses the
 existing timeline node editor (including precise entry, curve Read and Undo).
 The Editing console's owner selector also lists each stem. The selected stem's
 curve uses the parent lane's editing area. Only volume and pan are independent
 stem effects in this version; the parent EQ/filter/VST chain processes the sum.
-Stem curves use authored timeline nodes; live Touch/Latch recording remains
-available for parent controls only.
+Stem curves use authored timeline nodes; live Touch/Write recording is available
+for parent controls only.
 
 Stems share the parent's sample-zero clock, trim, reverse, loop, audio slip and
 tempo map. Splits slice stem automation with the parent; moves and tempo changes
 retain source timing. Stems never undergo independent beat/downbeat detection.
-Session 38 saves asset identity and stem mix/automation, reading older sessions
-as original-only playback. Reopening validates original and stem identities;
+Current session format41 saves asset identity and stem mix/automation (introduced
+with format38). Reopening validates original and stem identities;
 missing or changed assets reject the open and keep the current mix. Keep the
 external stem folder with sessions that use it.
 

@@ -183,7 +183,7 @@ void Workstation::replaceSelectedAudio(bool commit)
         if (!selection.range) for (const auto& id : selection.clips) if (auto* c = source.clipFor(id)) begin = std::min(begin, c->start);
         auto* dialog = new juce::AlertWindow("Replace selected audio", plan.error.isNotEmpty() ? plan.error
             : "Replace selected audio from " + juce::String(begin - source.tempo.origin, 3) + " to " + juce::String(plan.end - source.tempo.origin, 3)
-                + " s with " + juce::String((int) plan.added.size()) + " copied segments. Shorter copies leave a gap. Other segments, project automation, clipboard and playhead stay in place. One Undo restores the mix.",
+                + " s with " + juce::String((int) plan.added.size()) + " copied segments. Shorter copies leave a gap; other audio stays in place. Undo restores the mix.",
             juce::MessageBoxIconType::NoIcon, this);
         dialog->addButton("Replace", 1, juce::KeyPress(juce::KeyPress::returnKey));
         dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
@@ -221,9 +221,21 @@ void Workstation::refreshEditSelection()
     if (const auto r = editSelection.range)
         text += " / " + juce::String(r->getStart() - engine.project.tempo.origin, 3) + " to "
             + juce::String(r->getEnd() - engine.project.tempo.origin, 3) + " s / " + juce::String(r->getLength(), 3) + " s";
-    if (ids.empty()) text = "No range selected";
+    if (const auto* clip = currentClip())
+        text = clip->media->libraryTitle() + " / Lane " + juce::String(clip->track + 1) + " / "
+            + (ids.empty() ? "Whole track" : text);
+    else text = "Select a track or drag across its waveform to highlight audio.";
     editingSelectionInfo.setText(text, juce::dontSendNotification);
     editingSelectionInfo.setTooltip(text);
+    editingMove.setToggleState(!editingRange.getToggleState(), juce::dontSendNotification);
+    const auto hint = editingPage == 2 ? juce::String("Lane curves affect all tracks on that lane. Track fades have their own owner.")
+        : editingPage == 1 ? juce::String("These settings affect the selected track piece only.")
+        : editingRange.getToggleState() ? juce::String(editingRangeSize.getSelectedId() == 1
+            ? "Click to place the playhead; drag to select freely. S splits. Ctrl+C copies; Ctrl+V pastes."
+            : editingRangeSize.getSelectedId() == 7 ? "Drag the waveform to select on the beat grid. Alt bypasses snapping."
+            : "Click a waveform for the chosen musical length. Choose Free drag for any length.")
+        : juce::String("Drag tracks to move. Shift-drag selects audio. Click the ruler, then Split at playhead (S).");
+    editingHint.setText(hint, juce::dontSendNotification); editingHint.setTooltip(hint);
     editingRangeTime.setEnabled(!busy && !engine.exporting && currentClip());
     editingAll.setEnabled(!busy && !engine.exporting && !engine.project.clips.empty());
     editingClear.setEnabled(!ids.empty());
@@ -297,14 +309,17 @@ void Workstation::editRangeTime()
 
 bool Timeline::beginEditSelection(const juce::MouseEvent& e)
 {
-    if (e.mods.isPopupMenu() || e.mods.isShiftDown() || e.y < 0) return false;
+    if (e.mods.isPopupMenu() || e.y < 0) return false;
     const auto& clips = owner.engine.project.clips;
     const auto found = std::find_if(clips.rbegin(), clips.rend(), [&](const auto& c) { return clipBounds(c).contains(e.position); });
-    if (!owner.editingRange.getToggleState() && (!e.mods.isCtrlDown() || automationPointAt(e.position))) return false;
     if (found == clips.rend()) return false;
+    // Headers remain move handles. Shift-drag is the temporary range tool on a waveform.
+    const bool waveform = e.position.y >= clipBounds(*found).getY() + 20;
+    const bool rangeTool = waveform && (owner.editingRange.getToggleState() || e.mods.isShiftDown());
+    if (!rangeTool && (!e.mods.isCtrlDown() || automationPointAt(e.position))) return false;
     const auto id = found->id; const int track = found->track;
     auto& s = owner.editSelection;
-    if (!owner.editingRange.getToggleState())
+    if (!rangeTool)
     {
         if (s.primary != owner.selectedClip) s.clear();
         if (s.clips.empty() && owner.engine.project.clipFor(owner.selectedClip)) s.clips.push_back(owner.selectedClip);
@@ -323,11 +338,12 @@ bool Timeline::beginEditSelection(const juce::MouseEvent& e)
     if (!s.contains(id)) { s.clear(); s.clips.push_back(id); }
     owner.selectedClip = id; s.primary = id;
     owner.selectedTransition.clear();
-    rangeDragAnchor = owner.engine.project.snappedTime(e.x / pixelsPerSecond, owner.engine.project.snap && !e.mods.isAltDown());
+    const int size = owner.editingRangeSize.getSelectedId();
+    const bool snapRange = size != 1 && !e.mods.isAltDown();
+    rangeDragAnchor = owner.engine.project.snappedTime(e.position.x / pixelsPerSecond, snapRange);
     owner.selectedAutomationTarget = -1; editingAutomationPoint.reset(); selectedCutAmount.reset();
     selectedLabel.clear(); selectedHotcue.reset(); selectedSection.reset();
-    const int size = owner.editingRangeSize.getSelectedId();
-    if (size > 1)
+    if (size > 1 && size < 7)
     {
         const double beats[] {0, 0, 1, 4, 32, 64, 128};
         const auto clock = owner.engine.project.gridClock();
@@ -339,9 +355,11 @@ bool Timeline::beginEditSelection(const juce::MouseEvent& e)
 bool Timeline::continueEditSelection(const juce::MouseEvent& e)
 {
     if (!rangeDragAnchor) return false;
-    if (owner.editingRangeSize.getSelectedId() == 1)
+    moved = moved || e.mouseWasDraggedSinceMouseDown();
+    const int size = owner.editingRangeSize.getSelectedId();
+    if (size == 1 || size == 7)
     {
-        const double end = owner.engine.project.snappedTime(std::max(0., e.x / pixelsPerSecond), owner.engine.project.snap && !e.mods.isAltDown());
+        const double end = owner.engine.project.snappedTime(std::max(0., e.position.x / pixelsPerSecond), size == 7 && !e.mods.isAltDown());
         if (end != *rangeDragAnchor) owner.setEditRange(*rangeDragAnchor, end);
         else { owner.editSelection.range.reset(); owner.refresh(); }
     }
@@ -350,6 +368,8 @@ bool Timeline::continueEditSelection(const juce::MouseEvent& e)
 void Timeline::finishEditSelection()
 {
     if (!rangeDragAnchor) return;
+    // A click places the cut/paste cursor; an audio-selection drag never seeks.
+    if (!moved && !owner.editSelection.range) owner.engine.seek(*rangeDragAnchor);
     rangeDragAnchor.reset();
     owner.refresh();
 }
@@ -375,8 +395,13 @@ void Timeline::paintEditSelection(juce::Graphics& g)
         const float b = std::min(r.getRight(), (float) (s.range->getEnd() * pixelsPerSecond));
         if (b <= a) continue;
         auto selected = juce::Rectangle<float>(a, r.getY() + 20, b - a, std::max(0.f, r.getHeight() - 20)).getIntersection(visible);
-        g.setColour(juce::Colours::lightskyblue.withAlpha(.20f)); g.fillRect(selected);
+        g.setColour(juce::Colours::lightskyblue.withAlpha(.30f)); g.fillRect(selected);
         g.setColour(juce::Colours::lightskyblue); g.drawRect(selected, 1.5f);
+        if (selected.getWidth() >= 62 && selected.getHeight() >= 24)
+        {
+            g.setColour(colour::text); g.setFont(juce::FontOptions(11));
+            g.drawText(juce::String(s.range->getLength(), 3) + " s", selected.reduced(3).removeFromTop(16), juce::Justification::centred);
+        }
     }
 }
 

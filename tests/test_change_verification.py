@@ -44,6 +44,14 @@ class ScopedTests(unittest.TestCase):
         write_json(self.folder/'scoped.json', self.receipt)
         self.assertEqual(validate_receipt(self.folder/'scoped.json', self.exe)['scope'], 'presentation')
 
+    def test_scoped_suite_rejects_retention_failure(self):
+        suite = self.fixture.report('PASS fixture\n1 checks; 0 failures\n', name='alloy-scoped.txt')
+        suite.update(name='alloy', invocation=dict(flags=['--alloy-only'], executableSha256=fixtures.digest(self.exe)),
+                     artifactRetention=dict(errors=['cleanup denied']))
+        self.receipt.update(scope='ui-behaviour', suites=[suite])
+        with self.assertRaisesRegex(ValueError, '[Rr]etention'):
+            validate_scoped_receipt(self.receipt, self.exe)
+
     def test_existing_timeline_ui_is_classified_without_new_membership(self):
         before = dict(self.before, **{'Source/TimelineEditing.cpp': b'existing paste UI'})
         after = dict(before, **{'Source/TimelineEditing.cpp': b'seek after successful paste'})
@@ -102,8 +110,9 @@ class ScopedTests(unittest.TestCase):
         self.receipt['scope']='ui-behaviour'
         with self.assertRaisesRegex(ValueError,'requires affected'):
             validate_scoped_receipt(self.receipt,self.exe)
-        suite=self.fixture.summary()['suites'][14]  # window
+        suite=next(s for s in self.fixture.summary()['suites'] if s['name']=='window')
         self.assertEqual(suite['name'],'window')
+        suite['invocation']['flags']=['--window-only']  # scoped invocation, not the full gate's plugin flags
         self.receipt['suites']=[suite]
         validate_scoped_receipt(self.receipt,self.exe)
         Path(suite['report']).write_text('FAIL fixture\n1 checks; 1 failures\n')

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Mixworks VERSION 0.55.64 LANGUAGES C CXX)
+project(Mixworks VERSION 0.55.68 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.local/deps/JUCE" CACHE PATH "JUCE 8 source directory")
@@ -25,6 +25,8 @@ target_sources(Mixworks PRIVATE Source/AnalysisCache.cpp Source/WorkspaceUI.cpp 
 target_sources(Mixworks PRIVATE Source/MusicalEnergy.cpp Source/MusicalEnergyTests.cpp)
 target_sources(Mixworks PRIVATE Source/StemJobs.cpp Source/StemMixing.cpp Source/StemUI.cpp Source/StemTests.cpp)
 target_sources(Mixworks PRIVATE Source/GridCorrection.cpp Source/GridCorrectionUI.cpp Source/GridCorrectionTests.cpp)
+target_sources(Mixworks PRIVATE Source/UiMessages.cpp Source/RetryReview.cpp Source/UiClarityTests.cpp)
+target_sources(Mixworks PRIVATE Source/EarTools.cpp Source/KeyEarUI.cpp Source/HarmonyEarUI.cpp Source/EarToolWorkflows.cpp Source/EarToolTests.cpp)
 target_sources(Mixworks PRIVATE Source/RhythmDecoder.cpp Source/RhythmDecoderTests.cpp Source/RhythmResearch.cpp)
 target_sources(Mixworks PRIVATE Source/AuftaktFeatures.cpp Source/AuftaktFeatureTests.cpp Source/AuftaktNetwork.cpp)
 target_sources(Mixworks PRIVATE Source/PcmCache.cpp Source/MusicScanner.cpp Source/PlaybackCacheTests.cpp)
@@ -51,7 +53,7 @@ target_sources(Mixworks PRIVATE Source/SourceSectionStore.cpp Source/SourceSecti
 target_sources(Mixworks PRIVATE Source/DownbeatReferences.cpp)
 target_sources(Mixworks PRIVATE Source/PresetNodes.cpp Source/PresetNodeTests.cpp)
 target_sources(Mixworks PRIVATE Source/EditSelection.cpp Source/EditSelectionTests.cpp)
-target_sources(Mixworks PRIVATE Source/ElasticAudio.cpp)
+target_sources(Mixworks PRIVATE Source/ElasticAudio.cpp Source/OriginalAudio.cpp)
 target_sources(Mixworks PRIVATE Source/Transitions.cpp Source/TimelineEditing.cpp Source/TimelineEditingTests.cpp)
 target_sources(Mixworks PRIVATE Source/BarNavigation.cpp Source/BarNavigationTests.cpp Source/RehearsalContext.cpp Source/RehearsalContextTests.cpp Source/TransitionSwapHandles.cpp Source/TransitionSwapTests.cpp Source/TransitionNavigation.cpp Source/TransitionNavigationTests.cpp Source/TransitionFilters.cpp Source/TransitionFilterTests.cpp Source/TransitionControls.cpp Source/TransitionBands.cpp Source/TransitionUI.cpp Source/TransitionBandTests.cpp)
 target_sources(Mixworks PRIVATE Source/TransitionStyles.cpp Source/TransitionRehearsal.cpp Source/TransitionRehearsalUI.cpp Source/TransitionRehearsalTests.cpp)
@@ -99,3 +101,27 @@ target_sources(Mixworks PRIVATE Source/Hotcues.cpp Source/HotcueUI.cpp Source/Ho
 target_sources(Mixworks PRIVATE Source/MidiConnection.cpp Source/MidiConnectionUI.cpp Source/MidiConnectionTests.cpp)
 target_sources(Mixworks PRIVATE Source/AutoArrangement.cpp Source/AutoArrangementUI.cpp Source/AutoArrangementTests.cpp)
 target_sources(Mixworks PRIVATE Source/LibraryPreview.cpp Source/LibraryPreviewTests.cpp)
+
+# Visual runtime is packaged beside the executable; no reference installation is used.
+target_sources(Mixworks PRIVATE Source/VisualScenes.cpp Source/VisualArrangement.cpp Source/VisualArrangementTests.cpp Source/SceneLane.cpp Source/SceneLaneTests.cpp)
+
+
+  set(alloy_original_sources
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_scene_worker.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_compositor.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_handoff.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_presenter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_scene_player.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_catalogue.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_media.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_visual_gl.py")
+  file(GLOB_RECURSE alloy_original_assets CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/*")
+  list(FILTER alloy_original_assets EXCLUDE REGEX "/(Sprites|Backgrounds|Video)/")
+  set_property(TARGET Mixworks APPEND PROPERTY LINK_DEPENDS ${alloy_original_sources} ${alloy_original_assets})
+  add_custom_command(TARGET Mixworks POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${alloy_original_sources} "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/scenes" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/scenes"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/previews" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/previews"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/original-scenes.json" "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/media-library.json" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Sprites" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Backgrounds")

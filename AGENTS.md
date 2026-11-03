@@ -16,6 +16,13 @@ For bridge changes run the client/harness tests and `scripts/verify-bridge.py` t
 
 ## Low-disruption verification — user instruction, 23 October 2026
 
+**1 November override:** Jay explicitly removed the free-memory guard as too
+restrictive. Do not refuse, defer or terminate builds/tests merely because
+available RAM crosses a numeric threshold. This supersedes historical local
+memory-preflight/kill wrappers and handover instructions to wait for memory.
+Keep single-worker, below-normal-priority builds, serial focused tests, stress
+opt-in and the instruction to stop owned testing if actual responsiveness worsens.
+
 The user reports severe computer freezes during project testing and requests absolutely essential checks only, less frequently, while making successive requests. This instruction supersedes automatic full-gate requirements below during ongoing development. Batch related edits and verify once at a useful checkpoint; do not rebuild or rerun suites after every small request. Prefer source inspection and the smallest relevant focused check. No automatic full regression, stress, capacity or benchmark runs during this iterative work. Reserve a complete gate for an explicitly requested release/verification checkpoint; state deferred coverage honestly and never substitute a focused result for a complete receipt.
 
 Use one build worker (`--parallel 1`), one test process at a time, and no overlap between builds/tests. Native checks use `verification.run_checks`, which launches ordinary children below normal priority on Windows and disables deliberate Alloy stress by default. Stress requires explicit `include_stress=True` (full-gate CLI: `--include-stress`); do not enable it merely because audio/engine code changed. Lower priority is not a memory or disk limit: stop owned testing if responsiveness worsens. Keep production apps, audio devices and user data untouched. Avoid launching older Alloy test binaries that predate the stress opt-in guard.

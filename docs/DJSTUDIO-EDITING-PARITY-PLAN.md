@@ -1,3 +1,5 @@
+> Current status,24 October 2026: EP02 selection, rigid groups, Repeat/Crop/Replace, local separation and timeline stem mixing are implemented to the scope in the [request register](REQUEST-STATUS-20261024.md). EP03 protection/node groups/partial transition surgery/changing-tempo retiming, EP04–06 advanced snippets/effect regions, advanced EP08 extraction and EP09 complete acceptance remain. Checklists below retain design/acceptance criteria and dated incremental history, not current completion labels.
+
 # DJ.Studio Editing Parity Implementation Plan
 
 > **For agentic workers:** implement one checked increment at a time, inline, preserving existing work. This product/architecture plan identifies implementation owners and acceptance checks; it is not an untested replacement patch. Do not mark a checkbox complete on the strength of this plan.
@@ -47,7 +49,7 @@ This refines existing items, without declaring unrelated finishing work complete
 
 **Files:** `docs/TIMELINE-EDITING.md`, `docs/TRANSITION-PRESETS.md`, `docs/PRESET-NODES.md`, `docs/README.md`, `FINISHING-PLAN.md`, `HANDOVER.md`. Proven interaction repairs use `Source/AutomationUI.cpp`, `Source/TimelineAutomation.cpp`, `Source/TransitionUI.cpp` and existing timeline tests.
 
-- [ ] Consolidate current instructions for empty curves/single-node Add, ordinary preset replacement, None,1600px/s, presets and source ownership. Mark older procedural descriptions as historical/compatibility material.
+- [ ] Consolidate current instructions for empty curves/single-node Add, ordinary preset replacement, None,1600 px/s, presets and source ownership. Mark older procedural descriptions as historical/compatibility material.
 - [ ] Record Add/select/bend/move/delete/amount/lock/Undo/Redo/save/reopen for Volume/Bass/Mid/Treble/cutoff and a real VST parameter, with both manual and preset curves.
 - [ ] Exercise a three-source arrangement at1250/1920 widths, collapsed panels and detached Editing. Selection must not seek, change audio/Read/recording or create history. Repair demonstrated failures without replacing working controls.
 - [ ] Retain captures and gesture notes distinguishing native fixture, bridge command, actual input, listening and physical MIDI evidence.

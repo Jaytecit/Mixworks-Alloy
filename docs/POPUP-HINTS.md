@@ -4,7 +4,7 @@ Hover over a control for about a second to see its action and result. **View > P
 
 Help covers the toolbar and transport, library and playlist, lane controls, Editing console, effects and keyboard controls, live desk and MIDI settings, transitions and rehearsal, master panel and source-grid review. Menu commands also offer hover help. Existing key, controller-state and source-file details remain available.
 
-The timeline explains the object under the pointer: segment movement/trimming, source slip, transition frames and anchors, paired swaps, automation lines and editable nodes. Node help includes Enter for precise entry and Left/Right for neighbouring nodes. Disabled controls keep their explanation and an unavailable-state note; selection, lock state or a running operation can prevent editing.
+The timeline explains the object under the pointer: segment movement/trimming, source slip, transition frames and anchors, paired swaps, automation lines and editable nodes. Disabled controls show a specific recovery action where available, without appending generic possible causes.
 
 Hints appear beside the pointer, with room around the hovered node. They dismiss when mouse editing or scrolling begins, do not take keyboard focus, and do not animate. Turning hints off dismisses any visible popup immediately. Motion settings, musical Undo and the arrangement are independent of this workspace choice.
 
@@ -24,7 +24,9 @@ Editing groups automation commands above segment tools at compact widths and bes
 
 **Save downbeat** stores a reliable beat one anywhere in the original track; it need not be the earliest downbeat. It replaces the stored downbeat, preserves BPM/key corrections and archives each changed reviewed choice separately from the detection. An archived choice alone does not prove a source-save succeeded. Prepared audio retains its current clock until Beatmatch or **Save + update mix**. IN/OUT, section flags and hotcues remain separate. See [downbeat references](DOWNBEAT-REFERENCES.md) and [range editing](RANGE-EDITING.md).
 
-In track timing review, blank BPM/beat-one fields use the available detected values. Tap three or more steady beats, then check the beginning, middle and end. **Save to track** keeps current placements; **Save + update mix** rebuilds the timeline using the correction and can replace transition placement. Grid click accents beat one only when a downbeat is known. Detector diagnostics remain in the heading's popup hint; confidence is a heuristic, not a calibrated probability.
+In track timing review, blank BPM/beat-one fields use the available detected values. Tap three or more steady beats, then check the beginning, middle and end. **Save source only** keeps current placements; **Apply to arrangement** saves corrections and rebuilds the timeline, which can replace transition placement. Grid click accents beat one only when a downbeat is known. Detector diagnostics are available through **Analysis details**.
+
+The 25 October clarity audit limits app-owned hover help to two sentences,35 words and240 characters. Routine results use the status area, with longer reports available explicitly. See [messages and retry review](UI-MESSAGES-AND-RETRY-REVIEW.md) for per-track notifications and the Source corrections failure list.
 
 Effects follow the selected segment, or the lane when no segment is selected. The master spectrum measures processed audio before monitor mute. EQ, width and saturation are saved settings; master gain keeps its automation. dBFS measures signal level, not perceived loudness. These explanations are available in the associated popup hints.
 

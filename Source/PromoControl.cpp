@@ -90,6 +90,26 @@ juce::var PromoControl::state() const
     put(o, "status", owner.status); put(o, "selectedClip", owner.selectedClip); put(o, "selectedTransition", owner.selectedTransition);
     put(o, "width", owner.getWidth()); put(o, "height", owner.getHeight()); put(o, "peak", owner.engine.masterPeak.load());
     put(o, "timestamp", (double) juce::Time::currentTimeMillis());
+    put(o,"monitorMuted",owner.engine.monitorMuted.load()); put(o,"audibleEnd",owner.engine.project.audibleEnd());
+    const auto streaming=OriginalAudio::statistics(); auto stream=object();
+    put(stream,"poolBytes",(juce::int64)streaming.bytes); put(stream,"blockReads",(juce::int64)streaming.reads);
+    put(stream,"callbackSampleMisses",(juce::int64)streaming.misses); put(stream,"buffering",owner.engine.streamBuffering.load());
+    put(stream,"waitCallbacks",(juce::int64)owner.engine.streamWaitCallbacks.load()); put(o,"originalAudio",stream);
+    if(owner.sceneLane)
+    {
+        const auto& lane=*owner.sceneLane; const auto& timing=lane.getProperties();
+        auto visual=object(); put(visual,"validFrame",lane.preview.isValid() || (bool)lane.previewFacts["presented"]); put(visual,"status",lane.previewStatus);
+        put(visual,"frame",lane.previewFacts.clone()); put(visual,"paintedFrames",timing.getWithDefault("visualPaintCount",0));
+        put(visual,"lastPaintMs",timing.getWithDefault("visualPaintTime",0.)); put(visual,"maxGapMs",timing.getWithDefault("visualPaintMaxGap",0.));
+        put(visual,"gapHistogramCeilMs",timing["visualGapHistogramCeilMs"].clone()); put(o,"visuals",visual);
+        if (lane.previewFacts["presentation"].toString()=="shared-gpu-texture")
+        {
+            put(visual,"paintedFrames",lane.previewFacts["presentedFrames"]);
+            put(visual,"maxGapMs",lane.previewFacts["maxGapMs"]);
+            put(visual,"gapHistogramCeilMs",lane.previewFacts["gapHistogramCeilMs"].clone());
+            put(visual,"measurement","GPU window swaps; not monitor scanout");
+        }
+    }
     juce::Array<juce::var> media, clips;
     for (const auto& m : owner.engine.library) { auto v = object(); put(v,"id",m->id); put(v,"name",m->name); put(v,"bpm",m->bpm()); media.add(v); }
     for (const auto& c : owner.engine.project.clips) { auto v = object(); put(v,"id",c.id); put(v,"name",c.media->name); put(v,"start",c.start); put(v,"end",c.end()); put(v,"lane",c.track); clips.add(v); }
@@ -314,6 +334,17 @@ void runPromoControlTests(const std::function<void(bool,const juce::String&)>& c
     auto w=std::make_unique<Workstation>(false); PromoControl bridge(*w,root,false);
     int id=0; auto call=[&](const char* command,const char* key=nullptr,juce::var value={}) { auto q=object(); put(q,"id","test-"+juce::String(++id)); put(q,"token",juce::String::repeatedString("a",64)); put(q,"timestamp",(double)juce::Time::currentTimeMillis()); put(q,"command",command); if(key)put(q,key,value); return bridge.execute(q); };
     check((bool)call("status")["ok"],"promo status returns actual state");
+    {
+        SceneLane* diagnosticLane=nullptr;
+        for(auto* child:w->getChildren()) if(auto* lane=dynamic_cast<SceneLane*>(child)) diagnosticLane=lane;
+        check(diagnosticLane!=nullptr,"visual diagnostics use the actual scene component");
+        auto gaps=object(); put(gaps,"17",2);
+        if(diagnosticLane) diagnosticLane->getProperties().set("visualGapHistogramCeilMs",gaps);
+        const auto snapshot=call("status")["state"]["visuals"];
+        put(gaps,"17",3);
+        check(snapshot["gapHistogramCeilMs"]["17"]==juce::var(2) && snapshot["paintedFrames"].isInt(),
+            "read-only visual diagnostics copy cumulative timing facts instead of sharing mutable state");
+    }
     check((int)call("status")["state"]["protocolVersion"]==1,"bridge advertises protocol version");
     check(call("status")["state"]["capabilities"].getArray()->contains("close"),"bridge advertises graceful close");
     check(!(bool)bridge.execute(object())["ok"],"promo rejects unauthenticated request");

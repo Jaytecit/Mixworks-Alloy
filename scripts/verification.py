@@ -11,11 +11,26 @@ from test_artifacts import begin_run, finish_run
 
 REGRESSION_SUITES = (
     'rhythm-reliability', 'beat-grid', 'placement', 'tempo', 'tempo-browser',
-    'track-ownership', 'analysis-refresh', 'grid-correction', 'rhythm-decoder', 'library-assets', 'playback-cache', 'source-streaming',
+    'track-ownership', 'split-effects', 'analysis-refresh', 'grid-correction', 'rhythm-decoder', 'library-assets', 'playback-cache', 'source-streaming',
     'timeline-editing', 'alloy', 'window', 'fusion-workflows', 'mastering', 'export', 'latency', 'core',
     'missing-model', 'corrupt-model',
 )
 SUMMARY = re.compile(r'(\d+) checks; (\d+) failures')
+
+
+def regression_module_arguments(suite, paths):
+    """Bind fixture roles for the exact native branch, shared by run and receipt."""
+    if suite not in REGRESSION_SUITES or len(paths) != 4:
+        raise ValueError('A named regression suite and four module roles are required.')
+    if suite in ('source-streaming', 'missing-model', 'corrupt-model'):
+        return []
+    # The split-only branch measures the finite echo, not the gain fixture used
+    # by the ordinary ownership branch of the same C++ function.
+    primary = paths[1] if suite == 'split-effects' else paths[0]
+    flags = ['--plugin', str(primary), '--delay-plugin', str(paths[1]), '--latency-plugin', str(paths[2])]
+    if suite == 'core':
+        flags += ['--instrument', str(paths[3])]
+    return flags
 
 
 def digest(path):
@@ -121,7 +136,19 @@ def run_checks(exe, flags, folder, *, timeout=900, cwd=None, retain_audio=False,
             result['artifactRetention'] = finish_run(folder, owner)
         except (OSError, ValueError) as error:
             result['artifactRetention'] = dict(errors=[str(error)], bytes=0, files=0)
+        if result['artifactRetention']['errors']:
+            result['errors'].append('Generated-fixture retention failed; inspect artifactRetention and the retained journal.')
+            result['exit'] = result['exit'] or 1
     return result
+
+
+def validate_artifact_retention(suite):
+    # Current accepted suites must be owned runs. Historical reports without
+    # retention evidence remain historical rather than implying successful cleanup.
+    retention = suite.get('artifactRetention')
+    if (not isinstance(retention, dict) or not isinstance(retention.get('errors'), list)
+            or retention['errors']):
+        raise ValueError('Generated-fixture retention failed or its evidence is missing/malformed.')
 
 
 def validate_regressions(summary, exe):
@@ -138,16 +165,49 @@ def validate_regressions(summary, exe):
         raise ValueError('Exactly one result for each required named regression suite is required.')
     if len({str(Path(s['report']).resolve()) for s in suites}) != len(suites):
         raise ValueError('Each named suite needs its own check report.')
+    # verify-analysis records these roles in a fixed order. Bind the required
+    # flags as well as their bytes: native tests intentionally omit some plugin
+    # assertions when the optional CLI arguments are absent.
+    modules = summary.get('nativePluginEvidence')
+    if not isinstance(modules, list) or len(modules) != 4:
+        raise ValueError('Four native plugin/module identities are required (gain, delay, latency, instrument).')
+    paths = []
+    for module in modules:
+        if (not isinstance(module, dict) or not isinstance(module.get('path'), str)
+                or not Path(module['path']).is_absolute()):
+            raise ValueError('Invalid native plugin/module identity.')
+        path = Path(module['path'])
+        if plugin_identity(path) != module:
+            raise ValueError('Native plugin/module bytes changed after verification.')
+        paths.append(str(path))
+    if len(set(paths)) != 4:
+        raise ValueError('Native plugin/module roles need distinct modules.')
     for suite in suites:
+        validate_artifact_retention(suite)
         invocation = suite.get('invocation', {})
         if not isinstance(invocation, dict) or not isinstance(invocation.get('flags'), list) or any(not isinstance(f, str) for f in invocation['flags']):
             raise ValueError(f"Invalid invocation evidence: {suite['name']}")
-        if suite.get('name') == 'alloy' and invocation.get('includeStress') is False:
+        if suite.get('name') == 'alloy' and invocation.get('includeStress') is not True:
             raise ValueError('Routine Alloy coverage omits stress checks; it cannot establish a complete regression receipt.')
         if invocation.get('mode') is not None:
             raise ValueError('Interactive evidence is supplemental, not a named native regression.')
         flag = '--neural-unavailable-only' if suite['name'] in ('missing-model', 'corrupt-model') else '--' + suite['name'] + '-only'
         flags = invocation.get('flags', [])
+        module_flags = regression_module_arguments(suite['name'], paths)
+        if module_flags:
+            required = list(zip(module_flags[::2], module_flags[1::2]))
+            for required_flag, module_path in required:
+                if (flags.count(required_flag) != 1 or flags.index(required_flag) + 1 >= len(flags)
+                        or flags[flags.index(required_flag) + 1] != module_path):
+                    raise ValueError(f"Required native plugin/instrument module invocation missing or changed: {suite['name']} {required_flag}")
+        allowed = set(module_flags[::2])
+        if suite['name'] != 'core':
+            allowed.add(flag)
+        if suite['name'] == 'source-streaming':
+            allowed.add('--capacity-fixture')
+        unexpected = [value for value in flags if value.startswith('--') and value not in allowed]
+        if unexpected:
+            raise ValueError(f"Unexpected conditional/unsupported invocation flags for {suite['name']}: {unexpected}")
         selectors = [value for value in flags if value.endswith('-only')]
         if (invocation.get('executableSha256') != identity['executableSha256']
                 or selectors != ([] if suite['name'] == 'core' else [flag])):

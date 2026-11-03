@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     errors = []
-    documents = sorted(ROOT.glob('*.md')) + sorted((ROOT / 'docs').rglob('*.md'))
+    documents = (sorted(ROOT.glob('*.md')) + sorted((ROOT / 'docs').rglob('*.md'))
+                 + sorted((ROOT / 'visuals').rglob('*.md')))
     links = 0
     for document in documents:
         text = document.read_text(encoding='utf-8-sig')

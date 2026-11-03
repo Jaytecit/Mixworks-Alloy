@@ -1,6 +1,7 @@
 #include "Workstation.h"
 #include "Beatmatch.h"
 #include <cmath>
+#include <limits>
 
 namespace mixworks
 {
@@ -30,8 +31,81 @@ void runFocusedRealProbe(const std::function<void(bool, const juce::String&)>& c
     }
     check(report.getSiblingFile("real-retry-results.json").replaceWithText(juce::JSON::toString(juce::var(outcomes))), "retain independent real-source numerical outcomes (not ground truth)");
 }
+void runFreshAnalysisProbe(const std::function<void(bool,const juce::String&)>& check, const juce::File& report, const juce::StringArray& args)
+{
+    const int index=args.indexOf("--analysis-source");
+    const bool valid=index>=0 && index+1<args.size() && juce::File::isAbsolutePath(args[index+1].unquoted());
+    check(valid,"one absolute source supplied for isolated baseline analysis"); if(!valid)return;
+    const juce::File source(args[index+1].unquoted());
+    const bool isolated=analysisStoreRoot().isAChildOf(report.getParentDirectory());
+    check(isolated && source.existsAsFile(),"analysis output is isolated and original source exists");if(!isolated || !source.existsAsFile())return;
+    const auto digest=audioDigest(source);const auto size=source.getSize();const auto modified=source.getLastModificationTime();
+    juce::AudioFormatManager formats;formats.registerBasicFormats();
+    const auto loaded=readMedia(formats,source,{},AnalysisCacheMode::refresh,MediaReadPurpose::catalogue);
+    check(loaded.media && loaded.error.isEmpty(),"fresh catalogue analysis completes: "+source.getFileName()+" / "+loaded.error);
+    check(source.getSize()==size && source.getLastModificationTime()==modified && audioDigest(source)==digest,"original source bytes and modification time remain unchanged");
+    if(!loaded.media)return;
+    const auto& media=*loaded.media;
+    check(!media.analysisFromCache && media.manualBpm==0 && media.manualBeatOrigin<0 && media.manualKey<0,"fresh automatic facts contain no retained analysis or manual overrides");
+    juce::var row(new juce::DynamicObject());auto* object=row.getDynamicObject();
+    object->setProperty("status","automatic baseline; not independently reviewed ground truth");
+    object->setProperty("source",source.getFullPathName());object->setProperty("sourceSha256",digest);
+    object->setProperty("durationSeconds",media.duration());object->setProperty("record",analysisRecordToJson(media.analysisRecord()));
+    check(report.getSiblingFile("fresh-analysis.json").replaceWithText(juce::JSON::toString(row,true,17)),"retain numerical baseline and source identity without copying original music");
+}
+
 void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--review-sorting-only"))
+    {
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1920,900); ui.layout.preferredLibraryWidth=820; ui.resized();
+        const juce::StringArray names {"Unknown tempo","Uncertain tempo","Uncertain bar","Detected grid","Manual bar","Manual grid"};
+        for (int i=0;i<names.size();++i)
+        {
+            auto m=std::make_shared<Media>(); m->name=names[i]; m->analysis.bpm=i==0 ? 0 : 120;
+            m->analysis.tempoConfidence=i==1 ? .1 : .9; m->analysis.downbeatOrigin=i==2 ? -1 : 0;
+            m->analysis.downbeatConfidence=.9; m->manualBeatOrigin=i>=4 ? .125 : -1; m->manualBpm=i==5 ? 120 : 0;
+            m->analysis.key=i==5 ? -1 : i; m->analysis.keyConfidence=i==4 ? .01 : .9;
+            if (i==1) m->analysis.keyConfidence=.146;
+            if (i==4) { m->analysis.key=-1; m->analysis.keyGuess=4; }
+            m->manualKey=i==0 ? 3 : -1; ui.engine.library.push_back(m);
+        }
+        ui.refresh(); ui.libraryTable.sortOrderChanged(9,true);
+        for (double score : {0., .0028, .05, .146, .30, .5499, .55, 1.})
+        {
+            Media detected; detected.analysis.key=6; detected.analysis.keyConfidence=score;
+            check(Workstation::keyEvidenceText(detected)=="Detected", "accepted automatic key is detected independent of stability score " + juce::String(score,4));
+        }
+        Media tentative; tentative.analysis.keyGuess=6; tentative.analysis.keyConfidence=1;
+        check(Workstation::keyEvidenceText(tentative)=="Review", "a tentative fallback stays in review even with a high stored score");
+        tentative.analysis.key=6; tentative.analysis.keyConfidence=std::numeric_limits<double>::quiet_NaN();
+        check(Workstation::keyEvidenceText(tentative)=="Review", "invalid automatic evidence stays in review");
+        tentative.manualKey=3;
+        check(Workstation::keyEvidenceText(tentative)=="Manual", "manual choice remains manual regardless of detector evidence");
+        bool ordered=ui.visibleMedia.size()==6;
+        for (int i=0;i<6 && ordered;++i) ordered &= ui.visibleMedia[(size_t)i]==i;
+        check(ordered,"GRID CHECK sorts unknown/BPM/bar problems before detected and manual grids independently of key");
+        ui.libraryTable.sortOrderChanged(9,false);
+        check(ui.visibleMedia.front()==5 && ui.visibleMedia.back()==0,"GRID CHECK reverses its review ordering");
+        ui.libraryTable.sortOrderChanged(7,true);
+        check(ui.visibleMedia.front()==5 && ui.visibleMedia[1]==4 && ui.visibleMedia.back()==0,
+            "KEY CHECK independently sorts unknown/review before detected and manually chosen keys");
+        ui.libraryTable.sortOrderChanged(9,true);
+        const juce::StringArray expected {"Unknown BPM","Review BPM","Review bar","Detected","Manual bar","Manual grid"};
+        for (int i=0;i<6;++i)
+        {
+            std::unique_ptr<juce::Component> cell(ui.libraryTable.accessibleCell(i,9,false,nullptr));
+            check(cell && cell->getTitle()=="grid check "+expected[i],"native accessible grid cell explains "+names[i]);
+        }
+        check(Workstation::keyEvidenceText(*ui.engine.library[3])=="Detected"
+            && ui.libraryTable.getCellTooltip(3,9).contains("not human confirmation"),"high detector evidence is not presented as human confirmation");
+        const auto geometry=juce::JSON::toString(projectToJson(ui.engine.project));
+        ui.libraryTable.sortOrderChanged(7,false); ui.libraryTable.sortOrderChanged(9,true);
+        check(geometry==juce::JSON::toString(projectToJson(ui.engine.project)) && ui.undoHistory.empty(),"review sorting is view-only and creates no mix edits or Undo");
+        auto pixels=report.getSiblingFile("independent-review-columns.png").createOutputStream();
+        check(pixels && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*pixels),"capture native key/grid review columns");
+        return;
+    }
     runFocusedSignalTests(check, report);
     Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940);
     for (int track = 0; track < 4; ++track)
@@ -194,12 +268,12 @@ void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)
                 && ui.engine.library[1]->manualBeatOrigin == .213 && ui.engine.library[0] == beforeCancel[0]
                 && ui.engine.library[2] == beforeCancel[2] && ui.engine.library[3] == beforeCancel[3],
                 "native focused batch attempts only weak unprotected fields and skips manual sources");
-            check(ui.status.contains("0 improved; 1 unchanged; 3 skipped; 0 failed")
+            check(ui.status.contains("need review in Source corrections")
                 && juce::JSON::toString(projectToJson(ui.engine.project)) == geometry && ui.engine.project.clips[0].prepared == pcm,
                 "focused completion reports unchanged honestly and preserves arranged PCM and clocks");
             const auto completed = ui.engine.library;
             ui.menuItemSelected(64, 3);
-            check(!ui.busy && ui.engine.library == completed && ui.status.contains("No untried"), "repeating completed batch retry is a no-op with clear feedback");
+            check(!ui.busy && ui.engine.library == completed && ui.status.contains("No tracks need another retry"), "repeating completed batch retry is a no-op with clear feedback");
             poll.stopTimer(); juce::MessageManager::getInstance()->stopDispatchLoop();
         }
     };

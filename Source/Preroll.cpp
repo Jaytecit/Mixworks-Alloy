@@ -78,7 +78,17 @@ juce::Result Project::setTimelineOrigin(double seconds)
             clip.elasticSource = found->second;
         }
     }
-    auto shiftCurve = [&](AutomationCurve& curve) { for (auto& point : curve.points) shift(point.time); };
+    auto shiftCurve = [&](AutomationCurve& curve)
+    {
+        for (auto& point : curve.points) shift(point.time);
+    };
+    for (auto& [key, state] : candidate.laneHandles)
+    {
+        for (auto& seed : state.seeds) for (auto& time : seed.second) shift(time);
+        std::set<double> generated;
+        for (double time : state.generatedPoints) { shift(time); generated.insert(time); }
+        state.generatedPoints = std::move(generated);
+    }
     shiftCurve(candidate.masterAutomation);
     for (auto& track : candidate.tracks)
     {
@@ -86,6 +96,8 @@ juce::Result Project::setTimelineOrigin(double seconds)
         for (auto& lane : track.pluginAutomation) shiftCurve(lane.curve);
     }
     for (auto& label : candidate.labels) shift(label.time);
+    for (auto& scene : candidate.visualScenes) shift(scene.start);
+    if (validateVisualScenes(candidate.visualScenes).failed()) valid = false;
     if (!valid) return juce::Result::fail("Keep enough pre-roll for the intro and its markers. Move them to or after musical zero before removing it.");
     const auto links = candidate.validateTransitionLinks(); if (links.failed()) return links;
     *this = std::move(candidate); return juce::Result::ok();

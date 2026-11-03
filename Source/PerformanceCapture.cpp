@@ -98,6 +98,12 @@ void Engine::appendTakeEvent(TakeEvent event)
     if (!capturingPerformance() || applyingPerformanceEvent) return;
     auto& take=project.performanceTakes[(size_t)activeTake];
     if (take.events.size()==PerformanceTake::maximumEvents) { take.complete=false; take.issue=eventLimitIssue; return; }
+    // Quantized private launches also append project events, bypassing
+    // recordProjectCommit's early guard. Keep every saved take within the same
+    // snapshot limit, and leave programme playback running if capture fills.
+    if (event.kind==TakeEventKind::project
+        && std::count_if(take.events.begin(),take.events.end(),[](const auto& saved) { return saved.kind==TakeEventKind::project; })>=64)
+    { take.complete=false; take.issue="Structural checkpoint capacity reached. Keep the optional master WAV; original arrangement remains protected."; return; }
     event.frame=std::max(event.frame,performanceFrames.load()); event.sequence=takeSequence++;
     // Events at an audible callback boundary can precede the next message-thread
     // gesture. Do not reorder ties by source position after a seek.
@@ -138,7 +144,8 @@ void Engine::recordProjectCommit()
 void Engine::returnToAutomation(const AutomationAddress& input)
 {
     const juce::ScopedLock guard(lock); auto address=input;
-    if (address.clipId.isEmpty() && address.target!=AutomationTarget::master && controlClip(address.track)) address.clipId=selectedClip;
+    if (address.clipId.isEmpty() && address.target==AutomationTarget::plugin && controlClip(address.track)) address.clipId=selectedClip;
+    if (exporting || project.automationLocked(address)) return;
     auto* curve=project.curve(address); if (!curve) return;
     const auto writing=std::find_if(activeWrites.begin(),activeWrites.end(),[&](const auto& item) { return item.address==address; });
     const float returnValue=writing!=activeWrites.end() ? writing->manualBefore : project.manualValue(address);
@@ -291,7 +298,7 @@ void Engine::renderTake(juce::AudioBuffer<float>& output,int frames,double secon
         // previous loops/tails. This path runs on the preparation/export worker.
         if (wanted<replayFrame) { output.clear(0,frames); return; }
         while (replayFrame<wanted)
-        { const int count=(int)std::min<int64_t>(blockSize,wanted-replayFrame); renderTake(takeBuffer,count,replayFrame/sampleRate.load()); }
+        { const auto before=replayFrame; const int count=(int)std::min<int64_t>(blockSize,wanted-replayFrame); renderTake(takeBuffer,count,replayFrame/sampleRate.load()); if (replayFrame==before) { output.clear(0,frames); return; } }
     }
     output.clear(0,frames); int offset=0;
     while (offset<frames)
@@ -305,6 +312,7 @@ void Engine::renderTake(juce::AudioBuffer<float>& output,int frames,double secon
         juce::MidiBuffer midi;
         // The same renderer owns control application and continuous DSP for live
         // audition and offline output. Clip shifts are the committed cue clocks.
+        if (OriginalAudio::isRealtime() && replayRunning && !requestPlayback(replaySource,count)) return;
         render(mixBuffer,count,replaySource,midi);
         for (int ch=0;ch<2;++ch) output.copyFrom(ch,offset,mixBuffer,ch,0,count);
         if (replayRunning) { deviceClockFrames+=count; replaySource=deviceClockAnchor+deviceClockFrames/sampleRate.load(); }
@@ -314,6 +322,7 @@ void Engine::renderTake(juce::AudioBuffer<float>& output,int frames,double secon
 juce::Result Engine::auditionTake(int index)
 {
     if (playing || capturingPerformance()) return juce::Result::fail("Stop programme playback before auditioning a take.");
+    beginTakeAuditionRequest();
     juce::String error; auto renderer=prepareTakeReplay(index,error); if (!renderer) return juce::Result::fail(error);
     return installTakeAudition(std::move(renderer));
 }
@@ -322,9 +331,11 @@ juce::Result Engine::installTakeAudition(std::unique_ptr<Engine> renderer)
     const juce::ScopedLock guard(lock);
     if (playing || capturingPerformance() || !renderer || !renderer->replayingTake()) return juce::Result::fail("Stop programme playback before auditioning a prepared take.");
     if (renderer->sampleRate.load()!=sampleRate.load()) return juce::Result::fail("Select the take's recorded sample rate in Audio / MIDI before live audition. Offline take export keeps its recorded rate.");
-    takeAudition=std::move(renderer); return juce::Result::ok();
+    ++takeAuditionRequest; takeAudition=std::move(renderer); return juce::Result::ok();
 }
-void Engine::endTakeAudition() { takeAudition.reset(); }
+void Engine::endTakeAudition() { const juce::ScopedLock guard(lock); ++takeAuditionRequest; takeAudition.reset(); }
+uint64_t Engine::beginTakeAuditionRequest() { const juce::ScopedLock guard(lock); return ++takeAuditionRequest; }
+bool Engine::isTakeAuditionRequestCurrent(uint64_t request) const { const juce::ScopedLock guard(lock); return request==takeAuditionRequest; }
 void Engine::prepareRender(double rate,int size)
 {
     const juce::ScopedLock guard(lock); sampleRate=rate; blockSize=size; prepareBuffers(size); midiCollector.reset(rate);

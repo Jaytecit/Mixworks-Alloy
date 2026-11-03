@@ -18,7 +18,7 @@ void Workstation::editSavedDownbeat(const juce::String& id)
     const auto exact = std::make_shared<std::pair<double,juce::String>>(anchor >= 0 ? anchor : 0,juce::String(anchor >= 0 ? anchor : 0,6));
     auto* dialog = new juce::AlertWindow("Save downbeat", media->libraryTitle(), juce::MessageBoxIconType::NoIcon, this);
     dialog->addTextEditor("source", exact->second, "Beat one (seconds)");
-    dialog->getTextEditor("source")->setTooltip("Choose a reliable beat one anywhere in the original track. Save replaces the stored downbeat and keeps BPM/key corrections. Beatmatch applies it to the mix. Each changed choice keeps a dated comparison with automatic detection; IN, sections and hotcues stay separate.");
+    dialog->getTextEditor("source")->setTooltip("Choose a known beat one anywhere in the track. Save keeps BPM and key; Beatmatch applies the timing to the mix.");
     dialog->addButton("Save to track",1,juce::KeyPress(juce::KeyPress::returnKey));
     dialog->addButton("Use playhead",2); dialog->addButton("Use IN marker",3);
     dialog->addButton("Cancel",0,juce::KeyPress(juce::KeyPress::escapeKey));

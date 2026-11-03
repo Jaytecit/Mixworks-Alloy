@@ -1,5 +1,94 @@
 # Proportionate testing
 
+Current visuals: [glass/maintenance checkpoint](MAINTENANCE-20261103.md) and
+[verification entry points](../VERIFICATION.md). The dated records below apply to
+their named candidates; current status is in [HANDOVER](../HANDOVER.md).
+
+Latest: [ua20 versioned activation](release-audit/UA20-VERSION-ACTIVATION-20261101.md)
+passes waveform/version37/0 on `708a26477c5d` with actual UI and Windows metadata
+both0.55.66. Source is identical to ua19 except CMake version; its109/0 remains
+separate prior-candidate evidence. User-authorised local preview activated;
+no full regression, stress, physical/device or real-track listening acceptance.
+
+Latest: [ua19 Simple A/B/C workflow](release-audit/UA19-SIMPLE-ABC-GRID-20261101.md)
+passes `--grid-alignment-only`109/0 on candidate `91f5a141564e` through
+verification.run_checks. Ten native captures inspected; no stress/full gate or
+physical/listening acceptance. Includes fixed-marker navigation, ordered marks,
+bar-count confirmation, independent C mismatch, source save/reopen and Advanced
+switching. Broader grid/key test callers select the secondary tools explicitly;
+those broader suites remain unrun on this candidate.
+
+Latest: [ua18 playback boundary repair](release-audit/UA18-PLAYBACK-BOUNDARY-20261101.md)
+passes `--transition-boundary-only --boundary-fixture <absolute audio path>`5/0
+and `--original-playback-only`42/0 on candidate `3c1e3f3eb943`, after reproducing
+the MP3 EOF failure. The boundary selector copies its input into the owned report
+root. Encoded MP3 copies need exact-path hash-journalled cleanup separately from
+the shared generated-audio matcher. No full gate or hardware/listening acceptance.
+
+Latest: [ua16 waveform/grid controls](release-audit/UA16-WAVEFORM-GRID-CONTROLS-20261101.md)
+passes `--waveform-alignment-only`36/0 and `--grid-alignment-only`76/0 on candidate
+`e1d1c5737f7b`. Both are bounded functional entries through `verification.run_checks`;
+no detector/model/device or stress/performance work. The waveform selector returns
+before the broader BeatGrid suite. Twelve native captures inspected. Shared stream/
+model changes still need broader regression at a later authorised checkpoint;
+these focused results do not qualify whole-product readiness. ua15's recovery67/0
+remains separate evidence on its own candidate.
+
+Latest: [ua13 combined focused checkpoint](release-audit/UA13-FOCUSED-VERIFICATION-20261101.md)
+builds successfully and passes grid61/0, review23/0, destination111/0 and
+save-export42/0 on candidate `3a8286068928`. Twelve native captures inspected;
+all four runs used `verification.run_checks` serially with no retention errors.
+This supersedes the ua09–ua11 pending notes below within the stated focused scope.
+No complete gate or physical/listening acceptance is implied.
+
+**1 November: RAM guard removed at Jay's request.** Available-memory thresholds
+must no longer block or kill builds/tests. Older memory-stop records below are
+historical, not current prerequisites. The active ua09-ua12 wrappers have no RAM
+gate; their original guard scripts are preserved in
+`.local/ua12/previous-memory-guards.zip`. Continue one-worker, below-normal-priority
+builds and serial focused checks through `verification.run_checks`, with stress
+off. Stop owned work for observed responsiveness problems, not a RAM reading.
+
+ua11 extends `--grid-alignment-only` with guided page visibility/draft preservation,
+whole-beat bar-accent shifts, rebuild confirmation cancellation/acceptance and
+three guided page captures. Existing two-anchor arithmetic, Undo, bounds and
+source-save/reopen checks remain. The initial1497MiB memory stop was superseded
+by ua13's successful build and61-check pass; see
+[ua11](release-audit/UA11-GUIDED-GRID-20261101.md). Use this bounded entry, not a
+detector run or full grid-correction suite, at the next safe checkpoint.
+
+ua10 extends `--review-sorting-only` with accepted-key score boundaries,
+tentative/invalid/manual classifications and a low-score accepted key in the
+native column capture. Build and run this bounded selector through
+`verification.run_checks`, then inspect `independent-review-columns.png`.
+ua13 passes23 checks and its native capture was inspected; do not run analysis
+or a library scan to verify this display-only classification change.
+
+`--destination-safety-only` adds a bounded companion to the save/export journey:
+extension-corrected overwrite confirmation/cancel, existing destinations and
+backups, arrangement-only source/hardlink protection, missing folders, Windows
+locked-file failures followed by retry, and mid-write cancellation. It shares the
+0.2-second fixture and returns before the broader take/export checks. Run through
+`verification.run_checks`; do not substitute the broad export suite. ua13 passes
+111 checks and its confirmation/error captures were inspected; see
+[ua09](release-audit/UA09-DESTINATION-SAFETY-20261101.md).
+
+`--save-export-workflow-only` adds a bounded native Save As/Save/reopen/normal WAV/
+playlist/track-list/cancel journey. It uses one 0.2-second source, an independent
+2,000-frame output oracle and four dialog captures, returning before broader take
+tests. ua08 passes42/0 via verification.run_checks; see
+[scope and limits](release-audit/UA08-SAVE-EXPORT-20261101.md). Do not substitute
+`--export-only`, which includes a 90-minute callback simulation, during the current
+minimal-check phase. No physical gestures or whole-export qualification implied.
+
+1 November ua02 adds `--live-transition-only`:29 bounded native UI-callback,
+sample-clock/PCM, history, source-backed save/reopen and export-renderer checks.
+Run through `verification.run_checks`; it returns before broader navigation checks
+and uses no device, detector, worker, timing/load/benchmark loop. Exact final and
+failed-fixture evidence: `.local/ua02/`. This does not qualify physical gestures,
+listening, complete file export or wider Record/Perform; see the
+[live-transition checkpoint](release-audit/UA02-LIVE-TRANSITIONS-20261101.md).
+
 ## Current override: protect desktop responsiveness (23 October 2026)
 
 The user reports severe freezing during tests and is making successive requests. During ongoing development, use only essential focused verification, batch related edits, and defer builds/checks until a useful checkpoint instead of rerunning after every request. This overrides automatic full-gate triggers in the table below. Do not automatically run broad regressions, stress probes, capacity fixtures or benchmarks. A complete gate is reserved for an explicitly requested release/verification checkpoint; deferred coverage must remain visible and focused checks must never be called complete regressions.
@@ -7,6 +96,23 @@ The user reports severe freezing during tests and is making successive requests.
 Build with `--parallel 1` and append `/MP1` to the Windows `_CL_` environment variable for that build (the project otherwise enables MSVC internal parallel compilation). Run the build below normal priority. Run one test process at a time, without overlapping builds. `verification.run_checks` launches native children at below-normal priority on Windows. It explicitly disables `MIXWORKS_TEST_STRESS` unless `include_stress=True` is supplied, even if the parent environment enabled it. The Alloy playback-budget probe (busy CPU worker, audio callbacks and full-window snapshots) is now opt-in. The full-gate CLI requires `--include-stress` when requesting a complete receipt. Older archived Alloy executables do not honour this new guard: avoid running them during interactive work. Interactive bridge drivers retain their own process-launch policy and should only run when essential.
 
 Reduced process priority does not cap RAM or disk traffic and does not prove the freezes resolved. Stop owned testing if responsiveness degrades. Do not restart production apps, clear user caches or change system/audio drivers as part of this policy.
+
+`scripts/build.ps1` now enforces one worker, `/MP1` and below-normal priority,
+including dependency/configuration children, and restores caller settings on
+success/failure. Disk-space checks remain; numeric RAM admission/kill guards are
+disabled by Jay's1 November instruction. Current full
+receipts require explicit Alloy stress evidence and matching native module
+identities/arguments; absent optional plugin flags cannot silently omit required
+checks. Retention errors make a run unsuccessful and block full/scoped receipts,
+even when the native checks passed. Historical receipts are retained as historical
+evidence and may not satisfy current validation.
+
+The ra06 coverage repair raises the named gate to23 suites: split-effects is a
+separate early-return branch and requires the finite-delay fixture rather than
+the ordinary ownership gain fixture. Runner/receipt validation share fixture
+roles and reject unreviewed options such as `--catalogue-reopen` under a complete
+library-suite label. Historical22-suite receipts stay historical. No revised full
+gate was run;31 harness tests and29 focused native checks are scoped evidence only.
 
 The user requested this policy on 20 October 2026 because small visual edits were repeatedly running thousands of unrelated checks. Select the smallest verification that addresses the actual risk. An application rebuild alone does not require the full gate.
 
@@ -24,6 +130,41 @@ The user requested this policy on 20 October 2026 because small visual edits wer
 Presentation-only means the diff does not change events, gestures, model state, parameter conversion, persistence or audio routing. A UI filename can still contain those behaviours. Review semantics before selecting scope. Do not add a unit test just to assert that a colour constant changed. Combine related changes before verifying; stop once relevant checks pass unless new changes or concerns justify more work.
 
 ## Bridge-assisted workflows
+
+The ra05 local staging checkpoint uses47 private-popup checks,29 take-UI checks,
+87 performance/replay/export/parser checks with the finite-delay VST, and22 preview
+checks:185 total, sequential `verification.run_checks`, stress disabled, all on
+the staged `0.55.64-66ebcab993b3` candidate. Same source/version formats are retained.
+This is an explicitly requested focused local stage, not a complete gate or public
+package qualification. No tests were repeated after the accepted final checkpoint.
+`--private-popup-only` returns from the existing performance friend-test entry;
+owned worker gates and isolated PCM/analysis exercise late completion without a
+model, production catalogue or physical device. Evidence: `.local/ra05/`.
+
+The 25 October ra02 audit adds `--performance-take-parser-only` for the smallest
+no-audio parser reproduction. Those checks also run under `--performance-take-only`.
+Final 74-check performance acceptance (including the real finite-delay VST fixture)
+belongs to the unstaged repaired candidate in `.local/ra02/final.json`, not the
+normal r646 launcher, and is not a complete gate. Red and fixture-failure reports
+remain retained. No bridge change or bridge suite was needed for this parser fix.
+
+The next ra03 repair uses only `--performance-take-parser-only`:34 checks cover
+unsupported-event refusal, all nine supported kinds and the earlier malformed
+snapshot/counter cases. It does not repeat the older ra02 performance suite or
+inherit its74-check result for the new executable. See `.local/ra03/final.json`.
+Static coverage/conditional maps distinguish18 supplemental entries,2 nested
+helpers and2 excluded production/research commands outside the named gate;
+mapping does not authorize running these tests or establish runtime acceptance.
+
+The ra04 `--performance-take-ui-only` branch runs29 targeted native take-popup/
+modal checks inside the existing performance friend-test entry, then returns
+without running its DSP/plugin suite. It uses Workstation(false), stops its timer,
+opens no device/catalogue/production recovery, completes real owned modal callbacks
+and exercises Undo plus Play with one tiny owned source. A test-only sentinel take
+keeps the faulty red capture-index case in bounds. Final29/0 and inspected popup/
+editor PNGs are retained in `.local/ra04/`; generated WAV retention removed48,104
+bytes without errors. No physical gestures, MIDI, output or full seek-thread/native
+file-picker journey is established, and ra02/ra03 results remain historical.
 
 The 0.55.64 mode/retry checkpoint uses `--targeted-analysis-only`,
 `--performance-take-only --plugin <finite-delay-fixture>` and
@@ -73,7 +214,7 @@ verify its build and affected Alloy suite, without repeating the full gate.
 
 ## Test data retention
 
-Ordinary native runs use `verification.run_checks` and a new empty directory below this repository's `.local/`. Each directory has an ownership marker; only outputs created in that fresh owned run are eligible for automatic removal. Child `TEMP`/`TMP` point inside the run, containing transient decoded caches. After the child exits, generated WAV/PCM, related raw audio and generated `.mixworks` test arrangements/backups are hashed, journalled and removed. Reports, analysis JSON/measurements, screenshots, binaries and source archives remain. Production arrangements and saved analysis outside the owned test run are untouched.
+Ordinary native runs use `verification.run_checks` and a new empty directory below this repository's `.local/`. Each directory has an ownership marker; only outputs created in that fresh owned run are eligible for automatic removal. Child `TEMP`/`TMP` point inside the run, containing transient decoded caches. After the child exits, generated WAV/PCM, related raw audio, their `.bak`/numbered backups and generated `.mixworks` test arrangements/backups are hashed, journalled and removed. The 24 October cleanup adds audio-backup matching while retaining report JSON, outside files and hardlinks. Reports, analysis JSON/measurements, screenshots, binaries and source archives remain. Production arrangements and saved analysis outside the owned test run are untouched.
 
 Links/reparse points and hard links are excluded. Existing nonempty directories cannot acquire ownership; source-baselines/dependencies/archives and paths outside `.local/` are forbidden. Low free space stops the full gate before its capacity fixture is generated; it never clears user data to make room. Retention errors are reported separately from native results.
 

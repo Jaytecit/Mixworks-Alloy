@@ -6,7 +6,7 @@ import re
 import zipfile
 
 from verification import (bundle_identity, check_report, digest, read_json,
-                          run_checks, validate_receipt, write_json)
+                          run_checks, validate_artifact_retention, validate_receipt, write_json)
 
 # These files still require semantic review: a UI filename does not prove a
 # cosmetic diff. Anything outside this list requires the complete gate.
@@ -98,6 +98,7 @@ def validate_scoped_receipt(receipt, exe):
     if len({s['name'] for s in suites}) != len(suites):
         raise ValueError('Duplicate scoped suites.')
     for suite in suites:
+        validate_artifact_retention(suite)
         name = suite['name']
         if name not in UI_SUITES or suite['invocation'].get('flags') != ['--' + name + '-only']:
             raise ValueError('Unexpected scoped suite invocation.')

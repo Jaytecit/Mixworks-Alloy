@@ -13,7 +13,7 @@ import wave
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from verification import (REGRESSION_SUITES, bundle_identity, check_report, create_receipt,
-                          digest, read_json, run_checks, validate_receipt, validate_regressions, write_json)
+                          digest, plugin_identity, read_json, regression_module_arguments, run_checks, validate_receipt, validate_regressions, write_json)
 
 spec = importlib.util.spec_from_file_location('real_benchmark', ROOT / 'scripts/run-real-benchmark.py')
 benchmark = importlib.util.module_from_spec(spec)
@@ -36,11 +36,20 @@ class VerificationTests(unittest.TestCase):
         return check_report(path, code)
 
     def summary(self):
+        plugins = []
+        for role in ('gain', 'delay', 'latency', 'instrument'):
+            path = self.folder / (role + '.vst3')
+            if not path.exists():
+                path.write_bytes(('fixture ' + role).encode())
+            plugins.append(plugin_identity(path))
         summary = dict(format='mixworks-analysis-tests', schemaVersion=2,
-                       **bundle_identity(self.exe), errors=[], suites=[])
+                       **bundle_identity(self.exe), errors=[], suites=[], nativePluginEvidence=plugins)
         for name in REGRESSION_SUITES:
             flags = [] if name == 'core' else ['--neural-unavailable-only' if name in ('missing-model', 'corrupt-model') else '--' + name + '-only']
-            summary['suites'].append(dict(name=name, invocation=dict(executableSha256=digest(self.exe), flags=flags),
+            if name not in ('source-streaming', 'missing-model', 'corrupt-model'):
+                flags += regression_module_arguments(name, [plugin['path'] for plugin in plugins])
+            summary['suites'].append(dict(name=name, invocation=dict(executableSha256=digest(self.exe), flags=flags, includeStress=True),
+                artifactRetention=dict(errors=[], files=0, bytes=0),
                 **self.report('PASS fixture\n1 checks; 0 failures\n', name=name + '.txt')))
         return summary
 
@@ -53,6 +62,45 @@ class VerificationTests(unittest.TestCase):
                 result = self.report(text)
                 self.assertFalse(result['complete'])
                 self.assertNotEqual(result['exit'], 0)
+
+    def test_complete_receipt_requires_split_effects_branch(self):
+        summary = self.summary()
+        summary['suites'] = [s for s in summary['suites'] if s['name'] != 'split-effects']
+        with self.assertRaisesRegex(ValueError, 'required named'):
+            validate_regressions(summary, self.exe)
+
+    def test_reduced_catalogue_child_cannot_stand_in_for_library_suite(self):
+        summary = self.summary()
+        library = next(s for s in summary['suites'] if s['name'] == 'library-assets')
+        library['invocation']['flags'] += ['--catalogue-reopen', str(self.folder / 'child.json')]
+        with self.assertRaisesRegex(ValueError, 'conditional|[Uu]nexpected|[Uu]nsupported'):
+            validate_regressions(summary, self.exe)
+
+    def test_split_effects_requires_finite_delay_fixture(self):
+        summary = self.summary()
+        split = next(s for s in summary['suites'] if s['name'] == 'split-effects')
+        flags = split['invocation']['flags']
+        self.assertEqual(flags[flags.index('--plugin') + 1], summary['nativePluginEvidence'][1]['path'])
+        validate_regressions(summary, self.exe)
+        flags[flags.index('--plugin') + 1] = summary['nativePluginEvidence'][0]['path']
+        with self.assertRaisesRegex(ValueError, 'module invocation'):
+            validate_regressions(summary, self.exe)
+
+    def test_gate_module_roles_keep_core_instrument_and_split_echo_distinct(self):
+        paths = ['gain-module', 'echo-module', 'latency-module', 'instrument-module']
+        self.assertEqual(regression_module_arguments('split-effects', paths),
+                         ['--plugin', 'echo-module', '--delay-plugin', 'echo-module', '--latency-plugin', 'latency-module'])
+        self.assertEqual(regression_module_arguments('core', paths)[-2:], ['--instrument', 'instrument-module'])
+        self.assertEqual(regression_module_arguments('source-streaming', paths), [])
+        with self.assertRaises(ValueError):
+            regression_module_arguments('not-a-suite', paths)
+
+    def test_unknown_branch_options_cannot_change_named_gate_coverage(self):
+        for name in ('core', 'library-assets', 'beat-grid', 'source-streaming'):
+            summary = self.summary()
+            next(s for s in summary['suites'] if s['name'] == name)['invocation']['flags'].append('--unreviewed-branch')
+            with self.subTest(suite=name), self.assertRaisesRegex(ValueError, 'Unexpected conditional'):
+                validate_regressions(summary, self.exe)
 
     def test_report_failure_and_process_disagreement_cannot_pass(self):
         self.assertEqual(self.report('FAIL one\n1 checks; 1 failures\n', 1)['exit'], 1)
@@ -110,6 +158,62 @@ class VerificationTests(unittest.TestCase):
             validate_regressions(summary, self.exe)
         alloy['invocation']['includeStress'] = True
         validate_regressions(summary, self.exe)
+
+    def test_alloy_stress_requires_explicit_true_evidence(self):
+        for state in ('absent', None, 0, 'true'):
+            summary = self.summary()
+            invocation = next(s for s in summary['suites'] if s['name'] == 'alloy')['invocation']
+            if state == 'absent':
+                invocation.pop('includeStress')
+            else:
+                invocation['includeStress'] = state
+            with self.subTest(state=state), self.assertRaisesRegex(ValueError, 'stress'):
+                validate_regressions(summary, self.exe)
+
+    def test_required_native_modules_cannot_silently_skip(self):
+        for name, flag in (('core', '--instrument'), ('core', '--plugin'), ('track-ownership', '--plugin'), ('export', '--delay-plugin'), ('latency', '--latency-plugin')):
+            summary = self.summary()
+            flags = next(s for s in summary['suites'] if s['name'] == name)['invocation']['flags']
+            at = flags.index(flag); del flags[at:at+2]
+            with self.subTest(name=name, flag=flag), self.assertRaisesRegex(ValueError, '[Pp]lugin|[Ii]nstrument|module'):
+                validate_regressions(summary, self.exe)
+
+    def test_native_module_evidence_is_required_and_bound_to_current_bytes(self):
+        summary = self.summary()
+        for evidence in (None, [], summary['nativePluginEvidence'][:-1]):
+            changed = copy.deepcopy(summary); changed['nativePluginEvidence'] = evidence
+            with self.subTest(evidence=evidence), self.assertRaises(ValueError):
+                validate_regressions(changed, self.exe)
+        module = Path(summary['nativePluginEvidence'][0]['path'])
+        module.write_bytes(b'changed fixture')
+        with self.assertRaisesRegex(ValueError, '[Pp]lugin|module'):
+            validate_regressions(summary, self.exe)
+
+    def test_retention_failure_cannot_be_reported_as_a_successful_run(self):
+        def child(command, **kwargs):
+            Path(command[-1]).write_text('PASS fixture\n1 checks; 0 failures\n')
+            return types.SimpleNamespace(returncode=0)
+        outcomes = [dict(errors=['fixture cleanup denied'], files=0, bytes=0),
+                    OSError('fixture retention journal denied')]
+        for index, outcome in enumerate(outcomes):
+            with self.subTest(outcome=outcome), patch('verification.subprocess.run', side_effect=child), \
+                    patch('verification.finish_run', **({'side_effect': outcome} if isinstance(outcome, Exception) else {'return_value': outcome})):
+                result = run_checks(self.exe, [], self.folder / f'retention-{index}')
+            self.assertEqual(result['processExit'], 0)
+            self.assertTrue(result['complete'])
+            self.assertNotEqual(result['exit'], 0)
+            self.assertTrue(result['errors'])
+            self.assertTrue(result['artifactRetention']['errors'])
+
+    def test_receipt_rejects_recorded_retention_failure_even_with_native_pass(self):
+        for retention in (dict(errors=['cleanup denied']), 'invalid', dict(errors=''), {}, None, 'absent'):
+            summary = self.summary()
+            if retention == 'absent':
+                summary['suites'][0].pop('artifactRetention')
+            else:
+                summary['suites'][0]['artifactRetention'] = retention
+            with self.subTest(retention=retention), self.assertRaisesRegex(ValueError, '[Rr]etention'):
+                validate_regressions(summary, self.exe)
 
     def test_receipt_binds_reports_summary_and_all_bundle_assets(self):
         summary_path = self.folder / 'summary.json'

@@ -6,7 +6,7 @@ namespace mixworks
 enum class WindowMode { windowed, maximised, fullscreen, spanning };
 
 // Owns monitor geometry and window state; both UI entry points use this owner.
-class AppWindow final : public juce::DocumentWindow
+class AppWindow : public juce::DocumentWindow
 {
 public:
     explicit AppWindow(juce::Component* content);

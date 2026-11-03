@@ -25,10 +25,10 @@ PerformanceDeck::PerformanceDeck(Engine& e) : engine(e)
     hint.setFont(juce::FontOptions(11)); hint.setColour(juce::Label::textColourId, colour::muted);
     cancelLearn.setTooltip("Cancel MIDI Learn or guided setup. Completed assignments are kept.");
     cancelLearn.onClick = [this] { engine.beginLearn({}); refresh(isEnabled()); };
-    setup.setTooltip("Map the current live desk in order. Use Custom Mode and enable the appropriate MIDI inputs. Each physical move replaces only that control/action assignment and saves a backup. Standard MIDI Play/Stop already work without learning. Skip unavailable buttons.");
+    setup.setTooltip("Map one controller control at a time in Custom Mode. Play/Stop already work; skip buttons you do not have.");
     setup.onClick = [this] { engine.beginControllerSetup(true); refresh(isEnabled()); };
     skip.setTooltip("Skip this guided setup step without changing its existing mapping."); skip.onClick = [this] { engine.skipControllerStep(); };
-    learn.setTooltip("Enable, then click a pad/button or move an on-screen dial/fader. Move the matching FLkey control next. Custom Mode; existing assignments are kept until replaced by your choice.");
+    learn.setTooltip("Enable Learn, use an on-screen control, then move its matching controller control. Use Custom Mode on FLkey.");
     learn.onClick = [this] { engine.setMidiLearnEnabled(learn.getToggleState()); refresh(isEnabled()); };
     for (int i = 0; i < 8; ++i)
     {
@@ -97,8 +97,7 @@ juce::PopupMenu PerformanceDeck::controlsMenu() const
     menu.addSeparator(); menu.addSectionHeader("Reset controls / MIDI Learn");
     for (int lane = 0; lane < 4; ++lane)
     {
-        const auto* source = engine.controlClip(lane);
-        menu.addItem(lane + 1, "Reset EQ / " + (source ? source->media->libraryTitle() + " (segment)" : "mixer lane " + juce::String(lane + 1)), isEnabled());
+        menu.addItem(lane + 1, "Reset EQ / mixer lane " + juce::String(lane + 1), isEnabled());
     }
     for (int lane = 0; lane < 4; ++lane) menu.addItem(lane + 5, "Reset cutoff / mixer lane " + juce::String(lane + 1), isEnabled());
     menu.addItem(9, "Centre pan controls", isEnabled()); return menu;
@@ -154,7 +153,7 @@ void PerformanceDeck::configure(juce::Slider& s, int slot, MidiAction a, Automat
     if (address.target == AutomationTarget::cutoff)
     {
         if (auto* dial = dynamic_cast<AlloyDial*>(&s)) dial->configureCutoff();
-        s.setTooltip(s.getName() + ". Controls this lane independently of segment selection. Centre Off; left low-pass, right high-pass. Double-click/Home resets. Text: LP/HP and Hz, or Off. MIDI centre 63/64 is Off.");
+        s.setTooltip(s.getName() + ". Turn left to soften highs, right to remove bass. Centre or double-click turns filtering off.");
     }
     if (address.target == AutomationTarget::pan)
     {
@@ -214,12 +213,9 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
         auto sample = [&](int slot, int lane, AutomationTarget target)
         {
             auto& s = view.sliders[(size_t) slot]; s.lane = lane; s.target = target;
-            const auto* clip = lane >= 0 && target != AutomationTarget::cutoff ? engine.controlClip(lane) : nullptr;
-            s.owner = lane < 0 ? juce::String("Master") : clip ? "Segment " + juce::String((int) (clip - engine.project.clips.data()) + 1)
-                + " / " + clip->media->libraryTitle() + " / lane " + juce::String(lane + 1) : "Mixer lane " + juce::String(lane + 1);
-            s.value = engine.automationValue({lane, target, {}, {}, clip ? clip->id : juce::String()},
-                clip ? engine.liveClipTime(clip->id, engine.position) : engine.position.load());
-            s.enabled = available && (target == AutomationTarget::cutoff ? !engine.project.automationLocked({lane, target}) : (!clip || !engine.project.clipTransitionLocked(clip->id)));
+            s.owner = lane < 0 ? juce::String("Master") : "Mixer lane " + juce::String(lane + 1);
+            s.value = engine.automationValue({lane, target}, engine.position.load());
+            s.enabled = available && !engine.project.automationLocked({lane, target});
         };
         for (int i = 0; i < 8; ++i)
         {

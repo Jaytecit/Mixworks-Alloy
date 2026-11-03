@@ -1,5 +1,25 @@
 # Whole-project coverage and boundary map
 
+1 November ua01: discovery registries refreshed against current source, adding
+ear/retry tools, original-file streaming, clarity UI and visual runtime/planning.
+MW-V01–V03 extend the rule catalog to97. [Current cases](inventory/current-cases.csv)
+is the current acceptance ledger; historic counts below remain dated. See the
+[execution checkpoint](UA01-CHECKPOINT-20261101.md) for source findings and limits.
+Visuals now form an explicit subsystem: VisualScenes/VisualArrangement/SceneLane,
+Python worker/compositor/presenter and image/transition persistence. Its new journey
+is music → project image → complete automatic/manual scene schedule → handovers →
+preview/output → save/reopen → late-scene pixels, under V01–V03/D01/U01/U05.
+OriginalAudio belongs to audio; ear/retry review belongs to analysis. Generated
+control rows are lexical discovery sites, not a count of distinct user commands.
+
+25 October ra09: AUD-D14/D15 repair stale seek lifecycle completion and progress-window dismissal.95 lifecycle/error plus87 performance/replay/export/parser checks pass on the staged candidate. Original red89/9 includes7 application failures and2 corrected fixture errors. Evidence: `.local/ra09/`; broad engine regression, physical testing and whole-rule acceptance remain open.
+
+25 October ra08: mode, capture-exclusion and seek controls add 107 focused checks on the staged candidate. AUD-D11/D12/D13 repair blocked/current-mode side effects, stale eligibility choices, malformed seek input, late Cancel and changed-mode completion. Red 107/10, initial fixture crash and intermediate 107/1 fixture failure retained. Evidence: `.local/ra08/`; full gate and whole-rule acceptance remain open.
+
+25 October ra07: AUD-D10 repairs stale take-export targets across chooser and deferred-tempo completion.75 focused checks pass on the newly staged candidate, including five capture exclusions and event Remove/Undo. Original red60/7 and intermediate75/1 fixture failure retained. Case evidence: `.local/ra07/`; no full gate or whole-rule PASS.
+
+25 October ra06: the named catalog now has23 suites, separating split-only finite-echo coverage from ordinary ownership. Complete invocation flags are reviewed/allowlisted.29 focused checks and31 harness tests pass; no revised full gate or whole-rule PASS. Case evidence and remaining conditional partitions: `.local/ra06/`. Application/launcher unchanged.
+
 The authoritative item list is [inventory/files.csv](inventory/files.csv), generated from tracked plus nonignored untracked files in this repository, never the parent REA repository. Each row records purpose, release relationship, dependencies/consumers, rule IDs, method and exclusion rationale. Headers, `.inc`, build patch inputs, native tests compiled into the app, Python/PowerShell, JSON fixtures, licences, reference/design assets and documentation are included. A row means **accounted for**, not source-line-reviewed or verified.
 
 Inventory generation rejects unclassified new items. Hashes detect changed bytes outside the framework; framework files are explicitly unhashed to avoid self-reference. CMake registration is independently checked by `scripts/check-project.py`. Vendor/ignored/generated treatment is in DEPENDENCIES. README/STATUS identify discovered baseline and contradictions. No first-party item is excluded from audit coverage.

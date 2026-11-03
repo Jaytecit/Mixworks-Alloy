@@ -1,6 +1,6 @@
 # Alloy release audit — canonical index
 
-Created 24 October 2026. **Framework creation only; Alloy has not passed this audit.**
+Created 24 October 2026. **Audit execution has started; Alloy has not passed this audit.** See [STATUS](STATUS.md) for the current run, repairs and continuation. The discovery baseline below remains historical.
 
 Source baseline: commit `28cad136131856a01e62ad86b6a1e0c245232ba0`, project `0.55.64`, analysis revision **11**, session format **41**, focused retry revision **3**. This folder supersedes no historical evidence; it is the canonical index for future release audits. Read [STATUS](STATUS.md) before execution.
 

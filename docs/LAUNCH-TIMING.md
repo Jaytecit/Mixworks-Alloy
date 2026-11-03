@@ -10,6 +10,6 @@ The pause executes on the audio sample clock and leaves the cursor at the stoppe
 
 Seeking, immediate pause/Stop, changing the grid/timing or audio clock, exclusive audition/export, or unavailable programme content cancels a pending pause with a reason. Cancelled or missed actions do not roll forward or execute later. Session reopen restores saved choices silently, with playback stopped and no pending queue. No automatic device configuration, MIDI remapping or transport start occurs.
 
-This shared launch clock covers scheduled programme pause and target-only playing hotcue queues. Live loops, private preparation and discrete performance-event replay remain subsequent work. Physical controller, audio-device and musical listening acceptance remain separate from native verification.
+This shared launch clock covers scheduled programme pause and target-only playing hotcue queues. Private preparation/launch and discrete performance-event replay were added in 0.55.64; general live-loop capture/release remains future work. See [the implemented mode contract](ARRANGE-RECORD-PERFORM-PLAN.md). Physical controller, audio-device and musical listening acceptance remain separate from native verification.
 
 See [live desk](LIVE-DESK.md), [Performance plan](PERFORMANCE-MODE-PLAN.md), [testing](TESTING.md) and [handover](../HANDOVER.md).

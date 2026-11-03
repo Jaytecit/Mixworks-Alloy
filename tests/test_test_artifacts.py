@@ -56,6 +56,23 @@ class ArtifactTests(unittest.TestCase):
             finish_run(self.run, owner)
         self.assertEqual((self.run / 'source.wav').read_bytes(), b'keep')
 
+    def test_generated_audio_backups_removed_without_touching_evidence_or_links(self):
+        owner = begin_run(self.run, self.root)
+        backups = ('cancelled.wav.bak', 'render.wav(2).bak', 'decoded.pcm.bak', 'render.WAV.BAK')
+        for name in backups:
+            (self.run / name).write_bytes(b'generated')
+        evidence = self.run / 'render.wav.bak.json'; evidence.write_bytes(b'keep report')
+        outside = self.root / 'original.wav.bak'; outside.write_bytes(b'original')
+        os.link(outside, self.run / 'linked.wav.bak')
+        result = finish_run(self.run, owner)
+        self.assertEqual(result['files'], len(backups))
+        self.assertEqual(result['bytes'], len(backups) * len(b'generated'))
+        self.assertFalse(result['errors'])
+        self.assertTrue(all(not (self.run / name).exists() for name in backups))
+        self.assertEqual(evidence.read_bytes(), b'keep report')
+        self.assertEqual(outside.read_bytes(), b'original')
+        self.assertTrue((self.run / 'linked.wav.bak').exists())
+
     def test_hard_link_keeps_original_and_link(self):
         owner = begin_run(self.run, self.root)
         original = self.root / 'original.wav'; original.write_bytes(b'original')

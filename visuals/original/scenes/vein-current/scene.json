@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "key": "original/vein-current",
+  "title": "Vein Current",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original state equations and shading by Mixworks; retained technique study, no reference code or assets copied.",
+  "family": "advected-flow",
+  "variant": 7,
+  "study": "vein_melter",
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous",
+      "label": "Surface light"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "speed",
+      "label": "Flow rate"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.82,
+      "type": "continuous",
+      "label": "Image colour"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.42,
+      "type": "continuous",
+      "label": "Vortex scale"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous",
+      "label": "Refraction"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.55,
+      "type": "continuous",
+      "label": "Relief"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.234,
+      "type": "continuous",
+      "label": "Surface palette"
+    },
+    "symmetry": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 7
+    },
+    "orbit": {
+      "min": 0,
+      "max": 1,
+      "default": 0.74,
+      "type": "continuous"
+    },
+    "focusX": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "focusY": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "colourR": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourG": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourB": {
+      "min": 0,
+      "max": 1,
+      "default": 0.78,
+      "type": "colour",
+      "group": "tint"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "pulse",
+      "label": "Attack response"
+    },
+    "mode": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "choice",
+      "steps": 4
+    },
+    "mirror": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "toggle",
+      "steps": 2
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous"
+    },
+    "imageRotation": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "imageIndex": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "counter"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous",
+      "label": "Image feeding"
+    }
+  },
+  "passSchema": 2,
+  "passes": [
+    {
+      "id": "flow",
+      "shader": "flow.glsl",
+      "size": [
+        384,
+        216
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "velocity-pigment-relief-v1",
+      "history": true,
+      "inputs": [
+        {
+          "pass": "flow",
+          "frame": "previous"
+        }
+      ]
+    },
+    {
+      "id": "transport",
+      "shader": "transport.glsl",
+      "size": [
+        384,
+        216
+      ],
+      "format": "rgba32f",
+      "state": true,
+      "semantic": "advected-material-uv-v1",
+      "history": true,
+      "inputs": [
+        {
+          "pass": "flow",
+          "frame": "current"
+        },
+        {
+          "pass": "transport",
+          "frame": "previous"
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "inputs": [
+        {
+          "pass": "flow",
+          "frame": "current"
+        },
+        {
+          "pass": "transport",
+          "frame": "current"
+        }
+      ]
+    }
+  ],
+  "motionProfile": "Persistent local flow between attacks; no beat-clock reversal",
+  "audioMapping": {
+    "bass": "Maintains vortex force; attacks inject momentum",
+    "mid": "Image-edge circulation and lower drag",
+    "treble": "Attacks add fine relief-driven curl"
+  },
+  "mediaRole": "flow-seed-refraction-colour",
+  "stateContract": {
+    "owner": "scene clip/revision/generation",
+    "transfer": "compatible semantic copy or explicit incoming adapter; no raw cross-semantic blend",
+    "reset": "seek/revision/generation",
+    "tickHz": 60
+  }
+}

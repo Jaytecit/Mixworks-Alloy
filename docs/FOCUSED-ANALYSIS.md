@@ -21,9 +21,11 @@ of the same source are analysed once.
 Batch processing runs in the background with progress and Stop. It requires
 stopped playback and no pending timeline/tempo preparation or export. Completed
 results survive cancellation; incomplete work is not published. The completion
-message distinguishes improved, unchanged, skipped and failed sources. A better
+message names remaining tracks that need review; the progress panel reports each
+finished track's result. A better
 evidence score is not proof of a correct musical answer. Uncertain tracks still
-need review. Hover a library cell to see the last focused outcome.
+need review. Open **Source corrections → Retry failures** to reach them directly;
+the last track result stays visible there. See [retry review](UI-MESSAGES-AND-RETRY-REVIEW.md).
 
 ## Best guesses and retry revision 3 (0.55.64)
 
@@ -34,8 +36,8 @@ choices remain authoritative. Silence or a lone pitch can still lack a useful
 key estimate. Compatible existing analysis remains intact; explicitly analysing
 or retrying a selected source adds new candidates. Older completed focused
 retries may run once again under revision 3. An unchanged accepted estimate can
-still gain a tentative candidate; the completion counts describe accepted
-estimates, not confidence in the musical result.
+still gain a tentative candidate; per-track results describe accepted estimate
+changes, while the failure count identifies sources still needing review.
 
 ## Secondary method
 

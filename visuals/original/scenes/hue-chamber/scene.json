@@ -1,0 +1,462 @@
+{
+  "schema": 1,
+  "key": "original/hue-chamber",
+  "title": "Hue Chamber",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Owned shader recipe. Reference study is inspiration, not a port or parity claim.",
+  "family": "image-optics",
+  "variant": 1,
+  "study": "hue_review",
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "speed"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.42,
+      "type": "continuous"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.29,
+      "type": "continuous"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.55,
+      "type": "continuous"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.069,
+      "type": "continuous"
+    },
+    "symmetry": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 7
+    },
+    "orbit": {
+      "min": 0,
+      "max": 1,
+      "default": 0.38,
+      "type": "continuous"
+    },
+    "focusX": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "focusY": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "colourR": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourG": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourB": {
+      "min": 0,
+      "max": 1,
+      "default": 0.68,
+      "type": "colour",
+      "group": "tint"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "pulse"
+    },
+    "mode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.3333,
+      "type": "choice",
+      "steps": 4
+    },
+    "mirror": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "toggle",
+      "steps": 2
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous"
+    },
+    "imageRotation": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "imageIndex": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "counter"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous"
+    },
+    "bassDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Bass response",
+      "type": "continuous"
+    },
+    "midDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "label": "Mid response",
+      "type": "continuous"
+    },
+    "trebleDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Treble response",
+      "type": "continuous"
+    },
+    "momentum": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Release momentum",
+      "type": "continuous"
+    },
+    "materialMotion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "label": "Image movement",
+      "type": "continuous"
+    },
+    "materialMode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "label": "Image method",
+      "type": "choice",
+      "steps": 4
+    },
+    "viewPattern": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "label": "View method",
+      "type": "choice",
+      "steps": 5
+    },
+    "finishGlow": {
+      "min": 0,
+      "max": 1,
+      "default": 0.2,
+      "label": "Soft highlight glow",
+      "type": "continuous"
+    }
+  },
+  "passSchema": 1,
+  "passes": [
+    {
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba16f",
+      "id": "light"
+    },
+    {
+      "inputs": [
+        "light"
+      ],
+      "shader": "bloom-x.glsl",
+      "scale": 0.25,
+      "format": "rgba16f",
+      "id": "bloomx"
+    },
+    {
+      "inputs": [
+        "bloomx"
+      ],
+      "shader": "bloom-y.glsl",
+      "scale": 0.25,
+      "format": "rgba16f",
+      "id": "bloomy"
+    },
+    {
+      "inputs": [
+        "light",
+        "bloomy"
+      ],
+      "shader": "finish.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "id": "finish"
+    }
+  ],
+  "motionProfile": "Independent accumulated band attacks; movement persists after release; no global beat reversal",
+  "audioMapping": {
+    "bass": "Accumulated attack travel and local structural accents",
+    "mid": "Independent retained material/structure turns",
+    "treble": "Fine nested articulation and local ridge light"
+  },
+  "mediaRole": "independently animated nested material charts carried by image-optics",
+  "refinementRevision": "retained-20261103-v1",
+  "presets": [
+    {
+      "id": "signature",
+      "title": "Signature",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.42,
+        "warp": 0.29,
+        "detail": 0.55,
+        "hue": 0.069,
+        "symmetry": 0.0,
+        "orbit": 0.38,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.3333,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2
+      }
+    },
+    {
+      "id": "silk",
+      "title": "Silk drift",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.42,
+        "warp": 0.29,
+        "detail": 0.55,
+        "hue": 0.069,
+        "symmetry": 0.0,
+        "orbit": 0.38,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.3333,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.38,
+        "midDrive": 0.48,
+        "trebleDrive": 0.35,
+        "momentum": 0.9,
+        "materialMotion": 0.4,
+        "materialMode": 0.3333333333333333,
+        "viewPattern": 0.0,
+        "finishGlow": 0.24
+      }
+    },
+    {
+      "id": "percussive",
+      "title": "Percussive",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.42,
+        "warp": 0.29,
+        "detail": 0.55,
+        "hue": 0.069,
+        "symmetry": 0.0,
+        "orbit": 0.38,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.3333,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.9,
+        "midDrive": 0.8,
+        "trebleDrive": 0.75,
+        "momentum": 0.3,
+        "materialMotion": 0.7,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.32
+      }
+    },
+    {
+      "id": "faceted",
+      "title": "Faceted motion",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.42,
+        "warp": 0.29,
+        "detail": 0.55,
+        "hue": 0.069,
+        "symmetry": 0.0,
+        "orbit": 0.38,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.3333,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.7,
+        "midDrive": 0.8,
+        "trebleDrive": 0.65,
+        "momentum": 0.65,
+        "materialMotion": 0.65,
+        "materialMode": 0.6666666666666666,
+        "viewPattern": 0.0,
+        "finishGlow": 0.18
+      }
+    },
+    {
+      "id": "ribbons",
+      "title": "Woven images",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.42,
+        "warp": 0.29,
+        "detail": 0.55,
+        "hue": 0.069,
+        "symmetry": 0.0,
+        "orbit": 0.38,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.3333,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.65,
+        "midDrive": 0.7,
+        "trebleDrive": 0.8,
+        "momentum": 0.8,
+        "materialMotion": 0.8,
+        "materialMode": 1.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.27
+      }
+    },
+    {
+      "id": "prismatic",
+      "title": "Prismatic",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.42,
+        "warp": 0.29,
+        "detail": 0.55,
+        "hue": 0.069,
+        "symmetry": 0.0,
+        "orbit": 0.38,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.3333,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.8,
+        "midDrive": 0.65,
+        "trebleDrive": 0.9,
+        "momentum": 0.6,
+        "materialMotion": 0.55,
+        "materialMode": 0.3333333333333333,
+        "viewPattern": 0.75,
+        "finishGlow": 0.38
+      }
+    }
+  ],
+  "sharedLookVersion": 1
+}

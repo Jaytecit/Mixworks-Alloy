@@ -127,6 +127,7 @@ WavExportResult Engine::writeWav(const juce::File& file, WavExportOptions option
         position = result.plan.arrangementStart + offset / result.plan.sampleRate;
         if (replayTake) { renderTake(takeBuffer,frames,position); mixBuffer.makeCopyOf(takeBuffer,true); }
         else render(mixBuffer, frames, position, midi);
+        if (!sourceAudioReady()) return fail("An original music file changed or could not be read. The destination was kept.");
         if (latencyBlocked) { const auto issue = pluginLatencyError(); return fail(issue.isNotEmpty() ? issue : "Plugin latency changed during export. The destination was kept."); }
         for (int channel = 0; channel < 2; ++channel) for (int frame = 0; frame < frames; ++frame)
             if (!std::isfinite(mixBuffer.getSample(channel, frame))) return fail("Rendered audio contains non-finite samples. The destination was kept.");

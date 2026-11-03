@@ -78,9 +78,13 @@ void Workstation::choosePlaylistExport(bool text)
         if (!safe || safe->busy || files.getResult() == juce::File()) return;
         auto destination = files.getResult();
         if (!destination.hasFileExtension(text ? "txt" : "m3u;m3u8")) destination = destination.withFileExtension(text ? "txt" : "m3u8");
-        const auto error = safe->engine.exportPlaylist(destination, text ? PlaylistExport::text : PlaylistExport::m3u);
-        if (error.isNotEmpty()) safe->fail(error);
-        else safe->setStatus("Exported " + destination.getFullPathName() + (text ? " / mix times and labels" : " / original sources only; mix edits stay in your session"));
+        safe->confirmChangedDestination(files.getResult(), destination, [safe, destination, text](bool confirmed)
+        {
+            if (!safe || !confirmed || safe->busy) return;
+            const auto error = safe->engine.exportPlaylist(destination, text ? PlaylistExport::text : PlaylistExport::m3u);
+            if (error.isNotEmpty()) safe->fail(error);
+            else safe->setStatus("Exported " + destination.getFullPathName() + (text ? " / mix times and labels" : " / original sources only; mix edits stay in your session"));
+        });
     });
 }
 }

@@ -112,9 +112,9 @@ void Workstation::initialiseEditing()
     editingSelect.setTooltip("Select a placed segment by source and lane. Selection keeps the playhead, sound and Undo unchanged.");
     editingCut.setTooltip("Cut the selected segment into the internal clipboard. Other segments keep their positions; Undo restores it. Original source audio is kept.");
     editingCopy.setTooltip("Copy the selected segment, its automation and effects into the internal clipboard. Paste at the playhead on the selected lane.");
-    editingPaste.setTooltip("Paste a new segment at the playhead on the selected lane. Snap applies. Source audio is shared; effects get independent ownership. Existing segments keep their positions.");
-    editingRipple.setTooltip("Delete this unpaired segment and its time range across all lanes. All later segments, complete linked pairs, session automation, tempo and labels move left together. Overlaps, crossing pairs and protected transitions reject the whole edit. One Undo restores the mix; source audio is kept.");
-    editingCloseGap.setTooltip("Close the empty time before this segment, from the latest earlier segment end across all lanes (or mix start). Move all later segments and complete linked pairs together, including session automation, tempo and labels. Overlaps and protected transitions reject the whole edit. One Undo restores it.");
+    editingPaste.setTooltip("Paste at the playhead on this lane. Existing segments stay in place, and the new copy has separate effects.");
+    editingRipple.setTooltip("Delete this segment and close its time across all lanes. Later audio, automation and markers move left; Undo restores the edit.");
+    editingCloseGap.setTooltip("Remove the empty gap before this segment across all lanes. Later audio, automation and markers move left; Undo restores the edit.");
     editingSelect.onClick = [this]
     {
         if (busy || engine.exporting) return;
@@ -137,12 +137,26 @@ void Workstation::initialiseEditing()
     editingCloseGap.onClick = [this] { performTimelineAction(TimelineAction::closeGap, engine.position, engine.selectedTrack); };
     editingSelect.setButtonText("Select..."); editingCut.setButtonText("Cut"); editingCopy.setButtonText("Copy");
     editingPaste.setButtonText("Paste"); editingRipple.setButtonText("Ripple delete"); editingCloseGap.setButtonText("Close gap");
-    editingRange.setButtonText("Range"); editingRangeTime.setButtonText("Exact...");
+    editingRange.setButtonText("Select audio"); editingRangeTime.setButtonText("Exact range...");
     editingAll.setButtonText("All"); editingClear.setButtonText("Clear");
     initialiseAutomationEditor();
     for (auto* control : std::initializer_list<juce::Component*> {&editingRange, &editingRangeTime, &editingAll, &editingClear, &editingRangeSize, &editingSelectionInfo}) editingBody.addAndMakeVisible(control);
-    editingRange.setTooltip("Drag on selected segment waveforms to select an audio range without seeking. Ctrl-click selects several segments with Range tool off. Shift-drag still slips audio when Range tool is off; Alt bypasses Snap.");
-    editingRange.onClick = [this] { timeline.rangeDragAnchor.reset(); setStatus(editingRange.getToggleState() ? "Range tool on." : "Range tool off."); };
+    editingRange.setTooltip("Drag across a waveform to highlight audio. Free drag ignores global Snap. Drag a track header to move it. Shift-drag also selects audio.");
+    editingRange.onClick = [this] { timeline.rangeDragAnchor.reset(); refreshEditSelection(); };
+    for (auto* control : std::initializer_list<juce::Component*> {&editingAudioPage, &editingSettingsPage, &editingAutomationPage, &editingMove, &editingSplit, &editingDelete, &editingMore, &editingHint}) editingBody.addAndMakeVisible(control);
+    editingAudioPage.onClick = [this] { showEditingPage(0); };
+    editingSettingsPage.onClick = [this] { showEditingPage(1); refresh(); };
+    editingAutomationPage.onClick = [this] { showEditingPage(2); };
+    editingMove.onClick = [this] { editingRange.setToggleState(false, juce::dontSendNotification); timeline.rangeDragAnchor.reset(); refreshEditSelection(); };
+    editingMove.setTooltip("Drag tracks to move them. Ctrl-click selects several tracks; Shift-drag highlights audio. Global Snap controls track movement.");
+    editingSplit.onClick = [this] { splitClip(); };
+    editingDelete.onClick = [this] { performTimelineAction(TimelineAction::remove, engine.position, engine.selectedTrack); };
+    editingDelete.setTooltip("Delete the highlighted audio, leaving a gap. Other audio stays in place. Undo restores the edit.");
+    editingMore.onClick = [this] { showEditingMore(); };
+    editingHint.setFont(juce::FontOptions(12));
+    editingHint.setColour(juce::Label::textColourId, colour::text);
+    clipSliders[5].setSliderStyle(juce::Slider::LinearHorizontal);
+    clipSliders[5].setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 22);
     editingRangeTime.onClick = [this] { editRangeTime(); };
     for (auto* control : {&editingRepeat, &editingCrop, &editingReplace}) editingBody.addAndMakeVisible(control);
     editingReplace.onClick = [this] { performTimelineAction(TimelineAction::replaceSelection, engine.position, engine.selectedTrack); };
@@ -150,80 +164,124 @@ void Workstation::initialiseEditing()
     editingRepeat.onClick = [this] { performTimelineAction(TimelineAction::repeatSelection, engine.position, engine.selectedTrack); };
     editingCrop.onClick = [this] { performTimelineAction(TimelineAction::cropSelection, engine.position, engine.selectedTrack); };
     editingRepeat.setTooltip("Preview and add copies after the selected range or segments. Empty destination required; clipboard stays unchanged. One Undo restores the mix.");
-    editingCrop.setTooltip("Keep only the chosen range on selected segments, leaving other segments and timeline positions unchanged. Partial linked transitions refuse. One Undo restores the mix.");
+    editingCrop.setTooltip("Keep only the selected audio range. Other audio stays in place; Undo restores the mix.");
     editingRangeTime.setTooltip("Select an exact audio interval using project start/end seconds. Selection applies only to the selected segments, without seeking, editing audio or adding Undo.");
     editingAll.onClick = [this] { selectAllSegments(); };
     editingAll.setTooltip("Select every placed segment as a group without changing the mix or playhead. Copy/Cut/Delete affect the selected scope. Ctrl+A does the same on the timeline.");
     editingClear.onClick = [this] { clearEditSelection(); refresh(); };
     editingClear.setTooltip("Clear the transient audio range or segment group without changing audio, transport or Undo. Escape also clears selection; during a range drag it restores the preceding selection.");
     editingBody.addAndMakeVisible(editingUnlink);
-    editingUnlink.setTooltip("Unlink selected whole segments so waveform drags move them independently. Keeps audible boundaries, fades and automation. Ctrl-click pieces to move them together; Undo restores links.");
+    editingUnlink.setTooltip("Let selected segments move independently when dragged. Undo restores their links.");
     editingUnlink.onClick = [this] { performTimelineAction(TimelineAction::unlinkSelection, engine.position, engine.selectedTrack); };
-    editingRangeSize.addItemList({"Drag range", "1 beat", "1 bar", "8 bars", "16 bars", "32 bars"}, 1);
+    editingRangeSize.addItem("Free drag", 1);
+    editingRangeSize.addItem("Snap drag to beats", 7);
+    editingRangeSize.addSeparator();
+    editingRangeSize.addItemList({"Select 1 beat", "Select 1 bar", "Select 8 bars", "Select 16 bars", "Select 32 bars"}, 2);
     editingRangeSize.setSelectedId(1, juce::dontSendNotification);
-    editingRangeSize.setTooltip("Range tool: drag a range, or click a waveform for a fixed musical length in constant-tempo 4/4. Exact range uses project seconds.");
+    editingRangeSize.setTooltip("Free drag selects any length without snapping. Beat snap affects only selection. Musical presets select a fixed length with one click.");
+    editingRangeSize.onChange = [this] { timeline.rangeDragAnchor.reset(); refreshEditSelection(); };
     editingSelectionInfo.setFont(juce::FontOptions(11));
     editingSelectionInfo.setAccessible(true);
+}
+void Workstation::showEditingPage(int page)
+{
+    editingPage = juce::jlimit(0, 2, page);
+    timeline.rangeDragAnchor.reset();
+    editingRange.setToggleState(editingPage == 0, juce::dontSendNotification);
+    if (editingPage == 0) { selectedAutomationTarget = -1; timeline.selectAutomationPoint({}, -1); }
+    if (editingPage == 1) clearEditSelection(); // Settings explicitly address the active track piece.
+    editingViewport.setViewPosition(0, 0);
+    layoutEditing(); refreshEditSelection(); timeline.repaint();
+}
+void Workstation::showEditingMore()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader("Selection");
+    menu.addItem(1, "Choose track...", editingSelect.isEnabled());
+    menu.addItem(2, "Select all tracks", editingAll.isEnabled());
+    menu.addSectionHeader("Selected audio");
+    menu.addItem(3, "Repeat...", editingRepeat.isEnabled());
+    menu.addItem(4, "Keep only selected range", editingCrop.isEnabled());
+    menu.addItem(5, "Replace with clipboard...", editingReplace.isEnabled());
+    menu.addItem(6, "Unlink tracks for independent movement", editingUnlink.isEnabled());
+    menu.addSectionHeader("Close time across ALL lanes");
+    menu.addItem(7, "Delete track and close its time", editingRipple.isEnabled());
+    menu.addItem(8, "Close empty gap before track", editingCloseGap.isEnabled());
+    // Disabled commands and selection can change while a native menu is open.
+    const auto selection = editSelection; const auto id = selectedClip;
+    const auto before = juce::JSON::toString(projectToJson(engine.project));
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&editingMore),
+        [safe = juce::Component::SafePointer<Workstation>(this), selection, id, before](int result)
+    {
+        if (!safe || !result || safe->busy || safe->engine.exporting) return;
+        if (safe->selectedClip != id || safe->editSelection.clips != selection.clips || safe->editSelection.range != selection.range
+            || before != juce::JSON::toString(projectToJson(safe->engine.project)))
+        { safe->setStatus("Selection changed. Open More edits again."); return; }
+        juce::TextButton* commands[] {&safe->editingSelect, &safe->editingAll, &safe->editingRepeat, &safe->editingCrop,
+            &safe->editingReplace, &safe->editingUnlink, &safe->editingRipple, &safe->editingCloseGap};
+        if (result > 0 && result <= 8 && commands[result - 1]->isEnabled()) commands[result - 1]->onClick();
+    });
 }
 void Workstation::layoutEditing()
 {
     if (editingViewport.getViewedComponent() == nullptr) return;
+    const int requiredHeight = editingPage == 2 ? 168 : 142;
     const int bar = editingViewport.getScrollBarThickness();
-    const bool wide = editingViewport.getWidth() >= 1000;
-    const int requiredHeight = wide ? 280 : 364;
-    const bool vertical = editingViewport.getHeight() < requiredHeight;
-    const int width = std::max(600, editingViewport.getWidth() - (vertical ? bar : 0));
-    const bool horizontal = width > editingViewport.getWidth();
-    editingBody.setSize(width, std::max(requiredHeight, editingViewport.getHeight() - (horizontal ? bar : 0)));
-    auto area = editingBody.getLocalBounds().reduced(8, 4);
-    auto automation = wide ? area.removeFromLeft(area.getWidth() * 40 / 100).withTrimmedRight(12) : area.removeFromTop(108);
-    auto row = automation.removeFromTop(18);
-    automationHeading.setBounds(row.removeFromLeft(110)); automationState.setBounds(row);
-    auto targets = automation.removeFromTop(wide ? 52 : 26);
-    if (wide) { automationOwner.setBounds(targets.removeFromTop(26).reduced(0, 1)); automationParameter.setBounds(targets.reduced(0, 1)); }
-    else { automationOwner.setBounds(targets.removeFromLeft(targets.getWidth() / 2).withTrimmedRight(4)); automationParameter.setBounds(targets); }
-    auto buttons = [](juce::Rectangle<int> row, std::initializer_list<juce::Component*> controls)
+    const int width = std::max(560, editingViewport.getWidth() - (editingViewport.getHeight() < requiredHeight ? bar : 0));
+    editingBody.setSize(width, std::max(requiredHeight, editingViewport.getHeight() - (width > editingViewport.getWidth() ? bar : 0)));
+    // Only controls for the current task are exposed. Hidden legacy buttons back the More edits menu.
+    for (auto* child : editingBody.getChildren()) child->setVisible(false);
+    auto put = [](juce::Component& c, juce::Rectangle<int> r) { c.setVisible(true); c.setBounds(r); };
+    auto buttons = [&](juce::Rectangle<int> row, std::initializer_list<juce::Component*> controls)
     {
         const int cell = row.getWidth() / (int) controls.size();
-        for (auto* c : controls) c->setBounds(row.removeFromLeft(cell).reduced(2, 1));
+        for (auto* c : controls) put(*c, row.removeFromLeft(cell).reduced(2, 1));
     };
-    row = automation.removeFromTop(26);
-    if (wide)
+    auto area = editingBody.getLocalBounds().reduced(8, 4);
+    auto row = area.removeFromTop(28);
+    put(editingAudioPage, row.removeFromLeft(110).reduced(1));
+    put(editingSettingsPage, row.removeFromLeft(130).reduced(1));
+    put(editingAutomationPage, row.removeFromLeft(120).reduced(1));
+    editingAudioPage.setToggleState(editingPage == 0, juce::dontSendNotification);
+    editingSettingsPage.setToggleState(editingPage == 1, juce::dontSendNotification);
+    editingAutomationPage.setToggleState(editingPage == 2, juce::dontSendNotification);
+    if (editingPage == 0)
     {
-        buttons(row, {&automationAdd, &automationPrevious, &automationNext});
-        row = automation.removeFromTop(26); automationNode.setBounds(row.removeFromRight(86));
-        buttons(row, {&automationEdit, &automationDelete});
-        buttons(automation.removeFromTop(26), {&automationRead, &automationMode});
-        buttons(automation.removeFromTop(26), {&automationArm, &automationPairedFilter});
+        put(editingMore, row.removeFromRight(104).reduced(1));
+        put(editingSelectionInfo, area.removeFromTop(22));
+        row = area.removeFromTop(30);
+        put(editingMove, row.removeFromLeft(100).reduced(2, 1));
+        put(editingRange, row.removeFromLeft(115).reduced(2, 1));
+        put(editingRangeSize, row.removeFromLeft(std::min(170, row.getWidth() - 156)).reduced(2, 1));
+        put(editingClear, row.removeFromRight(56).reduced(2, 1));
+        put(editingRangeTime, row.reduced(2, 1));
+        row = area.removeFromTop(32);
+        put(editingSplit, row.removeFromLeft(135).reduced(2, 1));
+        buttons(row, {&editingCut, &editingCopy, &editingPaste, &editingDelete});
+        put(editingHint, area.removeFromTop(22));
+    }
+    else if (editingPage == 1)
+    {
+        put(reverseButton, row.removeFromLeft(90).reduced(2, 1));
+        put(loopButton, row.removeFromLeft(90).reduced(2, 1));
+        put(clipDetail, area.removeFromTop(22));
+        auto fields = area.removeFromTop(88);
+        const int cell = fields.getWidth() / 3;
+        for (int i = 0; i < 6; ++i)
+        {
+            auto field = juce::Rectangle<int>(fields.getX() + (i % 3) * cell, fields.getY() + (i / 3) * 44, cell - 8, 44);
+            put(clipLabels[(size_t) i], field.removeFromTop(16)); put(clipSliders[(size_t) i], field);
+        }
     }
     else
     {
-        automationNode.setBounds(row.removeFromRight(110));
+        row = area.removeFromTop(22); put(automationHeading, row.removeFromLeft(110)); put(automationState, row);
+        row = area.removeFromTop(28); put(automationOwner, row.removeFromLeft(row.getWidth() / 2).withTrimmedRight(4)); put(automationParameter, row);
+        row = area.removeFromTop(28); put(automationNode, row.removeFromRight(110));
         buttons(row, {&automationAdd, &automationPrevious, &automationNext, &automationEdit, &automationDelete});
-        buttons(automation.removeFromTop(26), {&automationRead, &automationMode, &automationArm, &automationPairedFilter});
+        buttons(area.removeFromTop(28), {&automationRead, &automationMode, &automationArm, &automationPairedFilter});
+        put(editingHint, area.removeFromTop(22));
     }
-    row = area.removeFromTop(20);
-    inspectorLabel.setBounds(row.removeFromLeft(130)); clipDetail.setBounds(row);
-    row = area.removeFromTop(28);
-    editingSelectionInfo.setBounds(row.removeFromRight(std::max(90, row.getWidth() - 400)));
-    buttons(row, {&editingRange, &editingRangeSize, &editingRangeTime, &editingAll, &editingClear});
-    buttons(area.removeFromTop(28), {&editingSelect, &editingCut, &editingCopy, &editingPaste, &editingRipple, &editingCloseGap});
-    buttons(area.removeFromTop(28), {&editingRepeat, &editingCrop, &editingReplace, &editingUnlink});
-    area.removeFromTop(4);
-    auto fields = area.removeFromTop(96);
-    auto gain = fields.removeFromRight(86); fields.removeFromRight(6);
-    clipLabels[5].setBounds(gain.removeFromTop(16));
-    clipLabels[5].setJustificationType(juce::Justification::centred);
-    clipSliders[5].setBounds(gain);
-    const int cell = fields.getWidth() / 3;
-    for (int i = 0; i < 5; ++i)
-    {
-        auto field = juce::Rectangle<int>(fields.getX() + (i % 3) * cell, fields.getY() + (i / 3) * 48, cell - 8, 44);
-        clipLabels[(size_t) i].setBounds(field.removeFromTop(16)); clipSliders[(size_t) i].setBounds(field);
-    }
-    auto actions = area.removeFromTop(28);
-    reverseButton.setBounds(actions.removeFromLeft(90).reduced(2, 1));
-    loopButton.setBounds(actions.removeFromLeft(90).reduced(2, 1));
 }
 void Workstation::trackEditingWorkspace()
 {
@@ -274,7 +332,7 @@ void Workstation::showToolPage(int page)
     auto* window = page == 0 ? performanceWindow.get() : page == 1 ? transitionWindow.get() : editingWindow.get();
     if (window) { window->setMinimised(false); window->toFront(true); return; }
     if (consoleCollapsed) layout.timeline = {};
-    consoleCollapsed = false; toolPage = page; trackEditingWorkspace(); resized(); repaint();
+    consoleCollapsed = false; toolPage = page; if (page == 2) showEditingPage(editingPage); trackEditingWorkspace(); resized(); repaint();
 }
 void Workstation::detachToolPanel(int page, bool detached)
 {

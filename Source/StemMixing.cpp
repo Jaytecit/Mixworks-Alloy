@@ -47,8 +47,7 @@ juce::Result loadStemAssets(const Media& parent, const juce::File& directory, co
         || (parent.analysisSource.sha256.isNotEmpty() && parent.analysisSource.sha256 != doc["sourceSha256"].toString())
         || (double) doc["sampleRate"] != parent.sampleRate || doc["sourceSha256"].toString() != hash(parent.file))
         return fail("Source identity or sample clock changed.");
-    if (!parent.hasPlayback() || parent.frames() <= 0 || parent.channels() < 1 || parent.channels() > 2
-        || (int64_t) parent.frames() * parent.channels() * 4 > 512LL * 1024 * 1024) return fail("Unsupported source dimensions.");
+    if (!parent.hasPlayback() || parent.frames() <= 0 || parent.channels() < 1 || parent.channels() > 2) return fail("Unsupported source dimensions.");
     auto assets = std::make_shared<StemAssets>(); assets->directory = directory; assets->manifestHash = identity;
     juce::AudioFormatManager formats; formats.registerBasicFormats();
     for (int s = 0; s < stemCount; ++s)
@@ -59,26 +58,31 @@ juce::Result loadStemAssets(const Media& parent, const juce::File& directory, co
         std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(path));
         if (!reader || reader->lengthInSamples != parent.frames() || reader->sampleRate != parent.sampleRate || (int) reader->numChannels != parent.channels()) return fail("Stem dimensions do not match the original.");
         auto media = std::make_shared<Media>(); media->file = path; media->name = stemNames[s]; media->sampleRate = parent.sampleRate;
-        media->samples.setSize(parent.channels(), parent.frames());
-        if (!reader->read(&media->samples, 0, parent.frames(), 0, true, true)) return fail("Cannot read stem audio.");
+        media->analysisSource = {digest, path.getSize(), parent.sampleRate, parent.frames(), parent.channels()};
+        media->original = std::make_shared<OriginalAudio>(path, parent.sampleRate, parent.channels(), parent.frames());
         const int bucket = std::max(1, media->frames() / 4000);
-        for (int first = 0; first < media->frames(); first += bucket)
+        juce::AudioBuffer<float> chunk(media->channels(), std::min(32768, bucket));
+        for (int64_t first = 0; first < media->frames(); first += bucket)
         {
-            float peak = 0;
-            for (int ch = 0; ch < media->channels(); ++ch) for (int i = first; i < std::min(first + bucket, media->frames()); ++i)
+            float peak = 0; double power = 0; int samples = 0;
+            const auto end = std::min<int64_t>(media->frames(), first + bucket);
+            for (auto position = first; position < end; position += chunk.getNumSamples())
             {
-                const float value = media->samples.getSample(ch, i);
-                if (!std::isfinite(value)) return fail("Invalid stem sample.");
-                peak = std::max(peak, std::abs(value));
+                const int count = (int)std::min<int64_t>(chunk.getNumSamples(), end - position);
+                if (!reader->read(&chunk, 0, count, position, true, media->channels() > 1)) return fail("Cannot read stem audio.");
+                for (int ch = 0; ch < media->channels(); ++ch) for (int i = 0; i < count; ++i)
+                {
+                    const float value = chunk.getSample(ch, i);
+                    if (!std::isfinite(value)) return fail("Non-finite stem audio.");
+                    peak = std::max(peak, std::abs(value)); power += value * (double)value; ++samples;
+                }
             }
-            media->peaks.push_back(peak);
+            media->peaks.push_back(peak); media->waveformRms.push_back(float(std::sqrt(power / std::max(1, samples))));
         }
+        if (path.getSize() != media->original->fileBytes || path.getLastModificationTime().toMilliseconds() != media->original->modified)
+            return fail("Stem changed while loading.");
         media->analysis = parent.analysis; media->manualBpm = parent.manualBpm; media->manualBeatOrigin = parent.manualBeatOrigin; media->manualKey = parent.manualKey;
-        media->analysisSource = {digest, path.getSize(), media->sampleRate, media->frames(), media->channels()};
-        media->prepareWaveformBody();
-        juce::String error; media->cache = AudioCache::create(media->samples, error);
-        if (!media->cache) return fail("Cannot map stem playback: " + error);
-        media->samples.setSize(0, 0); assets->sources[(size_t) s] = std::move(media);
+        assets->sources[(size_t) s] = std::move(media);
     }
     if (identity != hash(file) || doc["sourceSha256"].toString() != hash(parent.file)) return fail("Source changed while loading.");
     output = std::move(assets); return juce::Result::ok();

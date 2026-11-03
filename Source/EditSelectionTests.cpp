@@ -12,6 +12,142 @@
 
 namespace mixworks
 {
+void runEditingWorkflowTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
+{
+    auto window = std::make_unique<Workstation>(false); auto& w = *window;
+    w.setSize(1440, 900); w.engine.sampleRate = 8000;
+    auto media = std::make_shared<Media>(); media->name = "Editing preview"; media->sampleRate = 8000;
+    media->manualBpm = 120; media->manualBeatOrigin = 0;
+    media->samples.setSize(1, 160000); media->peaks.resize(4000);
+    for (int i = 0; i < media->frames(); ++i)
+        media->samples.setSample(0, i, .45f * (float) std::sin(i * .07) * (.35f + .65f * std::abs(std::sin(i * .0007f))));
+    for (int i = 0; i < 4000; ++i) media->peaks[(size_t)i] = media->samples.getMagnitude(0, i * 40, 40);
+    media->prepareWaveformBody();
+    media->file = report.getSiblingFile("editing-source.wav");
+    {
+        juce::WavAudioFormat format; auto stream = media->file.createOutputStream();
+        std::unique_ptr<juce::AudioFormatWriter> writer(format.createWriterFor(stream.get(), 8000, 1, 24, {}, 0));
+        if (writer) stream.release();
+        check(writer && writer->writeFromAudioSampleBuffer(media->samples, 0, media->frames()), "write isolated source for reopen and export renderer");
+    }
+    Project base; base.followTrackTempo = false; base.masterDb = 0; base.snap = true; base.transitionLinksKnown = true;
+    for (int lane = 0; lane < 2; ++lane) { Clip c; c.media = media; c.length = 20; c.track = lane; base.clips.push_back(c); }
+    base.updateLaneHandles();
+    auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p)); };
+    const auto initial = json(base);
+    auto reset = [&]
+    {
+        w.clearEditSelection(); w.engine.project = base; w.engine.playing = false;
+        w.selectedClip = base.clips[0].id; w.engine.selectedTrack = 0; w.engine.position = 3.125;
+        w.undoHistory.clear(); w.redoHistory.clear(); w.editClipboard.reset(); w.clipClipboard.reset();
+        w.showToolPage(2); w.showEditingPage(0); w.refresh(); w.dirty = false;
+        w.timeline.pixelsPerSecond = 20; w.timeline.updateSize();
+    };
+    const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+    auto event = [&](juce::Point<float> point, int mods = 0, bool drag = false)
+    { return juce::MouseEvent(mouse, point, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | mods), 1, 0, 0, 0, 0,
+        &w.timeline, &w.timeline, juce::Time::getCurrentTime(), point, juce::Time::getCurrentTime(), 1, drag); };
+    auto select = [&](float a, float b, int mods = 0)
+    {
+        const auto bounds = w.timeline.clipBounds(w.engine.project.clips[0]);
+        w.timeline.mouseDown(event({a, bounds.getY() + 30}, mods));
+        w.timeline.mouseDrag(event({b, bounds.getY() + 30}, mods, true));
+        w.timeline.mouseUp(event({b, bounds.getY() + 30}, mods));
+    };
+    reset(); select(43, 127);
+    check(w.editSelection.range && std::abs(w.editSelection.range->getStart() - 2.15) < 1.e-6
+        && std::abs(w.editSelection.range->getEnd() - 6.35) < 1.e-6 && base.snap,
+        "native free drag selects arbitrary sub-beat endpoints while global Snap stays enabled");
+    check(json(w.engine.project) == initial && w.engine.position == 3.125 && w.undoHistory.empty() && !w.dirty,
+        "selection changes no audio, playhead, saved document or Undo");
+    check(w.editingSelectionInfo.getText().contains("Lane 1") && w.editingSelectionInfo.getText().contains("2.150")
+        && w.editingSelectionInfo.getText().contains("4.200"), "selection summary identifies lane, bounds and duration");
+    for (auto size : {juce::Point<int>(1250, 800), juce::Point<int>(1440, 900)})
+    {
+        w.setSize(size.x, size.y); w.resized(); w.editingViewport.setViewPosition(0, 0);
+        const auto visible = w.editingViewport.getViewArea();
+        check(visible.contains(w.editingRange.getBounds()) && visible.contains(w.editingCopy.getBounds())
+            && visible.contains(w.editingSplit.getBounds()) && !w.automationOwner.isVisible() && !w.clipSliders[0].isVisible(),
+            "primary audio workflow visible without scrolling at " + juce::String(size.x) + "x" + juce::String(size.y));
+        bool mixerVisible = true;
+        for (const auto& strip : w.strips)
+        {
+            int toggles = 0, levels = 0;
+            for (auto* child : strip->getChildren()) if (child->isVisible() && strip->getLocalBounds().contains(child->getBounds()))
+            {
+                if (auto* b = dynamic_cast<juce::TextButton*>(child); b && (b->getButtonText() == "M" || b->getButtonText() == "S")) ++toggles;
+                if (auto* level = dynamic_cast<juce::Slider*>(child); level && level->getSliderStyle() == juce::Slider::LinearHorizontal) ++levels;
+            }
+            mixerVisible = mixerVisible && toggles == 2 && levels == 1;
+        }
+        check(mixerVisible, "editing dock retains all four lanes' Mute, Solo and level at " + juce::String(size.x));
+        juce::PNGImageFormat png; auto output = report.getSiblingFile("audio-edits-" + juce::String(size.x) + ".png").createOutputStream();
+        check(output && png.writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()), *output), "capture native highlighted audio workflow");
+    }
+    w.editingCopy.onClick();
+    check(w.editClipboard && w.editClipboard->clips.size() == 1 && std::abs(w.editClipboard->clips[0].offset - 2.15) < 1.e-6
+        && std::abs(w.editClipboard->clips[0].length - 4.2) < 1.e-6 && json(w.engine.project) == initial,
+        "Copy button takes exactly the freely selected source passage");
+    w.engine.position = 22; w.engine.selectedTrack = 2; w.refresh(); w.editingPaste.onClick();
+    const auto* pasted = w.currentClip();
+    check(pasted && pasted->track == 2 && pasted->start == 22 && std::abs(pasted->offset - 2.15) < 1.e-6
+        && std::abs(pasted->length - 4.2) < 1.e-6 && w.undoHistory.size() == 1,
+        "Paste button inserts passage on destination lane at playhead with one Undo");
+    const auto pastedJson = json(w.engine.project);
+    check(w.engine.project.clips[0].start == 0 && w.engine.project.clips[1].length == 20, "paste leaves both original tracks unchanged");
+    const auto savedFile = report.getSiblingFile("editing-workflow.mixworks");
+    check(savedFile.replaceWithText(pastedJson) && parseProject(savedFile.loadFileAsString()).error.isEmpty(), "actual saved arrangement reopens with selected source offset");
+    auto rendered = std::make_unique<Engine>(); rendered->project = w.engine.project; rendered->sampleRate = 8000;
+    juce::AudioBuffer<float> audio(2, 160); juce::MidiBuffer midi; rendered->render(audio, 160, 22.5, midi);
+    auto oracle = std::make_unique<Engine>(); oracle->project = base; oracle->sampleRate = 8000; oracle->project.tracks[0].solo = true;
+    juce::AudioBuffer<float> expected(2, 160); oracle->render(expected, 160, 2.65, midi);
+    float error = 0; for (int ch = 0; ch < 2; ++ch) for (int n = 0; n < 160; ++n)
+        error = std::max(error, std::abs(audio.getSample(ch, n) - expected.getSample(ch, n)));
+    check(audio.getMagnitude(0, 160) > .01f && error < 1.e-5f,
+        "production export PCM matches independently rendered original passage at the selected source offset");
+    w.undo(false); check(json(w.engine.project) == initial, "Undo restores exact pre-paste document");
+    w.undo(true); check(json(w.engine.project) == pastedJson, "Redo restores exact pasted document");
+    reset(); select(127, 43); check(w.editSelection.range && std::abs(w.editSelection.range->getLength() - 4.2) < 1.e-6, "right-to-left free selection works");
+    w.editingCut.onClick();
+    check(w.engine.project.clips.size() == 3 && w.editClipboard && w.undoHistory.size() == 1, "Cut removes just the passage, leaves a gap and copies it");
+    w.undo(false); check(json(w.engine.project) == initial, "Cut Undo restores exact original audio");
+    reset(); select(43, 127); w.editingDelete.onClick();
+    check(w.engine.project.clips.size() == 3 && w.engine.project.clips[2].track == 1 && w.undoHistory.size() == 1,
+        "Delete button removes highlighted audio without closing time on another lane");
+    w.undo(false); check(json(w.engine.project) == initial, "Delete Undo restores exact original audio");
+    reset(); w.editingMove.onClick(); select(43, 127, juce::ModifierKeys::shiftModifier);
+    check(w.editSelection.range && std::abs(w.editSelection.range->getLength() - 4.2) < 1.e-6, "Shift-drag temporarily selects audio while Move tracks stays active");
+    w.editingClear.onClick(); w.editingRangeSize.setSelectedId(7, juce::dontSendNotification);
+    select(43, 127, juce::ModifierKeys::shiftModifier);
+    check(w.editSelection.range && w.editSelection.range->getStart() == 2 && w.editSelection.range->getEnd() == 6.5, "explicit beat selection snaps both dragged endpoints");
+    w.editingRangeSize.setSelectedId(1, juce::dontSendNotification); w.editingClear.onClick();
+    w.editingRange.setToggleState(true, juce::dontSendNotification);
+    const auto cutBounds = w.timeline.clipBounds(w.engine.project.clips[0]);
+    w.timeline.mouseDown(event({142.5f, cutBounds.getY() + 30})); w.timeline.mouseUp(event({142.5f, cutBounds.getY() + 30}));
+    check(w.engine.position == 7.125 && !w.editSelection.range && json(w.engine.project) == initial && w.undoHistory.empty(),
+        "single waveform click places exact cut cursor without a document edit");
+    w.refresh(); w.editingSplit.onClick();
+    check(w.engine.project.clips.size() == 3 && w.engine.project.clips[0].end() == 7.125 && w.currentClip()->start == 7.125
+        && w.undoHistory.size() == 1, "Split at playhead creates two exact contiguous pieces without global Snap changing the cut");
+    w.undo(false); check(json(w.engine.project) == initial, "Split Undo restores original track");
+    reset(); const auto bounds = w.timeline.clipBounds(w.engine.project.clips[0]);
+    w.timeline.mouseDown(event({40, bounds.getY() + 8}));
+    check(!w.timeline.rangeDragAnchor && w.timeline.clipDrag.has_value(), "track header remains a movement handle in Select audio mode");
+    w.timeline.mouseUp(event({40, bounds.getY() + 8}));
+    w.showEditingPage(1); w.refresh();
+    check(w.clipSliders[3].isVisible() && !w.editingCopy.isVisible() && !w.automationOwner.isVisible()
+        && !w.editingRange.getToggleState(), "Fades and timing exposes per-track settings without active range interception");
+    w.timeline.selectAutomationCurve({0, AutomationTarget::volume}); w.refresh();
+    check(w.editingPage == 2 && w.automationOwner.isVisible() && !w.editingCopy.isVisible() && !w.editingRange.getToggleState(),
+        "choosing a curve opens Automation and releases waveform range capture");
+    for (int page : {1, 2})
+    {
+        w.showEditingPage(page); w.editingViewport.setViewPosition(0, 0);
+        juce::PNGImageFormat png; auto output = report.getSiblingFile("editing-page-" + juce::String(page) + ".png").createOutputStream();
+        check(output && png.writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()), *output), "capture contextual editing page");
+    }
+}
+
 void runIndependentTimelineTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
     auto ui = std::make_unique<Workstation>(false); auto& w = *ui;

@@ -5,16 +5,19 @@
 #include <optional>
 #include <vector>
 #include <map>
+#include <set>
 #include "AnalysisCache.h"
 #include "PcmCache.h"
+#include "OriginalAudio.h"
 #include "LibraryAssets.h"
 #include "Mastering.h"
 #include "PerformanceTake.h"
+#include "VisualScenes.h"
 
 namespace mixworks
 {
 constexpr int trackCount = 4;
-constexpr int projectVersion = 41;
+constexpr int projectVersion = 47;
 enum class LaunchTiming { immediate, nextBeat, nextBar, nextPhrase };
 struct LaunchSettings
 {
@@ -61,6 +64,7 @@ constexpr int64_t maxDecodedBytes = 1024LL * 1024 * 1024;
 struct WaveformRange
 {
     float peak = 0, rms = 0;
+    bool ready = true; // False: sample detail is loading; do not substitute coarse peaks.
 };
 struct Media
 {
@@ -69,6 +73,7 @@ struct Media
     LibraryAssets assets;
     juce::AudioBuffer<float> samples;
     std::unique_ptr<AudioCache> cache;
+    std::shared_ptr<OriginalAudio> original;
     double sampleRate = 44100.0;
     MusicAnalysis analysis;
     int analysisVersion = analysisRevision;
@@ -100,7 +105,8 @@ struct Media
     MusicalEnergyProfile energy; // Independently versioned, source-owned activity evidence.
     SourceSections sectionTemplate; // Reusable source defaults; explicit placed snapshots retain priority.
     juce::String sectionTemplateError;
-    bool hasPlayback() const { return cache != nullptr || samples.getNumSamples() > 0; }
+    bool hasPlayback() const { return original != nullptr || cache != nullptr || samples.getNumSamples() > 0; }
+    float sample(int ch, int frame) const { return original ? original->sample(ch, frame) : channelData(ch)[frame]; }
     int frames() const { return cache ? cache->frames : samples.getNumSamples() > 0 ? samples.getNumSamples() : analysisSource.frames; }
     int channels() const { return cache ? cache->channels : samples.getNumSamples() > 0 ? samples.getNumChannels() : analysisSource.channels; }
     const float* channelData(int ch) const { return cache ? cache->channelData(ch) : samples.getReadPointer(ch); }
@@ -128,6 +134,7 @@ struct PreparedClipGeometry
     double offset = 0, length = 0, rate = 1, loopSpan = 0, loopPhase = 0, sourceBpm = 0;
     bool reversed = false;
     std::vector<TempoPoint> tempo; // Only the tempo segments intersecting this clip, in local seconds.
+    double pitchSemitones = 0;
     bool operator==(const PreparedClipGeometry& other) const;
 };
 struct PreparedAudio
@@ -143,6 +150,7 @@ struct PreparedAudio
     // Mapped PCM is paged by the OS; only owned sample allocations consume our RAM budget.
     int64_t residentBytes() const { return (int64_t) samples.getNumSamples() * samples.getNumChannels() * sizeof(float); }
     double rate = 1;
+    double pitchSemitones = 0;
     bool clipLocal = false;
     PreparedClipGeometry geometry;
 };
@@ -187,6 +195,12 @@ struct AutomationCurve
     int setPoint(double time, float value);
     void movePoint(int index, double time, float value);
     AutomationCurve sliced(double begin, double end, float fallback) const;
+};
+struct LaneHandleState
+{
+    // Empty seed geometry means authored: deleted handles must not regenerate.
+    std::map<juce::String, std::vector<double>> seeds;
+    std::set<double> generatedPoints;
 };
 struct PluginAutomation
 {
@@ -342,6 +356,7 @@ struct Clip
     std::optional<double> fadeInAnchor, fadeOutAnchor;
     float gainDb = 0;
     double rate = 1; // Source seconds per timeline second; key is preserved by prepared PCM.
+    double pitchSemitones = 0; // Segment-only transposition; never changes source key, tempo or placement.
     bool beatmatched = false;
     bool reversed = false;
     double loopSpan = 0, loopPhase = 0; // Source seconds; zero span means a single pass.
@@ -385,6 +400,8 @@ std::optional<std::array<double, 4>> initialiseTransition(Clip&, Clip&, double o
 struct Project
 {
     std::vector<PerformanceTake> performanceTakes;
+    std::vector<VisualSceneClip> visualScenes;
+    juce::String visualImage; // One caller-selected local image shared by scene shaders.
     enum class TransitionEdit { moveWindow, resizeStart, resizeEnd, moveOutgoing, moveIncoming };
     struct TransitionLink
     {
@@ -423,6 +440,7 @@ struct Project
     bool transitionLinksKnown = true;
     std::vector<LabelMarker> labels; // Absolute session seconds, ordered by time; identity survives moves.
     std::array<TrackSettings, trackCount> tracks;
+    std::map<int, LaneHandleState> laneHandles; // Only lane builtins need provenance; keep Clip/AutomationCurve compact.
     std::map<juce::String, TrackSettings> effectControls; // Value-owned for Undo; processors are shared by split pieces.
     TrackSettings& effectSettings(const Clip&);
     const TrackSettings& effectSettings(const Clip&) const;
@@ -497,6 +515,7 @@ struct Project
     double automationTime(const AutomationAddress&, double sessionTime) const;
     double automationSessionTime(const AutomationAddress&, double curveTime) const;
     void automationEdited(const AutomationAddress&, AutomationEdit = AutomationEdit::change, double removedSourceTime = 0);
+    void updateLaneHandles(); // Message-thread commit, never the audio callback.
     AutomationCurve* curve(const AutomationAddress&);
     const AutomationCurve* curve(const AutomationAddress&) const;
     float manualValue(const AutomationAddress&) const;

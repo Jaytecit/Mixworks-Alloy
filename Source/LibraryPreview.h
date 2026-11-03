@@ -22,6 +22,7 @@ public:
     Output selectedOutput() const { return output; }
     void restoreOutputPreference(Output value) { stop(); output=std::move(value); }
     bool active(const juce::String& id) const { return id.isNotEmpty() && id == source; }
+    bool idle() const { return source.isEmpty(); }
     bool configured() const { return output.name.isNotEmpty(); }
     void setPrivateOutput(bool enabled) { stop(); privateOutput = enabled; }
     bool usesPrivateOutput() const { return privateOutput; }

@@ -1,0 +1,10 @@
+# Version0.55.65 local activation - ua17
+
+Jay requested: "Please activate, update the v number in the app UI and update the launcher".
+CMake project version changed0.55.64 ->0.55.65. WorkspaceUI and application metadata use the same generated version. No other production input changed from ua16; the one test addition captures the complete Workstation for actual version inspection. Exact byte comparisons against ua16 source/archive passed.
+
+One successful serial single-worker below-normal build, no numeric RAM guard. Fresh `--waveform-alignment-only` through verification.run_checks passes37/0, including the new full UI capture. ProductVersion/FileVersion and inspected visible branding read0.55.65. The six waveform captures exactly match the previously inspected ua16 images. Retention removed one generated WAV/3,840,104 bytes without errors. No detector, physical device, stress/performance or full gate.
+
+Activated `out/releases/0.55.65-912922ef0ceb/Mixworks.exe`, SHA256 `912922ef0ceba0ea841a7769d933ba0de55ceb9364ca6186501b3f5dbec11a65`. All35 payload files hash-verified, dependencies match pinned assets, runtime source identities checked. Model/runtime use canonical hardlinks. The exact source archive, binary, reports, capture hashes, build log and staging receipt survive in `.local/ua17/`; the release also carries the scoped receipt. Previous launcher bytes retained in `.local/ua17/Launch-before-final.cmd` and `out/Launch.cmd.bak.ua17`.
+
+Desktop shortcut -> Mixworks.cmd -> out/Launch.cmd -> new immutable executable verified. This follows the established user-authorised focused local-preview path, without modifying normal release-gate rules or claiming complete regressions. ua16's112/0 is retained as earlier exact-candidate evidence; only37 checks ran on this versioned executable. Native UI capture is technical evidence, not physical/listening/novice acceptance. Full readiness remains open. No normal application launch/restart, scan, source cleanup or user-data changes.

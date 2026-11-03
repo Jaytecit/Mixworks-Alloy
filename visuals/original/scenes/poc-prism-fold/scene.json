@@ -1,0 +1,235 @@
+{
+  "schema": 1,
+  "key": "original/poc-prism-fold",
+  "title": "Prism Fold \u2014 proof",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original two-level ribbon composition; no reference implementation copied.",
+  "family": "nested-proof",
+  "variant": 2,
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "speed",
+      "label": "Particle speed"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "continuous",
+      "label": "Source refresh"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.48,
+      "type": "continuous",
+      "label": "Fragment size"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous",
+      "label": "Dispersion"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.55,
+      "type": "continuous",
+      "label": "Fragment edges"
+    },
+    "mode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 4,
+      "label": "Behaviour A / B / C / D"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "pulse",
+      "label": "Attack force"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "type": "continuous",
+      "label": "Momentum"
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous",
+      "label": "Source framing"
+    },
+    "imageRotation": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous",
+      "label": "Source rotation"
+    },
+    "focusX": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "focusY": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "xy",
+      "group": "focus"
+    },
+    "colourR": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourG": {
+      "min": 0,
+      "max": 1,
+      "default": 0.82,
+      "type": "colour",
+      "group": "tint"
+    },
+    "colourB": {
+      "min": 0,
+      "max": 1,
+      "default": 0.78,
+      "type": "colour",
+      "group": "tint"
+    }
+  },
+  "passSchema": 2,
+  "passes": [
+    {
+      "id": "capture",
+      "shader": "capture.glsl",
+      "size": [
+        512,
+        288
+      ],
+      "format": "rgba16f",
+      "state": true,
+      "semantic": "premultiplied-source-atlas-v1",
+      "history": true,
+      "inputs": [
+        {
+          "frame": "previous",
+          "pass": "capture"
+        }
+      ]
+    },
+    {
+      "id": "parents",
+      "shader": "parents.glsl",
+      "size": [
+        8,
+        3
+      ],
+      "format": "rgba32f",
+      "filter": "nearest",
+      "state": true,
+      "semantic": "poc-parent-transform-velocity-phase-v1",
+      "history": true,
+      "inputs": [
+        {
+          "frame": "previous",
+          "pass": "parents"
+        }
+      ]
+    },
+    {
+      "id": "children",
+      "shader": "children.glsl",
+      "size": [
+        48,
+        8
+      ],
+      "format": "rgba32f",
+      "filter": "nearest",
+      "state": true,
+      "semantic": "poc-child-local-position-velocity-v1",
+      "history": true,
+      "inputs": [
+        {
+          "frame": "previous",
+          "pass": "children"
+        },
+        {
+          "frame": "current",
+          "pass": "parents"
+        }
+      ]
+    },
+    {
+      "id": "ribbons",
+      "shader": "ribbon.glsl",
+      "vertex": "ribbon-vertex.glsl",
+      "instances": 384,
+      "scale": 1,
+      "format": "rgba16f",
+      "inputs": [
+        {
+          "frame": "current",
+          "pass": "parents"
+        },
+        {
+          "frame": "current",
+          "pass": "children"
+        },
+        {
+          "frame": "current",
+          "pass": "capture"
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "inputs": [
+        {
+          "pass": "ribbons",
+          "frame": "current"
+        }
+      ]
+    }
+  ],
+  "motionProfile": "Shallow-perspective hinged panels carry image tiles; local articulation continues between attacks.",
+  "audioMapping": {
+    "energy": "Parent travel and tension",
+    "bassHit": "Travelling child disturbance with damped release",
+    "mid": "Child travel phase",
+    "treble": "Small phase acceleration"
+  },
+  "mediaRole": "captured-image-material-inside-parented-ribbons",
+  "stateContract": {
+    "owner": "scene clip/revision/generation",
+    "transfer": "compatible semantic copy or explicit incoming adapter; no raw cross-semantic blend",
+    "reset": "seek/revision/generation",
+    "tickHz": 60
+  },
+  "hierarchyMode": 2
+}

@@ -9,7 +9,9 @@
 
 namespace mixworks
 {
+void runOriginalPlaybackTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
+void runPerformanceTakeParserTests(const std::function<void(bool,const juce::String&)>&);
 void runTargetedAnalysisTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runImportScanTests(const std::function<void(bool,const juce::String&)>&, const juce::File&, const juce::StringArray&);
 void runSectionFlagTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
@@ -23,6 +25,11 @@ void runLatencyTests(const std::function<void(bool, const juce::String&)>&, cons
 void runExportTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
 void runMasteringTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runGridAlignmentTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runEarToolTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runVisualArrangementTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runUiClarityTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runFocusedRealProbe(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
 void runNeuralFailureTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
@@ -33,10 +40,12 @@ void runWindowTests(const std::function<void(bool, const juce::String&)>&, const
 void runAlloyTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runAudioUiTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runEditingWorkflowTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runAutoArrangementTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runLibraryPreviewTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runZoomHandleTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runTransitionSwapTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runTransitionNavigationTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runAutoArrangementCatalogueProbe(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&, const juce::String&, int, int);
 void runTimelineEditingSuite(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runPresetNodeTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
@@ -60,12 +69,19 @@ void runAutomationTests(const std::function<void(bool, const juce::String&)>&, c
 void runLiveAutomationTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
 void runUnlinkTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runIndependentTimelineTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runFreshAnalysisProbe(const std::function<void(bool,const juce::String&)>&,const juce::File&,const juce::StringArray&);
 int runSelfTests(const juce::String& commandLine)
 {
     auto args = juce::StringArray::fromTokens(commandLine, true); args.removeEmptyStrings();
     juce::File output = juce::File::getCurrentWorkingDirectory().getChildFile(".local/test-results.txt");
     auto outputIndex = args.indexOf("--report"); if (outputIndex >= 0 && outputIndex + 1 < args.size()) output = juce::File(args[outputIndex + 1].unquoted());
     output.getParentDirectory().createDirectory(); juce::String report; int failures = 0, tests = 0;
+    // A retired focused selector must never fall through to the broad suite.
+    if (args.contains("--visual-scenes-only") || args.contains("--visual-coverage-only"))
+    {
+        output.replaceWithText("Unsupported retired visual test selector. Use --original-visual-only or --visual-arrangement-only.\n");
+        return 2;
+    }
     const int rootIndex = args.indexOf("--playback-cache-root");
     const auto testRoot = rootIndex >= 0 && rootIndex + 1 < args.size() && juce::File::isAbsolutePath(args[rootIndex + 1].unquoted())
         ? juce::File(args[rootIndex + 1].unquoted()) : output.getParentDirectory().getChildFile("playback-test-cache-" + juce::Uuid().toString());
@@ -74,6 +90,30 @@ int runSelfTests(const juce::String& commandLine)
     analysisStoreRoot(testRoot.getSiblingFile(testRoot.getFileName() + "-analysis"));
     auto check = [&](bool condition, const juce::String& name) { ++tests; if (!condition) ++failures; report += juce::String(condition ? "PASS " : "FAIL ") + name + "\n"; output.replaceWithText(report); };
     auto near = [](double a, double b, double tolerance = 0.0001) { return std::abs(a - b) < tolerance; };
+    if (args.contains("--recovery-only"))
+    {
+        runRecoveryTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--fresh-analysis-only"))
+    {
+        runFreshAnalysisProbe(check,output,args);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures==0 ? 0 : 1;
+    }
+    if (args.contains("--performance-take-ui-only") || args.contains("--private-popup-only") || args.contains("--export-target-ui-only") || args.contains("--save-export-workflow-only") || args.contains("--destination-safety-only") || args.contains("--mode-seek-ui-only") || args.contains("--take-seek-lifecycle-only"))
+    {
+        runPerformanceTakeTests(check,output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures==0 ? 0 : 1;
+    }
+    if (args.contains("--performance-take-parser-only"))
+    {
+        runPerformanceTakeParserTests(check);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures==0 ? 0 : 1;
+    }
     if (args.contains("--performance-take-only") || args.contains("--targeted-analysis-only"))
     {
         if (args.contains("--performance-take-only")) runPerformanceTakeTests(check,output); else runTargetedAnalysisTests(check,output);
@@ -86,7 +126,7 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--grid-attack-only"))
+    if (args.contains("--grid-attack-only") || args.contains("--waveform-alignment-only"))
     {
         runBeatGridTests(check, output, {});
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
@@ -110,9 +150,21 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
+    if (args.contains("--editing-workflow-only"))
+    {
+        runEditingWorkflowTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
     if (args.contains("--edit-selection-only"))
     {
         runEditSelectionTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--live-transition-only") || args.contains("--alignment-guide-only") || args.contains("--lane-automation-only"))
+    {
+        runTransitionNavigationTests(check,output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
@@ -136,7 +188,7 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--stems-only"))
+    if (args.contains("--stems-only") || args.contains("--lane-stem-solo-only"))
     {
         runStemTests(check, output); runStemIntegration(check, output, args);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
@@ -199,6 +251,11 @@ int runSelfTests(const juce::String& commandLine)
         if (args.contains("--long-open-only")) runLongOpenTests(check, output, args); else runLongSessionTests(check, output, args);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
+    if (args.contains("--original-playback-only") || args.contains("--transition-boundary-only"))
+    {
+        runOriginalPlaybackTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
     if (args.contains("--source-streaming-only"))
     {
         const auto at = args.indexOf("--capacity-fixture");
@@ -230,6 +287,31 @@ int runSelfTests(const juce::String& commandLine)
         runRhythmDecoderTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
+    if (args.contains("--visual-arrangement-only"))
+    {
+        runVisualArrangementTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--original-visual-only"))
+    {
+        runOriginalVisualTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--ui-clarity-only"))
+    {
+        runUiClarityTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--ear-tools-only"))
+    {
+        runEarToolTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--grid-alignment-only"))
+    {
+        runGridAlignmentTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
     if (args.contains("--grid-correction-only"))
     {
         runGridCorrectionTests(check, output);
@@ -240,7 +322,7 @@ int runSelfTests(const juce::String& commandLine)
         runNeuralFailureTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--analysis-refresh-only"))
+    if (args.contains("--analysis-refresh-only") || args.contains("--review-sorting-only"))
     {
         runAnalysisRefreshTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
@@ -274,7 +356,7 @@ int runSelfTests(const juce::String& commandLine)
     }
     if (args.contains("--tempo-only"))
     {
-        runTempoTests(check, output); runTempoUiTests(check, output);
+        runTempoTests(check, output); runTempoUiTests(check, output); runEarToolTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
     if (args.contains("--placement-only"))
@@ -319,11 +401,11 @@ int runSelfTests(const juce::String& commandLine)
         Engine reopened; const auto sessionIndex = args.indexOf("--session"), digestIndex = args.indexOf("--expected-pcm");
         const auto error = sessionIndex >= 0 && sessionIndex + 1 < args.size() && juce::File::isAbsolutePath(args[sessionIndex + 1].unquoted())
             ? reopened.restoreProject(juce::File(args[sessionIndex + 1].unquoted()).loadFileAsString()) : juce::String("Missing test session.");
-        check(error.isEmpty() && !reopened.library.empty() && std::all_of(reopened.project.clips.begin(), reopened.project.clips.end(), [](const auto& clip) { return clip.media->decodedFromCache; })
-              && !reopened.project.clips.empty() && std::all_of(reopened.project.clips.begin(), reopened.project.clips.end(), [](const auto& clip) { return clip.prepared && clip.prepared->fromDiskCache; }), "fresh-process reopen uses decoded and prepared caches: " + error);
+        check(error.isEmpty() && !reopened.library.empty() && !reopened.project.clips.empty()
+              && std::all_of(reopened.project.clips.begin(), reopened.project.clips.end(), [](const auto& clip) { return clip.media->original && !clip.media->cache && !clip.prepared; }), "fresh-process reopen streams originals without whole-song copies: " + error);
         juce::AudioBuffer<float> pcm(2, 512); juce::MidiBuffer midi; reopened.render(pcm, 512, 2.1, midi); juce::MemoryOutputStream bytes;
         for (int ch = 0; ch < 2; ++ch) bytes.write(pcm.getReadPointer(ch), 512 * sizeof(float));
-        check(digestIndex >= 0 && digestIndex + 1 < args.size() && juce::SHA256(bytes.getData(), bytes.getDataSize()).toHexString() == args[digestIndex + 1].unquoted(), "fresh-process mapped PCM equals the parent process render");
+        check(digestIndex >= 0 && digestIndex + 1 < args.size() && juce::SHA256(bytes.getData(), bytes.getDataSize()).toHexString() == args[digestIndex + 1].unquoted(), "fresh-process streamed PCM equals the parent process render");
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
     // Each UI suite owns one JUCE dispatch loop. Stopping it is terminal for that
@@ -381,8 +463,8 @@ int runSelfTests(const juce::String& commandLine)
     auto oldId = engine.project.clips[0].id; check(engine.restoreProject("{}").isNotEmpty() && engine.project.clips[0].id == oldId, "failed open preserves active session");
     auto session = output.getSiblingFile("roundtrip.mixworks"); check(engine.saveProject(session).isEmpty(), "save session");
     auto diskLibrary = readMedia(engine.formats, fixture);
-    check(diskLibrary.media && diskLibrary.media->cache && diskLibrary.media->samples.getNumSamples() == 0 && near(diskLibrary.media->duration(), 1)
-          && near(diskLibrary.media->channelData(0)[100], 0.25), "disk-backed library import does not accumulate a full decoded-RAM budget");
+    check(diskLibrary.media && diskLibrary.media->original && !diskLibrary.media->cache && diskLibrary.media->samples.getNumSamples() == 0 && near(diskLibrary.media->duration(), 1)
+          && near(diskLibrary.media->sample(0,100), 0.25), "original-file library import retains no full decoded audio");
     check(engine.restoreProject(session.loadFileAsString()).isEmpty() && engine.project.clips.size() == 1, "session and source-media round trip");
     auto savedMappings = engine.mappings; engine.beginLearn("volume-1"); engine.testMidi(juce::MidiMessage::controllerEvent(1, 71, 64));
     check(engine.mappingSummary().contains("volume-1  <-  CC 71"), "FLkey MIDI learn from actual MIDI message parser");

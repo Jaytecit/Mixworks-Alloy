@@ -20,6 +20,7 @@ struct AutoArrangementOptions
     AutoEnergyPolicy energy = AutoEnergyPolicy::unrestricted;
     juce::String preferredGenre; // Soft preference; empty accepts any tag.
     bool extendExisting = false; // Count/duration describe additional material.
+    bool createVisualScenes = false; // Explicit replacement, after the final music timeline is prepared.
 };
 struct AutoArrangementResult
 {

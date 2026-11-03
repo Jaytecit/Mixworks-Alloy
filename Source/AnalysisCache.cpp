@@ -78,7 +78,6 @@ AnalysisRecordRead parseAnalysisRecord(const juce::var& root, const std::optiona
         || !number(identity["sampleRate"], 1, 1.0e9) || !identity["frames"].isInt() || !number(identity["frames"], 1, 2147483646)
         || !identity["channels"].isInt() || !number(identity["channels"], 1, 2)) return {};
     SourceIdentity source {identity["sha256"].toString(), (int64_t) identity["bytes"], (double) identity["sampleRate"], (int) identity["frames"], (int) identity["channels"]};
-    if ((int64_t) source.frames * source.channels * sizeof(float) > 1024LL * 1024 * 1024) return {};
     if (expected && !(source == *expected)) return {};
     if (!root.isObject() || root["format"].toString() != recordFormat || !root["version"].isInt() || (int) root["version"] != cacheVersion) return {};
     const double duration = source.frames / source.sampleRate;
@@ -95,7 +94,9 @@ AnalysisRecordRead parseAnalysisRecord(const juce::var& root, const std::optiona
         || !number(a["tempoConfidence"], 0, 1) || !number(a["gridErrorMs"], 0, duration * 1000) || !key(a["key"]) || !key(a["alternativeKey"])
         || !number(a["keyConfidence"], 0, 1) || !number(a["tuningCents"], -50.0001, 50.0001) || !number(a["examinedSeconds"], 0, std::min(180.0, duration) + 0.01)
         || !a["variableTempo"].isBool() || !a["beatWindows"].isArray() || a["beatWindows"].size() > maxAnalysisWindows) return refresh();
-    const int bucket = std::max(1, source.frames / 4000), expectedPeaks = (source.frames + bucket - 1) / bucket;
+    // Records hold bounded waveform/analysis facts, never source-sized PCM.
+    const int bucket = std::max(1, source.frames / 4000);
+    const int expectedPeaks = (int)((int64_t(source.frames) + bucket - 1) / bucket);
     auto& result = record.analysis;
     if (a.hasProperty("attackTimingRevision"))
     {
@@ -116,10 +117,12 @@ AnalysisRecordRead parseAnalysisRecord(const juce::var& root, const std::optiona
         if (result.downbeatMethod != "unknown" && result.downbeatMethod != "signal-structure" && result.downbeatMethod != "signal-accent"
             && result.downbeatMethod != "signal-conflict" && result.downbeatMethod != "beat-this-final0") return refresh();
         if (result.downbeatMethod == "signal-conflict" && (double) a["downbeatOrigin"] >= 0) return refresh();
-        if (result.rhythmMethod != "dsp" && result.rhythmMethod != "beat-this-final0" && result.rhythmMethod != "unavailable") return refresh();
+        const bool boundedScan = result.rhythmMethod == "bounded-scan"
+            && int64_t(record.source.frames) * record.source.channels * sizeof(float) > 256LL * 1024 * 1024;
+        if (result.rhythmMethod != "dsp" && result.rhythmMethod != "beat-this-final0" && result.rhythmMethod != "unavailable" && !boundedScan) return refresh();
         // A focused attempt can retain a useful key alongside an unresolved
         // tempo. Supplemental retry evidence makes that partial result durable.
-        if ((result.rhythmIssue.isNotEmpty() || result.rhythmMethod == "unavailable") && !a["retryEvidence"].isObject()) return refresh();
+        if ((result.rhythmIssue.isNotEmpty() || result.rhythmMethod == "unavailable") && !boundedScan && !a["retryEvidence"].isObject()) return refresh();
     }
     result.bpm = (double) a["bpm"]; result.beatOrigin = (double) a["beatOrigin"]; result.tempoConfidence = (double) a["tempoConfidence"]; result.gridErrorMs = (double) a["gridErrorMs"];
     result.downbeatOrigin = (double) a["downbeatOrigin"]; result.downbeatConfidence = (double) a["downbeatConfidence"];

@@ -2,6 +2,13 @@
 
 The [Mixworks Personal Beta Licence](LICENSE) applies only to the Licensor's original material. Third-party rights remain governed by their own terms. **The current local executable is not cleared for public binary distribution.** See [distribution prerequisites](docs/LICENSING.md).
 
+The [2 November commercial assessment](docs/commercial/README.md) records
+additional unresolved provenance: the local preview bundles an extracted
+Synesthesia SSF helper and reads original installed scenes; its compiled
+AUFTAKT research path can load a recovered model that is not bundled. No
+commercial grant for that material is established here. This notice is a factual
+disclosure, not permission or a complete notice/SBOM set for a future package.
+
 - **JUCE 8.0.16-security** — Raw Material Software Limited, pinned commit `ea77444750de45e036e0279bb0291144bf8e3688`. The pinned source's LICENSE.md offers AGPLv3 or the [JUCE agreement](https://juce.com/legal/juce-8-licence/). A restrictive beta needs an appropriate proprietary entitlement; none has been verified here. JUCE bundles further codecs/SDKs with their own notices, which must accompany any eventual package as applicable.
 - **SoundTouch 2.4.0** — Olli Parviainen and contributors, pinned commit `d994965fbbcf0f6ceeed0e72516968130c2912f0`, LGPL-2.1. The current build links it statically. Public distribution must satisfy the [upstream terms](https://www.surina.net/soundtouch/license.html), including replacement/relinking rights and source/object provision as applicable, or use a separately obtained licence. The complete LGPL text is in `licenses/SoundTouch-LGPL-2.1.txt`.
 
@@ -30,3 +37,16 @@ NumPy, Julius, safetensors and other resolved packages retain their own licences
 See [the exact local dependency and model provenance](docs/LICENSING.md) and
 [the workflow](docs/STEM-SEPARATION.md). Before distributing any runtime or model,
 audit its complete actual notices and weight redistribution provenance.
+# Visual scene: Beats in 4D (CC0)
+
+The adapted Beats in 4D shader is by Mårten Rånge, released under CC0 1.0
+Universal. See `licenses/CC0-1.0.txt` and the scene's `PROVENANCE.md`. The function
+identified in its source as having an unknown licence was removed and replaced
+with GLSL's built-in tanh. Controller, media sampling and descriptor integration
+are Alloy implementations. No Synesthesia host helper, script, texture or
+thumbnail is included. Other original scene recipes retain their own notices.
+
+The local visual-python package contains Python 3.12.10, NumPy 2.3.5, Pillow
+12.3.0, PyOpenGL 3.1.10 and glfw 2.10.2. Interpreter and wheel licence files are
+retained within that package beside `runtime-manifest.json`. No PyAV, FFmpeg,
+Duktape, OpenCV or audio-device capture package is needed by this visual runtime.

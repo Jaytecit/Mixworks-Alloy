@@ -18,6 +18,6 @@ Mute monitor uses the same persistent workspace preference as the main master ch
 
 The spectrum shows post-master stereo mean spectral power in dBFS per bin. Independent left/right transforms preserve anti-phase material. A 4096-sample Hann window sets its frequency and time resolution. This is signal analysis, not perceived-loudness measurement or matching. Audio callbacks only copy into a bounded preallocated queue; the UI computes the FFT. Closing/hiding the panel or exporting suspends capture and clears old history. A rate change or queue overflow discards discontinuous history rather than presenting it as one coherent window.
 
-Master settings entered session version 18; versions 1–17 open with bypass defaults. The current session format is 24; keep normal session backups when changing app versions. Recovery captures master settings with the rest of the session. Export includes the configured bounded effect-tail window; see [export controls and limits](EXPORTING.md).
+Master settings entered session version 18; versions 1–17 open with bypass defaults. The current session format is41; keep normal session backups when changing app versions. Recovery captures master settings with the rest of the session. Export includes the configured bounded effect-tail window; see [export controls and limits](EXPORTING.md).
 
 Exact candidate, regression and deployment status live in HANDOVER.md. Native controls, session/WAV round trips and numerical DSP are tested separately from musical listening and physical device checks.

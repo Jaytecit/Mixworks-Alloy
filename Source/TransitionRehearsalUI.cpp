@@ -17,7 +17,7 @@ void Workstation::initialiseTransitionRehearsalUI()
     }
     for (auto* combo : {&rehearsalLeadIn, &rehearsalLeadOut})
     {
-        combo->setTooltip("Shared A/B/C context, clipped to available audio. Zero starts or ends at the frame; short context has fresh effect history and may cut a comparison tail. The session retains this choice.");
+        combo->setTooltip("How much audio to hear before and after each comparison. A short preview may cut off an effect ending.");
         combo->onChange = [this] { if (!refreshing) changeSelectedRehearsalContext(); };
     }
     for (int i = 0; i < 3; ++i)
@@ -28,7 +28,7 @@ void Workstation::initialiseTransitionRehearsalUI()
         store.setButtonText("Store " + letter); audition.setButtonText("Hear " + letter); apply.setButtonText("Apply " + letter);
         audition.getProperties().set("alloyMolten", true);
         store.setTooltip("Replace this slot with the selected frame's current treatment. Save the session to retain it.");
-        audition.setTooltip("Loop a rendered comparison at matched RMS, with the selected before/after context. Session edits remain unchanged.");
+        audition.setTooltip("Loop this comparison at matched listening volume. The mix stays unchanged.");
         apply.setTooltip("Apply this treatment to the existing frame with one Undo. Manual automation, effects and song positions stay in place.");
         store.onClick = [this, i] { storeSelectedAlternative(i); };
         audition.onClick = [this, i]
@@ -42,7 +42,7 @@ void Workstation::initialiseTransitionRehearsalUI()
         apply.onClick = [this, i]
         { const auto* link = engine.project.transitionFor(selectedTransition); if (link && link->alternatives[(size_t) i]) applySelectedStyle(*link->alternatives[(size_t) i]); };
     }
-    prepareRehearsal.setTooltip("Render saved A/B/C alternatives for matched-RMS comparison with the chosen context.");
+    prepareRehearsal.setTooltip("Prepare saved A/B/C blends at matched listening volume.");
     endRehearsal.setTooltip("End comparison playback and restore the previous mix cursor, paused.");
     savedTransitionPresets.setTooltip("Choose a session preset to apply its treatment to the selected frame. One Undo restores the previous treatment.");
     saveTransitionPreset.setTooltip("Name and save the selected transition treatment as a preset in this session.");

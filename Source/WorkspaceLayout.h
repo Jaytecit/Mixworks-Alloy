@@ -34,6 +34,8 @@ struct WorkspaceLayout
     bool forgeEffects = false;
     int forgeMotion = 0; // 0 follows Windows, 1 explicit animation, 2 steady.
     juce::Rectangle<int> brand, menu, windowControls, toolbar, transport, overview, ruler, library, playlist, headers, timeline, tempo, peakPanel, performance, master, detail, status, leftDivider, rightDivider, timelineDivider;
+    static constexpr int visualLaneHeight = 82;
+    juce::Rectangle<int> visuals, visualHeader;
     void update(int width, int height, bool performanceDocked = true, bool editingDocked = false);
     void resizePanel(bool left, int requestedWidth);
     void resizeTimeline(int height);

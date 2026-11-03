@@ -154,6 +154,7 @@ ArrangementInsertion planArrangementInsertion(const Project& input, std::shared_
             if (!sameClock(before, admitted)) return fail("An existing source clock cannot be preserved at this boundary. Finish Beatmatch before inserting.");
         }
         for (auto& label : p.labels) if (label.time >= from) label.time += delta;
+        for (auto& [key, state] : p.laneHandles) { state.generatedPoints.clear(); for (auto& seed : state.seeds) seed.second.clear(); }
         expandCurve(p.masterAutomation, clockFrom, prefixEnd, delta);
         for (auto& settings : p.tracks)
         {
@@ -208,10 +209,11 @@ juce::String prepareArrangementInsertion(ArrangementInsertion& insertion, int64_
     if (insertion.error.isNotEmpty()) return insertion.error;
     auto* clip = insertion.project.clipFor(insertion.inserted); if (!clip) return "The proposed new song is unavailable.";
     const double estimate = clip->length * clip->media->sampleRate * clip->media->channels() * sizeof(float);
-    if (existingResidentBytes < 0 || estimate > maxPreparedBytes - existingResidentBytes) return "The new song exceeds the remaining preparation memory budget.";
+    if (!clip->media->original && (existingResidentBytes < 0 || estimate > maxPreparedBytes - existingResidentBytes)) return "The new song exceeds the remaining preparation memory budget.";
     Project single = insertion.project; single.clips = {*clip}; single.transitionLinks.clear(); single.transitionLinksKnown = true;
     const auto error = prepareSavedClips(single); if (error.isNotEmpty()) return error;
     clip->prepared = single.clips[0].prepared; clip->preparedOffset = single.clips[0].preparedOffset;
+    clip->elasticPlayback = single.clips[0].elasticPlayback; clip->elasticSource = single.clips[0].elasticSource;
     return {};
 }
 }

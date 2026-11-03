@@ -254,7 +254,10 @@ void runMusicTests(const std::function<void(bool, const juce::String&)>& check, 
         check(std::abs(before.sourceTimeAt(splitTime) - (before.offset + splitTime * 120 / 128)) < 1.0e-8, "trim/split uses source time after stretching");
         Engine engine; engine.project = matched.project; engine.library = { first };
         auto saved = juce::JSON::toString(engine.captureProject());
-        check(engine.restoreProject(saved).isEmpty() && engine.project.clips[0].prepared && engine.project.clips[0].media->manualBpm == 128, "beatmatching, key display and manual overrides survive save/reopen");
+        check(engine.restoreProject(saved).isEmpty() && engine.project.clips[0].media->original
+              && engine.project.clips[0].elasticPlayback && !engine.project.clips[0].prepared
+              && engine.project.clips[0].media->manualBpm == 128,
+              "beatmatching and manual overrides survive original-file save/reopen without whole-song preparation");
         auto corrupt = juce::JSON::parse(saved); corrupt["clips"].getArray()->getReference(0).getDynamicObject()->setProperty("rate", -2);
         check(engine.restoreProject(juce::JSON::toString(corrupt)).isNotEmpty(), "malformed stretch rates cannot replace a valid session");
         auto wav = report.getSiblingFile("beatmatched-render.wav");

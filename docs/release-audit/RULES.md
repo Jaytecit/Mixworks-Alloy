@@ -11,6 +11,7 @@ Use [README](README.md) as the canonical index. Durable rules live here and in t
 | [Performance and integrations](rules/PERFORMANCE.md) | automation/MIDI, launch, takes, private preparation, live WAV |
 | [Persistence and stems](rules/DATA.md) | JSON/save/relink/recovery/cache, external stem lifecycle/playback |
 | [Arrangement and export](rules/OUTPUT.md) | intelligent mixing, rehearsals, render/WAV/tracklist validation |
+| [Visual shows](rules/VISUALS.md) | complete scene schedules, image/transition editing, preview/output lifecycle |
 | [Release engineering](rules/RELEASE.md) | trust, dependencies, build/package, capacity, diagnostics/tests/claims |
 
 ## Required fields and shared preconditions

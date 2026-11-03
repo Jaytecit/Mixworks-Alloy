@@ -18,6 +18,6 @@ Source seconds survive trimming, audio slip, tempo mapping, reverse, movement an
 
 EQ, cutoff and pan resets remain under **Cues / resets…**, with their previous command and MIDI profile identities. MIDI Learn can still map those reset actions. Cue edits respect transition locks, preparation, export, rehearsal and active automation recording. Choose Read before changing slots.
 
-Session format34 retains the existing optional slot data; analysis revision11/caches remain compatible. P51 live target cues and queues are implemented; hotcue MIDI, private Performance routing and discrete event replay remain subsequent work. Human screen-reader, controller and listening acceptance remain separate.
+Current session format41 retains cue data; analysis revision11/caches remain. Live target cues/queues, private preparation and performance-event replay are implemented through 0.55.64. Full hotcue MIDI/controller acceptance remains open; see [the current mode contract](ARRANGE-RECORD-PERFORM-PLAN.md). Human screen-reader, controller and listening acceptance remain separate.
 
 See [section flags](SECTION-FLAGS.md), [timeline editing](TIMELINE-EDITING.md), [testing](TESTING.md) and [handover](../HANDOVER.md).

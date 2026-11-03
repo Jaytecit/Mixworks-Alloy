@@ -8,6 +8,6 @@ For a new first song, the existing mix moves later together. Between A and B, on
 
 The new song follows the established mix tempo and keeps its source intro. Its preview explicitly reports a nondestructive tail trim of less than one source bar when needed to preserve bar phase. Existing nonzero join lengths are retained around the new song; a hard-cut boundary can receive the chosen overlap. New local treatments use the current transition default. Other manually edited transitions are retained. An unavailable source range, competing chain, occupied lanes or protected transition rejects the proposal with an explanation. Current transition locks protect absolute arrangement time, so unlock them before insertion.
 
-Ordinary Library add/drop and Cut/Delete keep their existing behavior. Insertion does not globally run Auto Arrange or rewrite source files. It retains session format31 and analysis revision11; no analysis/cache reset is required.
+Ordinary Library add/drop and Cut/Delete keep their existing behavior. Insertion does not globally run Auto Arrange or rewrite source files. The insertion feature originally used session31; current saves use session41 with analysis11; no analysis/cache reset is required.
 
 See [section flags](SECTION-FLAGS.md), [timeline editing](TIMELINE-EDITING.md), [testing](TESTING.md) and [handover](../HANDOVER.md). Musical listening and physical controller acceptance remain separate from native regression checks.

@@ -1,19 +1,17 @@
-# Paired swap drag handles
+# Swap timing and amount controls
 
-Version0.42 adds labelled horizontal handles to both tracks of the selected transition's visible swaps. **V / B / M / H** identify Volume, Bass, Mid and High. Drag either handle left/right to move its whole off/on pair. Both sides retain their gap in mix beats; the frame and song placements stay in place. Existing Snap applies; hold **Alt** for a free move. A changed gesture has one Undo, and a click has none.
+Current guide for 0.55.64. Presets now place ordinary nodes, replacing the procedural model in [the archived swap guide (archived)](MAINTENANCE-20261103.md).
 
-This includes generated **Swap** on all four bands, Bass **Swap fade**, and earlier explicitly paired **Bass swap** source points. Legacy Bass moves all four owned points together, retaining ramp values and unrelated manual data. Generated swaps update their existing continuous position, retaining mode, depth and beat gap. Presets, saved alternatives and session persistence use that same model data. Unrelated manual steps are not paired automatically; use the explicit Pair bass swap command described below.
+## Move the handover
 
-Handles follow **Show curve / Only curve** visibility. Colour and letters distinguish overlapping bands. Locked pairs show subdued handles; unlock both participating tracks and any protected neighbour to move them. A move beyond the frame or across another manual bass point is rejected without adding Undo. If a treatment changes during a drag, release and grab its new handle.
+Select a transition and reveal Volume/Bass/Mid/Treble. A recognizable ordinary swap exposes paired horizontal handles. Drag either side to move the paired handover while keeping its musical gap and song/frame geometry. Snap applies; Alt permits free timing. One changed gesture has one Undo. Ambiguous envelopes do not get guessed handles. Locks, audio/frame bounds, neighbouring ownership and conflicting points still protect edits.
 
-The model owns all swap times and edits. Rendering and handle drawing consume the same source clocks and compiled envelopes, including tempo ramps. Dragging uses the current model so unrelated live controls remain current. Ordinary playback position is retained; editing an active rendered rehearsal invalidates its cached audition through the existing Undo/edit workflow.
+## Change the amount
 
-The exact0.42 bundle passes **1,676 checks across22 suites**, with all160 source/CMake/harness hashes unchanged, zero failures/errors and accepted VerifyOnly/deployment. Focused448 checks include native gestures, legacy/all-band pairs, snapping/free moves, locks, manual conflicts, musical gap retention, source/effect identity, live controls, Undo/Redo, persistence and actual PCM response. Generated/legacy handle and narrow-context captures were inspected. Launcher release **0.42.0-576706fa89e5**, SHA256 `576706fa89e545657cfc4a5c229413e659415dced116d8d355eae91076b366d5`. Physical mouse/controller and listening acceptance remain separate; the running user app was retained.
+Vertical amount handles change supported cut levels at fixed time. Selected captions show percentages; gain/EQ remaining level differs from cut depth. Filter uses its actual normalized/physical value. D/Shift+D cycles available handles; Up/Down changes1 percent, Shift ten. Enter/double-click/RMB opens the exact editor. Delete on an amount does not delete audio.
 
-## Pair an existing bass cut (0.52)
+## Place or pair a swap
 
-Right-click the audio track that should **receive** the complementary bass change, then choose **Pair bass swap**. The command uses that clicked clip's existing transition links and finds the nearest enabled manual bass cut on a linked partner. Distance is measured in mix time from the click to the full-cut node. A full cut is an adjacent 0 dB to -60 dB ramp entirely inside their shared transition/audio span. The receiver gains the opposite -60 dB to 0 dB ramp at the same mix times, converted through its own source clock.
+RMB **Swaps** distinguishes applying Bass/Mid/Treble/Volume shapes from **Pair bass swap**. Placement reveals the proper parameter/lane. Pairing targets the clicked receiver and an existing explicit linked partner; it can use a full cut or supported complementary opening and retain sharp bends. Source-time mapping remains canonical. Unlinked, ambiguous, conflicting or protected targets refuse; ordinary placement does not invent a transition.
 
-The source cut, unrelated nodes, track positions, other treatments and audio preparation remain. Compatible receiving endpoints are reused with their exact identities. Existing conflicting nodes, dormant receiving curves, a different pair, points already owned by neighbours, locks and ambiguous equal-distance cuts reject the operation with an explanation. Unlinked tracks are not assigned guessed partners. Generated Bass treatments must be set to Manual before pairing a manual cut; the command does not replace generated treatments silently.
-
-The pair uses the existing saved bass-swap representation and linked B handles. Drag either handle to move both sides; ordinary curve visibility and locks apply. One successful change has one Undo; repeating the same pair is a no-op. Undo restores the previous receiving curve and unpaired relationship. No new analysis, automatic BPM/downbeat change or data reset occurs.
+Node Add/Delete/time/value/bend operations remain available after preset placement. See [ordinary preset nodes](PRESET-NODES.md) and [transition controls](TRANSITION-PRESETS.md). Native handler/PCM evidence exists across the recorded builds; physical feel/listening acceptance remains open in the [request register](REQUEST-STATUS-20261024.md).

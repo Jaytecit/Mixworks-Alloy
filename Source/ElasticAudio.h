@@ -5,6 +5,7 @@
 
 namespace mixworks
 {
+bool requestOriginalClip(const Clip&, double at, double before, double after);
 // Immutable placement facts. Splits share their original mapping so a cut cannot
 // change the sound. Construction performs no decoding, analysis or stretching.
 struct ElasticSource

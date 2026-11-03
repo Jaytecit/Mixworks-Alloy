@@ -136,7 +136,14 @@ juce::String rememberLibraryCatalogue(const juce::File& file, const juce::Array<
     if (text.getNumBytesAsUTF8() > maxCatalogueBytes) return "The library snapshot exceeds its 128 MiB storage budget; existing data was kept.";
     if (file.existsAsFile() && file.loadFileAsString() == text) return {};
     if (file.getParentDirectory().createDirectory().failed()) return "Cannot create the saved library folder.";
-    if (file.existsAsFile() && !file.copyFileTo(file.getSiblingFile(file.getFileName() + ".bak").getNonexistentSibling())) return "Cannot back up the library catalogue.";
+    if (file.existsAsFile())
+    {
+        // One previous snapshot, not another full catalogue on every scan save.
+        const auto backup = file.getSiblingFile(file.getFileName() + ".previous");
+        if (backup.isSymbolicLink()) return "Linked library backups are unsupported.";
+        juce::TemporaryFile previous(backup);
+        if (!file.copyFileTo(previous.getFile()) || !previous.overwriteTargetFileWithTemporary()) return "Cannot back up the library catalogue.";
+    }
     juce::TemporaryFile temporary(file);
     if (!temporary.getFile().replaceWithText(text, false, false, "\n") || !temporary.overwriteTargetFileWithTemporary()) return "Cannot save the library catalogue; the previous catalogue was kept.";
     return {};

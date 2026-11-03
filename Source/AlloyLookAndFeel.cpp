@@ -1,4 +1,5 @@
 #include "AlloyLookAndFeel.h"
+#include "UiMessages.h"
 #include "Model.h"
 #include <cmath>
 #if JUCE_WINDOWS
@@ -521,7 +522,7 @@ juce::String AlloyHints::textFor(juce::Component& component)
             {
                 text = commandHint(handler->getTitle());
                 if (text.isEmpty() && handler->getRole() == juce::AccessibilityRole::menuItem && handler->getTitle().isNotEmpty())
-                    text = "Choose " + handler->getTitle() + ". Unavailable commands cannot be applied in the current state.";
+                    text = "Choose " + handler->getTitle() + ".";
             }
         if (text.isNotEmpty()) break;
         // Text/value children of sliders and combos inherit their owner's help.
@@ -551,10 +552,9 @@ juce::String AlloyHints::textFor(juce::Component& component)
     if (text.isNotEmpty() && !component.isEnabled())
     {
         auto reason = component.getProperties()["mixworksHintDisabled"].toString();
-        if (reason.isEmpty()) reason = "Unavailable in the current selection or operation. Finish the active operation and check the selection or lock state.";
-        text += "\n\n" + reason;
+        if (reason.isNotEmpty()) text = reason;
     }
-    return text;
+    return shortUiMessage(text);
 }
 
 juce::String AlloyHints::getTipFor(juce::Component& component)

@@ -149,6 +149,10 @@ public:
     juce::Result auditionTake(int index);
     juce::Result installTakeAudition(std::unique_ptr<Engine>);
     void endTakeAudition();
+    // Transient intent identity: Stop/Play/seek/mode/document changes and newer
+    // audition requests invalidate asynchronous take preparation.
+    uint64_t beginTakeAuditionRequest();
+    bool isTakeAuditionRequestCurrent(uint64_t) const;
     juce::String performanceStatus() const;
     juce::File masterRecordingDestination; // Optional; new path required for each pass.
     bool recordMasterWav = false;
@@ -170,6 +174,9 @@ public:
     std::array<std::vector<std::unique_ptr<PluginSlot>>, trackCount> plugins;
     std::atomic<bool> playing { false }, exporting { false };
     std::atomic<double> position { 0 }, sampleRate { 44100 }, tempo { 120 };
+    std::atomic<bool> streamBuffering {false}, streamFailed {false};
+    std::atomic<uint64_t> streamWaitCallbacks {0};
+    bool requestPlayback(double at, int frames);
     std::array<std::atomic<float>, trackCount> meters {};
     std::atomic<float> masterPeak { 0 };
     StereoPeakFeed outputPeaks; // Device output before monitor mute; offline rendering never publishes here.
@@ -177,6 +184,8 @@ public:
     std::atomic<float> masterInputPeak { 0 }; // -1 when a pre-rendered/source preview has no bus-input measurement.
     std::atomic<bool> masterClipped { false };
     SpectrumFeed spectrum;
+    std::atomic<juce::uint64> visualClockRevision {0}; // Seek/reset identity, independent of playback frame cadence.
+    SpectrumFeed visualSpectrum; // Independent SPSC feed; renderer never consumes the master analyser feed.
     std::atomic<bool> monitorMuted { false }; // Device output only; project renders and exports remain audible.
     std::atomic<float> privatePreviewGain {.5f};
     void prepareRender(double rate,int size);
@@ -327,6 +336,7 @@ private:
     int64_t takeSequence = 0;
     std::optional<PerformanceTake> replayTake;
     std::unique_ptr<Engine> takeAudition;
+    uint64_t takeAuditionRequest = 0; // Under lock; never persisted.
     std::vector<std::unique_ptr<Engine>> replayProjects;
     size_t replayEvent = 0;
     int64_t replayFrame = 0;

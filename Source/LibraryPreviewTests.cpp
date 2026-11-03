@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "EarTools.h"
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -95,6 +96,19 @@ void runLibraryPreviewTests(const std::function<void(bool,const juce::String&)>&
     check(masterCapture && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*masterCapture),"capture default master preview"); masterCapture.reset();
     ui.engine.setPlaying(true); pumpPreview(70);
     check(!ui.libraryPreview.active(media->id) && ui.engine.playing,"programme Play ends master preview");
+    auto earSource = std::make_shared<Media>(); earSource->sampleRate = 48000; earSource->samples.makeCopyOf(tone);
+    EarLoopPlayer ear; ear.source(earSource, 0, 1); ear.hear(0); ear.level(-12);
+    const double earPosition = ui.engine.position.load();
+    check(ui.libraryPreview.playPrepared(ear,"ear-master-fixture").wasOk() && ui.engine.hasLibraryPreview(ear),
+          "prepared by-ear loop uses the existing isolated fake master output");
+    for (int block=0;block<8;++block) ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,masterPreview.getArrayOfWritePointers(),2,256,{});
+    check(masterPreview.getMagnitude(0,256) > .03f && masterPreview.getMagnitude(0,256) < .05f
+        && !ui.engine.playing && ui.engine.position == earPosition && cueType->created == 0,
+          "prepared master loop is audible at listening/master gain without moving the programme cursor or opening headphones");
+    ui.libraryPreview.stop();
+    ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,masterPreview.getArrayOfWritePointers(),2,256,{});
+    check(!ui.engine.hasLibraryPreview(ear) && masterPreview.getMagnitude(0,256) == 0,
+          "prepared master callback is detached before the listening owner can be destroyed");
     ui.previewLibraryTrack(media->id); ui.engine.stop(); pumpPreview(80);
     check(!ui.libraryPreview.active(media->id),"programme Stop cancels a pending master preview reader");
     ui.engine.position = 12.25; ui.engine.playing = true;
@@ -122,6 +136,15 @@ void runLibraryPreviewTests(const std::function<void(bool,const juce::String&)>&
     check(capture && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*capture),"capture artwork stop overlay during headphone preview"); capture.reset();
     ui.previewLibraryTrack(media->id);
     check(!ui.libraryPreview.active(media->id),"same artwork stops preview");
+    ui.engine.workMode = WorkMode::recordPerform;
+    check(ui.libraryPreview.playPrepared(ear,"ear-private-fixture").wasOk(), "prepared by-ear loop opens only the explicitly selected fake headphones route");
+    juce::AudioBuffer<float> earCue(2,256); float earPeak = 0;
+    if (cueType->last && cueType->last->callback) for (int block=0;block<8;++block)
+    { cueType->last->callback->audioDeviceIOCallbackWithContext(nullptr,0,earCue.getArrayOfWritePointers(),2,256,{}); earPeak = std::max(earPeak,earCue.getMagnitude(0,256)); }
+    ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,master.getArrayOfWritePointers(),2,256,{});
+    check(earPeak > .01f && earPeak < .04f && master.getMagnitude(0,256) == 0 && ui.engine.playing,
+          "prepared private listening remains audible only on headphones while programme transport continues");
+    ui.libraryPreview.stop(); ui.engine.workMode = WorkMode::arrange;
     ui.previewLibraryTrack(media->id); ui.libraryPreview.stop(); pumpPreview(40);
     check(!ui.libraryPreview.active(media->id),"stopped pending reader cannot restart playback");
     cueType->names = {"Live speakers"}; const int before = cueType->created;

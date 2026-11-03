@@ -30,7 +30,9 @@ Capture volume, EQ, filter, pan, mapped VST parameters and master controls, plus
 
 Built-in and VST automation belong to the **originally placed track**, shared across surviving split pieces and deleted gaps. Separate placements of the same song remain independent. Piece trims/source fades remain local. Reset ownership for a new placement, not a split. Preserve natural tails, unrestricted four-lane overlap and explicit transition creation.
 
-## Starting foundations and gaps (0.55.63)
+## Historical starting foundations and gaps in 0.55.63
+
+The following is the pre-implementation baseline. Its “planned” statements are superseded by the completed0.55.64 checklist and acceptance below.
 
 - `Automation.cpp` / `LiveAutomationTests.cpp`: Read/Touch/Latch capture, timestamped MIDI and Undo exist. They write arrangement curves directly, require arming and end writes on seek; they are not a complete performance take.
 - `Model.h/.cpp`, `Engine.cpp`, `EffectTail.h`: session 40 shares VST ownership/curves across split pieces. Built-in volume/EQ/filter are still piece-owned and must join the same original-track owner.

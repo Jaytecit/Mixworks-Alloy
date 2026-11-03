@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "UiMessages.h"
 #include "AutoArrangement.h"
 #include "Beatmatch.h"
 #include <cmath>
@@ -31,9 +32,9 @@ void Workstation::showAutoArrangement()
     dialog->addComboBox("mode", {"Number of songs", "Total length (minutes)"}, "Arrange by");
     dialog->addTextEditor("amount", juce::String(std::min(10, (int) choices.size())), "Songs or minutes");
     dialog->addComboBox("transitions", {"Balanced", "Smooth", "Bold", "Use my settings", "Constant power", "Hard cuts only", "DJ set (varied)"}, "Blend style");
-    dialog->getComboBoxComponent("transitions")->setTooltip("Balanced/Bold use bass/filter treatment at a shared section change. Smooth uses a linear crossfade. Constant power uses an equal-power envelope; it does not normalise recordings. Hard cuts use a short click-prevention ramp. DJ set varies supported phrase, bass and restrained filter handovers using musical activity and recent choices. A genuine section match may need more than 32 bars.");
+    dialog->getComboBoxComponent("transitions")->setTooltip("Choose how songs blend: gentle fades, bass swaps, quick cuts or a varied DJ set. Song volumes stay unchanged.");
     dialog->addComboBox("energy", {"Unrestricted", "Keep pace", "Build energy", "Wind down"}, "Energy direction");
-    dialog->getComboBoxComponent("energy")->setTooltip("Keep pace favours steady musical activity and tempo. Build energy favours a gradual rise; Wind down favours a descent. Uses rhythm, rhythmic bass and transient dynamics, plus tempo. Missing profiles are analysed before choosing songs; unknown activity remains usable and is reported. Plateaus and necessary reversals are allowed. This is an activity estimate, not a calibrated taste or danceability model. No automatic gain changes.");
+    dialog->getComboBoxComponent("energy")->setTooltip("Keep the pace steady, build energy or wind down. This guides song choice without changing volume.");
     juce::StringArray genres {"Any genre"}; std::set<juce::String> genreKeys;
     for (const auto& media : choices)
     {
@@ -43,7 +44,10 @@ void Workstation::showAutoArrangement()
     if (genres.size() > 1) { const auto first = genres[0]; genres.remove(0); genres.sortNatural(); genres.insert(0, first); }
     dialog->addComboBox("genre", genres, "Preferred genre");
     dialog->getComboBoxComponent("genre")->setEditableText(true);
-    dialog->getComboBoxComponent("genre")->setTooltip("Choose a tag or type a genre. This is a preference, not a filter: better musical/timing matches, other genres and unlabelled tracks remain usable. Original tags are kept; no genre is guessed from audio.");
+    dialog->getComboBoxComponent("genre")->setTooltip("Choose a preferred genre. Other genres and unlabelled songs can still be used.");
+    dialog->addComboBox("visuals", {"Create automatic visual show", "Keep visual lane"}, "Visuals");
+    dialog->getComboBoxComponent("visuals")->setSelectedItemIndex(engine.project.visualScenes.empty() ? 0 : 1, juce::dontSendNotification);
+    dialog->getComboBoxComponent("visuals")->setTooltip("Choose a coherent visual family and transitions following music handovers. Uses the image selected in Visuals / scenes. Replaces existing visual blocks.");
     dialog->getTextEditor("amount")->setInputRestrictions(7, "0123456789.");
     dialog->getComboBoxComponent("mode")->onChange = [dialog, previousMode = dialog->getComboBoxComponent("mode")->getSelectedItemIndex()]() mutable
     {
@@ -60,16 +64,27 @@ void Workstation::showAutoArrangement()
     dialog->addButton("Make mix", 1, juce::KeyPress(juce::KeyPress::returnKey));
     dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     const auto before = juce::JSON::toString(projectToJson(engine.project));
-    dialog->getComboBoxComponent("action")->onChange = [dialog, count = engine.project.clips.size()]
+    dialog->getComboBoxComponent("action")->onChange = [dialog]
     {
         const bool extend = dialog->getComboBoxComponent("action")->getSelectedItemIndex() == 1;
         dialog->getComboBoxComponent("start")->setEnabled(!extend);
-        dialog->setMessage(extend ? "Keep the existing " + juce::String((int) count)
-            + " segments and add the requested songs or minutes after the last song. Existing joins stay in place; the new handover uses its tail. Songs already used are excluded. One Undo restores the mix."
-            : "Replace the current mix?");
+        const bool visuals = dialog->getComboBoxComponent("visuals")->getSelectedItemIndex() == 0;
+        dialog->setMessage((extend ? "Add songs after the existing mix. "
+            : "Replace the current music arrangement. ") + juce::String(visuals
+            ? "Replace visual blocks with scenes blended across music transitions."
+            : "Keep existing visual blocks."));
         dialog->getButton(0)->setButtonText(extend ? "Extend mix" : "Make mix");
         dialog->getTextEditor("amount")->setTooltip(extend ? "Additional songs or additional minutes. Total mix limit: 180 minutes." : "Songs or total minutes for the new mix.");
+        // AlertWindow caps its height to the display, but retains fixed 50px rows.
+        // Own the form spacing within that available area so every field remains usable.
+        const std::array<juce::Component*,8> fields {dialog->getComboBoxComponent("action"), dialog->getComboBoxComponent("start"),
+            dialog->getComboBoxComponent("mode"), dialog->getTextEditor("amount"), dialog->getComboBoxComponent("transitions"),
+            dialog->getComboBoxComponent("energy"), dialog->getComboBoxComponent("genre"), dialog->getComboBoxComponent("visuals")};
+        const int firstY=fields.front()->getY();
+        const int step=std::min(50,(dialog->getButton(0)->getY()-12-firstY-fields.back()->getHeight())/7);
+        for (size_t i=0;i<fields.size();++i) fields[i]->setTopLeftPosition(fields[i]->getX(),firstY+(int)i*step);
     };
+    dialog->getComboBoxComponent("visuals")->onChange = [dialog] { dialog->getComboBoxComponent("action")->onChange(); };
     dialog->getComboBoxComponent("action")->setSelectedItemIndex(engine.project.clips.empty() ? 0 : 1, juce::dontSendNotification);
     dialog->getComboBoxComponent("action")->onChange();
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, ids, before](int answer)
@@ -82,6 +97,7 @@ void Workstation::showAutoArrangement()
             || !std::isfinite(amount) || amount <= 0 || (duration ? amount > 180 : amount != std::floor(amount) || amount > INT_MAX))
         { safe->setStatus("Enter a positive whole song count, or minutes up to 180. The current mix was kept."); return; }
         AutoArrangementOptions options;
+        options.createVisualScenes = dialog->getComboBoxComponent("visuals")->getSelectedItemIndex() == 0;
         options.extendExisting = dialog->getComboBoxComponent("action")->getSelectedItemIndex() == 1;
         if (options.extendExisting && before != juce::JSON::toString(projectToJson(safe->engine.project)))
         { safe->setStatus("The arrangement changed. Open Auto Arrange again before extending it."); return; }
@@ -105,6 +121,9 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
     if (options.extendExisting && (engine.project.clips.empty() || engine.rehearsalActive() || engine.recordingAutomation()
         || engine.automationRecordMode != AutomationRecordMode::read))
     { setStatus("Choose an existing arrangement, stop rehearsal and finish automation in Read before extending."); return; }
+    const auto visualLibrary = sceneLane ? sceneLane->catalogue() : std::vector<VisualSceneEntry>();
+    if (options.createVisualScenes && automaticVisualScenes(visualLibrary).empty())
+    { setStatus("No music visual scenes are available. Choose Keep visual lane to arrange only music."); return; }
     const auto original = engine.project;
     const auto before = options.extendExisting ? juce::JSON::toString(projectToJson(original)) : juce::String();
     auto library = engine.library;
@@ -120,7 +139,7 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
     setBusy(true); importProgress.begin(1); importProgress.setAutoArrangement();
     autoArrangeButton.setButtonText("Arranging...");
     setStatus("Preparing musical energy and choosing compatible songs. The current mix stays available until the new mix is ready.");
-    workers.addJob([safe = juce::Component::SafePointer<Workstation>(this), library = std::move(library), options, cancelled, resident, original, before]() mutable
+    workers.addJob([safe = juce::Component::SafePointer<Workstation>(this), library = std::move(library), options, visualLibrary, cancelled, resident, original, before]() mutable
     {
         juce::Random random;
         juce::AudioFormatManager formats; formats.registerBasicFormats();
@@ -140,7 +159,7 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
                     safe->importProgress.setCounts(done, total); safe->importProgress.showFile(name, MediaReadStage::energy);
                 });
                 auto upgraded = media->catalogueCopy();
-                if (media->hasPlayback()) upgraded->energy = analyseMusicalEnergy(media->audioView(), media->sampleRate, cancelled);
+                if (media->hasPlayback() && !media->original) upgraded->energy = analyseMusicalEnergy(media->audioView(), media->sampleRate, cancelled);
                 else
                 {
                     const auto record = media->analysisRecord();
@@ -206,6 +225,16 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
                 result.project = std::move(prepared.project); result.error = prepared.error;
             }
         }
+        if (result.error.isEmpty() && !*cancelled && options.createVisualScenes)
+        {
+            juce::Random visualRandom;
+            result.project.visualImage=original.visualImage;
+            const auto visuals = arrangeVisualScenes(result.project, visualLibrary, visualRandom);
+            if (visuals.failed()) result.error = visuals.getErrorMessage();
+            else result.summary += " Visuals: " + juce::String((int)result.project.visualScenes.size()) + " scenes in "
+                + result.project.visualScenes.front().style + " style, with music-matched transitions"
+                + juce::String(original.visualImage.isNotEmpty() ? " and your image inside the scenes." : ".");
+        }
         juce::MessageManager::callAsync([safe, cancelled, result = std::move(result), energyUpdates = std::move(energyUpdates), options, before, prefix = original.clips.size()]() mutable
         {
             if (!safe || safe->importCancellation != cancelled) return;
@@ -221,14 +250,12 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
                     { const juce::ScopedLock guard(safe->engine.lock); media->energy = update.second; safe->markCatalogueChanged(); }
             if (result.error.isNotEmpty())
             {
-                safe->setStatus("Auto arrangement: " + result.error + " The current mix was kept.");
-                juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Auto Arrange stopped", safe->status, "OK", safe);
+                safe->fail("Auto Arrange stopped. " + result.error);
                 return;
             }
             if (options.extendExisting && result.project.clips.size() == prefix)
             {
-                safe->setStatus(result.summary);
-                juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,"Auto Arrange complete",result.summary,"OK",safe);
+                safe->getProperties().set("lastMessageDetails", result.summary); safe->setStatus(shortUiMessage(result.summary));
                 return;
             }
             safe->engine.setAutomationRecordMode(AutomationRecordMode::read); safe->remember();
@@ -237,11 +264,12 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
                 // Preserve the user's mixer, plugins and master settings; replace arrangement-owned data only.
                 auto candidate = safe->engine.project;
                 candidate.name = result.project.name; candidate.clips = std::move(result.project.clips);
+                if (options.createVisualScenes) candidate.visualScenes = std::move(result.project.visualScenes);
                 candidate.tempo = std::move(result.project.tempo); candidate.bpm = result.project.bpm;
                 candidate.followTrackTempo = result.project.followTrackTempo;
                 if (!options.extendExisting)
                 {
-                    candidate.labels.clear(); candidate.masterAutomation = {};
+                    candidate.labels.clear(); candidate.masterAutomation = {}; candidate.laneHandles.clear();
                     for (auto& track : candidate.tracks)
                     {
                         track.automation = {};
@@ -256,13 +284,12 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
             safe->selectedClip = safe->engine.project.clips[options.extendExisting ? prefix : 0].id; safe->selectedTransition.clear();
             if (!options.extendExisting) safe->sessionFile = {}; // A new mix gets its own document.
             safe->timeline.selectAutomationPoint({}, -1); safe->timeline.selectedLabel.clear(); safe->tempoStrip.selectedTempoPoint = -1;
-            safe->refresh(); safe->menuItemSelected(22, 0); safe->setStatus(result.summary);
+            safe->refresh(); safe->menuItemSelected(22, 0); safe->getProperties().set("lastMessageDetails", result.summary); safe->setStatus(shortUiMessage(result.summary));
             safe->attractState.motion = AttractMotion::animated;
             safe->setAttractMode(true);
             if (!safe->layout.forgeEffects) safe->menuItemSelected(81, 0);
             safe->menuItemSelected(83, 0);
-            safe->autoArrangeButton.setTooltip(result.summary);
-            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon, "Auto Arrange complete", result.summary, "OK", safe);
+            safe->autoArrangeButton.setTooltip("Add tracks to this mix or start a new one.");
         });
     });
 }

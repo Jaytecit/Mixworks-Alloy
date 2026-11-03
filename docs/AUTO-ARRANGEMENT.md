@@ -4,6 +4,20 @@ Auto Arrange finds a feasible progression using a bounded heuristic, not an exha
 
 With an existing mix, the **Auto Arrange** dialog opens with **Extend current arrangement** selected. Enter additional songs or minutes and choose **Extend mix**. The existing arrangement stays in place, already-used sources are excluded, and one Undo restores the previous mix. Use **Create new arrangement** in the Action selector to start over. The first-song selector applies only to a new arrangement.
 
+**Visuals → Create scenes with transition blends** generates one editable scene
+per song, fading across each final prepared music transition. It replaces the
+whole visual lane, including when extending a mix. **Keep visual lane** leaves
+visual blocks intact and is the default when any already exist. Scene choices
+use independent randomness and do not change music selection. For an existing
+arrangement, **Match mix** in the visual library creates the same kind of lane
+without rearranging music. Later music edits require matching again. See
+[Visual scenes](VISUAL-SCENES.md) for placement, playback and current scope.
+
+Crowded or nested music handovers no longer stop visual generation. The visual
+planner follows transition order rather than raw clip starts, shortens competing
+fades and uses cuts where needed. Music placement, timing and audio treatment
+remain unchanged. Exceptionally short coincident placements may share scenes.
+
 ## Energy direction
 
 | Direction | Preference |
@@ -32,7 +46,7 @@ The arranger uses central80% mean activity for its overall target and two halves
 
 New imports obtain profiles while PCM is available. Existing tracks are upgraded on the Auto Arrange worker when an energy direction or **DJ set (varied)** needs them. Progress says **Analysing rhythm, bass and dynamics**. Cancellation preserves the mix; completed compatible cache results can survive a later cancellation, but partial profiles are never published. Ordinary warm catalogue startup does not decode every old source merely to add features.
 
-Profiles are bound to the enclosing record's source identity and independently versioned. Missing/malformed/future supplementary data does not invalidate valid grids. An opaque newer supplement survives a same-source manual correction. Detector analysis11, session34 and portable preset3 remain; no analysis/correction/arrangement/cache reset is required.
+Profiles are bound to the enclosing record's source identity and independently versioned. Missing/malformed/future supplementary data does not invalidate valid grids. An opaque newer supplement survives a same-source manual correction. Current detector analysis revision11 and session format41 are unchanged by supplementary activity analysis; no analysis/correction/arrangement/cache reset is required. The activity feature originally landed with session34/portable preset3; those are historical identities.
 
 ## Preferred genre
 

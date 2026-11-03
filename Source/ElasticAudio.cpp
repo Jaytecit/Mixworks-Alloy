@@ -4,6 +4,37 @@
 
 namespace mixworks
 {
+bool requestOriginalClip(const Clip& placement, double at, double before, double after)
+{
+    if (placement.start >= at + after || placement.end() <= at - before) return true;
+    const auto& clip = placement.elasticSource ? placement.elasticSource->clip : placement;
+    // Read the same immutable source clock used by ElasticSource, including
+    // warm-up around seeks and retained geometry across splits.
+    const double a = clip.sourceElapsed(at - placement.audioSlip - before - clip.start);
+    const double b = clip.sourceElapsed(at - placement.audioSlip + after - clip.start);
+    bool ready = true;
+    const auto range = [&](const Media& media, double lo, double hi)
+    {
+        if (!media.original) return;
+        if (clip.reversed) { const double old = lo; lo = clip.sourceSpan() - hi; hi = clip.sourceSpan() - old; }
+        const double first = (clip.offset + lo) * media.sampleRate - 2;
+        const double last = (clip.offset + hi) * media.sampleRate + 2;
+        ready = media.original->request((int)juce::jlimit(0., double(media.frames()), std::floor(first)),
+                                        (int)juce::jlimit(0., double(media.frames()), std::ceil(last))) && ready;
+    };
+    const auto source = [&](const Media& media)
+    {
+        if (clip.loopSpan <= 0) { range(media, a, b); return; }
+        if (b - a >= clip.loopSpan) { range(media, 0, clip.loopSpan); return; }
+        double lo = std::fmod(clip.loopPhase + a, clip.loopSpan); if (lo < 0) lo += clip.loopSpan;
+        const double hi = lo + b - a;
+        range(media, lo, std::min(hi, clip.loopSpan));
+        if (hi > clip.loopSpan) range(media, 0, hi - clip.loopSpan);
+    };
+    source(*clip.media);
+    if (clip.stems && clip.stemsEnabled) for (const auto& stem : clip.stems->sources) source(*stem);
+    return ready;
+}
 ElasticSource::ElasticSource(const Clip& value) : clip(value)
 {
     clip.elasticSource.reset(); clip.prepared.reset();
@@ -31,8 +62,8 @@ float ElasticSource::sample(int channel, double source, int stem) const
     if (frame < 0 && frame > -64*std::numeric_limits<double>::epsilon()*std::max(1.,std::abs(source)*media.sampleRate)) frame = 0;
     if (frame < 0 || frame >= media.frames()) return 0;
     const int first = (int) frame;
-    const auto* data = media.channelData(channel);
-    return data[first] + (float) (frame - first) * (data[std::min(first + 1, media.frames() - 1)] - data[first]);
+    const float a = media.sample(channel, first);
+    return a + (float) (frame - first) * (media.sample(channel, std::min(first + 1, media.frames() - 1)) - a);
 }
 ElasticRenderer::Window& ElasticRenderer::window(const std::shared_ptr<const ElasticSource>& source, int64_t index, int stem)
 {
@@ -62,7 +93,7 @@ ElasticRenderer::Window& ElasticRenderer::window(const std::shared_ptr<const Ela
         // would cancel sustained tones during their crossfades.
         for (auto& cached : stream.windows) cached.index = std::numeric_limits<int64_t>::min();
         processor.clear(); processor.setSampleRate((unsigned) std::llround(sr)); processor.setChannels((unsigned) channels);
-        processor.setPitch(1); processor.setRate(1);
+        processor.setPitchSemiTones(source->clip.pitchSemitones); processor.setRate(1);
         processor.setSetting(SETTING_USE_QUICKSEEK, 0); processor.setSetting(SETTING_USE_AA_FILTER, 1);
         processor.setSetting(SETTING_SEQUENCE_MS, 40); processor.setSetting(SETTING_SEEKWINDOW_MS, 15); processor.setSetting(SETTING_OVERLAP_MS, 8);
         stream.sourceOrigin = source->progressAt((index * hop - padding) / sr); stream.inputFrames = 0; skip = padding;

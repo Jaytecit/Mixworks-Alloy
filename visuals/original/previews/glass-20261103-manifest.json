@@ -1,0 +1,621 @@
+{
+  "schema": 1,
+  "kind": "Scene and preset reference stills; not live mix or motion acceptance",
+  "entries": [
+    {
+      "key": "original/mosaic-kiln",
+      "title": "Mosaic Kiln",
+      "preview": "mosaic-kiln.jpg",
+      "presets": [
+        {
+          "id": "signature",
+          "title": "Signature",
+          "preview": "mosaic-kiln.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.34,
+            "detail": 0.65,
+            "hue": 0.7810000000000001,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.62,
+            "materialMotion": 0.35,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.2
+          }
+        },
+        {
+          "id": "silk",
+          "title": "Glass image",
+          "preview": "mosaic-kiln--silk.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.34,
+            "detail": 0.65,
+            "hue": 0.7810000000000001,
+            "pulse": 0.85,
+            "warp": 0.94,
+            "bassDrive": 0.38,
+            "midDrive": 0.48,
+            "trebleDrive": 0.35,
+            "momentum": 0.9,
+            "materialMotion": 0.4,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.24
+          }
+        },
+        {
+          "id": "percussive",
+          "title": "Percussive",
+          "preview": "mosaic-kiln--percussive.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.34,
+            "detail": 0.65,
+            "hue": 0.7810000000000001,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.9,
+            "midDrive": 0.8,
+            "trebleDrive": 0.75,
+            "momentum": 0.3,
+            "materialMotion": 0.7,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.32
+          }
+        },
+        {
+          "id": "faceted",
+          "title": "Faceted motion",
+          "preview": "mosaic-kiln--faceted.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.34,
+            "detail": 0.65,
+            "hue": 0.7810000000000001,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.7,
+            "midDrive": 0.8,
+            "trebleDrive": 0.65,
+            "momentum": 0.65,
+            "materialMotion": 0.65,
+            "materialMode": 0.6666666666666666,
+            "viewPattern": 0.0,
+            "finishGlow": 0.18
+          }
+        },
+        {
+          "id": "ribbons",
+          "title": "Woven images",
+          "preview": "mosaic-kiln--ribbons.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.34,
+            "detail": 0.65,
+            "hue": 0.7810000000000001,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.65,
+            "midDrive": 0.7,
+            "trebleDrive": 0.8,
+            "momentum": 0.8,
+            "materialMotion": 0.8,
+            "materialMode": 1.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.27
+          }
+        },
+        {
+          "id": "prismatic",
+          "title": "Prismatic",
+          "preview": "mosaic-kiln--prismatic.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.34,
+            "detail": 0.65,
+            "hue": 0.7810000000000001,
+            "pulse": 0.85,
+            "warp": 0.88,
+            "bassDrive": 0.8,
+            "midDrive": 0.65,
+            "trebleDrive": 0.9,
+            "momentum": 0.6,
+            "materialMotion": 0.55,
+            "materialMode": 0.3333333333333333,
+            "viewPattern": 0.75,
+            "finishGlow": 0.38
+          }
+        }
+      ],
+      "sourceHashes": {
+        "main.glsl": "322a54e1ed535c2fd337d43f54d17bdb5ed5636c437b80cd72b37952dccc15bf",
+        "scene.json": "6fe80a7032c5264826446381bb74b465b72adcf1965ecf01d5d781b4b0a97906"
+      }
+    },
+    {
+      "key": "original/rhombus-foundry",
+      "title": "Rhombus Foundry",
+      "preview": "rhombus-foundry.jpg",
+      "presets": [
+        {
+          "id": "signature",
+          "title": "Signature",
+          "preview": "rhombus-foundry.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.48,
+            "detail": 0.65,
+            "hue": 0.9920000000000002,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.62,
+            "materialMotion": 0.35,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.2
+          }
+        },
+        {
+          "id": "silk",
+          "title": "Glass image",
+          "preview": "rhombus-foundry--silk.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.48,
+            "detail": 0.65,
+            "hue": 0.9920000000000002,
+            "pulse": 0.85,
+            "warp": 0.94,
+            "bassDrive": 0.38,
+            "midDrive": 0.48,
+            "trebleDrive": 0.35,
+            "momentum": 0.9,
+            "materialMotion": 0.4,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.24
+          }
+        },
+        {
+          "id": "percussive",
+          "title": "Percussive",
+          "preview": "rhombus-foundry--percussive.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.48,
+            "detail": 0.65,
+            "hue": 0.9920000000000002,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.9,
+            "midDrive": 0.8,
+            "trebleDrive": 0.75,
+            "momentum": 0.3,
+            "materialMotion": 0.7,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.32
+          }
+        },
+        {
+          "id": "faceted",
+          "title": "Faceted motion",
+          "preview": "rhombus-foundry--faceted.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.48,
+            "detail": 0.65,
+            "hue": 0.9920000000000002,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.7,
+            "midDrive": 0.8,
+            "trebleDrive": 0.65,
+            "momentum": 0.65,
+            "materialMotion": 0.65,
+            "materialMode": 0.6666666666666666,
+            "viewPattern": 0.0,
+            "finishGlow": 0.18
+          }
+        },
+        {
+          "id": "ribbons",
+          "title": "Woven images",
+          "preview": "rhombus-foundry--ribbons.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.48,
+            "detail": 0.65,
+            "hue": 0.9920000000000002,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.65,
+            "midDrive": 0.7,
+            "trebleDrive": 0.8,
+            "momentum": 0.8,
+            "materialMotion": 0.8,
+            "materialMode": 1.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.27
+          }
+        },
+        {
+          "id": "prismatic",
+          "title": "Prismatic",
+          "preview": "rhombus-foundry--prismatic.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.48,
+            "detail": 0.65,
+            "hue": 0.9920000000000002,
+            "pulse": 0.85,
+            "warp": 0.88,
+            "bassDrive": 0.8,
+            "midDrive": 0.65,
+            "trebleDrive": 0.9,
+            "momentum": 0.6,
+            "materialMotion": 0.55,
+            "materialMode": 0.3333333333333333,
+            "viewPattern": 0.75,
+            "finishGlow": 0.38
+          }
+        }
+      ],
+      "sourceHashes": {
+        "main.glsl": "c863276b9b715fe8463baca7ca30a84a6de0febcfa30657bf5d0bb17e086617b",
+        "scene.json": "0157d99f7450b26e117d1f08537f2e1de1a450a56c303a51b83f5be024a87ebf"
+      }
+    },
+    {
+      "key": "original/enamel-scales",
+      "title": "Enamel Scales",
+      "preview": "enamel-scales.jpg",
+      "presets": [
+        {
+          "id": "signature",
+          "title": "Signature",
+          "preview": "enamel-scales.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.27,
+            "detail": 0.65,
+            "hue": 0.2030000000000003,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.62,
+            "materialMotion": 0.35,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.2
+          }
+        },
+        {
+          "id": "silk",
+          "title": "Glass image",
+          "preview": "enamel-scales--silk.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.27,
+            "detail": 0.65,
+            "hue": 0.2030000000000003,
+            "pulse": 0.85,
+            "warp": 0.94,
+            "bassDrive": 0.38,
+            "midDrive": 0.48,
+            "trebleDrive": 0.35,
+            "momentum": 0.9,
+            "materialMotion": 0.4,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.24
+          }
+        },
+        {
+          "id": "percussive",
+          "title": "Percussive",
+          "preview": "enamel-scales--percussive.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.27,
+            "detail": 0.65,
+            "hue": 0.2030000000000003,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.9,
+            "midDrive": 0.8,
+            "trebleDrive": 0.75,
+            "momentum": 0.3,
+            "materialMotion": 0.7,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.32
+          }
+        },
+        {
+          "id": "faceted",
+          "title": "Faceted motion",
+          "preview": "enamel-scales--faceted.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.27,
+            "detail": 0.65,
+            "hue": 0.2030000000000003,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.7,
+            "midDrive": 0.8,
+            "trebleDrive": 0.65,
+            "momentum": 0.65,
+            "materialMotion": 0.65,
+            "materialMode": 0.6666666666666666,
+            "viewPattern": 0.0,
+            "finishGlow": 0.18
+          }
+        },
+        {
+          "id": "ribbons",
+          "title": "Woven images",
+          "preview": "enamel-scales--ribbons.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.27,
+            "detail": 0.65,
+            "hue": 0.2030000000000003,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.65,
+            "midDrive": 0.7,
+            "trebleDrive": 0.8,
+            "momentum": 0.8,
+            "materialMotion": 0.8,
+            "materialMode": 1.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.27
+          }
+        },
+        {
+          "id": "prismatic",
+          "title": "Prismatic",
+          "preview": "enamel-scales--prismatic.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.27,
+            "detail": 0.65,
+            "hue": 0.2030000000000003,
+            "pulse": 0.85,
+            "warp": 0.88,
+            "bassDrive": 0.8,
+            "midDrive": 0.65,
+            "trebleDrive": 0.9,
+            "momentum": 0.6,
+            "materialMotion": 0.55,
+            "materialMode": 0.3333333333333333,
+            "viewPattern": 0.75,
+            "finishGlow": 0.38
+          }
+        }
+      ],
+      "sourceHashes": {
+        "main.glsl": "269396d571949915287e11713a32f25594e43f48544426ff47973464efc4c05e",
+        "scene.json": "e91a58f381e08ffae26c96175893b3136ae9c8126afcb0a9ab322ea0ef446b2b"
+      }
+    },
+    {
+      "key": "original/spinning-stamps",
+      "title": "Spinning Stamps",
+      "preview": "spinning-stamps.jpg",
+      "presets": [
+        {
+          "id": "signature",
+          "title": "Signature",
+          "preview": "spinning-stamps.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.42,
+            "detail": 0.65,
+            "hue": 0.41400000000000015,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.62,
+            "materialMotion": 0.35,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.2
+          }
+        },
+        {
+          "id": "silk",
+          "title": "Glass image",
+          "preview": "spinning-stamps--silk.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.42,
+            "detail": 0.65,
+            "hue": 0.41400000000000015,
+            "pulse": 0.85,
+            "warp": 0.94,
+            "bassDrive": 0.38,
+            "midDrive": 0.48,
+            "trebleDrive": 0.35,
+            "momentum": 0.9,
+            "materialMotion": 0.4,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.24
+          }
+        },
+        {
+          "id": "percussive",
+          "title": "Percussive",
+          "preview": "spinning-stamps--percussive.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.42,
+            "detail": 0.65,
+            "hue": 0.41400000000000015,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.9,
+            "midDrive": 0.8,
+            "trebleDrive": 0.75,
+            "momentum": 0.3,
+            "materialMotion": 0.7,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.32
+          }
+        },
+        {
+          "id": "faceted",
+          "title": "Faceted motion",
+          "preview": "spinning-stamps--faceted.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.42,
+            "detail": 0.65,
+            "hue": 0.41400000000000015,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.7,
+            "midDrive": 0.8,
+            "trebleDrive": 0.65,
+            "momentum": 0.65,
+            "materialMotion": 0.65,
+            "materialMode": 0.6666666666666666,
+            "viewPattern": 0.0,
+            "finishGlow": 0.18
+          }
+        },
+        {
+          "id": "ribbons",
+          "title": "Woven images",
+          "preview": "spinning-stamps--ribbons.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.42,
+            "detail": 0.65,
+            "hue": 0.41400000000000015,
+            "pulse": 0.85,
+            "warp": 0.5,
+            "bassDrive": 0.65,
+            "midDrive": 0.7,
+            "trebleDrive": 0.8,
+            "momentum": 0.8,
+            "materialMotion": 0.8,
+            "materialMode": 1.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.27
+          }
+        },
+        {
+          "id": "prismatic",
+          "title": "Prismatic",
+          "preview": "spinning-stamps--prismatic.jpg",
+          "controls": {
+            "intensity": 0.65,
+            "motion": 0.5,
+            "imageMix": 0.66,
+            "scale": 0.42,
+            "detail": 0.65,
+            "hue": 0.41400000000000015,
+            "pulse": 0.85,
+            "warp": 0.88,
+            "bassDrive": 0.8,
+            "midDrive": 0.65,
+            "trebleDrive": 0.9,
+            "momentum": 0.6,
+            "materialMotion": 0.55,
+            "materialMode": 0.3333333333333333,
+            "viewPattern": 0.75,
+            "finishGlow": 0.38
+          }
+        }
+      ],
+      "sourceHashes": {
+        "main.glsl": "94c27153993cc45ad24fe3c39305aa14d2f43fc76c68efb7be5085d9661aa90e",
+        "scene.json": "6e04df07e65bd22a1b161978e1a3e74d23f63eb5388cbd43f81ec5919f57d8b0"
+      }
+    }
+  ],
+  "resolution": [
+    640,
+    360
+  ],
+  "sourceMusicSeconds": [
+    112,
+    114.53333333333333
+  ],
+  "musicSha256": "9e9ac5390a030224ccf48bd15916071d2d81779efd074ae2b6a748649e7b7e73",
+  "runtimeHashes": {
+    "original_scene_player.py": "4cac1af75f4adedee96b3c3a1bd05aff3ada7908ab40d0e00cc17679be5f1fef",
+    "original_visual_gl.py": "2230ebc6b940f13fc7ff85b654f03f0fed2b76f9bc673ef9a330fcbf10f6c21b",
+    "visual_catalogue.py": "6df05d2e486ef80c91dfb6a84a7cecd466f78ce68f2831de0f5336d6c1a733ea",
+    "visual_compositor.py": "d4b50e5df48f02d8d559c7f6bee0579e65a972e5b6ff660456bce9e8a94b7e87",
+    "visual_handoff.py": "7ff51832d9074515216263ce4ba1062509068993c66ec212b8a9b36d859f3714",
+    "visual_media.py": "bb5ec53783aace21ce7369538100a7a254acb1f876eda3a08ba18bc9f65776d4",
+    "visual_presenter.py": "72080864a84491496c1dc896c3ceebf6c93015a323714a3dcb35180d432d0cfc",
+    "visual_scene_worker.py": "fab0684e1b774e34084b058f1a55db30b7caa6b7da2b26038423362657ac4e07"
+  }
+}

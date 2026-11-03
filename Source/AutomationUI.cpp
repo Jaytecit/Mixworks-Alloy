@@ -118,18 +118,18 @@ void Workstation::initialiseAutomationEditor()
     editingBody.addChildComponent(automationArm); // Capture exclusions live in the advanced take menu.
     automationHeading.setText("AUTOMATION", juce::dontSendNotification);
     automationOwner.setTitle("Automation owner"); automationParameter.setTitle("Automation parameter"); automationMode.setTitle("Automation recording mode");
-    automationOwner.setTextWhenNothingSelected("Select segment, lane or master"); automationParameter.setTextWhenNothingSelected("Select parameter");
-    automationOwner.setTooltip("Choose the exact segment, mixer lane or master curve. Browsing leaves sound, playhead and recording unchanged.");
+    automationOwner.setTextWhenNothingSelected("Select lane or master"); automationParameter.setTextWhenNothingSelected("Select parameter");
+    automationOwner.setTooltip("Lane curves affect every track on that lane. Per-track fades and effects are available separately. Browsing leaves sound, playhead and recording unchanged.");
     automationParameter.setTooltip("Select Volume, Bass, Mid, Treble, Pan, manual Filter or a named effect parameter. Selection is view-only.");
     automationMode.addItem("Read mode", 1); automationMode.addItem("Touch", 2); automationMode.addItem("Latch", 3);
     automationMode.setTooltip("Read mode does not record. Touch returns after 0.5 seconds without control input; Latch writes until stopped or Read is selected. Curve Read is separate.");
     automationRead.setTooltip("Enable or disable this owner's automation nodes. Preset nodes use the same Read control. Undo restores the change.");
-    automationAdd.setTooltip("Add a node to the selected owner and parameter at the playhead; Snap applies. Right-click a segment for Add node here. Time / value bypasses Snap.");
+    automationAdd.setTooltip("Add a point at the playhead for the selected control. Snap applies.");
     automationPrevious.setTooltip("Select the previous node without seeking; Left on the timeline does the same.");
     automationNext.setTooltip("Select the next node without seeking; Right on the timeline does the same.");
-    automationEdit.setTooltip("Edit the selected node's project time and value. With no node selected, enter a new node seeded at the playhead. Exact entry bypasses Snap.");
+    automationEdit.setTooltip("Set the selected point's exact time and value. With no point selected, this adds one at the playhead.");
     automationDelete.setTooltip("Delete the selected automation node, including a point placed by a preset. One Undo restores it.");
-    automationArm.setTooltip("Arm this owner's lane (including its segments), or master. This is separate from Controller Record, which arms all lanes and master.");
+    automationArm.setTooltip("Enable movement recording for this lane or the master output. Controller Record enables it for all lanes and master.");
     automationPairedFilter.setButtonText("Filters...");
     automationPairedFilter.setTooltip("Choose a transition filter preset, then edit its regular Filter nodes in this same editor.");
     automationOwner.onChange = [this]
@@ -190,12 +190,11 @@ void Workstation::refreshAutomationEditor(bool rebuildChoices)
             if ((address.target == AutomationTarget::master && choice.target == AutomationTarget::master)
                 || (address.target != AutomationTarget::master && choice.target != AutomationTarget::master && choice.track == address.track && choice.clipId == address.clipId && choice.stem == address.stem)) ownerIndex = id;
         };
-        for (size_t i = 0; i < engine.project.clips.size(); ++i)
-        { const auto& clip = engine.project.clips[i]; addOwner("Segment " + juce::String((int) i + 1) + " / " + clip.media->libraryTitle(), {clip.track, AutomationTarget::volume, {}, {}, clip.id}); }
+        for (int i = 0; i < trackCount; ++i) addOwner("Lane " + juce::String(i + 1) + " / all tracks", {i, AutomationTarget::volume});
+        addOwner("Master output", {-1, AutomationTarget::master});
+        if (const auto* clip = currentClip()) addOwner("Track fades / " + clip->media->libraryTitle(), {clip->track, AutomationTarget::volume, {}, {}, clip->id});
         for (const auto& clip : engine.project.clips) if (clip.stems) for (int s = 0; s < stemCount; ++s)
             addOwner(clip.media->libraryTitle() + " / " + stemNames[s], {clip.track, AutomationTarget::volume, {}, {}, clip.id, s});
-        for (int i = 0; i < trackCount; ++i) addOwner("Lane " + juce::String(i + 1) + " / all segments", {i, AutomationTarget::volume});
-        addOwner("Master output", {-1, AutomationTarget::master});
         automationOwner.setSelectedId(ownerIndex, juce::dontSendNotification);
         automationParameter.clear(juce::dontSendNotification); automationParameterChoices.clear();
         auto addParameter = [&](const juce::String& name, AutomationAddress choice)
@@ -352,8 +351,9 @@ AutomationAddress Workstation::displayedAddress(int track) const
     const auto target = (AutomationTarget) std::max(0, automationLane());
     if (target == AutomationTarget::plugin) { auto address = pluginLane; if (track != address.track) address.track = -2; return address; }
     const auto* clip = engine.controlClip(track);
-    return {target == AutomationTarget::master ? -1 : track, target, {}, {}, target != AutomationTarget::master && clip ? selectedClip : juce::String(),
-        clip && clip->stems && (target == AutomationTarget::volume || target == AutomationTarget::pan) ? selectedStem : -1};
+    const int stem = clip && clip->stems && (target == AutomationTarget::volume || target == AutomationTarget::pan) ? selectedStem : -1;
+    const auto id = target != AutomationTarget::master && clip && (stem >= 0 || automationClip == selectedClip) ? selectedClip : juce::String();
+    return {target == AutomationTarget::master ? -1 : track, target, {}, {}, id, stem};
 }
 AutomationCurve* Workstation::displayedCurve(int track)
 {

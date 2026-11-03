@@ -40,6 +40,286 @@ void runZoomHandleTests(const std::function<void(bool, const juce::String&)>& ch
 }
 void runTransitionNavigationTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--lane-automation-only"))
+    {
+    const auto json=[](const Project& p) { return juce::JSON::toString(projectToJson(p),juce::JSON::FormatOptions().withMaxDecimalPlaces(17)); };
+    Project base; base.followTrackTempo=false; base.transitionLinksKnown=true; base.bpm=base.tempo.fallback=120; base.masterDb=0;
+    auto media=std::make_shared<Media>(); media->sampleRate=8000; media->manualBpm=120; media->manualBeatOrigin=0;
+    media->name="Lane curve preview"; media->file=report.getSiblingFile("lane-curve-source.wav");
+    media->samples.setSize(1,8000*64); media->peaks.assign(256,.1f); media->waveformRms.assign(256,.06f);
+    for(int i=0;i<media->frames();++i)media->samples.setSample(0,i,.08f*std::sin((float)i*.031f));
+    { juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> stream=media->file.createOutputStream();
+      auto writer=wav.createWriterFor(stream,juce::AudioFormatWriterOptions().withSampleRate(8000).withNumChannels(1).withBitsPerSample(24));
+      check(writer && writer->writeFromAudioSampleBuffer(media->samples,0,media->frames()),"write bounded original source for actual save/reopen and take replay"); }
+    Clip first; first.media=media; first.length=48; base.clips.push_back(first);
+    const AutomationAddress lane{0,AutomationTarget::volume};
+    auto times=[](const AutomationCurve& curve) { std::vector<double> result; for(const auto& p:curve.points)result.push_back(p.time);return result; };
+    base.updateLaneHandles();
+    check(times(*base.curve(lane))==std::vector<double>({0,16,32,48}),"long track receives start / eight bars / last eight bars / end handles");
+    bool neutral=true; for(const auto& curve:base.tracks[0].automation)for(const auto& p:curve.points)neutral=neutral && p.value==0;
+    check(neutral && base.tracks[1].automation[0].points.empty(),"all six parameters begin neutral without nodes on empty lanes");
+    const auto stable=json(base); base.updateLaneHandles(); check(json(base)==stable,"repeated refresh is idempotent");
+    auto shorter=base; shorter.clips[0].length=8; shorter.updateLaneHandles();
+    check(times(*shorter.curve(lane))==std::vector<double>({0,4,8}),"short tracks merge inner handles at the beat midpoint");
+    auto overlap=base; Clip second=first; second.id=juce::Uuid().toString(); second.effects=makeClipEffects(); second.start=32; overlap.clips.push_back(second); overlap.updateLaneHandles();
+    check(times(*overlap.curve(lane))==std::vector<double>({0,16,32,48,64,80}),"same-lane overlap shares one curve and merges coincident handles");
+    auto moved=base; moved.clips[0].start=5; moved.updateLaneHandles();
+    check(times(*moved.curve(lane))==std::vector<double>({5,21,37,53}),"untouched handles follow a move without leaving old nodes");
+    moved.clips.clear(); moved.updateLaneHandles(); check(moved.curve(lane)->points.empty(),"deleting the last untouched track removes only its scaffolding");
+    auto faster=base; faster.bpm=faster.tempo.fallback=240; faster.updateLaneHandles();
+    check(times(*faster.curve(lane))==std::vector<double>({0,8,40,48}),"eight-bar handles use the current project tempo");
+    auto split=base; split.clips[0].length=24; auto right=first; right.id=juce::Uuid().toString(); right.start=24; right.offset=24; right.length=24; split.clips.push_back(right);split.updateLaneHandles();
+    check(times(*split.curve(lane))==std::vector<double>({0,12,24,36,48}),"split pieces share a single boundary and receive short-piece midpoint handles");
+    auto authored=base; check(authored.moveAutomationPoint(lane,1,17,-9).wasOk(),"existing neutral handle can be edited directly");
+    authored.curve(lane)->enabled=true; const auto authoredPoints=times(*authored.curve(lane));
+    authored.clips[0].start=9; authored.bpm=90; authored.updateLaneHandles();
+    check(times(*authored.curve(lane))==authoredPoints && authored.curve(lane)->points[1].value==-9,"authored lane nodes stay at project positions after move and tempo changes");
+    authored.automationEdited(lane,AutomationEdit::removePoint); authored.curve(lane)->points.erase(authored.curve(lane)->points.begin()+1); authored.updateLaneHandles();
+    check(authored.curve(lane)->points.size()==3,"deleted authored handle does not respawn");
+    const auto saved=parseProject(json(authored)); check(saved.error.isEmpty() && saved.project.laneHandles.at(0).seeds.at(first.id).empty(),"session 46 retains authored ownership independently of point contents: "+saved.error);
+    auto preroll=base; const auto shifted=preroll.setTimelineOrigin(4); preroll.updateLaneHandles();
+    check(shifted.wasOk() && times(*preroll.curve(lane))==std::vector<double>({4,20,36,52}) && parseProject(json(preroll)).error.isEmpty(),"pre-roll rebases both default handles and their saved ownership");
+    for(bool exponential:{false,true})for(bool gain:{false,true})
+    {
+        auto shaped=base; auto& curve=*shaped.curve(lane); curve={true,{{0,-30,.45,exponential,gain},{96,0}}};
+        const auto original=curve; shaped.updateLaneHandles(); double error=0;
+        for(int i=0;i<=192;++i)error=std::max(error,std::abs((double)curve.interpolatedValue(i*.5,0)-original.interpolatedValue(i*.5,0)));
+        shaped.clips[0].start=7; shaped.updateLaneHandles();
+        for(int i=0;i<=192;++i)error=std::max(error,std::abs((double)curve.interpolatedValue(i*.5,0)-original.interpolatedValue(i*.5,0)));
+        shaped.clips.clear(); shaped.updateLaneHandles();
+        check(error<.00005 && curve.points.size()==2 && std::abs(curve.points[0].bend-.45)<1.e-8,"generated subdivisions preserve bent "+juce::String(exponential?"exponential":"rational")+" / "+(gain?"gain":"dB")+" interpolation through add/move/delete");
+    }
+    auto render=[](Project p,double at)
+    {
+        Engine engine; engine.sampleRate=8000; engine.project=std::move(p); juce::AudioBuffer<float> audio(2,128); juce::MidiBuffer midi; engine.render(audio,128,at,midi); return audio;
+    };
+    auto error=[](const juce::AudioBuffer<float>& a,const juce::AudioBuffer<float>& b)
+    { float result=0;for(int c=0;c<2;++c)for(int i=0;i<128;++i)result=std::max(result,std::abs(a.getSample(c,i)-b.getSample(c,i)));return result; };
+    auto faded=overlap; faded.automationEdited(lane); auto& shared=*faded.curve(lane); shared={true,{{0,-6},{80,-6}}};
+    faded.effectSettings(faded.clips[0]).automation[0]={true,{{0,0},{32,0},{48,-60}}};
+    faded.effectSettings(faded.clips[1]).automation[0]={true,{{0,-60},{16,0},{48,0}}};
+    auto perTrackOnly=faded; perTrackOnly.curve(lane)->enabled=false;
+    const auto wet=render(faded,40), dry=render(perTrackOnly,40);
+    check(std::abs(wet.getRMSLevel(0,0,128)/dry.getRMSLevel(0,0,128)-juce::Decibels::decibelsToGain(-6.f))<.0001,
+        "one lane gain multiplies both overlapping tracks while separate transition fades remain active");
+    check(faded.effectSettings(faded.clips[0]).automation[0].valueAt(1,0)>faded.effectSettings(faded.clips[0]).automation[0].valueAt(47,0)
+        && faded.effectSettings(faded.clips[1]).automation[0].valueAt(1,0)<faded.effectSettings(faded.clips[1]).automation[0].valueAt(47,0),"per-track fades keep opposite directions on a shared lane");
+    auto other=faded; other.clips[0].track=1; other.clips.erase(other.clips.begin()+1); auto otherBaseline=other; otherBaseline.tracks[0].automation={};
+    check(error(render(other,20),render(otherBaseline,20))<1.e-7,"lane curve leaves other-lane PCM unchanged");
+    Workstation ui(false);ui.stopTimer();ui.setSize(1440,900);ui.engine.sampleRate=8000;ui.engine.project=overlap;ui.selectedClip=second.id;ui.refresh();
+    ui.timeline.chooseCurveTool(0);
+    check(ui.displayedAddress(0)==lane && ui.selectedClip==second.id && ui.timeline.automationNodesVisible(lane),"normal Volume tool selects the lane and keeps track selection");
+    bool visibleOnly=true;for(const auto& address:ui.timeline.visibleAutomationAddresses(0))if(ui.timeline.automationVisible(address))visibleOnly=visibleOnly && address==lane;
+    check(visibleOnly,"ordinary editor shows only the selected lane parameter");
+    const auto initial=json(ui.engine.project);ui.engine.position=12.25;ui.engine.playing=true;
+    const auto mouse=juce::Desktop::getInstance().getMainMouseSource();ui.timeline.pixelsPerSecond=12;ui.refresh();
+    const juce::Point<float> down{16*12,ui.timeline.automationY(0,0,0)},to{16*12,ui.timeline.automationY(0,-12,0)};
+    auto event=[&](juce::Point<float> at,bool drag)
+    {return juce::MouseEvent(mouse,at,juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier|juce::ModifierKeys::altModifier),1,0,0,0,0,&ui.timeline,&ui.timeline,juce::Time::getCurrentTime(),down,juce::Time::getCurrentTime(),1,drag);};
+    ui.timeline.mouseDown(event(down,false));ui.timeline.mouseDrag(event(to,true));ui.timeline.mouseUp(event(to,true));
+    check(ui.engine.project.curve(lane)->active() && ui.engine.project.curve(lane)->points[1].value<-6 && ui.undoHistory.size()==1
+        && ui.engine.position==12.25 && ui.engine.playing,"native node drag activates the shared lane curve with one Undo and no live seek");
+    const auto edited=json(ui.engine.project);ui.undo(false);check(json(ui.engine.project)==initial,"Undo restores untouched default-handle ownership");
+    ui.undo(true);check(json(ui.engine.project)==edited,"Redo restores the edited shared curve exactly");
+    ui.timeline.selectAutomationCurve({0,AutomationTarget::volume,{},{},second.id});check(ui.displayedAddress(0).clipId==second.id,"explicit Track fades scope still exposes per-track automation");
+    ui.timeline.chooseCurveTool(0);ui.engine.playing=false;
+    ui.engine.setControlValue(lane,-8);ui.refresh();
+    check(ui.engine.project.tracks[0].gainDb==-8 && ui.engine.project.effectSettings(ui.engine.project.clips[1]).gainDb==0,"lane fader controls all tracks even when a track is selected");
+    ui.performance->refresh(true);
+    check(std::abs(ui.performance->faders[0].getValue()+8)<1.e-6 && ui.performance->faders[0].getTitle().contains("Mixer lane 1"),
+        "performance fader display and owner agree with lane input while a track is selected");
+    for(int target=0;target<trackAutomationCount;++target)
+    {
+        const AutomationAddress address{0,(AutomationTarget)target};const float value=target<4?-3.f:.25f;
+        const auto old=ui.engine.project.effectSettings(ui.engine.project.clips[1]).manualValue((AutomationTarget)target);
+        check(ui.engine.setControlValue(address,value) && ui.engine.project.manualValue(address)==value
+            && ui.engine.project.effectSettings(ui.engine.project.clips[1]).manualValue((AutomationTarget)target)==old,
+            "builtin control remains lane-owned with a selected track / "+juce::String(target));
+    }
+    ui.engine.setControlValue({0,AutomationTarget::cutoff,{},{},second.id},-.2f);
+    check(ui.engine.project.effectSettings(ui.engine.project.clips[1]).filterCutoff==-.2f && ui.engine.project.tracks[0].filterCutoff==.25f,
+        "explicit per-track cutoff remains separate from ordinary lane cutoff");
+    ui.engine.applyMidiControl({MidiActionKind::pan,0},.75f);
+    check(ui.engine.project.tracks[0].pan==.5f && ui.engine.project.effectSettings(ui.engine.project.clips[1]).pan==0,"MIDI pan retains lane ownership with a selected track");
+    ui.engine.returnToAutomation(lane);check(ui.engine.project.curve(lane)->enabled,"Return to automation re-enables the shared lane curve");
+    const auto path=report.getSiblingFile("shared-lane.mixworks");const auto saveError=ui.engine.saveProject(path);
+    Engine reopened;const auto openError=saveError.isEmpty()?reopened.restoreProject(path.loadFileAsString()):saveError;
+    check(openError.isEmpty(),"save and source-backed reopen the shared lane curve: "+openError);
+    if(openError.isEmpty())
+    {
+        check(error(render(ui.engine.project,20),render(reopened.project,20))<2.e-6,"reopened shared automation reproduces the same PCM");
+        juce::String exportError;auto exporter=reopened.createExportRenderer(exportError);check(exporter && exportError.isEmpty(),"offline export admits lane automation and per-track controls: "+exportError);
+    }
+    ui.showToolPage(2);ui.timeline.selectAutomationCurve(lane);ui.refresh();
+    auto pixels=report.getSiblingFile("shared-lane-automation.png").createOutputStream();
+    check(pixels && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*pixels),"capture actual shared lane automation editor");
+    auto touch=std::make_unique<Engine>();touch->sampleRate=8000;touch->project=overlap;touch->selectedClip=second.id;
+    touch->armAutomation(0,true);touch->setAutomationRecordMode(AutomationRecordMode::touch);touch->setPlaying(true);touch->position=10;
+    touch->setControlValue({0,AutomationTarget::cutoff},.4f);touch->setPlaying(false);touch->project.updateLaneHandles();
+    check(touch->project.tracks[0].automation[5].active() && touch->project.tracks[0].automation[5].valueAt(10,0)==.4f
+        && touch->project.effectSettings(touch->project.clips[1]).automation[5].points.empty(),
+        "Touch writes project-time lane cutoff while a track is selected, without recreating neutral handles");
+    Project::TransitionLink locked;locked.outgoing=first.id;locked.incoming=second.id;locked.locked=true;touch->project.transitionLinks={locked};
+    touch->project.curve(lane)->enabled=false;const auto lockedBefore=json(touch->project);
+    const bool blocked=!touch->setControlValue(lane,-9);touch->returnToAutomation(lane);
+    check(blocked && json(touch->project)==lockedBefore,"locked transition protects shared lane input and Return to automation");
+    Engine capture;capture.sampleRate=8000;capture.project=overlap;capture.selectedClip=second.id;capture.prepareRender(8000,128);capture.prepareClipProcessing();
+    check(capture.setWorkMode(WorkMode::recordPerform).wasOk(),"prepare bounded Record/Perform ownership check");capture.setPlaying(true);
+    check(capture.capturingPerformance(),"start source-backed take without a physical audio device");
+    if(capture.capturingPerformance())
+    {
+        capture.setControlValue(lane,-12);juce::AudioBuffer<float> heard(2,128);capture.audioDeviceIOCallbackWithContext(nullptr,0,heard.getArrayOfWritePointers(),2,128,{});capture.stop();
+        const auto& events=capture.project.performanceTakes.back().events;
+        check(std::any_of(events.begin(),events.end(),[](const auto& e){return e.kind==TakeEventKind::control && e.control==0 && e.owner.isEmpty() && e.lane==0 && e.value==-12;}),"captured lane fader event has no hidden selected-track owner");
+        juce::String replayError;auto replay=capture.prepareTakeReplay(0,replayError);
+        juce::AudioBuffer<float> replayed(2,128);if(replay)replay->renderTake(replayed,128,0);
+        check(replay && error(heard,replayed)<1.e-6,"captured and replayed lane-controlled PCM agree: "+replayError);
+    }
+
+        return;
+    }
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--alignment-guide-only"))
+    {
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800);
+        auto media=std::make_shared<Media>(); media->sampleRate=8000; media->samples.setSize(1,8000*32); media->samples.clear();
+        media->name="Alignment preview"; media->manualBpm=120;
+        Clip clip; clip.media=media; clip.length=32; ui.engine.project.clips={clip};
+        ui.engine.project.followTrackTempo=false; ui.engine.project.bpm=120; ui.engine.project.snap=true;
+        ui.timeline.pixelsPerSecond=30; ui.refresh(); ui.engine.position=7.25; ui.engine.playing=true;
+        const auto before=juce::JSON::toString(projectToJson(ui.engine.project));
+        const auto mouse=juce::Desktop::getInstance().getMainMouseSource();
+        const auto event=[&](float x,int flags,int clicks=1)
+        {
+            const juce::Point<float> at{x,8};
+            return juce::MouseEvent(mouse,at,juce::ModifierKeys(flags),1,0,0,0,0,&ui.timelineRuler,&ui.timelineRuler,
+                juce::Time::getCurrentTime(),at,juce::Time::getCurrentTime(),clicks,false);
+        };
+        const int left=juce::ModifierKeys::leftButtonModifier;
+        auto down=event(123,left|juce::ModifierKeys::shiftModifier);
+        ui.timelineRuler.mouseDown(down); ui.timelineRuler.mouseUp(down);
+        check(ui.timelineRuler.alignmentGuide && *ui.timelineRuler.alignmentGuide==ui.engine.project.snappedTime(4.1,true),
+            "Shift-click places an independent alignment guide using the project Snap setting");
+        const float handle=(float)(*ui.timelineRuler.alignmentGuide*30);
+        ui.timelineRuler.mouseDown(event(handle,left));
+        auto free=event(157,left|juce::ModifierKeys::altModifier);
+        ui.timelineRuler.mouseDrag(free); ui.timelineRuler.mouseUp(free);
+        check(std::abs(*ui.timelineRuler.alignmentGuide-157./30)<1.e-8,"Alt-drag freely positions the guide between beats");
+        ui.timelineRuler.mouseDoubleClick(event(157,left,2));
+        check(ui.engine.playing && ui.engine.position==7.25 && before==juce::JSON::toString(projectToJson(ui.engine.project))
+            && ui.undoHistory.empty(),"guide placement/drag/double-click neither seeks nor edits audio or history during playback");
+        ui.timelineRuler.guideButton.setToggleState(false,juce::dontSendNotification); ui.timelineRuler.guideButton.onClick();
+        check(!ui.timelineRuler.alignmentGuide && ui.engine.playing && ui.engine.position==7.25,"Guide toggle hides the view-only reference without changing playback");
+        ui.timelineRuler.guideButton.setToggleState(true,juce::dontSendNotification); ui.timelineRuler.guideButton.onClick();
+        check(ui.timelineRuler.alignmentGuide.has_value(),"Guide toggle restores a visible alignment reference");
+        auto pixels=report.getSiblingFile("alignment-guide-playing.png").createOutputStream();
+        check(pixels && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*pixels),"capture distinct cyan guide and playback cursor");
+        ui.engine.playing=false; return;
+    }
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--live-transition-only"))
+    {
+        // Bounded functional fixture: no device, detector, worker, timing or load test.
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800); ui.engine.sampleRate = 8000;
+        Project base; base.followTrackTempo = false; base.bpm = base.tempo.fallback = 120; base.masterDb = 0; base.transitionLinksKnown = true;
+        for (int lane = 0; lane < 3; ++lane)
+        {
+            auto media = std::make_shared<Media>(); media->sampleRate = 8000; media->manualBpm = 120; media->manualBeatOrigin = 0;
+            media->manualKey = 0; media->name = "Live transition " + juce::String(lane + 1); media->file = report.getSiblingFile("live-transition-" + juce::String(lane) + ".wav");
+            media->samples.setSize(1,16*8000); media->peaks.assign(256,.15f); media->waveformRms.assign(256,.1f);
+            for (int i = 0; i < media->frames(); ++i) media->samples.setSample(0,i,.15f*std::sin((float)i*(.031f+lane*.013f)));
+            { juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> stream = media->file.createOutputStream();
+              auto writer = wav.createWriterFor(stream,juce::AudioFormatWriterOptions().withSampleRate(8000).withNumChannels(1).withBitsPerSample(24));
+              check(writer && writer->writeFromAudioSampleBuffer(media->samples,0,media->frames()),"write tiny owned live-transition source " + juce::String(lane)); }
+            Clip clip; clip.media = media; clip.track = lane; clip.start = lane == 1 ? 8 : 0; clip.length = 16; base.clips.push_back(clip);
+        }
+        base.updateLaneHandles();
+        const auto a = base.clips[0].id, b = base.clips[1].id;
+        const auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p),juce::JSON::FormatOptions().withMaxDecimalPlaces(17)); };
+        const auto hasVolumeNodes = [](const Project& p, size_t clip) { return !p.effectSettings(p.clips[clip]).automation[0].points.empty(); };
+        auto reset = [&](bool playing, int preset)
+        {
+            ui.engine.setPlaying(false); ui.engine.project = base; ui.undoHistory.clear(); ui.redoHistory.clear();
+            ui.selectedTransition.clear(); ui.selectedClip = b; ui.editSelection.clips = {a,b}; ui.editSelection.primary = b;
+            ui.transitionIndex = 2; ui.transitionPreset.setSelectedId(preset,juce::dontSendNotification);
+            ui.engine.seek(9); ui.engine.setPlaying(playing); ui.refresh();
+        };
+        auto capture = [&](const juce::String& name)
+        { auto stream = report.getSiblingFile(name).createOutputStream(); check(stream && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*stream),"capture actual native transition UI: " + name); };
+        reset(true,1);
+        check(!ui.canInsertArrangement(),"original song-insertion guard reproduces the playback exclusion (kept for song insertion)");
+        check(ui.addTransitionButton.isEnabled(),"native Add Transition is enabled during normal prepared playback");
+        const auto context = ui.timelineMenu(9,1);
+        bool contextEnabled = false;
+        for (juce::PopupMenu::MenuItemIterator item(context); item.next();)
+            if (item.getItem().itemID == (int)TimelineAction::addTransition) contextEnabled = item.getItem().isEnabled;
+        check(contextEnabled,"timeline context menu also enables Add Transition during playback");
+        const double before = ui.engine.position.load(); ui.addTransitionButton.onClick();
+        const auto* link = ui.engine.project.transitionFor(b);
+        check(link && ui.engine.playing && ui.engine.position == before && ui.undoHistory.size() == 1,"native Add callback links the selected pair with one Undo and no transport jump: " + ui.status);
+        if (!link) { capture("live-transition-rejected.png"); ui.engine.setPlaying(false); return; }
+        check(link->outgoing == a && ui.engine.project.transitionRange(*link) == juce::Range<double>(8,16),"transition names the chosen pair and actual 8-second overlap");
+        check(ui.engine.project.clips[2].id == base.clips[2].id && !hasVolumeNodes(ui.engine.project,2)
+            && ui.engine.project.clips[0].start == 0 && ui.engine.project.clips[1].start == 8,"adding the pair preserves unrelated lane and track positions");
+        juce::AudioBuffer<float> callback(2,128);
+        ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,callback.getArrayOfWritePointers(),2,128,{});
+        check(ui.engine.playing && std::abs(ui.engine.position-(before+128./8000))<1.e-8 && callback.getMagnitude(0,128)>.001f,
+            "actual device callback renders nonzero audio and continues the pre-edit sample clock");
+        const double livePosition = ui.engine.position.load();
+        ui.selectTransition(b,true); ui.navigateTransition(1);
+        check(ui.engine.playing && ui.engine.position == livePosition,"focused selection and Next preserve playback position while running");
+        ui.transitionPresetForSelection.setSelectedId(3,juce::dontSendNotification); ui.transitionPresetForSelection.onChange();
+        const auto applied = ui.engine.project;
+        const bool shaped = hasVolumeNodes(applied,0) && hasVolumeNodes(applied,1);
+        check(shaped && ui.undoHistory.size() == 2 && ui.engine.position == livePosition && ui.engine.playing,"native Apply Crossfade creates audible ordinary nodes without seeking: " + ui.status);
+        auto render = [&](const Project& p, int lane, double at)
+        {
+            Engine engine; engine.sampleRate = 8000; engine.project = p;
+            for (int i = 0; i < trackCount; ++i) engine.project.tracks[(size_t)i].mute = lane != i;
+            juce::AudioBuffer<float> audio(2,128); juce::MidiBuffer midi; engine.render(audio,128,at,midi); return audio;
+        };
+        auto relative = [&](int lane,double at) { const auto raw = render(base,lane,at), faded = render(applied,lane,at); return faded.getRMSLevel(0,0,128)/std::max(.00001f,raw.getRMSLevel(0,0,128)); };
+        check(relative(0,9)>relative(0,15)+.4f && relative(1,15)>relative(1,9)+.4f,"rendered PCM independently confirms outgoing fades down and incoming fades up");
+        const auto otherBefore = render(base,2,10), otherAfter = render(applied,2,10); float otherError = 0;
+        for (int ch=0;ch<2;++ch) for(int i=0;i<128;++i) otherError=std::max(otherError,std::abs(otherBefore.getSample(ch,i)-otherAfter.getSample(ch,i)));
+        check(otherError<1.e-7f,"unrelated lane PCM is unchanged by live preset placement");
+        capture("live-transition-playing.png");
+        ui.undo(false); const bool presetUndone = !hasVolumeNodes(ui.engine.project,0); ui.undo(true);
+        check(presetUndone && json(ui.engine.project)==json(applied) && ui.engine.playing && ui.engine.position==livePosition,"live preset Undo/Redo restores the exact project without changing transport");
+        ui.undo(false); ui.undo(false); check(json(ui.engine.project)==json(base),"second Undo removes the newly added transition completely");
+        ui.undo(true); ui.undo(true); ui.engine.setPlaying(false);
+        ui.selectTransition(b,true); check(ui.engine.position==8,"explicit focused transition navigation still seeks while stopped");
+        const auto file=report.getSiblingFile("live-transition.mixworks"); const auto save=ui.engine.saveProject(file);
+        Engine reopened; const auto opened=save.isEmpty()?reopened.restoreProject(file.loadFileAsString()):save;
+        check(save.isEmpty() && opened.isEmpty() && reopened.project.transitionFor(b),"save and actual source-backed reopen retain the placed transition: " + opened);
+        if(opened.isEmpty())
+        {
+            const auto restored=render(reopened.project,0,10), expected=render(applied,0,10); float error=0;
+            for(int ch=0;ch<2;++ch) for(int i=0;i<128;++i) error=std::max(error,std::abs(restored.getSample(ch,i)-expected.getSample(ch,i)));
+            check(error<2.e-6f,"reopened transition reproduces its rendered source PCM");
+            juce::String errorText; auto exporter=reopened.createExportRenderer(errorText);
+            check(exporter && errorText.isEmpty(),"normal offline export renderer admits the saved live transition: " + errorText);
+            if(exporter) { exporter->sampleRate=8000; juce::AudioBuffer<float> audio(2,128); juce::MidiBuffer midi; exporter->render(audio,128,10,midi); check(audio.getMagnitude(0,128)>.001f,"offline export path renders the transition audio"); }
+        }
+        for(bool playing:{false,true})
+        {
+            reset(playing,3); ui.performTimelineAction(TimelineAction::addTransition,9,1);
+            check(ui.engine.project.transitionFor(b) && hasVolumeNodes(ui.engine.project,0) && hasVolumeNodes(ui.engine.project,1)
+                && ui.engine.playing==playing && ui.engine.position==9,"default Add Crossfade has the same result stopped/playing: " + juce::String((int)playing) + " / " + ui.status);
+        }
+        for(int condition=0;condition<5;++condition)
+        {
+            reset(true,1);
+            if(condition==0)ui.busy=true; if(condition==1)ui.engine.exporting=true;
+            if(condition==2)ui.pendingTempo=121; if(condition==3)ui.tempoPreparationPending=true;
+            if(condition==4)ui.engine.automationRecordMode=AutomationRecordMode::write;
+            const auto original=json(ui.engine.project); ui.refresh(); const bool disabled=!ui.addTransitionButton.isEnabled();
+            ui.addSelectedTransition(a,b);
+            check(disabled && json(ui.engine.project)==original && ui.undoHistory.empty() && ui.engine.playing && ui.engine.position==9,"live Add rechecks busy/export/preparation/write guard " + juce::String(condition));
+            ui.busy=false;ui.engine.exporting=false;ui.pendingTempo=0;ui.tempoPreparationPending=false;ui.engine.automationRecordMode=AutomationRecordMode::read;
+        }
+        reset(true,1); ui.engine.project.clips.erase(ui.engine.project.clips.begin()); const auto removed=json(ui.engine.project);
+        ui.addSelectedTransition(a,b); check(json(ui.engine.project)==removed && ui.undoHistory.empty() && ui.engine.playing,"late removed-target admission rejects without editing another lane or transport");
+        ui.engine.setPlaying(false); return;
+    }
     const auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p), juce::JSON::FormatOptions().withMaxDecimalPlaces(17)); };
     Project base; base.followTrackTempo = false; base.bpm = base.tempo.fallback = 120;
     for (int n = 0; n < 3; ++n)

@@ -65,7 +65,8 @@ def finish_run(folder, owner):
             for name in names:
                 path = Path(directory) / name
                 generated_session = re.search(r'\.mixworks(?:\(\d+\))?(?:\.bak)?$', name, re.I)
-                if path.suffix.lower() not in BULK and not generated_session:
+                audio_name = re.sub(r'(?:\(\d+\))?\.bak$', '', name, flags=re.I)
+                if Path(audio_name).suffix.lower() not in BULK and not generated_session:
                     continue
                 try:
                     if linked(path) or not path.resolve().is_relative_to(folder):

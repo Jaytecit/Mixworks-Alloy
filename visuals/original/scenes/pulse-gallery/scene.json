@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "key": "original/pulse-gallery",
+  "title": "Pulse Gallery",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original Mixworks solid-frame image stage",
+  "family": "image-stage",
+  "variant": 0,
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.95,
+      "type": "continuous"
+    },
+    "scale": {
+      "min": 0,
+      "max": 1,
+      "default": 0.34,
+      "type": "continuous"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.85,
+      "type": "continuous"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "type": "continuous"
+    },
+    "bassDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Bass response",
+      "type": "continuous"
+    },
+    "midDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "label": "Mid response",
+      "type": "continuous"
+    },
+    "trebleDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Treble response",
+      "type": "continuous"
+    },
+    "momentum": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Release momentum",
+      "type": "continuous"
+    },
+    "materialMotion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "label": "Image movement",
+      "type": "continuous"
+    },
+    "materialMode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "label": "Image method",
+      "type": "choice",
+      "steps": 4
+    },
+    "viewPattern": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "label": "View method",
+      "type": "choice",
+      "steps": 5
+    },
+    "finishGlow": {
+      "min": 0,
+      "max": 1,
+      "default": 0.2,
+      "label": "Soft highlight glow",
+      "type": "continuous"
+    }
+  },
+  "passSchema": 2,
+  "passes": [
+    {
+      "id": "surface",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8"
+    }
+  ],
+  "composition": "Depth-travelling rectangular frames",
+  "audioMapping": {
+    "bass": "Depth travel and complete image scale",
+    "mid": "Solid frame turns and image plane movement",
+    "treble": "Frame aperture and local refraction"
+  },
+  "mediaRole": "Complete fitted image with musical plane motion and surrounding solid geometry",
+  "presets": [
+    {
+      "id": "signature",
+      "title": "Signature",
+      "controls": {
+        "intensity": 0.65,
+        "motion": 0.5,
+        "imageMix": 0.95,
+        "scale": 0.34,
+        "detail": 0.65,
+        "hue": 0.0,
+        "pulse": 0.85,
+        "warp": 0.5,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2
+      }
+    },
+    {
+      "id": "silk",
+      "title": "Silk drift",
+      "controls": {
+        "intensity": 0.65,
+        "motion": 0.5,
+        "imageMix": 0.95,
+        "scale": 0.34,
+        "detail": 0.65,
+        "hue": 0.0,
+        "pulse": 0.85,
+        "warp": 0.5,
+        "bassDrive": 0.38,
+        "midDrive": 0.48,
+        "trebleDrive": 0.35,
+        "momentum": 0.9,
+        "materialMotion": 0.4,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.24
+      }
+    },
+    {
+      "id": "percussive",
+      "title": "Percussive",
+      "controls": {
+        "intensity": 0.65,
+        "motion": 0.5,
+        "imageMix": 0.95,
+        "scale": 0.34,
+        "detail": 0.65,
+        "hue": 0.0,
+        "pulse": 0.85,
+        "warp": 0.5,
+        "bassDrive": 0.9,
+        "midDrive": 0.8,
+        "trebleDrive": 0.75,
+        "momentum": 0.3,
+        "materialMotion": 0.7,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.32
+      }
+    },
+    {
+      "id": "faceted",
+      "title": "Faceted motion",
+      "controls": {
+        "intensity": 0.65,
+        "motion": 0.5,
+        "imageMix": 0.95,
+        "scale": 0.34,
+        "detail": 0.65,
+        "hue": 0.0,
+        "pulse": 0.85,
+        "warp": 0.5,
+        "bassDrive": 0.7,
+        "midDrive": 0.8,
+        "trebleDrive": 0.65,
+        "momentum": 0.65,
+        "materialMotion": 0.65,
+        "materialMode": 0.0,
+        "viewPattern": 0.25,
+        "finishGlow": 0.18
+      }
+    },
+    {
+      "id": "ribbons",
+      "title": "Woven images",
+      "controls": {
+        "intensity": 0.65,
+        "motion": 0.5,
+        "imageMix": 0.95,
+        "scale": 0.34,
+        "detail": 0.65,
+        "hue": 0.0,
+        "pulse": 0.85,
+        "warp": 0.5,
+        "bassDrive": 0.65,
+        "midDrive": 0.7,
+        "trebleDrive": 0.8,
+        "momentum": 0.8,
+        "materialMotion": 0.8,
+        "materialMode": 0.3333333333333333,
+        "viewPattern": 0.0,
+        "finishGlow": 0.27
+      }
+    },
+    {
+      "id": "prismatic",
+      "title": "Prismatic",
+      "controls": {
+        "intensity": 0.65,
+        "motion": 0.5,
+        "imageMix": 0.95,
+        "scale": 0.34,
+        "detail": 0.65,
+        "hue": 0.0,
+        "pulse": 0.85,
+        "warp": 0.5,
+        "bassDrive": 0.8,
+        "midDrive": 0.65,
+        "trebleDrive": 0.9,
+        "momentum": 0.6,
+        "materialMotion": 0.55,
+        "materialMode": 0.0,
+        "viewPattern": 0.75,
+        "finishGlow": 0.38
+      }
+    }
+  ],
+  "sharedLookVersion": 1
+}

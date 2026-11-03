@@ -1,5 +1,6 @@
 #include "Workstation.h"
 #include "AppWindow.h"
+#include "UiMessages.h"
 
 namespace mixworks
 {
@@ -8,6 +9,7 @@ namespace
 // JUCE transports integer IDs; keep each command family explicit and disjoint.
 enum class MenuCommand : int
 {
+    lastMessage = 7140,
     newMix = 1,
     openMix = 2,
     saveMix = 3,
@@ -92,7 +94,7 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
     switch (index)
     {
         case 0: menu.addSectionHeader("Current: " + (sessionFile == juce::File() ? "Untitled mix" : sessionFile.getFileName()) + (dirty ? " *" : "")); menu.addItem(commandId(MenuCommand::newMix), "New mix"); menu.addItem(commandId(MenuCommand::openMix), "Open mix..."); menu.addItem(commandId(MenuCommand::saveMix), "Save mix (Ctrl+S)"); menu.addItem(commandId(MenuCommand::saveMixAs), "Save mix as... (Ctrl+Shift+S)"); menu.addItem(commandId(MenuCommand::recover), "Recover unsaved mix..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addFiles), "Add files to library..."); menu.addItem(commandId(MenuCommand::importPlaylist), "Import playlist..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::exportWav), "Export mix as WAV..."); menu.addItem(commandId(MenuCommand::exportPlaylist), "Export source playlist..."); menu.addItem(commandId(MenuCommand::exportTrackList), "Export track list..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::quit), "Exit Mixworks (Alt+F4)"); break;
-        case 1: menu.addItem(commandId(MenuCommand::undo), "Undo", !undoHistory.empty()); menu.addItem(commandId(MenuCommand::redo), "Redo", !redoHistory.empty()); menu.addSeparator(); menu.addItem(commandId(MenuCommand::split), "Split at playhead", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::duplicate), "Duplicate segment", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::remove), "Remove segment", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::reverse), "Reverse", currentClip() != nullptr, currentClip() && currentClip()->reversed); menu.addItem(commandId(MenuCommand::loop), "Loop section...", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::resetClipCutoff), "Reset selected segment cutoff", currentClip() && !engine.project.clipTransitionLocked(currentClip()->id)); break;
+        case 1: menu.addItem(commandId(MenuCommand::undo), "Undo", !undoHistory.empty()); menu.addItem(commandId(MenuCommand::redo), "Redo", !redoHistory.empty()); menu.addSeparator(); menu.addItem(commandId(MenuCommand::split), "Split at playhead", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::duplicate), "Duplicate selection", currentClip() != nullptr || (sceneLane && sceneLane->hasSelectedScene())); menu.addItem(commandId(MenuCommand::remove), "Remove selection", currentClip() != nullptr || (sceneLane && sceneLane->hasSelectedScene())); menu.addItem(commandId(MenuCommand::reverse), "Reverse", currentClip() != nullptr, currentClip() && currentClip()->reversed); menu.addItem(commandId(MenuCommand::loop), "Loop section...", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::resetClipCutoff), "Reset selected segment cutoff", currentClip() && !engine.project.clipTransitionLocked(currentClip()->id)); break;
         case 2: menu.addSubMenu("Automation", automationMenu(engine.selectedTrack.load())); menu.addSeparator(); menu.addItem(commandId(MenuCommand::effectEnding), "Effect ending...", !busy); menu.addSeparator(); menu.addItem(commandId(MenuCommand::tempo), "Tempo marker at playhead... (P)"); menu.addItem(commandId(MenuCommand::snap), "Snap to grid", true, engine.project.snap); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addLabel), "Label marker at playhead... (L)"); menu.addItem(commandId(MenuCommand::editLabel), "Edit selected label...", timeline.selectedLabel.isNotEmpty()); menu.addItem(commandId(MenuCommand::removeLabel), "Remove selected label", timeline.selectedLabel.isNotEmpty()); menu.addItem(commandId(MenuCommand::previousLabel), "Previous label ([)", !engine.project.labels.empty()); menu.addItem(commandId(MenuCommand::nextLabel), "Next label (])", !engine.project.labels.empty()); menu.addSeparator(); menu.addItem(commandId(MenuCommand::play), "Play / pause"); menu.addItem(commandId(MenuCommand::stop), "Stop"); menu.addItem(commandId(MenuCommand::home), "Return to start"); break;
         case 3:
         {
@@ -129,6 +131,7 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
             }
             menu.addItem(commandId(MenuCommand::popupHints), "Popup hints", true, layout.popupHints);
             menu.addItem(commandId(MenuCommand::energySections), "Suggested energy sections", true, showEnergySections);
+            menu.addItem(2781, "Visual scene library / preview...", !busy);
             menu.addItem(commandId(MenuCommand::masterOutput), "Master output / Spectrum...", !busy); menu.addSeparator();
             menu.addItem(commandId(MenuCommand::forge), "Forge sparks", true, layout.forgeEffects);
             {
@@ -155,7 +158,7 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
             menu.addSeparator(); menu.addItem(commandId(MenuCommand::fit), "Fit whole mix"); menu.addItem(commandId(MenuCommand::zoomIn), "Zoom in"); menu.addItem(commandId(MenuCommand::zoomOut), "Zoom out");
             if (const auto* window = findParentComponentOfClass<AppWindow>()) { menu.addSeparator(); menu.addSubMenu("Display", window->displayMenu()); }
             break;
-        case 5: menu.addItem(commandId(MenuCommand::settings), "Audio / MIDI settings..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addPlugin), "Add VST3 effect / instrument..."); menu.addItem(commandId(MenuCommand::assignPlugin), "Assign MIDI plugin controls..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::scanMusic), "Scan Music folder now", !engine.playing); menu.addItem(commandId(MenuCommand::autoScan), "Automatically scan Music folder", true, musicScanEnabled); menu.addItem(commandId(MenuCommand::stopScan), "Stop current Music scan", musicScan != nullptr || musicScanJobPending || musicScanManual); menu.addItem(commandId(MenuCommand::scanReports), "Music scan reports..."); break;
+        case 5: menu.addItem(commandId(MenuCommand::settings), "Audio / MIDI settings..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addPlugin), "Add VST3 effect / instrument..."); menu.addItem(commandId(MenuCommand::assignPlugin), "Assign MIDI plugin controls..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::scanMusic), "Scan Music folder now", !engine.playing); menu.addItem(commandId(MenuCommand::autoScan), "Automatically scan Music folder", true, musicScanEnabled); menu.addItem(commandId(MenuCommand::stopScan), "Stop current Music scan", musicScan != nullptr || musicScanJobPending || musicScanManual); menu.addItem(commandId(MenuCommand::scanReports), "Music scan reports..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::lastMessage), "Last message details...", getProperties()["lastMessageDetails"].toString().isNotEmpty()); break;
         default: break;
     }
     if (index == 1)
@@ -171,6 +174,7 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
 }
 void Workstation::menuItemSelected(int id, int menuIndex)
 {
+    if (id == 2781) { if (sceneLane) sceneLane->showBrowser(); return; }
     if (id == commandId(MenuCommand::insertBefore) || id == commandId(MenuCommand::insertAfter))
     {
         if (menuIndex == 1 && currentClip()) chooseArrangementInsertion(selectedClip, id == commandId(MenuCommand::insertAfter));
@@ -264,6 +268,7 @@ void Workstation::menuItemSelected(int id, int menuIndex)
             else if (musicScanReportsFolder(musicPreference).isDirectory()) musicScanReportsFolder(musicPreference).revealToUser();
             else setStatus("No scan issues have been recorded by this version yet.");
             break;
+        case MenuCommand::lastMessage: showUiDetails(*this, "Message details", getProperties()["lastMessageDetails"].toString()); break;
         case MenuCommand::analyseSelected: reanalyseTracks(0); break; case MenuCommand::analyseReview: reanalyseTracks(1); break; case MenuCommand::analyseAll: reanalyseTracks(2); break;
         case MenuCommand::analyseFocused: reanalyseTracks(0, true); break;
         case MenuCommand::selectAllVisible:
@@ -427,7 +432,7 @@ void Workstation::showInspectorPage(int page)
     keyboardButton.setToggleState(inspectorPage == 2, juce::dontSendNotification);
     piano.setVisible(inspectorPage == 2); midiLabel.setVisible(inspectorPage == 2);
     sidebarHelp.setText({}, juce::dontSendNotification);
-    pluginList.list.setTooltip("Effects and effect automation apply to every split piece of the selected original track, across cuts and gaps. Separate added tracks keep independent effects. With no segment selected, effects process the whole selected lane.");
+    pluginList.list.setTooltip("These effects apply to all split pieces of this track. With no segment selected, they affect the whole lane.");
     resized(); repaint();
 }
 
@@ -440,6 +445,7 @@ void Workstation::resizeLane(int lane, int height)
 void Workstation::layoutTrackHeaders()
 {
     for (int i = 0; i < trackCount; ++i) strips[(size_t) i]->setBounds(0, timeline.laneTop(i) - viewport.getViewPositionY(), trackHeaders.getWidth(), timeline.laneSize(i));
+    if (sceneLane) { sceneLane->setBounds(layout.visuals.withWidth(viewport.getViewWidth())); sceneLane->browserButton.setBounds(layout.visualHeader.reduced(5, 20)); sceneLane->repaint(); }
     tempoStrip.setBounds(layout.tempo.withWidth(viewport.getViewWidth())); tempoStrip.repaint();
     timelineRuler.setBounds(layout.ruler.withWidth(viewport.getViewWidth()));
 }
@@ -659,7 +665,7 @@ void Workstation::resized()
     bottomSplitter.setVisible(true);
     bottomSplitter.setEnabled(true); bottomSplitter.setBounds(layout.timelineDivider);
     bottomSplitter.setRange(layout.minimumTimelineHeight, layout.maximumTimelineHeight, 1);
-    bottomSplitter.setValue(layout.timeline.getHeight(), juce::dontSendNotification);
+    bottomSplitter.setValue(layout.timeline.getHeight() + layout.visuals.getHeight(), juce::dontSendNotification);
     leftSplitter.setBounds(layout.leftDivider); rightSplitter.setBounds(layout.rightDivider);
     const int panelBudget = getWidth() - 44 - WorkspaceLayout::minimumCentreWidth;
     leftSplitter.setRange(0, std::max(240, panelBudget - layout.master.getWidth()), 1);
@@ -671,7 +677,7 @@ void Workstation::resized()
     for (auto* c : std::initializer_list<juce::Component*> {&libraryTable.table, &search, &keyDisplay, &trackInfoButton, &musicScanNotice}) c->setVisible(!layout.libraryCollapsed && browserPage == 0);
     playlistTable.table.setVisible(!layout.libraryCollapsed && browserPage == 1);
     rightSplitter.setTitle(layout.inspectorCollapsed ? "Restore right inspector" : "Resize or collapse right inspector");
-    rightSplitter.setTooltip(layout.inspectorCollapsed ? "Inspector collapsed. Double-click, Enter or Home restores its previous width; drag left to open. Master level remains beside the peak meter." : "Drag right or press End to collapse the entire inspector; drag left to widen. Enter, Home or double-click restores width.");
+    rightSplitter.setTooltip(layout.inspectorCollapsed ? "Drag left or double-click to open this panel." : "Drag to resize this panel. Double-click to restore its width.");
     auto library = layout.library.reduced(8, 6); auto row = library.removeFromTop(30);
     button(libraryTab, row, std::min(156, std::max(84, row.getWidth() - 76))); button(playlistTab, row, 68);
     library.removeFromTop(8); search.setBounds(library.removeFromTop(26)); library.removeFromTop(6);

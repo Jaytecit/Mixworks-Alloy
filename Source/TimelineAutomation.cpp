@@ -229,7 +229,9 @@ void Timeline::refreshAccessibleItems()
                     const int i = locate(address, storedTime, duplicate); if (i < 0) return;
                     selectedLabel.clear(); owner.correctionFromLibrary = false;
                     owner.selectedStem = address.stem;
-    owner.selectedClip = address.clipId; owner.selectedAutomationTarget = (int) address.target;
+    owner.automationClip = address.clipId;
+    if (address.clipId.isNotEmpty()) owner.selectedClip = address.clipId;
+    owner.selectedAutomationTarget = (int) address.target;
                     if (address.target == AutomationTarget::plugin) owner.pluginLane = address;
                     owner.selectTrack(address.target == AutomationTarget::master ? 0 : address.track);
                     selectAutomationPoint(address, i); owner.showToolPage(2); reveal(key);
@@ -429,7 +431,7 @@ void Timeline::refreshCurveTools()
     const bool compact = row.getWidth() < 6 * buttonWidth;
     const auto selectorBounds = row;
     curveTools->saveDownbeat.setTitle("Save downbeat to track / " + clip->media->libraryTitle());
-    curveTools->saveDownbeat.setTooltip("Review an exact source beat-one position, or explicitly use the playhead or IN marker's audible source position. Save replaces the track's stored downbeat, keeping BPM/key corrections. Prepared audio keeps its captured clock until Beatmatch.");
+    curveTools->saveDownbeat.setTooltip("Save beat one from an exact time, the playhead or IN marker. Beatmatch applies the correction to the mix.");
     curveTools->saveDownbeat.setEnabled(available && !clip->media->sourceDetailsPending && clip->media->hasPlayback()
         && owner.pendingTempo <= 0 && !owner.tempoPreparationPending && !owner.engine.project.clipTransitionLocked(clip->id)
         && owner.engine.automationRecordMode == AutomationRecordMode::read && !owner.engine.recordingAutomation());
@@ -439,14 +441,14 @@ void Timeline::refreshCurveTools()
     for (size_t i = 0; i < curveTools->buttons.size(); ++i)
     {
         auto& button = curveTools->buttons[i];
-        const AutomationAddress address {clip->track, curveTargets[i], {}, {}, clip->id};
+        const AutomationAddress address {clip->track, curveTargets[i]};
         const auto* curve = owner.engine.project.curve(address);
         button.hasCurve = hasGeneratedAutomation(address) || (curve && !curve->points.empty());
         const bool active = owner.automationLane() == (int) address.target && owner.displayedAddress(clip->track) == address;
         if (active) selected = (int) i + 1;
         button.setToggleState(active, juce::dontSendNotification);
         button.setTooltip(juce::String(curveNames[i]) + (button.hasCurve ? " / existing automation" : " / no saved nodes")
-            + ". Select to show this segment's curve; selection does not change the sound. Filled dot: automation exists."
+            + ". Select the shared lane curve. Neutral handles mark each track and its first/last eight bars. Filled dot: automation exists."
             + (owner.engine.project.automationLocked(address) ? " Locked: viewing is available; unlock to edit." : ""));
         button.setEnabled(available); button.setVisible(!compact);
         button.setBounds(row.removeFromLeft(std::max(0, width)).withTrimmedRight(2));
@@ -481,24 +483,26 @@ void Timeline::chooseCurveTool(int index)
     }
     if (index == 6) { owner.editSavedDownbeat(id); refreshCurveTools(); return; }
     if (index == 5) { owner.selectTrack(track); owner.chooseAutomationPlugin(); return; }
-    const AutomationAddress address {track, curveTargets[(size_t) index], {}, {}, id};
+    const AutomationAddress address {track, curveTargets[(size_t) index]};
     // Reveal the requested curve even when the inspector previously hid or isolated another band.
     owner.transitionCurveOnlyBand = -1;
     if (index < 4) owner.transitionCurveShown[(size_t) index] = true;
     selectAutomationCurve(address);
-    owner.setStatus(juce::String(curveNames[(size_t) index]) + " / " + clip->media->name
-        + " selected.");
+    owner.setStatus(juce::String(curveNames[(size_t) index]) + " / Lane " + juce::String(track + 1) + " / all tracks. Transition fades remain per track.");
     owner.refresh();
 }
 
 void Timeline::selectAutomationCurve(const AutomationAddress& address)
 {
+    owner.showEditingPage(2);
     owner.clearEditSelection();
     selectedSection.reset(); selectedHotcue.reset(); hotcueGesture.reset();
     selectedCutAmount.reset();
     editingAutomationPoint.reset();
     owner.selectedStem = address.stem;
-    owner.selectedClip = address.clipId; owner.selectedAutomationTarget = (int) address.target;
+    owner.automationClip = address.clipId;
+    if (address.clipId.isNotEmpty()) owner.selectedClip = address.clipId;
+    owner.selectedAutomationTarget = (int) address.target;
     if (address.target == AutomationTarget::plugin) owner.pluginLane = address;
     owner.selectTrack(address.target == AutomationTarget::master ? 0 : address.track);
     refreshCurveTools();
@@ -692,11 +696,16 @@ std::optional<AutomationAddress> Timeline::automationCurveAt(juce::Point<float> 
 bool Timeline::automationVisible(const AutomationAddress& address) const
 {
     const int target = (int) address.target;
+    if (target != owner.automationLane()) return false;
+    if (address.target == AutomationTarget::plugin) return address == owner.pluginLane;
+    if (address.clipId.isEmpty()) return true;
+    if (address.stem < 0 && address.target != AutomationTarget::plugin && owner.automationClip.isEmpty()) return false;
     if (address.stem >= 0) return owner.selectedStem == address.stem && owner.selectedClip == address.clipId;
     if (target < 4 && hasGeneratedAutomation(address) && !owner.transitionCurveVisible(target)) return false;
     const auto* link = owner.engine.project.transitionFor(owner.selectedTransition);
     const auto* outgoing = link ? owner.engine.project.clipFor(link->outgoing) : nullptr;
     const auto* incoming = link ? owner.engine.project.clipFor(link->incoming) : nullptr;
+    if (address.clipId != owner.automationClip && (!link || (address.clipId != link->incoming && address.clipId != link->outgoing))) return false;
     const bool mixerLane = address.clipId.isEmpty() && address.target != AutomationTarget::master
         && ((outgoing && outgoing->track == address.track) || (incoming && incoming->track == address.track));
     if (link && (mixerLane || address.clipId == link->incoming || address.clipId == link->outgoing))

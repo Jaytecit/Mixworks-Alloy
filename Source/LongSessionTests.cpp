@@ -84,14 +84,14 @@ void runLongOpenTests(const std::function<void(bool, const juce::String&)>& chec
           "fresh process restores the complete real-source long session: " + error);
     int cachedAnalysis = 0, cachedAudio = 0; juce::int64 decodedBytes = 0;
     for (const auto& media : engine.library)
-    { cachedAnalysis += media->analysisFromCache ? 1 : 0; cachedAudio += media->decodedFromCache ? 1 : 0; decodedBytes += (juce::int64) media->frames() * media->channels() * sizeof(float); }
+    { cachedAnalysis += media->analysisFromCache ? 1 : 0; cachedAudio += media->original ? 1 : 0; decodedBytes += (juce::int64) media->samples.getNumSamples() * media->samples.getNumChannels() * sizeof(float); }
     check(engine.library.size() == 7 && engine.project.mastering.saturation && engine.project.effectTailSeconds == .5 && engine.plugins[0].size() == 1 && engine.plugins[2].size() == 1
           && engine.project.labels.size() == engine.project.clips.size() && !engine.project.transitionLinks.empty() && engine.project.transitionLinks.front().locked,
           "long-session reopen retains all seven sources, master settings, tail policy and actual lane inserts");
-    if (args.contains("--expect-warm")) check(cachedAnalysis == 7 && cachedAudio == 7, "warm fresh-process opening reuses all seven source analyses and decoded PCM entries");
+    if (args.contains("--expect-warm")) check(cachedAnalysis == 7 && cachedAudio == 7, "warm fresh-process opening reuses all seven analyses and streams the original files");
     auto metrics = object(); property(metrics, "format", "mixworks-long-open"); property(metrics, "session", path); property(metrics, "minutes", minutes);
     property(metrics, "milliseconds", elapsed); property(metrics, "before", verificationMetricsJson(before)); property(metrics, "after", verificationMetricsJson(after));
-    property(metrics, "analysisCacheHits", cachedAnalysis); property(metrics, "pcmCacheHits", cachedAudio); property(metrics, "decodedBytes", decodedBytes);
+    property(metrics, "analysisCacheHits", cachedAnalysis); property(metrics, "originalFiles", cachedAudio); property(metrics, "decodedBytes", decodedBytes);
     property(metrics, "sourceCount", (int) engine.library.size()); property(metrics, "clipCount", (int) engine.project.clips.size());
     property(metrics, "labelCount", (int) engine.project.labels.size()); property(metrics, "transitionCount", (int) engine.project.transitionLinks.size());
     property(metrics, "lockedTransitions", engine.project.hasLockedTransitions());
@@ -218,7 +218,7 @@ void runLongSessionTests(const std::function<void(bool, const juce::String&)>& c
         {
             const int count = (int) std::min<juce::int64>(32768, plan.frames - offset); exact = encoded->read(&chunk, 0, count, offset, true, true);
             for (int channel = 0; exact && channel < 2; ++channel) for (int i = 0; exact && i < count; ++i)
-                exact = chunk.getSample(channel, i) == reimported.media->channelData(channel)[offset + i];
+                exact = chunk.getSample(channel, i) == reimported.media->sample(channel, offset + i);
         }
         check(exact, "every reimported real-mix sample matches its actual exported PCM24 data");
     }

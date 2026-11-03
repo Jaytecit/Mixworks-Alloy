@@ -1,18 +1,14 @@
 # Long recordings and sessions
 
-These capacity improvements were introduced in accepted0.37.0-268ef72f4c12, after1,498 checks across22 suites and the separate60/90-minute workflows. Subsequent releases retain them; see FINISHING-PLAN.md for the current launcher. Previous releases and the launcher backup are retained.
+These capacity improvements were introduced in accepted0.37.0-268ef72f4c12, after1,498 checks across22 suites and the separate60/90-minute workflows. These are historical measurements; see FINISHING-PLAN.md for the current launcher. Previous releases and the launcher backup are retained.
 
-Long source recordings can decode into a temporary, read-only PCM mapping instead of allocating the entire decoded recording on the heap. The existing 1 GiB limit still applies to ordinary in-memory decoding and individual persistent PCM cache entries. Larger recordings use session-owned temporary files, subject to available disk space and the supported frame range. Reopening them decodes them again; they do not gain a persistent warm cache. The persistent cache remains limited to 8 GiB.
+The current original-file architecture supersedes whole-source PCM mappings: long recordings play from the encoded original through the same shared 32 MiB block pool as ordinary tracks. No source-sized temporary or persistent PCM file is required. Decoder, DSP and analysis workspaces are separate. Original files must remain available while editing, playing or exporting.
 
-The decoder retains at most 256 KiB of its own float scratch data. Codec libraries and analysis have additional memory requirements. Mapped file pages can also remain resident: low private allocation does not mean low total working set. Temporary PCM stays alive while playback or Undo retains it and is removed after the final owner releases it.
-
-The rhythm analyser retains its separate 512 MiB signal/feature budget. A recording that exceeds that budget remains importable and playable, with the analysis limitation reported explicitly. This does not establish a reliable automatic beat grid for an entire changing-tempo mix. Treat unknown or variable timing as requiring manual handling.
-
-Stop and window close propagate cancellation into streaming decode and the neural source, feature and inference stages. Completed library entries and manual corrections are retained. Cancellation is cooperative and can wait for an in-flight codec or inference operation to return. No instant shutdown guarantee is implied.
+Cold automatic analysis currently has a 256 MiB source-PCM workspace limit. Larger sources retain bounded waveform/RMS results and an explicit unavailable-analysis reason, while remaining playable. This does not establish a reliable automatic beat grid for a changing-tempo recorded mix. See [loading and analysis](LOADING-AND-ANALYSIS.md).
 
 Device playback now derives transport time from an integer frame count anchored at the selected source time. This prevents accumulated block-duration rounding over long mixes while preserving fractional seeks, pause/resume and sample-rate changes. Offline rendering retains its existing integer output-frame clock.
 
-## Retained acceptance evidence
+## Historical acceptance evidence
 
 The owned 90-minute stereo 44.1 kHz PCM24 fixture contains 238,140,000 frames. Every decoded channel sample matched its construction. It decoded in 22.5 seconds in the first focused run, with a 148,488,192-byte peak private commit and a 2,084,831,232-byte peak working set. Those are observations from this machine, not universal resource promises. The source SHA256 was unchanged, and the mapped file was removed after its final owner released it.
 

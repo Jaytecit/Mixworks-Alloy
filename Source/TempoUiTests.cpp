@@ -199,9 +199,11 @@ void runTempoUiTests(const std::function<void(bool, const juce::String&)>& check
         {
             check(continued && std::abs(ui.engine.project.tempo.points[1].bpm - 127.35) < 0.001 && !ui.undoHistory.empty(), "typed BPM commits through the real worker/message queue before save/export continues");
             const auto changedPcm = ui.engine.project.clips[0].prepared;
-            bool mappedUndo = changedPcm && changedPcm->cache && changedPcm->residentBytes() == 0;
-            for (const auto& snapshot : ui.undoHistory) for (const auto& clip : snapshot.clips) if (clip.prepared) mappedUndo &= clip.prepared->cache && clip.prepared->residentBytes() == 0;
-            check(mappedUndo, "native tempo editing retains mapped playback in the current project and undo history without PCM RAM copies");
+            const auto streamed = [](const Clip& clip) { return clip.media->original && !clip.media->cache && clip.media->samples.getNumSamples()==0
+                && !clip.prepared && (!clip.elasticPlayback || clip.elasticSource); };
+            bool boundedUndo = streamed(ui.engine.project.clips[0]);
+            for (const auto& snapshot : ui.undoHistory) for (const auto& clip : snapshot.clips) boundedUndo &= streamed(clip);
+            check(boundedUndo, "native tempo editing and Undo retain original identities without whole-song PCM copies");
             ui.undo(false); check(ui.engine.project.tempo.points[1].bpm == 150, "Undo restores the tempo map and prepared playback");
             ui.undo(true); check(std::abs(ui.engine.project.tempo.points[1].bpm - 127.35) < 0.001 && ui.engine.project.clips[0].prepared == changedPcm, "Redo restores the prepared tempo edit without reprocessing audio");
             const juce::Point<float> from {280, strip.tempoY()}, to {315, strip.tempoY() - 30};

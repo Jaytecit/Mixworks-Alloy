@@ -160,7 +160,7 @@ void Workstation::attachStems(const juce::String& sourceId, const juce::File& di
             if (error.isNotEmpty()) { safe->fail(error); return; }
             safe->remember();
             { const juce::ScopedLock guard(safe->engine.lock); safe->engine.project = std::move(candidate); safe->engine.resetPlugins(); }
-            safe->dirty = true; safe->refresh(); safe->setStatus("Stems ready. Solo hears one stem across the whole timeline; click its label for level, mute or automation.");
+            safe->dirty = true; safe->refresh(); safe->setStatus("Stems ready. Solo isolates a stem on its lane; other lanes keep playing. Click its label for level, mute or automation.");
         });
     });
 }
@@ -173,22 +173,24 @@ void Workstation::toggleStemSolo(const juce::String& id, int stem)
     if (engine.project.clipTransitionLocked(id)) { setStatus("Unlock this segment's transition before changing stem Solo."); return; }
     const bool enable = !clip->stemsEnabled || !clip->stemControls[(size_t) stem].solo;
     if (enable) for (const auto& other : engine.project.clips)
-        if (other.id != id && engine.project.clipTransitionLocked(other.id)
+        if (other.track == clip->track && other.id != id && engine.project.clipTransitionLocked(other.id)
             && std::any_of(other.stemControls.begin(), other.stemControls.end(), [](const auto& control) { return control.solo; }))
         { setStatus("Unlock the other soloed segment's transition before switching stem Solo."); return; }
     remember();
     if (enable)
     {
-        for (auto& other : engine.project.clips) for (auto& control : other.stemControls) control.solo = false;
+        for (auto& other : engine.project.clips) if (other.track == clip->track)
+            for (auto& control : other.stemControls) control.solo = false;
         clip->stemsEnabled = true;
         clip->stemControls[(size_t) stem].mute = false;
     }
     clip->stemControls[(size_t) stem].solo = enable;
     selectedClip = id; selectTrack(clip->track);
-    engine.resetPlugins(); // Discard the previous full mix's effect tails when isolating/switching.
+    // Keep continuous processor histories: a local Solo must not reset other
+    // lanes, shared split returns or master effects during playback.
     dirty = true; refresh();
-    setStatus(enable ? "Solo: " + juce::String(stemNames[stem]) + " only across the timeline. Click Solo again to restore the mix. Parent levels, effects and lane mute still apply."
-                     : "Stem Solo off. Timeline mix restored.");
+    setStatus(enable ? "Solo: " + juce::String(stemNames[stem]) + " on lane " + juce::String(clip->track + 1) + ". Other lanes unchanged. Lane Mute/Solo, levels and effects still apply."
+                     : "Stem Solo off on lane " + juce::String(clip->track + 1) + ". Other lanes unchanged.");
 }
 bool Workstation::restoreTimelineStems()
 {
@@ -252,7 +254,7 @@ void Workstation::showStemMenu(const juce::String& id, int stem, double time)
     {
         const auto& controls = c->stemControls[(size_t) stem];
         menu.addSectionHeader(stemNames[stem]);
-        menu.addItem(3, "Mute", editable, controls.mute); menu.addItem(4, "Solo only this stem (whole timeline)", editable, c->stemsEnabled && controls.solo);
+        menu.addItem(3, "Mute", editable, controls.mute); menu.addItem(4, "Solo this stem on this lane", editable, c->stemsEnabled && controls.solo);
         menu.addItem(5, "Level / pan...", editable);
         menu.addItem(6, "Edit volume automation", editable); menu.addItem(7, "Edit pan automation", editable);
         menu.addItem(8, "Add volume node here...", editable);

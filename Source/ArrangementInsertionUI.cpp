@@ -18,7 +18,7 @@ void Workstation::chooseArrangementInsertion(const juce::String& anchor, bool af
     if (engine.library.empty()) { setStatus("Import the new song into Library before inserting it."); return; }
     const auto choices = engine.library;
     auto* dialog = new juce::AlertWindow(after ? "Insert song after" : "Insert song before",
-        destination->media->libraryTitle() + "\nArrangement only. Choose the new source; the next step previews independent placement and later movement.", juce::MessageBoxIconType::NoIcon, this);
+        destination->media->libraryTitle() + "\nChoose a track, then review where it will be inserted.", juce::MessageBoxIconType::NoIcon, this);
     juce::StringArray names;
     for (const auto& m : choices) names.add(m->libraryTitle() + " / " + juce::String(m->bpm(), 2) + " BPM / " + m->file.getFileName());
     dialog->addComboBox("source", names, "New song from Library");
@@ -91,6 +91,11 @@ void Workstation::previewArrangementInsertion(ArrangementInsertion proposal, con
         + "\nNo new transitions are created. Apply creates one Undo and shows Playlist in timeline order.";
     for (const auto& incoming : {proposal.inserted, proposal.incoming})
         if (const auto* link = proposal.project.transitionFor(incoming)) { const auto range = proposal.project.transitionRange(*link); message += "\nJoin into " + title(incoming) + ": " + timeText(range.getStart() - origin) + " - " + timeText(range.getEnd() - origin); }
+    getProperties().set("lastMessageDetails", message);
+    message = "Insert " + source->libraryTitle() + " on lane " + juce::String(inserted->track + 1) + ", "
+        + timeText(inserted->start - origin) + " - " + timeText(inserted->end() - origin) + ".\n"
+        + juce::String(proposal.moved) + " later segments, their transitions, labels and automation move " + juce::String(proposal.displacement, 2) + " seconds.\n"
+        + "The final " + juce::String(std::max(0., source->duration() - proposal.sourceEnd), 2) + " seconds of this song are omitted. No new transitions are added; Undo restores the mix.";
     auto* dialog = new juce::AlertWindow("Preview song insertion", message, juce::MessageBoxIconType::NoIcon, this);
     dialog->addButton("Apply insertion", 1, juce::KeyPress(juce::KeyPress::returnKey)); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), proposal = std::move(proposal), before, source](int answer) mutable

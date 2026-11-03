@@ -16,6 +16,9 @@ namespace mixworks
 void runStemTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
     const auto root = report.getParentDirectory().getChildFile("stem-tests"); root.createDirectory();
+    const bool focused = juce::JUCEApplicationBase::getCommandLineParameters().contains("--lane-stem-solo-only");
+    if (!focused)
+    {
     const auto analysis = root.getChildFile("analysis.json"); analysis.replaceWithText("preserve reviewed grid");
     const auto source = root.getChildFile("source.wav"); source.replaceWithText("owned invalid audio");
     auto awaitJob = [](StemJob& job)
@@ -34,6 +37,7 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
     cancelled.begin(); cancelled.cancel(); const auto stopped = awaitJob(cancelled);
     check(!stopped.running && !stopped.ready, "cancelled or failed job cannot publish a ready result");
 
+    }
     auto parent = std::make_shared<Media>(); parent->name = "Source-aligned stem fixture";
     parent->file = root.getChildFile("original.wav"); parent->sampleRate = 8000;
     parent->manualBpm = 120; parent->manualBeatOrigin = .125; parent->manualKey = 3;
@@ -70,8 +74,13 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
     const auto load = loadStemAssets(*parent, assets->directory, {}, loaded);
     check(load.wasOk() && loaded, "load validated stem set without analysing the four files: " + load.getErrorMessage());
     if (!loaded) return;
+    check(std::all_of(loaded->sources.begin(),loaded->sources.end(),[](const auto& source) { return source->original && !source->cache
+        && source->samples.getNumSamples()==0 && !source->peaks.empty() && source->waveformRms.size()==source->peaks.size(); }),
+        "stems share original-file playback and bounded waveform facts without whole-song PCM copies");
     // Re-adding a previously separated source must discover the completed set,
     // including in a fresh Workstation with no previous in-memory stem job.
+    if (!focused)
+    {
     const auto cachedStems = StemJob::defaultRoot().getChildFile(juce::String::repeatedString("a",64));
     check(assets->directory.copyDirectoryTo(cachedStems), "publish owned completed extraction fixture");
     {
@@ -89,9 +98,128 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
             && reload.engine.project.clips[0].stemDirectory == cachedStems,
             "re-adding a song restores its completed stems without a separation runtime");
     }
+    }
     const auto originalHash = audioDigest(parent->file);
     Clip c; c.media = parent; c.length = 10; c.offset = 1; c.start = 2; c.audioSlip = .05;
     c.stems = loaded; c.stemDirectory = loaded->directory; c.stemManifestHash = loaded->manifestHash;
+    if (focused)
+    {
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,900);
+        Project base; base.masterDb = 0; base.followTrackTempo = false; base.transitionLinksKnown = true;
+        for (int lane = 0; lane < trackCount; ++lane)
+        {
+            auto clip = c; clip.id = juce::Uuid().toString(); clip.track = lane; clip.effects = makeClipEffects();
+            clip.media->name = "Lane-only stem Solo";
+            base.clips.push_back(clip);
+            base.tracks[(size_t)lane].gainDb = -3.f * lane;
+            base.tracks[(size_t)lane].pan = .15f * lane;
+        }
+        auto sameLane = c; sameLane.id = juce::Uuid().toString(); sameLane.effects = makeClipEffects(); sameLane.stems.reset();
+        base.clips.push_back(sameLane);
+        const auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p),true,17); };
+        const auto error = [](const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b)
+        {
+            float difference = 0;
+            for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < a.getNumSamples(); ++i)
+                difference = std::max(difference,std::abs(a.getSample(ch,i)-b.getSample(ch,i)));
+            return difference;
+        };
+        juce::MidiBuffer events; juce::AudioBuffer<float> actual(2,512), expected(2,512);
+        const auto compare = [&](const Project& actualProject, const Project& expectedProject, const juce::String& message)
+        {
+            Engine a,b; a.project = actualProject; b.project = expectedProject;
+            a.render(actual,512,3,events); b.render(expected,512,3,events);
+            check(error(actual,expected) < 1.e-6f && actual.getMagnitude(0,512) > 0,message);
+        };
+        for (int lane = 0; lane < trackCount; ++lane) for (int stem = 0; stem < stemCount; ++stem)
+        {
+            auto solo = base; solo.clips[(size_t)lane].stemControls[(size_t)stem].solo = true;
+            auto reference = solo;
+            if (lane == 0) reference.clips.pop_back();
+            // Independent expectation: mute the other three stems, without using any solo flag.
+            auto& selected = reference.clips[(size_t)lane];
+            for (int s = 0; s < stemCount; ++s) { selected.stemControls[(size_t)s].solo = false; selected.stemControls[(size_t)s].mute = s != stem; }
+            compare(solo,reference,"lane " + juce::String(lane+1) + " " + stemNames[stem] + " Solo preserves the other three lanes' PCM");
+        }
+        auto solo = base; solo.clips[0].stemControls[0].solo = true;
+        auto reference = base; reference.clips.erase(reference.clips.begin()); reference.clips.pop_back();
+        solo.tracks[0].mute = true;
+        compare(solo,reference,"lane Mute still silences its soloed stem only");
+        solo.tracks[0].mute = false; solo.tracks[1].solo = true; reference.tracks[1].solo = true;
+        compare(solo,reference,"ordinary lane Solo retains priority and does not leak a stem from another lane");
+        solo.tracks[1].solo = false; reference.tracks[1].solo = false; solo.clips[0].start = 20;
+        compare(solo,reference,"outside selected segment only its lane is silent; other lanes continue");
+        solo.clips[0].stemsEnabled = false; reference.clips.push_back(sameLane);
+        compare(solo,reference,"original A/B ignores dormant Solo and restores same-lane sections");
+        solo.clips[0].stemsEnabled = true; solo.clips[0].pendingPlacement = PendingPlacement::move;
+        compare(solo,reference,"pending stem does not silence ready sections");
+
+        ui.engine.project = base; ui.engine.project.clips.pop_back(); ui.engine.library = {parent};
+        ui.selectedClip = base.clips[0].id; ui.timeline.pixelsPerSecond = 65; ui.refresh();
+        const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+        const auto click = [&](int lane,int stem)
+        {
+            const auto bounds = ui.timeline.clipBounds(ui.engine.project.clips[(size_t)lane]);
+            const juce::Point<float> at {std::max(bounds.getX(),(float)ui.viewport.getViewPositionX())+139,
+                bounds.getY()+43+stem*(bounds.getHeight()-47)/stemCount+10};
+            const juce::MouseEvent event(mouse,at,juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier),1,0,0,0,0,
+                &ui.timeline,&ui.timeline,juce::Time::getCurrentTime(),at,juce::Time::getCurrentTime(),1,false);
+            ui.timeline.mouseDown(event); ui.timeline.mouseUp(event);
+        };
+        ui.engine.project.clips[0].stemsEnabled = false; ui.engine.project.clips[0].stemControls[0].mute = true;
+        const auto before = json(ui.engine.project); const auto history = ui.undoHistory.size();
+        ui.engine.position = 3; ui.engine.playing = true;
+        click(0,0);
+        check(ui.engine.project.clips[0].stemsEnabled && ui.engine.project.clips[0].stemControls[0].solo
+            && !ui.engine.project.clips[0].stemControls[0].mute && ui.undoHistory.size() == history+1
+            && ui.engine.playing && ui.engine.position == 3,"native Solo enables/unmutes with one Undo and no playback seek");
+        const auto changed = json(ui.engine.project);
+        ui.engine.playing = false; ui.undo(false); check(json(ui.engine.project) == before,"Undo restores original mode and stem mute");
+        ui.undo(true); check(json(ui.engine.project) == changed,"Redo restores exact lane-only Solo state");
+        click(1,1);
+        check(ui.engine.project.clips[0].stemControls[0].solo && ui.engine.project.clips[1].stemControls[1].solo,
+            "native Solo on another lane preserves the first lane's choice");
+        click(0,2);
+        check(!ui.engine.project.clips[0].stemControls[0].solo && ui.engine.project.clips[0].stemControls[2].solo
+            && ui.engine.project.clips[1].stemControls[1].solo,"switching stems is exclusive only within the chosen lane");
+        ui.engine.project.clips[0].stemControls[2].automation[0].enabled = true;
+        ui.engine.project.clips[0].stemControls[2].automation[0].setPoint(0,-12);
+        ui.engine.project.clips[0].stemControls[2].automation[0].setPoint(10,-3);
+        ui.engine.project.clips[0].stemControls[2].pan = -.6f;
+        const auto saved = juce::JSON::toString(ui.engine.captureProject(),true,17);
+        Engine reopened; const auto openError = reopened.restoreProject(saved);
+        ui.engine.render(actual,512,3,events); reopened.render(expected,512,3,events);
+        check(openError.isEmpty() && error(actual,expected)<1.e-6f && actual.getMagnitude(0,512)>0,
+            "source-backed reopen retains simultaneous lane Solos, stem automation and identical PCM: " + openError);
+        juce::String exportError; auto renderer = ui.engine.createExportRenderer(exportError);
+        if (renderer) renderer->render(expected,512,3,events);
+        check(renderer && exportError.isEmpty() && error(actual,expected)<1.e-6f,"offline export renderer matches lane-only Solo and automation");
+        // Warm a stateful unaffected lane. A global processor reset on Solo would
+        // alter its next block, even though its stored controls stayed unchanged.
+        ui.engine.project = base; ui.engine.project.clips.pop_back();
+        ui.engine.project.tracks[0].mute = true;
+        ui.engine.project.tracks[1].filterCutoff = -.8f;
+        Engine continuous; continuous.project = ui.engine.project;
+        ui.engine.render(actual,512,3,events); continuous.render(expected,512,3,events);
+        click(0,0);
+        ui.engine.render(actual,512,3+512./48000.,events); continuous.render(expected,512,3+512./48000.,events);
+        check(error(actual,expected)<1.e-6f,"Solo leaves other lanes' continuous filter histories unchanged");
+        ui.engine.project.tracks[0].mute = false;
+        click(1,1); click(0,0);
+        check(!ui.engine.project.clips[0].stemControls[0].solo && ui.engine.project.clips[1].stemControls[1].solo,
+            "turning Solo off restores only its lane");
+        const auto guarded = json(ui.engine.project); const auto guardedHistory = ui.undoHistory.size();
+        ui.busy = true; click(0,0); ui.busy = false;
+        ui.engine.exporting = true; click(0,0); ui.engine.exporting = false;
+        check(json(ui.engine.project)==guarded && ui.undoHistory.size()==guardedHistory,"busy/export guards leave all lanes and history unchanged");
+        click(0,0); ui.refresh();
+        auto stream = report.getSiblingFile("lane-stem-solo.png").createOutputStream();
+        check(stream && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*stream),
+            "capture actual native lane-only Solo controls");
+        check(audioDigest(parent->file)==originalHash,"lane Solo preserves original audio bytes");
+        return;
+    }
+
     Engine engine; engine.project.clips = {c}; engine.project.masterDb = 0; engine.project.followTrackTempo = false;
     juce::AudioBuffer<float> sum(2, 512), original(2, 512); juce::MidiBuffer events;
     engine.render(sum, 512, 3, events); engine.project.clips[0].stemsEnabled = false;
@@ -107,31 +235,35 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
         check(difference < 1e-6, "stem sum matches parent reverse/loop mapping " + juce::String(mode));
     }
     engine.project.clips[0] = c;
-    // A stem solo must isolate the whole timeline, including overlapping
-    // original-only sections on the same lane and stem mixes on other lanes.
+    // A stem solo isolates its lane, preserving other lanes and their lane Solo.
     for (int selected = 0; selected < stemCount; ++selected)
     {
         auto isolated = c; isolated.stemControls[(size_t) selected].solo = true;
         Engine expected; expected.project = engine.project; expected.project.clips = {isolated};
-        auto sameLane = c; sameLane.id = juce::Uuid().toString(); sameLane.stems.reset();
-        auto otherLane = c; otherLane.id = juce::Uuid().toString(); otherLane.track = 1;
+        auto sameLane = c; sameLane.id = juce::Uuid().toString(); sameLane.stems.reset(); sameLane.effects = makeClipEffects();
+        auto otherLane = c; otherLane.id = juce::Uuid().toString(); otherLane.track = 1; otherLane.effects = makeClipEffects();
+        expected.project.clips = {isolated, otherLane};
         engine.project.clips = {isolated, sameLane, otherLane};
         engine.render(sum, 512, 3, events); expected.render(original, 512, 3, events);
         difference = 0;
         for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 512; ++i)
             difference = std::max(difference, std::abs(sum.getSample(ch,i) - original.getSample(ch,i)));
         check(difference < 1e-6 && sum.getMagnitude(0,512) > 0,
-            "whole-timeline solo isolates " + juce::String(stemNames[selected]) + " from same/other-lane sections");
+            "lane-only solo isolates " + juce::String(stemNames[selected]) + " while preserving other lanes");
         engine.project.tracks[1].solo = true;
+        expected.project.tracks[1].solo = true; expected.render(original,512,3,events);
         engine.render(sum,512,3,events);
         difference = 0;
         for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 512; ++i)
             difference = std::max(difference,std::abs(sum.getSample(ch,i)-original.getSample(ch,i)));
-        check(difference < 1e-6, "stem solo takes precedence over another lane's solo: " + juce::String(stemNames[selected]));
-        engine.project.tracks[1].solo = false;
+        check(difference < 1e-6, "stem solo respects another lane's solo: " + juce::String(stemNames[selected]));
+        engine.project.tracks[1].solo = false; expected.project.tracks[1].solo = false;
         engine.project.clips[0].start = 20;
         engine.render(sum,512,3,events);
-        check(sum.getMagnitude(0,512) == 0, "other sections stay silent outside soloed stem's time span");
+        expected.project.clips = {otherLane}; expected.render(original,512,3,events);
+        difference = 0;
+        for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 512; ++i) difference = std::max(difference,std::abs(sum.getSample(ch,i)-original.getSample(ch,i)));
+        check(difference < 1.e-6 && sum.getMagnitude(0,512)>0, "other lanes continue outside soloed stem's time span");
         engine.project.clips[0].stemsEnabled = false;
         expected.project.clips = {sameLane,otherLane};
         engine.render(sum,512,3,events); expected.render(original,512,3,events);
@@ -240,7 +372,7 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
         check(ui.displayedAddress(0) == address && ui.insertAutomationNode(address, 4, false), "stem automation uses native timeline node editor");
         ui.undo(false); check(ui.engine.project.clips[0].stemControls[0].automation[0].points.size() == 2, "Undo restores stem curve independently");
         const auto beforeSolo = ui.engine.project;
-        auto neighbour = c; neighbour.id = juce::Uuid().toString(); neighbour.track = 1;
+        auto neighbour = c; neighbour.id = juce::Uuid().toString(); neighbour.track = 1; neighbour.effects = makeClipEffects();
         ui.engine.project.clips = {c,neighbour}; ui.engine.project.clips[0].stemsEnabled = false;
         for (auto& control : ui.engine.project.clips[0].stemControls) control.mute = true;
         ui.refresh();
@@ -266,7 +398,7 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
         ui.undo(false);
         check(juce::JSON::toString(ui.engine.captureProject(),true,17) == soloBefore, "Undo restores original mode and every mute/solo flag");
         ui.undo(true);
-        check(soloCount() == 1 && ui.engine.project.clips[0].stemControls[0].solo, "Redo restores whole-timeline stem solo");
+        check(soloCount() == 1 && ui.engine.project.clips[0].stemControls[0].solo, "Redo restores lane-only stem solo");
         for (int selected = 1; selected < stemCount; ++selected)
         {
             clickSolo(0,selected);
@@ -275,7 +407,7 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
                 "native Solo switches exclusively to " + juce::String(stemNames[selected]));
         }
         clickSolo(1,1);
-        check(soloCount() == 1 && ui.engine.project.clips[1].stemControls[1].solo, "native Solo switches exclusively across sections");
+        check(soloCount() == 2 && ui.engine.project.clips[1].stemControls[1].solo, "native Solo preserves independent selections across lanes");
         const auto soloSaved = juce::JSON::toString(ui.engine.captureProject(),true,17);
         Engine soloReopened; const auto soloOpen = soloReopened.restoreProject(soloSaved);
         ui.engine.render(sum,512,3,events); soloReopened.render(original,512,3,events);
@@ -288,8 +420,9 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
         difference = 0;
         for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 512; ++i)
             difference = std::max(difference,std::abs(sum.getSample(ch,i)-original.getSample(ch,i)));
-        check(exportRenderer && exportError.isEmpty() && difference < 1e-6, "offline export uses the same whole-timeline stem isolation");
-        clickSolo(1,1); check(soloCount() == 0, "clicking active Solo restores the timeline mix");
+        check(exportRenderer && exportError.isEmpty() && difference < 1e-6, "offline export uses the same lane-only stem isolation");
+        clickSolo(1,1); check(soloCount() == 1, "clicking active Solo restores only its lane");
+        clickSolo(0,stemCount-1);
         ui.busy = true; history = ui.undoHistory.size(); clickSolo(0,0); ui.busy = false;
         check(soloCount() == 0 && ui.undoHistory.size() == history, "busy timeline refuses stem Solo without history changes");
         ui.engine.exporting = true; clickSolo(0,0); ui.engine.exporting = false;

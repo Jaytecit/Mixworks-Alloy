@@ -1,10 +1,13 @@
 #include "Workstation.h"
+#include "UiMessages.h"
+#include "RetryReview.h"
 #include "DownbeatReferences.h"
 #include "EnergySections.h"
 #include "GridCorrectionUI.h"
 #include "AppWindow.h"
 #include "Beatmatch.h"
 #include "AutoArrangement.h"
+#include <juce_cryptography/juce_cryptography.h>
 #include <cmath>
 #include <limits>
 #include <set>
@@ -14,6 +17,27 @@ namespace mixworks
 {
 namespace
 {
+int gridReviewRank(const Media& media)
+{
+    const auto grid=media.grid();
+    if (!std::isfinite(grid.bpm) || grid.bpm<=0) return 0;
+    if (media.manualBpm<=0 && (media.analysis.variableTempo || !std::isfinite(media.analysis.tempoConfidence) || media.analysis.tempoConfidence<.2)) return 1;
+    if (!grid.hasPulse() || (media.manualBeatOrigin<0 && media.analysis.signalGridNeedsReview)) return 2;
+    if (media.manualBeatOrigin<0 && (media.analysis.downbeatOrigin<0 || !std::isfinite(media.analysis.downbeatConfidence) || media.analysis.downbeatConfidence<.2)) return 3;
+    return media.manualBeatOrigin>=0 ? (media.manualBpm>0 ? 6 : 5) : 4;
+}
+juce::String gridReviewText(const Media& media)
+{
+    static const char* labels[]={"Unknown BPM","Review BPM","Review pulse","Review bar","Detected","Manual bar","Manual grid"};
+    return labels[gridReviewRank(media)];
+}
+juce::String gridReviewHint(const Media& media)
+{
+    return "Grid check: "+gridReviewText(media)+". BPM sets speed; pulse sets beat timing; bar sets beat one. "
+        +juce::String(media.manualBpm>0 ? "BPM manually set. " : "BPM is automatic. ")
+        +(media.manualBeatOrigin>=0 ? "Beat one manually set. " : "Beat one is automatic or unknown. ")
+        +"Detected is not human confirmation. Review beginning, middle and end in Source corrections.";
+}
 void label(juce::Label& l, const juce::String& text, float size = 12)
 {
     l.setText(text, juce::dontSendNotification); l.setFont(juce::Font(juce::FontOptions(size))); l.setColour(juce::Label::textColourId, colour::muted);
@@ -61,11 +85,11 @@ public:
     {
         addAndMakeVisible(audio); addAndMakeVisible(help); addAndMakeVisible(action); addAndMakeVisible(learn); addAndMakeVisible(cancel); addAndMakeVisible(mappings); addAndMakeVisible(quickSetup); addAndMakeVisible(reload); addAndMakeVisible(clear);
         for (auto* child : std::initializer_list<juce::Component*> { &profiles, &profileName, &openProfile, &saveProfile, &saveAsProfile, &nameProfile, &importProfile, &exportProfile, &deleteProfile }) addAndMakeVisible(child);
-        audio.getProperties().set("mixworksHint", "Choose the audio driver and output, sample rate and buffer size. Enable the required MIDI input ports below to receive keys and controller moves. Smaller buffers reduce latency but need more processing headroom.");
+        audio.getProperties().set("mixworksHint", "Choose your audio output and MIDI inputs. Smaller buffers respond faster but need more processing power.");
         label(help, "FLkey 49: enable its MIDI input above; use Custom Mode for faders / knobs. Keys play the selected lane's instrument.");
         help.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(audioHealth); label(audioHealth, ""); audioHealth.setComponentID("audio-callback-health");
-        audioHealth.setTooltip("Application callback counters since app start, including stopped transport. Over-budget means callback work exceeded that block's duration. Lock skips and size skips output silence. Export silence is intentional. These are not driver underrun counts and cannot detect delays before callback entry. Driver xruns are reported separately by the current driver, when supported, and may reset when the device changes. Restart begins a new application observation period.");
+        audioHealth.setTooltip("Audio performance since the app opened. High counts can help diagnose dropouts; they are separate from driver reports.");
         addAndMakeVisible(audioOptions); addAndMakeVisible(audioChoices);
         audioOptions.setButtonText("Buffer / rate options..."); audioOptions.setComponentID("audio-buffer-rate-options");
         audioOptions.setTooltip("Choose a driver mode, then select its supported sample rates and buffer sizes above. Changing mode briefly interrupts audio.");
@@ -76,27 +100,27 @@ public:
         for (auto a : midiActions()) { auto name = midiActionId(a); actions.add(name); action.addItem(name, id++); }
         action.setSelectedId(1); learn.setButtonText("Learn"); cancel.setButtonText("Cancel learn");
         action.setComponentID("midi-learn-action"); learn.setComponentID("learn-midi-control"); cancel.setComponentID("cancel-midi-learn");
-        learn.setTooltip("Choose an action, click Learn, then move the intended hardware control. That control/action assignment is replaced; other assignments are kept. Last MIDI below shows incoming messages even when they do not match an assignment.");
+        learn.setTooltip("Choose an action, click Learn, then move a controller control. Only that assignment is replaced.");
         learn.onClick = [this] { engine.beginLearn(actions[action.getSelectedId() - 1]); lastOperation.clear(); updateText(); };
         cancel.onClick = [this] { engine.beginLearn({}); lastOperation.clear(); updateText(); };
         quickSetup.setButtonText("FLkey guided setup"); quickSetup.setComponentID("guided-midi-setup");
-        quickSetup.setTooltip("Continue mapping the current live desk. Already mapped actions are kept and skipped. Faders 5–8 control Pan; paired pots control Bass, Mid, Treble and Filter. Standard MIDI Play/Stop need no learned assignment.");
+        quickSetup.setTooltip("Follow the steps to connect your controller. Existing assignments are kept and skipped.");
         quickSetup.onClick = [this] { engine.beginControllerSetup(); lastOperation.clear(); updateText(); };
         reload.setButtonText("Reload saved mappings"); reload.setComponentID("reload-midi-mappings");
-        reload.setTooltip("Reload active assignments from the startup snapshot shown below. Use Open profile to load a named copy. Does not rewrite the snapshot, controller or mix.");
+        reload.setTooltip("Reload the saved controller assignments. Use Open profile to choose another saved setup.");
         reload.onClick = [this] { const auto result = engine.reloadMidiMappings(); lastOperation = result.wasOk() ? "Reload complete." : "Reload failed: " + result.getErrorMessage(); updateText(); };
         clear.setButtonText("Clear mappings"); clear.setComponentID("clear-midi-mappings");
-        clear.setTooltip("Back up the startup snapshot, then remove active and startup assignments and cancel Learn. Named profiles stay available. Music and FLkey device configuration stay unchanged.");
+        clear.setTooltip("Back up and clear the current controller assignments. Saved profiles and music are kept.");
         clear.onClick = [this] { const auto result = engine.clearMidiMappings(); lastOperation = result.wasOk() ? "Cleared active and startup mappings. Named copies kept." : "Clear failed: " + result.getErrorMessage(); updateText(); };
         action.setTooltip("Choose the app action to map before pressing Learn. This choice alone does not change an assignment.");
         cancel.setTooltip("Cancel the current MIDI Learn or guided setup without changing completed assignments.");
         mappings.setTooltip("Active assignments, saved profile identity, last MIDI input and last profile read. Reload replaces active assignments from disk.");
         profiles.setComponentID("midi-profiles"); profiles.setTextWhenNothingSelected("Choose a saved profile");
-        profiles.setTooltip("Choose a named profile, then Open to replace active assignments. Selection alone changes nothing. Completed Learn steps autosave separately to the startup snapshot.");
+        profiles.setTooltip("Choose a saved controller setup, then click Open. Finished Learn steps are saved automatically.");
         profileName.setComponentID("midi-profile-name"); profileName.setTextToShowWhenEmpty("Profile name", colour::muted);
         profileName.setTooltip("Type a name, then Name active to apply it or Save as to create a distinct named profile. Typing alone changes nothing.");
         auto button = [](juce::TextButton& b, const char* caption, const char* id, const char* hint) { b.setButtonText(caption); b.setComponentID(id); b.setTooltip(hint); };
-        button(openProfile, "Open profile", "open-midi-profile", "Validate the chosen named profile, save it to the startup snapshot, then replace active assignments and cancel Learn. A failed load retains active assignments.");
+        button(openProfile, "Open profile", "open-midi-profile", "Use the chosen saved controller setup. This replaces current assignments and stops Learn.");
         button(saveProfile, "Save profile", "save-midi-profile", "Replace the active named profile with the current assignments and name, keeping a backup. Use Save as first when no named profile is active.");
         button(saveAsProfile, "Save as", "save-as-midi-profile", "Create a distinct named profile using the name above and make it active. An existing name is never overwritten.");
         button(nameProfile, "Name active", "name-midi-profile", "Apply the typed name to the active assignments and startup snapshot. Save profile updates a named copy separately.");
@@ -296,10 +320,11 @@ void runAudioSettingsUiTests(const std::function<void(bool, const juce::String&)
 }
 ImportProgressView::ImportProgressView()
 {
-    for (auto* child : std::initializer_list<juce::Component*> { &heading, &file, &stage, &detail, &bar, &cancel }) addAndMakeVisible(child);
+    for (auto* child : std::initializer_list<juce::Component*> { &heading, &file, &stage, &detail, &latestResult, &bar, &cancel }) addAndMakeVisible(child);
     label(heading, "Importing audio", 20); heading.setColour(juce::Label::textColourId, colour::text);
     label(file, {}, 14); file.setColour(juce::Label::textColourId, colour::text);
     label(stage, {}, 14); label(detail, {}, 13);
+    label(latestResult, {}, 12); latestResult.setName("Last analysed track");
     bar.setColour(juce::ProgressBar::foregroundColourId, colour::orange);
     cancel.setTooltip("Request cancellation. The current file or operation may finish before stopping; completed imports are kept.");
     bar.setTextToDisplay({}); setAlwaysOnTop(true);
@@ -316,9 +341,12 @@ void ImportProgressView::resized()
     file.setBounds(area.removeFromTop(46)); stage.setBounds(area.removeFromTop(26));
     area.removeFromTop(8); bar.setBounds(area.removeFromTop(20)); area.removeFromTop(12);
     cancel.setBounds(area.removeFromTop(30).removeFromRight(140));
+    latestResult.setBounds(getLocalBounds().reduced(22).removeFromBottom(35).withTrimmedRight(150));
 }
 void ImportProgressView::begin(int totalFiles)
 {
+    getProperties().remove("focusedLastResult");
+    latestResult.setText({}, juce::dontSendNotification);
     heading.setText("Importing audio", juce::dontSendNotification); stopMessage = "Stopping after this track. Finished tracks will stay in your library.";
     total = totalFiles; completed = 0; fraction = 0; stopping = false; exporting = false; startedAt = juce::Time::getMillisecondCounterHiRes();
     file.setText("Starting import...", juce::dontSendNotification); stage.setText({}, juce::dontSendNotification);
@@ -474,7 +502,14 @@ float Timeline::automationManualValue(const AutomationAddress& address, double t
 }
 void Timeline::selectAutomationPoint(const AutomationAddress& address, int point)
 {
-    if (point >= 0) owner.clearEditSelection();
+    if (point >= 0)
+    {
+        owner.showEditingPage(2);
+        owner.clearEditSelection(); owner.automationClip = address.clipId;
+        if (address.clipId.isNotEmpty()) owner.selectedClip = address.clipId;
+        owner.selectedStem = address.stem; owner.selectedAutomationTarget = (int) address.target;
+        if (address.target == AutomationTarget::plugin) owner.pluginLane = address;
+    }
     selectedSection.reset(); selectedHotcue.reset(); hotcueGesture.reset();
     selectedCutAmount.reset();
     const auto curve = automationViewCurve(address);
@@ -561,7 +596,7 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
     { setTooltip("Move this track and following playlist segments; earlier segments and the incoming transition stay fixed. Alt bypasses beat snap. Shift-drag slips audio only; double-click resets that slip. Unlock protected tracks first."); setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
     if (event.y < 0) { setMouseCursor(juce::MouseCursor::NormalCursor); return; }
     if (const auto swap = swapHandleAt(event.position))
-    { setTooltip("Drag this paired swap left/right. Both sides move together, keeping their beat gap. Alt bypasses snapping; unlock protected tracks first."); setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
+    { setTooltip("Drag to move both sides of this swap together. Hold Alt to move without snapping."); setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
     const auto transition = transitionAt(event.position);
     if (transition && (transition->second == Project::TransitionEdit::moveIncoming || transition->second == Project::TransitionEdit::moveOutgoing))
     {
@@ -569,7 +604,7 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
             + ": drag left/right to move this song inside its fixed transition window. Alt bypasses snap. Unlock protected tracks first.");
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return;
     }
-    setTooltip(transition ? "Transition frame: drag the header to move, top corners to resize, or lower I / O handles to move a song inside it. Alt bypasses snap." : juce::String("Drag a segment to move it; drag its edge to trim. Right-click for segment and automation actions. Wheel zooms; Alt bypasses beat snap. Drop audio or library songs here."));
+    setTooltip(transition ? "Drag the frame header to move this transition or a corner to resize it. I/O handles move the songs inside it." : juce::String("Drag a segment to move it; drag its edge to trim. Right-click for segment and automation actions. Wheel zooms; Alt bypasses beat snap. Drop audio or library songs here."));
     auto pointer = juce::MouseCursor::NormalCursor;
     if (!owner.busy)
     {
@@ -578,15 +613,15 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
         else if (automationPointAt(event.position)) { pointer = juce::MouseCursor::DraggingHandCursor; setTooltip("Drag this node to change time and value. Left/Right selects adjacent nodes; Enter opens precise entry; Delete removes the node. Unlock protected tracks first."); }
         else if (transition) pointer = juce::MouseCursor::DraggingHandCursor;
         else if (automationCurveAt(event.position))
-        { pointer = juce::MouseCursor::UpDownResizeCursor; setTooltip("Drag the line up/down to bend the segment with fixed end nodes. Pull a rising curve down fully for an instant snap at its second node. Click nodes to edit their time and value."); }
+        { pointer = juce::MouseCursor::UpDownResizeCursor; setTooltip("Drag up or down to change the curve shape. Click a node to edit its time or value."); }
         else for (const auto& clip : owner.engine.project.clips)
             if (clipBounds(clip).contains(event.position))
             {
                 pointer = juce::MouseCursor::DraggingHandCursor;
                 const bool linked = std::any_of(owner.engine.project.transitionLinks.begin(), owner.engine.project.transitionLinks.end(),
                     [&](const auto& link) { return link.incoming == clip.id || link.outgoing == clip.id; });
-                setTooltip(linked ? "Linked pieces with the same LINK number move together. Right-click > Unlink / move independently to separate them."
-                    : "Drag this waveform to move it independently. Ctrl-click several pieces to move them together. The header arrow moves following tracks.");
+                setTooltip(linked ? "Pieces with the same LINK number move together. Right-click and choose Unlink to move one separately."
+                    : "Drag to move this piece. Ctrl-click selects several pieces to move together.");
                 break;
             }
     }
@@ -606,6 +641,7 @@ void Timeline::updateSize()
     for (const auto& track : owner.engine.project.tracks) for (const auto& curve : track.automation) if (!curve.points.empty()) end = std::max(end, curve.points.back().time);
     if (!owner.engine.project.masterAutomation.points.empty()) end = std::max(end, owner.engine.project.masterAutomation.points.back().time);
     for (const auto& track : owner.engine.project.tracks) for (const auto& lane : track.pluginAutomation) if (!lane.curve.points.empty()) end = std::max(end, lane.curve.points.back().time);
+    for (const auto& scene : owner.engine.project.visualScenes) end = std::max(end, scene.end());
     const double width = std::min((double) std::numeric_limits<int>::max() / 4, std::max(60.0, end + 10) * pixelsPerSecond);
     const int contentHeight = laneTop(contentLaneCount());
     owner.viewport.setScrollBarsShown(contentHeight > owner.viewport.getHeight(), false, true, true);
@@ -727,12 +763,14 @@ void Timeline::paint(juce::Graphics& g)
         const bool linkedPiece = std::any_of(owner.engine.project.transitionLinks.begin(), owner.engine.project.transitionLinks.end(),
             [&](const auto& link) { return link.incoming == c.id || link.outgoing == c.id; });
         g.setFont(juce::FontOptions(12).withStyle("Bold")); g.setColour(colour::text); g.drawText(c.media->name
+            + (c.pitchSemitones != 0 ? "  [pitch " + juce::String(c.pitchSemitones > 0 ? "+" : "") + juce::String(c.pitchSemitones, 2) + " steps]" : juce::String())
             + (!c.media->playbackError.isEmpty() ? " [audio unavailable]" : !c.media->hasPlayback() ? (c.media->sourceDetailsPending ? " [reading duration / preparing audio]" : " [preparing audio]") : "")
             + (c.pendingPlacement == PendingPlacement::failed ? " [tempo failed; retry Beatmatch]" : c.pendingPlacement != PendingPlacement::none ? " [matching tempo]" : "")
             + (c.reversed ? " [reverse]" : "") + (c.loopSpan > 0 ? " [loop]" : "") + "  " + owner.keyText(*c.media)
             + (c.media->bpm() > 0 ? "  / " + juce::String(c.media->bpm(), 2) + " BPM / " + (c.media->manualBpm <= 0 && (c.media->analysis.variableTempo || c.media->analysis.tempoConfidence < 0.2) ? "beat grid needs review" : c.firstDownbeatTime() >= 0 ? (c.media->manualBeatOrigin >= 0 ? "4/4" : c.media->analysis.downbeatOrigin < 0 ? "4/4 best guess" : "4/4 inferred") : "downbeat unknown") : ""), r.withLeft((float) left + (c.stems ? 120.f : 0.f) + (linkedPiece ? 58.f : 0.f)).withRight((float) right).withTrimmedRight(28).reduced(8, 3).removeFromTop(18), juce::Justification::left);
         const float baseline = r.getBottom() - 5, height = std::max(1.f, r.getHeight() - 32);
         std::vector<WaveformRange> levels; levels.reserve((size_t) std::max(0, right - left));
+        bool waveformPending = false;
         float ceiling = 1;
         for (const float peak : c.media->peaks) ceiling = std::max(ceiling, peak);
         for (int x = left; x < right; ++x)
@@ -742,6 +780,7 @@ void Timeline::paint(juce::Graphics& g)
             // interval at its left edge, which makes an onset lead its tick.
             const double local = (x - 0.5) / pixelsPerSecond - c.start;
             const auto level = c.waveformRange(local, local + 1 / pixelsPerSecond);
+            waveformPending = waveformPending || !level.ready;
             levels.push_back(level); ceiling = std::max(ceiling, level.peak);
         }
         const int mode = owner.waveformMode.getSelectedId();
@@ -758,6 +797,12 @@ void Timeline::paint(juce::Graphics& g)
         }
         waveform.lineTo((float) right, baseline); waveform.closeSubPath();
         body.lineTo((float) right, baseline); body.closeSubPath();
+        if (waveformPending)
+        {
+            g.setColour(colour::muted); g.setFont(juce::FontOptions(11));
+            g.drawText(c.media->original && c.media->original->failed() ? "Waveform unavailable" : "Loading waveform detail...",
+                       r.withTop(r.getY() + 22).withHeight(18).reduced(8, 0), juce::Justification::left);
+        }
         auto drawWaveform = [&](float opacity)
         {
             if (mode != 1 || pixelsPerSecond >= 80)
@@ -901,6 +946,12 @@ void Timeline::paint(juce::Graphics& g)
         g.drawVerticalLine(Clip::gridPixel(marker.time, pixelsPerSecond), 0, (float) getHeight());
     }
     paintTransitions(g); paintAudioSlipHandles(g); paintSectionFlags(g); paintHotcues(g);
+    if (owner.timelineRuler.alignmentGuide)
+    {
+        const float x=(float)(*owner.timelineRuler.alignmentGuide*pixelsPerSecond);
+        const float dash[]={6,4}; g.setColour(juce::Colour(0xff67dce5));
+        g.drawDashedLine(juce::Line<float>(x,0,x,(float)getHeight()),dash,2,1.5f);
+    }
     const int playhead = Clip::gridPixel(owner.engine.position.load(), pixelsPerSecond);
     if (forging)
     {
@@ -1093,7 +1144,8 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
     if (const auto hit = automationPointAt(e.position))
     {
         owner.selectedStem = hit->first.stem;
-        owner.selectedClip = hit->first.clipId;
+        owner.automationClip = hit->first.clipId;
+        if (hit->first.clipId.isNotEmpty()) owner.selectedClip = hit->first.clipId;
         owner.selectedAutomationTarget = (int) hit->first.target;
         if (hit->first.target == AutomationTarget::plugin) owner.pluginLane = hit->first;
         const int track = trackAt((float) e.y);
@@ -1230,6 +1282,7 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         const auto& changed = candidate.curve(address)->points[(size_t) draggingPoint];
         const auto& existing = viewCurve.points[(size_t) draggingPoint];
         if (changed.time == existing.time && changed.value == existing.value) return;
+        candidate.curve(address)->enabled = true;
         if (!moved) { owner.engine.setAutomationRecordMode(AutomationRecordMode::read); owner.remember(); moved = true; }
         owner.engine.project = std::move(candidate);
         displayed = owner.engine.project.curve(address); if (!displayed || draggingPoint >= (int) displayed->points.size()) return;
@@ -1288,7 +1341,8 @@ void Timeline::mouseDoubleClick(const juce::MouseEvent& e)
     if (const auto hit = automationPointAt(e.position))
     {
         owner.selectedStem = hit->first.stem;
-        owner.selectedClip = hit->first.clipId;
+        owner.automationClip = hit->first.clipId;
+        if (hit->first.clipId.isNotEmpty()) owner.selectedClip = hit->first.clipId;
         owner.selectedAutomationTarget = (int) hit->first.target;
         if (hit->first.target == AutomationTarget::plugin) owner.pluginLane = hit->first;
         const int track = trackAt((float) e.y);
@@ -1318,7 +1372,7 @@ LibraryTable::LibraryTable(Workstation& w, bool playlist) : owner(w), isPlaylist
                 + ", length " + (clip->awaitingSourceLength ? juce::String("pending") : timeText(clip->length));
         else
         {
-            title += ", duration " + timeText(media->duration()) + ", CONF " + Workstation::keyEvidenceText(*media);
+            title += ", duration " + timeText(media->duration()) + ", key check " + Workstation::keyEvidenceText(*media) + ", grid check " + gridReviewText(*media);
             if (media->assets.genre.isNotEmpty()) title += ", genre " + media->assets.genre;
         }
         if (media->playbackError.isNotEmpty()) title += ", unavailable: " + media->playbackError;
@@ -1330,7 +1384,7 @@ LibraryTable::LibraryTable(Workstation& w, bool playlist) : owner(w), isPlaylist
     h.addColumn(playlist ? "LANE" : "TIME", 2, playlist ? 50 : 62, 50, 160, playlist ? juce::TableHeaderComponent::defaultFlags : juce::TableHeaderComponent::notSortable);
     h.addColumn(playlist ? "START" : "KEY", 3, playlist ? 82 : 60, 60, 220, juce::TableHeaderComponent::defaultFlags);
     h.addColumn(playlist ? "LENGTH" : "BPM", 4, playlist ? 84 : 62, 60, 180, juce::TableHeaderComponent::defaultFlags);
-    if (!playlist) { h.addColumn("CONF", 7, 60, 56, 100, juce::TableHeaderComponent::defaultFlags); h.addColumn("GENRE", 8, 100, 80, 240, juce::TableHeaderComponent::defaultFlags); }
+    if (!playlist) { h.addColumn("KEY CHECK", 7, 90, 70, 120, juce::TableHeaderComponent::defaultFlags); h.addColumn("GRID CHECK", 9, 100, 90, 150, juce::TableHeaderComponent::defaultFlags); h.addColumn("GENRE", 8, 100, 80, 240, juce::TableHeaderComponent::defaultFlags); }
     h.addColumn("ART", 5, playlist ? 36 : 32, 32, 120);
     if (playlist) h.addColumn("TRANSITION IN", 6, 130, 130, 300, juce::TableHeaderComponent::notSortable);
     if (!playlist) { h.moveColumn(5, 0); h.moveColumn(2, 4); }
@@ -1363,7 +1417,8 @@ juce::Component* LibraryTable::accessibleCell(int row, int column, bool selected
         else if (column == 3) text = "Key " + owner.keyText(*media) + " / " + keyNoteName(media->key());
         else if (column == 4) text = "BPM " + (media->bpm() > 0 ? juce::String(media->bpm(), 2) : juce::String("unknown"))
             + (media->analysis.variableTempo && media->manualBpm == 0 ? ", variable tempo" : media->manualBpm == 0 && media->analysis.tempoConfidence < .2 ? ", uncertain" : "");
-        else if (column == 7) text = "CONF " + Workstation::keyEvidenceText(*media);
+        else if (column == 7) text = "key check " + Workstation::keyEvidenceText(*media);
+        else if (column == 9) text = "grid check " + gridReviewText(*media);
         else if (column == 8) text = "Genre " + (media->assets.genre.isEmpty() ? juce::String("not tagged") : media->assets.genre);
     }
     cell->setTitle(text); cell->setDescription(table.rowName(row));
@@ -1453,12 +1508,12 @@ void LibraryTable::paintCell(juce::Graphics& g, int row, int col, int w, int h, 
         }
         else if (col == 7)
         {
-            const int level = Workstation::keyEvidenceLevel(*m);
-            const juce::Colour ink = level == 0 ? juce::Colour(0xff9acbfa) : level == 4 ? juce::Colour(0xff8fdbb2)
-                : level == 3 ? juce::Colour(0xffd7dba0) : level == 2 ? juce::Colour(0xffffbb78) : colour::muted;
+            const auto state = Workstation::keyEvidenceText(*m);
+            const juce::Colour ink = state == "Manual" ? juce::Colour(0xff9acbfa) : state == "Review" ? juce::Colour(0xffffbb78) : colour::muted;
             g.setColour(ink); g.setFont(juce::FontOptions(12));
-            g.drawText(Workstation::keyEvidenceText(*m), 10, 0, w - 15, h, juce::Justification::centredLeft, true); return;
+            g.drawText(state, 10, 0, w - 15, h, juce::Justification::centredLeft, true); return;
         }
+        else if (col == 9) text = gridReviewText(*m);
         else if (col == 8) text = m->assets.genre;
         else if (col == 2) text = timeText(m->duration()).dropLastCharacters(4); else if (col == 3) text = owner.keyText(*m); else text = m->bpm() > 0 ? juce::String(m->bpm(), 2) + (m->analysis.variableTempo && m->manualBpm == 0 ? " ~" : m->manualBpm == 0 && m->analysis.tempoConfidence < 0.2 ? " ?" : "") : "Unknown";
         if (col == 3 && m->key() >= 0)
@@ -1483,19 +1538,16 @@ juce::String LibraryTable::getCellTooltip(int row, int column)
     if (!isPlaylist && column == 5) return owner.libraryPreview.usesPrivateOutput()
         ? "Play / stop preview in headphones.\n" + owner.libraryPreview.description()
         : "Play / stop preview through master output. Arrangement playback pauses; its position is kept.";
-    const auto retryHint = a.focusedRevision == focusedAnalysisRevision
-        ? "\nFocused retry: BPM " + juce::String(a.focusedTempo == 2 ? "improved" : a.focusedTempo == 1 ? "unchanged" : "not attempted")
-            + "; key " + juce::String(a.focusedKey == 2 ? "improved" : a.focusedKey == 1 ? "unchanged" : "not attempted") + "."
-        : juce::String("\nCtrl/Shift-click to select tracks; right-click for batch analysis.");
-    if (!isPlaylist && column == 7) return Workstation::keyEvidenceHint(*media) + retryHint;
+    const auto retryHint = a.focusedRevision > 0 && (a.focusedTempo > 0 || a.focusedKey > 0)
+        ? juce::String(" Open Source corrections to review the retry result.") : juce::String();
+    if (!isPlaylist && column == 7) return Workstation::keyEvidenceHint(*media);
+    if (!isPlaylist && column == 9) return gridReviewHint(*media);
     if (!isPlaylist && column == 8) return media->assets.genre.isEmpty() ? "No genre tag found in this file." : "File genre tag: " + media->assets.genre;
     if (!isPlaylist && column == 3)
-        return owner.keyText(*media) + " / " + keyNoteName(media->key())
-            + ". m means minor; no m means major."
-            + "\n" + Workstation::keyEvidenceHint(*media) + retryHint;
-    return media->file.getFullPathName() + (media->playbackError.isNotEmpty() ? "\n" + media->playbackError : media->sessionMetadataPending ? "\nSource check pending; this library entry does not delay the mix." : "")
-        + (media->assets.album.isNotEmpty() ? "\nAlbum: " + media->assets.album : "")
-        + (media->assets.cover.isValid() ? "\nArtwork: " + juce::String(media->assets.audioThumbnail ? "audio thumbnail / " : "") + media->assets.coverSource.getFullPathName() : "\nNo local cover artwork found.") + retryHint;
+        return Workstation::keyEvidenceHint(*media);
+    return media->playbackError.isNotEmpty() ? "This file could not be opened. Find it or import it again."
+        : media->sessionMetadataPending ? "Checking this track's file. The mix can continue playing."
+        : "Select this track or drag it into the mix." + retryHint;
 }
 juce::PopupMenu LibraryTable::beatmatchMenu(int row)
 {
@@ -1626,7 +1678,7 @@ TrackStrip::TrackStrip(Workstation& w, int i) : owner(w), index(i)
     select.setTooltip("Select this mixer lane and its effects. This does not move any segments.");
     mute.setTooltip("Mute this lane in playback and export. Click again to restore it.");
     solo.setTooltip("Hear only soloed lanes. Click again to remove this lane from solo.");
-    pan.setTooltip("Position the controlled audio between left and right speakers. Double-click restores the centre.");
+    pan.setTooltip("Move the sound left or right. Double-click to centre it.");
     gain.setTooltip("A direct move takes control; Record captures a performance.");
     setTooltip("Drag the bottom edge to resize this lane; double-click resets. With the edge focused, Up/Down resize, Home resets and End doubles the height.");
     for (auto* c : std::initializer_list<juce::Component*> { &select, &mute, &solo, &cutoff, &gain, &pan }) addAndMakeVisible(c);
@@ -1638,7 +1690,7 @@ TrackStrip::TrackStrip(Workstation& w, int i) : owner(w), index(i)
     pan.valueFromTextFunction = [](const juce::String& text) { const auto v = text.trim().toUpperCase(); return v == "C" ? 0.0 : juce::jlimit(-1.0, 1.0, v.getDoubleValue() / 100 * (v.contains("L") ? -1 : 1)); };
     cutoff.configure("Lane " + juce::String(i + 1) + " cutoff filter"); cutoff.configureCutoff();
     cutoff.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 65, 18);
-    cutoff.setTooltip("Lane cutoff affects every segment and instrument on this lane, independent of segment selection. Centre Off; left low-pass removes highs; right high-pass removes bass. Double-click or Home returns to centre. Enter LP/HP and Hz, or Off. Drag or touch; no arm or MIDI mapping needed.");
+    cutoff.setTooltip("Left removes treble; right removes bass across this lane. Double-click returns to Off.");
     cutoff.onDragStart = [this] { controlGesture = true; if (!owner.engine.canWriteAutomation(index)) owner.remember(); };
     cutoff.onDragEnd = pan.onDragEnd = gain.onDragEnd = [this] { controlGesture = false; };
     cutoff.onValueChange = [this] { if (!owner.refreshing) { if (!controlGesture && !owner.engine.canWriteAutomation(index)) owner.remember(); owner.engine.setControlValue({index, AutomationTarget::cutoff}, (float) cutoff.getValue()); owner.dirty = true; } };
@@ -1653,10 +1705,8 @@ void TrackStrip::refresh()
 {
     const auto& t = owner.engine.controlSettings(index);
     const auto& mixer = owner.engine.project.tracks[(size_t) index];
-    const auto* selected = owner.engine.controlClip(index);
     const auto laneName = "Mixer lane " + juce::String(index + 1);
-    const auto controlOwner = selected ? "Segment " + juce::String((int) (selected - owner.engine.project.clips.data()) + 1)
-        + " / " + selected->media->libraryTitle() + " / lane " + juce::String(index + 1) : laneName;
+    const auto controlOwner = laneName;
     auto describe = [](juce::Slider& control, const juce::String& title)
     {
         auto& properties = control.getProperties();
@@ -1664,11 +1714,11 @@ void TrackStrip::refresh()
         control.setName(title); control.setTitle(title); control.setTooltip(title + ". " + properties["alloyOwnerBaseHint"].toString());
     };
     describe(gain, controlOwner + " / Volume"); describe(pan, controlOwner + " / Pan"); describe(cutoff, laneName + " / Filter cutoff");
-    select.setTooltip("Select " + laneName + ". Current Volume/Pan and effect owner: " + controlOwner + ". Cutoff, Mute and Solo belong to the mixer lane. Selection does not move segments.");
+    select.setTooltip("Select " + laneName + ". Volume, Pan, Filter, Mute and Solo affect every track on this lane. VST effects retain their selected track owner.");
     if (!gain.isMouseButtonDown() && !AlloyLookAndFeel::editingSliderText(gain)) gain.setValue(t.gainDb, juce::dontSendNotification);
     if (!pan.isMouseButtonDown() && !AlloyLookAndFeel::editingSliderText(pan)) pan.setValue(t.pan, juce::dontSendNotification);
     if (!cutoff.isMouseButtonDown() && !AlloyLookAndFeel::editingSliderText(cutoff)) cutoff.setValue(mixer.filterCutoff, juce::dontSendNotification);
-    const bool unlocked = !owner.engine.controlClip(index) || !owner.engine.project.clipTransitionLocked(owner.engine.controlClip(index)->id);
+    const bool unlocked = !owner.engine.project.automationLocked({index, AutomationTarget::volume});
     for (auto* control : {static_cast<juce::Slider*>(&pan), &gain}) control->setEnabled(!owner.busy && unlocked);
     cutoff.setEnabled(!owner.busy && !owner.engine.project.automationLocked({index, AutomationTarget::cutoff}));
     select.setButtonText(trackLabel(index) + "  " + (owner.engine.controlClip(index) ? owner.engine.controlClip(index)->media->name : mixer.name) + (std::any_of(t.automation.begin(), t.automation.end(), [](const auto& curve) { return curve.active(); }) || std::any_of(t.pluginAutomation.begin(), t.pluginAutomation.end(), [](const auto& lane) { return lane.curve.active(); }) ? " [A]" : ""));
@@ -1712,7 +1762,15 @@ void TrackStrip::resized()
         dial->setVisible(dials);
         dial->setTextBoxStyle(h >= 164 ? juce::Slider::TextBoxBelow : juce::Slider::NoTextBox, false, half, 18);
     }
-    mute.setVisible(h >= 76); solo.setVisible(h >= 76); gain.setVisible(h >= 76);
+    // Compact editing lanes still need immediate Mute/Solo/level access.
+    // Keep the title, then share one control row instead of hiding the mixer.
+    if (h >= 50 && h < 76)
+    {
+        mute.setBounds(7, 28, 26, 20); solo.setBounds(36, 28, 26, 20);
+        gain.setBounds(67, 28, std::max(20, getWidth() - 74), 20);
+        gain.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    }
+    mute.setVisible(h >= 50); solo.setVisible(h >= 50); gain.setVisible(h >= 50);
 
 }
 
@@ -1795,8 +1853,8 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     undoButton.setTooltip("Undo the most recent musical edit. Workspace appearance is saved separately.");
     redoButton.setTooltip("Reapply the last undone musical edit.");
     splitButton.setTooltip("Split the selected segment at the playhead, keeping both resulting segments.");
-    duplicateButton.setTooltip("Create another copy of the selected segment in the arrangement.");
-    removeButton.setTooltip("Remove the selected segment from this mix. The original audio and library entry are kept.");
+    duplicateButton.setTooltip("Create another copy of the selected block in the arrangement.");
+    removeButton.setTooltip("Remove the selected block from this arrangement.");
     libraryTab.setTooltip("Browse and search analysed audio. Drag a row to a lane, or double-click to add it to the mix.");
     playlistTab.setTooltip("View the current mix track list. Select a row to select its timeline segment.");
     editingTab.setTooltip("Show segment timing, trims, fades, gain, reverse and loop in the lower Editing console. Its hexagon detaches the same controls.");
@@ -1815,7 +1873,7 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     pluginControlsButton.setTooltip("Choose plugin parameters for MIDI control and automation.");
     timeLabel.setTooltip("Current mix cursor in minutes, seconds and milliseconds. Click the ruler to seek.");
     piano.getProperties().set("mixworksHint", "Play the selected lane instrument with this piano. Enable a hardware MIDI input in Audio / MIDI.");
-    menuBar.getProperties().set("mixworksHint", "File saves and exports; Edit changes segments; Mix controls automation and transport; Beatmatch reviews grids; View changes panels and popup hints; Tools configures devices and scans.");
+    menuBar.getProperties().set("mixworksHint", "Open a menu to see its actions.");
     libraryTable.table.getProperties().set("mixworksHint", "Select a library row; double-click adds it to the mix, or drag it onto a lane. Click a column heading to sort, or drag its edge to resize. Right-click for source actions.");
     playlistTable.table.getProperties().set("mixworksHint", "Select a row to select its timeline segment; double-click seeks to its start. Click a heading to sort the list. Source audio stays in place.");
     pluginList.list.getProperties().set("mixworksHint", "Select a plugin to open, bypass or remove it with the controls below. This chain belongs to the selected lane.");
@@ -1834,22 +1892,23 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     playButton.getProperties().set("alloyMolten", true);
     addAndMakeVisible(waveformMode);
     waveformMode.addItem("Waveform: energy", 1); waveformMode.addItem("Waveform: peaks", 2); waveformMode.addItem("Waveform: detail", 3); waveformMode.setSelectedId(1, juce::dontSendNotification);
-    waveformMode.setTooltip("Energy reveals quiet sections, builds and drops; close zoom also resolves transients. Detail always adds a peak outline; Peaks shows amplitude only. Strong grid lines mark four bars (16 beats in 4/4). Display changes never affect audio.");
+    waveformMode.setTooltip("Choose how much waveform detail to show. This changes the view, not the sound.");
     waveformMode.onChange = [this] { timeline.repaint(); };
     for (int i = 0; i < trackCount; ++i) { strips[(size_t) i] = std::make_unique<TrackStrip>(*this, i); trackHeaders.addAndMakeVisible(*strips[(size_t) i]); }
+    sceneLane = std::make_unique<SceneLane>(*this); addAndMakeVisible(*sceneLane); addAndMakeVisible(sceneLane->browserButton);
     label(inspectorLabel, "SEGMENT INSPECTOR"); label(pluginLabel, "VST3 INSERTS / AUDIO 1"); label(masterLabel, "MASTER"); label(timeLabel, "00:00.000", 21); timeLabel.setColour(juce::Label::textColourId, colour::orange);
     slider(tempoSlider, 20, 400, 0.01, " BPM"); tempoSlider.setSliderStyle(juce::Slider::LinearBarVertical); tempoSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 96, 28);
     tempoSlider.setVelocityBasedMode(false); tempoSlider.setSliderSnapsToMousePosition(false); tempoSlider.setMouseDragSensitivity(3800); tempoSlider.setValue(120, juce::dontSendNotification);
     tempoSlider.setTooltip("Live BPM at the playhead during playback. When stopped, edits the selected marker. Drag up/down or double-click to type; during playback, adds a tempo target at the playhead.");
     keyDisplay.addItem("Note", 1); keyDisplay.addItem("Camelot", 2); keyDisplay.addItem("Note + Camelot", 3); keyDisplay.setSelectedId(3, juce::dontSendNotification);
-    keyDisplay.setTooltip("Key labels: Gb means Gb major; Gbm means Gb minor. Camelot uses the numbered harmonic wheel. Confidence is shown separately; Unknown means no key found.");
+    keyDisplay.setTooltip("Choose note names, numbered Camelot keys or both. Unknown means no key was found.");
     keyDisplay.onChange = [this] { if (!refreshing) { engine.project.keyDisplay = keyDisplay.getSelectedId() - 1; dirty = true; refresh(); timeline.repaint(); } };
     trackInfoButton.onClick = [this] { editAnalysis(selectedLibraryId); };
     const juce::StringArray transitions {"Cut", "4 bars", "8 bars", "16 bars", "32 bars", "Sections 8-64+ bars"};
     for (int i = 0; i < transitions.size(); ++i) transitionLength.addItem(transitions[i], i + 1);
     transitionLength.setSelectedId(transitionIndex + 1, juce::dontSendNotification);
     transitionLength.setTitle("New transition length");
-    transitionLength.setTooltip("Sections aligns measured changes on both songs, normally within 8-64 bars. A paired match may use a longer overlap. Bass swap follows a shared boundary; missing evidence uses a grid fallback. Fixed lengths remain available.");
+    transitionLength.setTooltip("Match transitions to song sections, or choose a fixed overlap length. Section matches may need a longer overlap.");
     transitionLength.onChange = [this] { transitionIndex = transitionLength.getSelectedId() - 1; };
     transitionPreset.addItem("None", 1); transitionPreset.addItem("Bass swap", 2); transitionPreset.addItem("Crossfade", 3);
     transitionPreset.setSelectedId(3, juce::dontSendNotification); transitionPreset.setTitle("New transition preset");
@@ -1987,6 +2046,7 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
 }
 Workstation::~Workstation()
 {
+    sceneLane.reset();
     libraryPreview.onChange = {}; libraryPreview.stop();
     hints.setHintsEnabled(false); hints.setLookAndFeel(nullptr);
     trackEditingWorkspace(); saveWorkspacePreferences();
@@ -1997,7 +2057,7 @@ Workstation::~Workstation()
     if (transitionWindow) transitionWindow->clearContentComponent();
     transitionWindow.reset(); transitionViewport.setViewedComponent(nullptr, false);
     performanceWindow.reset(); performanceViewport.setViewedComponent(nullptr, false);
-    gridWindow.reset();
+    earWindow.reset(); gridWindow.reset();
     stopTimer(); engine.onControl = {}; engine.onMidiChanged = {}; engine.onAutomationWriteBegin = {}; engine.onPerformanceAction = {};
     if (stemJob) stemJob->finish();
     saveWorkspacePreferences();
@@ -2020,6 +2080,7 @@ Workstation::~Workstation()
 }
 void Workstation::timerCallback()
 {
+    if (engine.streamFailed.exchange(false)) setStatus("Playback stopped: an original music file changed or could not be read. Reload that track.");
     engine.servicePerformance(); engine.recordProjectCommit();
     workModeButton.setButtonText(engine.workMode==WorkMode::arrange ? "Arrange" : "Record/Perform");
     takeButton.setTooltip(engine.performanceStatus());
@@ -2107,7 +2168,12 @@ void Workstation::setBusy(bool value)
     if (settingsWindow && settingsWindow->getContentComponent()) settingsWindow->getContentComponent()->setEnabled(!busy);
     for (auto& editor : editors) editor->setEnabled(!busy);
 }
-void Workstation::fail(const juce::String& error) { setStatus(error); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Mixworks", error); }
+void Workstation::fail(const juce::String& error)
+{
+    getProperties().set("lastMessageDetails", error);
+    const bool technical = error.containsIgnoreCase("onnx") || error.contains("std::") || error.containsIgnoreCase("tensor") || error.containsIgnoreCase("sha256");
+    setStatus(technical ? "Could not finish this action. Open Tools > Last message details." : shortUiMessage(error, 30, 200));
+}
 void Workstation::remember()
 {
     if (engine.capturingPerformance()) { engine.performanceProjectPending=true; dirty=true; return; }
@@ -2207,11 +2273,16 @@ void Workstation::filterLibrary()
             }
             if (librarySortColumn == 7)
             {
-                const int x = keyEvidenceLevel(first), y = keyEvidenceLevel(second);
-                // Manual, absent and unavailable evidence stay unranked in either direction.
-                if ((x == 0) != (y == 0)) return x != 0;
+                const auto rank=[](const Media& m) { return m.key()<0 || m.key()>23 ? 0 : m.manualKey>=0 ? 3 : keyEvidenceText(m)=="Review" ? 1 : 2; };
+                const int x = rank(first), y = rank(second);
                 if (x != y) return librarySortForward ? x < y : x > y;
-                return x > 0 && (librarySortForward ? first.analysis.keyConfidence < second.analysis.keyConfidence : first.analysis.keyConfidence > second.analysis.keyConfidence);
+                return first.libraryTitle().compareNatural(second.libraryTitle())<0;
+            }
+            if (librarySortColumn == 9)
+            {
+                const int x=gridReviewRank(first), y=gridReviewRank(second);
+                if (x!=y) return librarySortForward ? x<y : x>y;
+                return first.libraryTitle().compareNatural(second.libraryTitle())<0;
             }
             if (librarySortColumn == 1) { const int order = first.libraryTitle().compareNatural(second.libraryTitle()); return librarySortForward ? order < 0 : order > 0; }
             if (librarySortColumn == 2) return librarySortForward ? first.duration() < second.duration() : first.duration() > second.duration();
@@ -2254,6 +2325,8 @@ void Workstation::refreshMusicScanStatus()
 }
 void Workstation::refresh()
 {
+    { const juce::ScopedLock guard(engine.lock); engine.project.updateLaneHandles(); }
+    if (automationClip != selectedClip) automationClip.clear();
     engine.recordProjectCommit();
     refreshEditSelection();
     refreshMusicScanStatus();
@@ -2271,7 +2344,8 @@ void Workstation::refresh()
     pluginLabel.setTooltip(engine.controlClip(engine.selectedTrack) ? "Effects and effect automation are shared by every split piece of this track." : "Effects for this entire lane.");
     const auto* c = currentClip(); for (auto& s : clipSliders) s.setEnabled(c != nullptr && (!c->media->sourceDetailsPending || &s == &clipSliders[0] || &s == &clipSliders[5]));
     midiLabel.setText("MIDI / Lane " + juce::String(engine.selectedTrack.load() + 1) + " / " + engine.project.tracks[(size_t) engine.selectedTrack.load()].name + "\n" + engine.lastMidiText(), juce::dontSendNotification);
-    clipDetail.setText(c ? c->media->libraryTitle() + " / Lane " + juce::String(c->track + 1) : "Select a segment", juce::dontSendNotification);
+    clipDetail.setText(c ? c->media->libraryTitle() + " / Lane " + juce::String(c->track + 1)
+        + (c->pitchSemitones != 0 ? " / pitch " + juce::String(c->pitchSemitones, 2) + " steps" : juce::String()) : "Select a segment", juce::dontSendNotification);
     if (c)
     {
         const double values[] { c->start - engine.project.tempo.origin, c->offset, c->length, c->fadeIn, c->fadeOut, c->gainDb };
@@ -2286,23 +2360,28 @@ void Workstation::refresh()
     const bool copyReady = editingReady && c && c->media->hasPlayback() && !c->media->sourceDetailsPending && c->pendingPlacement == PendingPlacement::none;
     const bool scopedSelection = editSelection.multiple();
     inspectorLabel.setText(scopedSelection ? "SELECTED RANGE / GROUP" : "SELECTED SEGMENT", juce::dontSendNotification);
-    editingCopy.setTooltip(scopedSelection ? "Copy the selected audio range or segment group with independent effect snapshots. Source files and the mix stay unchanged. Stop playback/rehearsal and finish recording first." : "Copy the selected segment, its automation and effects. Paste at the playhead on the selected lane.");
+    editingCopy.setTooltip(scopedSelection ? "Copy the selected audio and its effects. Stop playback and recording first." : "Copy the selected segment, its automation and effects. Paste at the playhead on the selected lane.");
     editingCut.setTooltip(scopedSelection ? "Copy and remove the selected audio range/group, leaving a gap. One Undo restores the complete edit; original audio is kept." : "Cut the selected segment. Other positions stay fixed; Undo restores it.");
     editingSelect.setEnabled(!busy && !engine.exporting && !engine.project.clips.empty());
     editingCopy.setEnabled(copyReady); editingCut.setEnabled(copyReady && !clipLocked);
     const bool rangeEditReady = copyReady && !engine.playing && !engine.rehearsalActive() && !engine.recordingAutomation()
         && engine.automationRecordMode == AutomationRecordMode::read && !engine.project.hasPendingPlacement();
+    editingSplit.setEnabled(rangeEditReady && !clipLocked && !scopedSelection);
+    editingSplit.setTooltip(scopedSelection ? "Clear the range/group, click the ruler for the cut position, then Split at playhead (S)."
+        : "Click the ruler for the cut position, then split this track at the playhead (S). Both pieces keep their audio.");
+    editingDelete.setEnabled(rangeEditReady && !clipLocked);
     editingRepeat.setEnabled(rangeEditReady && !engine.project.hasLockedTransitions());
     editingCrop.setEnabled(rangeEditReady && editSelection.range.has_value() && !clipLocked);
     editingReplace.setEnabled(rangeEditReady && (editClipboard || clipClipboard) && !engine.project.hasLockedTransitions());
     editingRipple.setEnabled(copyReady && !clipLocked && !scopedSelection); editingCloseGap.setEnabled(copyReady && !clipLocked && !scopedSelection);
     editingPaste.setEnabled(editingReady && (editClipboard || (clipClipboard && (engine.project.followTrackTempo || !clipClipboard->tempoMap))) && !engine.project.hasLockedTransitions());
     editingPaste.setTooltip("Paste at " + timeText(engine.position.load() - engine.project.tempo.origin) + " on lane " + juce::String(engine.selectedTrack.load() + 1)
-        + (editClipboard ? ". Group's earliest lane maps here; relative lanes/times stay together. Occupied destinations refuse. Stop playback and use Read first." : ". Snap applies. Other segments keep their positions; source files are kept and effects receive independent ownership."));
+        + (editClipboard ? ". The copied group keeps its spacing." : ". Other segments keep their positions."));
     for (auto& slider : clipSliders) if (clipLocked) slider.setEnabled(false);
     tempoSlider.setEnabled(!engine.project.hasLockedTransitions());
     beatmatchButton.setEnabled(!engine.project.clips.empty() && !engine.project.hasLockedTransitions());
-    splitButton.setEnabled(c != nullptr && !clipLocked && !c->media->sourceDetailsPending); duplicateButton.setEnabled(c != nullptr); removeButton.setEnabled(c != nullptr && !clipLocked);
+    const bool visualSelected = sceneLane && sceneLane->hasSelectedScene();
+    splitButton.setEnabled(c != nullptr && !clipLocked && !c->media->sourceDetailsPending); duplicateButton.setEnabled(c != nullptr || visualSelected); removeButton.setEnabled((c != nullptr && !clipLocked) || visualSelected);
     reverseButton.setEnabled(c != nullptr && !clipLocked && !c->media->sourceDetailsPending); loopButton.setEnabled(c != nullptr && !clipLocked && !c->media->sourceDetailsPending); reverseButton.setToggleState(c && c->reversed, juce::dontSendNotification);
     if (scopedSelection)
     {
@@ -2474,6 +2553,7 @@ void Workstation::splitClip()
 }
 void Workstation::duplicateClip()
 {
+    if (sceneLane && sceneLane->hasSelectedScene()) { sceneLane->duplicateSelected(); return; }
     if (editSelection.multiple()) { setStatus("Use Copy and Paste for a selected range/group."); return; }
     const auto* selected = currentClip(); if (!selected || busy) return;
     if (engine.project.hasLockedTransitions()) { setStatus("Unlock transitions before duplicating segments with new tempo markers."); return; }
@@ -2509,6 +2589,7 @@ bool removeMissingAutomaticTempo(Project& project, const Project& before)
 }
 void Workstation::removeClip()
 {
+    if (sceneLane && sceneLane->hasSelectedScene()) { sceneLane->removeSelected(); return; }
     if (performSelectionAction(TimelineAction::remove, engine.position, engine.selectedTrack)) return;
     if (!currentClip() || busy || engine.exporting) return;
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement())
@@ -2550,7 +2631,7 @@ void Workstation::newSession()
     pendingTempo = 0; tempoPreparationPending = false; tempoEditBaseline.reset(); afterTempoPreparation = {};
     tempoStrip.selectedTempoPoint = -1; setBusy(false);
     timeline.selectAutomationPoint({}, -1);
-    selectedAutomationTarget = -1; selectedStem = -1; pluginLane = {};
+    selectedAutomationTarget = -1; selectedStem = -1; pluginLane = {}; automationClip.clear();
     timeline.visibleHotcueClips.clear(); timeline.visibleSectionClips.clear();
     timeline.selectedHotcue.reset(); timeline.selectedSection.reset();
     timeline.hotcueGesture.reset(); timeline.sectionGesture.reset();
@@ -2586,21 +2667,20 @@ int Workstation::keyEvidenceLevel(const Media& media)
 }
 juce::String Workstation::keyEvidenceText(const Media& media)
 {
-    return juce::String(keyEvidenceLevel(media));
+    if (media.key() < 0 || media.key() > 23) return "Unknown";
+    if (media.manualKey >= 0) return "Manual";
+    // The detector already separates an accepted key from a tentative keyGuess.
+    // Its multiplicative stability score is not a probability or a review verdict.
+    return media.analysis.key >= 0 && media.analysis.key < 24 && std::isfinite(media.analysis.keyConfidence) && media.analysis.keyConfidence >= 0
+        && media.analysis.keyConfidence <= 1 ? "Detected" : "Review";
 }
 juce::String Workstation::keyEvidenceHint(const Media& media)
 {
-    const double score = media.analysis.keyConfidence;
-    const bool valid = std::isfinite(score) && score >= 0 && score <= 1;
-    return keyEvidenceText(media) + (media.manualKey >= 0 ? ": manual key override; no automatic rating."
-        : media.key() < 0 || media.key() > 23 ? ": no key found; unrated. Review the source key."
-        : media.analysis.key < 0 ? ": best guess; low evidence. Review the key."
-        : !valid ? ": unavailable / invalid evidence; unrated."
-        : ": ordinal evidence rating, not a probability or a guarantee of the correct key.")
-        + "\nAutomatic key: " + keyNoteName(media.analysis.key) + "; raw evidence score: "
-        + (valid ? juce::String(score, 6) : juce::String("unavailable / invalid"))
-        + ".\n0 Unrated (manual, no key or unavailable); 1 Limited: below 0.05; 2 Fair: 0.05 to below 0.15; 3 Good: 0.15 to below 0.30; 4 Strong: 0.30 to 1.00."
-        + "\nPresentation bands, not calibrated accuracy. Detection, selected key and raw evidence are unchanged.";
+    if (media.manualKey >= 0) return "Your chosen key: " + keyNoteName(media.manualKey) + ".";
+    if (media.key() < 0 || media.key() > 23) return "Key not found. Review it in Source corrections.";
+    if (keyEvidenceText(media) == "Detected")
+        return "Detected key: " + keyNoteName(media.key()) + ". Found by the analyser; you can check or change it in Key by ear.";
+    return "Suggested key: " + keyNoteName(media.key()) + ". The result is tentative or its evidence is unavailable; check it in Key by ear.";
 }
 void Workstation::syncMix(bool align)
 {
@@ -2722,6 +2802,7 @@ juce::Result Workstation::applySourceCorrection(const std::shared_ptr<Media>& me
         return juce::Result::fail("Corrections were not saved. " + media->analysisCacheWarning
             + (previous.downbeat != correction.downbeat ? " The reviewed choice remains in the comparison archive." : juce::String()));
     }
+    clearRetryError(*media, false, this);
     markCatalogueChanged(); dirty = true; refresh();
     if (rebuildTimeline) syncMix(true);
     else setStatus("Track timing saved.");
@@ -2741,6 +2822,8 @@ void Workstation::editAnalysis(std::optional<juce::String> sourceId)
     if (gridWindow && gridWindow->isVisible()) { gridWindow->toFront(true); return; }
     if (busy || !timelineLoads.empty() || pendingTempo > 0 || tempoPreparationPending)
     { setStatus("Wait for audio and tempo preparation before opening source grid correction."); return; }
+    auto reviewSources = engine.library; for (const auto& c : engine.project.clips) reviewSources.push_back(c.media);
+    const auto reviewFailures = retryIssues(reviewSources, getProperties()["focusedRetryRows"]);
     // Context actions use the selected clip; global commands pass their active source explicitly.
     if (!sourceId) { const auto* clip = currentClip(); sourceId = clip && clip->media ? clip->media->id : juce::String(); }
     std::shared_ptr<Media> media;
@@ -2750,7 +2833,28 @@ void Workstation::editAnalysis(std::optional<juce::String> sourceId)
         if (!media) for (const auto& clip : engine.project.clips)
             if (clip.media && clip.media->id == *sourceId) { media = clip.media; break; }
     }
-    if (!media) { setStatus("Select a library song or a timeline segment first."); return; }
+    if ((!media || media->duration() <= 0) && !reviewFailures.empty())
+    {
+        class FailureWindow final : public AlloyPopupWindow<juce::DialogWindow>
+        {
+        public:
+            FailureWindow() : AlloyPopupWindow("Source corrections / retry failures", colour::background, true) {}
+            void closeButtonPressed() override { setVisible(false); exitModalState(0); }
+        };
+        auto* panel = new RetryFailurePanel(reviewFailures);
+        panel->onOpen = [safe = juce::Component::SafePointer<Workstation>(this), target = juce::Component::SafePointer<RetryFailurePanel>(panel)](juce::String id)
+        {
+            juce::MessageManager::callAsync([safe, target, id]
+            {
+                if (!safe || !target || !safe->gridWindow || safe->gridWindow->getContentComponent() != target.getComponent()) return;
+                safe->gridWindow->closeButtonPressed(); safe->editAnalysis(id);
+            });
+        };
+        gridWindow = std::make_unique<FailureWindow>();
+        gridWindow->setUsingNativeTitleBar(true); gridWindow->setContentOwned(panel, true); gridWindow->setLookAndFeel(&look);
+        gridWindow->centreWithSize(panel->getWidth(), panel->getHeight()); gridWindow->setVisible(true); gridWindow->enterModalState(true, nullptr, false); return;
+    }
+    if (!media) { setStatus("Select a track to correct its BPM, beat one or key."); return; }
     const auto& a = media->analysis;
     juce::String details = media->name + "\nDetected " + juce::String(a.bpm, 2) + " BPM (evidence score " + juce::String(a.tempoConfidence * 100, 0) + "/100). Beat phase " + juce::String(a.beatOrigin, 3) + " s.";
     details += media->manualBeatOrigin >= 0 ? "\nManual downbeat anchor: " + juce::String(media->manualBeatOrigin, 4) + " s (4/4; may be anywhere in the source)."
@@ -2765,8 +2869,7 @@ void Workstation::editAnalysis(std::optional<juce::String> sourceId)
     if (a.retryEvidence.isObject()) details+="\nTargeted retry: "+a.retryEvidence["tempoDecision"].toString()+"; "+a.retryEvidence["keyDecision"].toString()+". Before/candidate values, passages and method are retained in the analysis record.";
     details += media->analysisCacheWarning.isNotEmpty() ? "\n" + media->analysisCacheWarning : media->analysisFromCache ? "\nReused saved analysis for unchanged audio." : "\nAnalysis is saved in Mixworks' local application data folder.";
     if (media->playbackError.isNotEmpty()) details += "\nAudio loading: " + media->playbackError;
-    details += "\nPlayback cache: " + PcmStore::shared().directory().getFullPathName()
-        + " / " + juce::String(PcmStore::shared().limitBytes() / (1024LL * 1024 * 1024)) + " GiB limit";
+    details += "\nPlayback reads the original music file through a small shared buffer; no full-song audio copy is stored.";
     if (media->playbackCacheWarning.isNotEmpty()) details += "\n" + media->playbackCacheWarning;
     if (!std::isfinite(media->duration()) || media->duration() <= 0) { setStatus("Wait until this source's duration is known."); return; }
     Engine* auditionEngine=&engine;
@@ -2780,20 +2883,49 @@ void Workstation::editAnalysis(std::optional<juce::String> sourceId)
     auto* editor = new GridCorrectionEditor(*auditionEngine, media, details,
         [safe = juce::Component::SafePointer<Workstation>(this), media](const SourceCorrection& correction, bool rebuildTimeline)
         { return safe ? safe->applySourceCorrection(media, correction, rebuildTimeline) : juce::Result::fail("The mix was closed."); });
+    editor->refreshFailures = [safe = juce::Component::SafePointer<Workstation>(this), grid = juce::Component::SafePointer<GridCorrectionEditor>(editor)]
+    {
+        if (!safe || !grid) return;
+        auto sources = safe->engine.library; for (const auto& c : safe->engine.project.clips) sources.push_back(c.media);
+        grid->setRetryFailures(retryIssues(sources, safe->getProperties()["focusedRetryRows"]), lastRetryResult(safe->getProperties()["focusedLastResult"]),
+            [safe, grid](juce::String id)
+            {
+                juce::MessageManager::callAsync([safe, grid, id]
+                {
+                    if (!safe || !grid || !safe->gridWindow || safe->gridWindow->getContentComponent() != grid.getComponent()) return;
+                    safe->gridWindow->closeButtonPressed(); safe->editAnalysis(id);
+                });
+            });
+    };
+    editor->refreshFailures();
+    editor->setKeyByEarAction([safe = juce::Component::SafePointer<Workstation>(this), media, target = juce::Component::SafePointer<GridCorrectionEditor>(editor)](auto playback)
+    { if (safe && target) safe->showKeyByEar(media, std::move(playback), target); });
+    editor->beforeAudition = [safe = juce::Component::SafePointer<Workstation>(this)]
+    {
+        if (!safe) return juce::Result::fail("The mix was closed.");
+        if (safe->engine.workMode == WorkMode::recordPerform) return safe->libraryPreview.playPrepared(safe->privatePreparation, "private-grid-review");
+        safe->libraryPreview.stop(); return juce::Result::ok();
+    };
     gridWindow = std::make_unique<GridCorrectionWindow>(editor); gridWindow->setLookAndFeel(&look);
     gridWindow->setVisible(true); gridWindow->enterModalState(true, nullptr, false);
     setStatus("Review track timing.");
     if (!media->hasPlayback())
     {
         const auto record = media->analysisRecord(); const auto file = media->file;
-        audioWorkers.addJob([safe = juce::Component::SafePointer<GridCorrectionEditor>(editor), record, file, cancelled = sourceReadsCancelled]
+        audioWorkers.addJob([safe = juce::Component::SafePointer<GridCorrectionEditor>(editor), owner = juce::Component::SafePointer<Workstation>(this), record, file, cancelled = sourceReadsCancelled]
         {
             juce::AudioFormatManager formats; formats.registerBasicFormats();
             auto result = readMedia(formats, file, {}, AnalysisCacheMode::readOnly, MediaReadPurpose::playback, &record, cancelled);
             if (result.media && !(result.media->analysisSource == record.source))
             { result.media.reset(); result.error = "The source changed. Reimport it before editing its grid."; }
-            juce::MessageManager::callAsync([safe, media = std::move(result.media), error = result.error]
-            { if (safe) safe->setPlaybackMedia(media, error); });
+            juce::MessageManager::callAsync([safe, owner, media = std::move(result.media), error = result.error]
+            {
+                if (safe)
+                {
+                    if (media && error.isEmpty()) clearRetryError(*media, true, owner.getComponent());
+                    safe->setPlaybackMedia(media, error); if (safe->refreshFailures) safe->refreshFailures();
+                }
+            });
         });
     }
 }
@@ -2802,6 +2934,17 @@ bool Workstation::saveSessionFile(const juce::File& file)
     const auto error = engine.saveProject(file);
     if (error.isNotEmpty()) { fail(error); return false; }
     clearRecovery(); sessionFile = file; dirty = false; saveButton.setTooltip("Save current mix to " + file.getFullPathName() + ". Ctrl+S saves; Ctrl+Shift+S chooses Save As."); setStatus("Saved " + file.getFullPathName()); return true;
+}
+void Workstation::confirmChangedDestination(const juce::File& chosen, const juce::File& destination, std::function<void(bool)> after)
+{
+    // The chooser confirms only the typed path, before our extension correction.
+    if (chosen == destination || !destination.existsAsFile()) { after(true); return; }
+    auto* dialog = new juce::AlertWindow("Replace existing file?",
+        "The completed filename already exists:\n" + destination.getFullPathName()
+        + "\n\nReplace it? Its previous contents will be kept in a backup.", juce::MessageBoxIconType::WarningIcon, this);
+    dialog->addButton("Replace", 1); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+    dialog->enterModalState(true, juce::ModalCallbackFunction::create(
+        [safe = juce::Component::SafePointer<Workstation>(this), after](int answer) { if (safe) after(answer == 1); }), true);
 }
 void Workstation::chooseSave(std::function<void()> onSaved, bool useSessionFile)
 {
@@ -2814,9 +2957,17 @@ void Workstation::chooseSave(std::function<void()> onSaved, bool useSessionFile)
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting, [safe = juce::Component::SafePointer<Workstation>(this), onSaved](const auto& f)
     {
         if (!safe) return;
-        safe->choosingSave = false;
-        if (f.getResult() != juce::File() && safe->saveSessionFile(f.getResult().withFileExtension("mixworks")) && onSaved)
-            juce::MessageManager::callAsync([safe, onSaved] { if (safe) onSaved(); });
+        if (f.getResult() == juce::File()) { safe->choosingSave = false; return; }
+        const auto destination = f.getResult().withFileExtension("mixworks");
+        safe->confirmChangedDestination(f.getResult(), destination, [safe, destination, onSaved](bool confirmed)
+        {
+            if (!safe) return;
+            safe->choosingSave = false;
+            if (!confirmed) return;
+            if (safe->busy || safe->engine.exporting) { safe->setStatus("Wait for the current task to finish, then save again. Your mix is still open."); return; }
+            if (safe->saveSessionFile(destination) && onSaved)
+                juce::MessageManager::callAsync([safe, onSaved] { if (safe) onSaved(); });
+        });
     });
 }
 void Workstation::chooseOpen()
@@ -2855,8 +3006,9 @@ void Workstation::openProjectDocument(juce::String document, const juce::File& f
             if (*cancelled) staged->error = "Session opening cancelled. The current session was kept.";
             if (staged->failedSource && !*cancelled)
             {
-                const auto source = *staged->failedSource; safe->setStatus(staged->error);
-                juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::WarningIcon, "Required audio unavailable", staged->error,
+                const auto source = *staged->failedSource; safe->setStatus("Find the missing audio to open this mix.");
+                safe->getProperties().set("lastMessageDetails", staged->error);
+                juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::WarningIcon, "Audio unavailable", "Find " + source.name + " to open this mix. Your current mix stays open until then.",
                     "Locate source...", "Cancel", safe.getComponent(), juce::ModalCallbackFunction::create(
                     [safe, file, recovered, recovery, fingerprint, staged, source](int answer)
                     {
@@ -2929,16 +3081,43 @@ void Workstation::openProjectDocument(juce::String document, const juce::File& f
 }
 void Workstation::chooseExport(int take)
 {
-    if (busy) return;
+    if (busy || exportTask || engine.exporting) return;
     if (engine.capturingPerformance()) { setStatus("Stop to finalise the editable take before exporting."); return; }
-    if (!ensureTempoReady([safe = juce::Component::SafePointer<Workstation>(this),take] { if (safe) safe->chooseExport(take); })) return;
-    selectedExportTake=take;
-    chooser = std::make_unique<juce::FileChooser>("Export stereo 24-bit WAV", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Mix.wav"), "*.wav", false);
-    chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting, [safe = juce::Component::SafePointer<Workstation>(this)](const auto& f)
+    if (take < -1 || take >= (int)engine.project.performanceTakes.size()) { setStatus("That take is no longer available. Reopen Takes / preview."); return; }
+    const auto safe = juce::Component::SafePointer<Workstation>(this);
+    const auto id = take >= 0 ? engine.project.performanceTakes[(size_t)take].id : juce::String();
+    const auto fingerprint = take >= 0 ? juce::SHA256(juce::JSON::toString(takeToJson(engine.project.performanceTakes[(size_t)take])).toUTF8()).toHexString() : juce::String();
+    // Bind both asynchronous boundaries to the chosen take, rather than its
+    // position in a list that Undo, editing or discard can replace.
+    const auto target = [safe, id, fingerprint]() -> int
     {
-        if (!safe || f.getResult() == juce::File()) return;
-        if (safe->selectedExportTake>=0) safe->beginWavExport(f.getResult().withFileExtension("wav"),{});
-        else safe->chooseExportEnd(f.getResult().withFileExtension("wav"));
+        if (!safe) return -2;
+        if (id.isEmpty()) return -1;
+        const auto& takes = safe->engine.project.performanceTakes;
+        const auto found = std::find_if(takes.begin(), takes.end(), [&](const auto& item) { return item.id == id; });
+        if (found == takes.end() || juce::SHA256(juce::JSON::toString(takeToJson(*found)).toUTF8()).toHexString() != fingerprint)
+        { safe->setStatus("That take changed. Reopen its export chooser."); return -2; }
+        return (int)(found - takes.begin());
+    };
+    if (!ensureTempoReady([safe, target]
+    {
+        if (!safe || safe->busy || safe->exportTask || safe->engine.exporting || safe->engine.capturingPerformance()) return;
+        const int current = target(); if (current >= -1) safe->chooseExport(current);
+    })) return;
+    chooser = std::make_unique<juce::FileChooser>("Export stereo 24-bit WAV", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Mix.wav"), "*.wav", false);
+    chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting, [safe, target](const auto& f)
+    {
+        if (!safe || safe->busy || safe->exportTask || safe->engine.exporting || safe->engine.capturingPerformance() || f.getResult() == juce::File()) return;
+        const auto destination = f.getResult().withFileExtension("wav");
+        safe->confirmChangedDestination(f.getResult(), destination, [safe, target, destination](bool confirmed)
+        {
+            if (!safe || !confirmed || safe->busy || safe->exportTask || safe->engine.exporting || safe->engine.capturingPerformance()) return;
+            const int current = target(); if (current < -1) return;
+            // Resolve the stable take again after the replacement confirmation.
+            safe->selectedExportTake = current;
+            if (current >= 0) safe->beginWavExport(destination,{});
+            else safe->chooseExportEnd(destination);
+        });
     });
 }
 void Workstation::choosePlugin()
@@ -3005,7 +3184,8 @@ void Workstation::configurePluginControls()
     if (insert < 0 && !chain.empty()) insert = 0;
     if (insert < 0 || insert >= (int) chain.size()) { setStatus("Add a VST3 to this track first."); return; }
     const auto slotId = chain[(size_t) insert]->id;
-    auto* dialog = new juce::AlertWindow("Plugin MIDI controls", "Choose a control for " + chain[(size_t) insert]->description.name + ". Save your mix to keep these choices.\n\n" + engine.pluginControlSummary(track), juce::MessageBoxIconType::NoIcon, this);
+    getProperties().set("lastMessageDetails", engine.pluginControlSummary(track));
+    auto* dialog = new juce::AlertWindow("Plugin MIDI controls", "Choose a control for " + chain[(size_t) insert]->description.name + ". Save your mix to keep these choices.", juce::MessageBoxIconType::NoIcon, this);
     juce::StringArray controls; for (int i = 0; i < 8; ++i) controls.add("Control " + juce::String(i + 1));
     juce::StringArray parameters { "Unassigned" }; std::vector<int> indices { -1 };
     const auto& available = chain[(size_t) insert]->processor->getParameters();

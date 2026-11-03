@@ -8,8 +8,29 @@ TimelineHeader::TimelineHeader(Workstation& w, bool isOverview) : owner(w), over
     setWantsKeyboardFocus(true);
     if (!overview) setFocusContainerType(FocusContainerType::focusContainer);
     setTitle(overview ? "Mix navigator" : "Timeline ruler and labels");
-    setTooltip(overview ? "Drag either preview edge to zoom with the opposite edge fixed; drag its body to pan. Double-click fits the mix. Arrows pan; Shift+Left/Right resizes the left edge, Ctrl+Left/Right the right edge; + and - zoom."
-                        : "Click the ruler to seek; double-click to play from that position. Drag a label to move it; double-click the label row to add or edit a label.");
+    setTooltip(overview ? "Drag an edge to zoom or the middle to move the view. Double-click to fit the mix."
+                        : "Click to move the playhead; double-click to play. Guide toggles an independent alignment line. Shift-click places it; drag its cyan handle to align. Snap applies; Alt gives free placement.");
+    if (!overview)
+    {
+        addAndMakeVisible(guideButton); guideButton.setClickingTogglesState(true);
+        guideButton.setTitle("Show alignment guide");
+        guideButton.setTooltip("Show/hide an independent alignment guide. Shift-click the ruler to place it; drag the cyan handle. Uses Snap; hold Alt for free placement. Never seeks or moves audio.");
+        guideButton.onClick=[this]
+        {
+            if (guideButton.getToggleState()) alignmentGuide=owner.engine.project.snappedTime(
+                (owner.viewport.getViewPositionX()+owner.viewport.getViewWidth()*.5)/owner.timeline.pixelsPerSecond,owner.engine.project.snap);
+            else alignmentGuide.reset();
+            repaint(); owner.timeline.repaint();
+        };
+    }
+}
+void TimelineHeader::resized() { if (!overview) guideButton.setBounds(std::max(0,getWidth()-66),1,64,20); }
+void TimelineHeader::placeGuide(const juce::MouseEvent& e)
+{
+    const double at=std::max(0.,(e.position.x+owner.viewport.getViewPositionX())/owner.timeline.pixelsPerSecond);
+    alignmentGuide=owner.engine.project.snappedTime(at,owner.engine.project.snap && !e.mods.isAltDown());
+    guideButton.setToggleState(true,juce::dontSendNotification);
+    repaint(); owner.timeline.repaint();
 }
 double TimelineHeader::overviewWidth() const { return std::max(1., (double) owner.timeline.getWidth()); }
 std::unique_ptr<juce::AccessibilityHandler> TimelineHeader::createAccessibilityHandler()
@@ -142,6 +163,14 @@ void TimelineHeader::paint(juce::Graphics& g)
         }
     }
     g.setColour(colour::border); g.drawHorizontalLine(getHeight() - 1, 0, (float) getWidth());
+    if (!overview && alignmentGuide)
+    {
+        const float x=(float)(*alignmentGuide*scale-scroll);
+        g.setColour(juce::Colour(0xff67dce5)); g.drawVerticalLine((int)x,0,(float)getHeight());
+        juce::Path handle; handle.addTriangle(x-7,2,x+7,2,x,14); g.fillPath(handle);
+        g.setColour(colour::panel); g.fillRect((int)x+7,2,38,16);
+        g.setColour(juce::Colour(0xff67dce5)); g.setFont(11.f); g.drawText("Align",(int)x+8,3,36,14,juce::Justification::centredLeft);
+    }
 }
 juce::MouseEvent TimelineHeader::timelineEvent(const juce::MouseEvent& e) const
 { return e.withNewPosition(juce::Point<float>{e.position.x + owner.viewport.getViewPositionX(), e.position.y - Timeline::rulerHeight}); }
@@ -157,6 +186,9 @@ void TimelineHeader::mouseDown(const juce::MouseEvent& e)
     grabKeyboardFocus();
     if (!overview)
     {
+        const double x=alignmentGuide ? *alignmentGuide*owner.timeline.pixelsPerSecond-owner.viewport.getViewPositionX() : -1000;
+        if (e.mods.isLeftButtonDown() && e.y<Timeline::timeRulerHeight && (e.mods.isShiftDown() || (alignmentGuide && std::abs(e.position.x-x)<=8)))
+        { draggingGuide=true; placeGuide(e); return; }
         if (owner.engine.exporting || (e.y < Timeline::timeRulerHeight && e.getNumberOfClicks() > 1)) return;
         owner.timeline.mouseDown(timelineEvent(e)); return;
     }
@@ -191,15 +223,17 @@ void TimelineHeader::resizePreview(double begin, double end)
 }
 void TimelineHeader::mouseDrag(const juce::MouseEvent& e)
 {
-    if (!overview) { owner.timeline.mouseDrag(timelineEvent(e)); return; }
+    if (!overview) { if (draggingGuide) placeGuide(e); else owner.timeline.mouseDrag(timelineEvent(e)); return; }
     if (zoomEdge == 0) { pan(e.position.x); return; }
     const double delta = (e.position.x - zoomStartX) * zoomExtent / std::max(1, getWidth());
     resizePreview(zoomStart + (zoomEdge < 0 ? delta : 0), zoomEnd + (zoomEdge > 0 ? delta : 0));
 }
-void TimelineHeader::mouseUp(const juce::MouseEvent& e) { zoomEdge = 0; if (!overview) owner.timeline.mouseUp(timelineEvent(e)); }
+void TimelineHeader::mouseUp(const juce::MouseEvent& e)
+{ zoomEdge = 0; if (draggingGuide) { draggingGuide=false; return; } if (!overview) owner.timeline.mouseUp(timelineEvent(e)); }
 void TimelineHeader::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if (overview) { owner.menuItemSelected(22, 4); return; }
+    if (e.mods.isShiftDown() || (alignmentGuide && std::abs(e.position.x-(*alignmentGuide*owner.timeline.pixelsPerSecond-owner.viewport.getViewPositionX()))<=8)) return;
     if (owner.busy || owner.engine.exporting) return;
     if (e.y >= 0 && e.y < Timeline::timeRulerHeight)
     {
