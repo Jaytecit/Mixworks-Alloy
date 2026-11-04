@@ -9,13 +9,14 @@ CONTROL_DEFAULTS = dict(intensity=.7, motion=.5, imageMix=.5, scale=.5,
     colourR=.7, colourG=.7, colourB=.7, pulse=.5, mode=0., mirror=0.,
     imageZoom=.35, imageRotation=.5, imageIndex=0., feedback=.65,
     bassDrive=.5, midDrive=.5, trebleDrive=.5, momentum=.5,
-    materialMotion=.35, materialMode=0., viewPattern=0., finishGlow=.2)
+    materialMotion=.35, materialMode=0., viewPattern=0., finishGlow=.2,
+    paletteStyle=0., paletteAmount=1.)
 DISCRETE = {'mode': 4, 'mirror': 2, 'symmetry': 7}
 
 def catalogue(root):
     root=Path(root)
     data=json.loads((root/'original-scenes.json').read_text(encoding='utf-8'))
-    if data.get('schema') != 1 or not isinstance(data.get('scenes'),list) or not 1<=len(data['scenes'])<=160:
+    if data.get('schema') != 1 or not isinstance(data.get('scenes'),list) or not 1<=len(data['scenes'])<=256:
         raise ValueError('Invalid original catalogue')
     result={}
     for entry in data['scenes']:

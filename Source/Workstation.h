@@ -551,6 +551,7 @@ private:
     friend class SceneLane;
     friend class SceneBrowser;
     friend void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend void runMilkDropTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
     std::unique_ptr<SceneLane> sceneLane;
     std::shared_ptr<StemJob> stemJob;
     juce::String stemSourceName, stemSourceId;

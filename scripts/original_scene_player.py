@@ -1,4 +1,4 @@
-"""Original scene protocol implementation. Only permissive runtime dependencies.
+"""Owned scene protocol implementation, with optional LGPL libprojectM support.
 
 Music comes from Alloy's bounded mixed-PCM feed, never a capture device.
 No scene scripts, extracted host helpers, Synesthesia paths or prototype imports.
@@ -60,13 +60,17 @@ def audio_levels(pcm, rate):
 
 
 class OriginalScenePlayer:
-    def __init__(self, renderer_root, install, width=1280, height=720, owner_pid=0):
+    def __init__(self, renderer_root, install, width=1280, height=720, owner_pid=0, *, milkdrop_library=None):
         if type(width) is not int or type(height) is not int or not 1 <= width <= 1920 or not 1 <= height <= 1080:
             raise ValueError('Invalid original visual dimensions')
         self.root, self.width, self.height = Path(install), width, height
         if not (self.root/'original-scenes.json').is_file():
             raise ValueError('Original scene collection is missing')
         self.entries=catalogue(self.root)
+        from milkdrop_catalogue import catalogue as imported_catalogue
+        self.entries.update(imported_catalogue(milkdrop_library))
+        self.milkdrop_library = None
+        self.renderer_root = Path(renderer_root)
         self.pool_textures={}; self.cutout_textures={}; self.pool_errors={}; self.pool=[]; self.cutouts=[]
         config_path=self.root/'media-library.json'
         config=json.loads(config_path.read_text(encoding='utf-8')) if config_path.is_file() else {}
@@ -158,6 +162,9 @@ class OriginalScenePlayer:
         duration=number(request.get('transitionSeconds',1e9),0,1e9,'transition duration')
         if duration>4. and transition not in ('dissolve','zoom','cut'): transition='dissolve'
         generative=transition not in ('dissolve','zoom','cut')
+        if generative and any(a['scene'].startswith('milkdrop/') for a in actors):
+            # Imported engines have no Alloy simulation state to inherit.
+            transition, generative = 'dissolve', False
         generation=request.get('generation')
         if type(generation) is not int or generation<0: raise ValueError('Invalid original visual generation')
         capture=request.get('capture',self.presenter is None)
@@ -189,6 +196,7 @@ class OriginalScenePlayer:
             blend=max(0.,min(1.,(phrase%1-(1-self.blend_beats/self.phrase_beats))/(self.blend_beats/self.phrase_beats)))
             blend=blend*blend*(3-2*blend)
             for a in actors:
+                if a['scene'].startswith('milkdrop/'): continue
                 offset=int(a['controls'].get('imageIndex',0)*(len(self.pool)-1))
                 i=(int(phrase)+offset)%len(self.pool)
                 paths=(self.pool[i],self.pool[(i+1)%len(self.pool)])
@@ -238,8 +246,18 @@ class OriginalScenePlayer:
                 if a['clip'] in self.instances and self.instances[a['clip']].key != a['scene']:
                     self.instances.pop(a['clip']).close()
                 if a['clip'] not in self.instances:
-                    self.instances[a['clip']]=Scene(self.root,self.width,self.height,a['scene'])
+                    if a['scene'].startswith('milkdrop/'):
+                        from milkdrop_scene import Library, MilkDropScene
+                        if self.milkdrop_library is None: self.milkdrop_library = Library(self.renderer_root)
+                        self.instances[a['clip']]=MilkDropScene(self.milkdrop_library,self.entries[a['scene']],
+                            self.width,self.height,a['scene'],self.renderer)
+                    else:
+                        self.instances[a['clip']]=Scene(self.root,self.width,self.height,a['scene'])
                 scene=self.instances[a['clip']]
+                if a['scene'].startswith('milkdrop/'):
+                    scene.render_pcm(a,pcm)
+                    gl.glBindVertexArray(self.renderer.vao)
+                    continue
                 if index==1 and not generative and scene.handoff:
                     scene.handoff.close();scene.handoff=None;scene.clock=None
                 if index==1 and generative:
@@ -296,6 +314,10 @@ class OriginalScenePlayer:
             self.width,self.height,generation,bool(request.get('playing'))) if self.presenter else {}
         presentation['pixelTransferBytes']=len(self.encoded)
         facts=[dict(**a,frames=self.instances[a['clip']].frames,rms=rms) for a in actors]
+        for fact in facts:
+            if fact['scene'].startswith('milkdrop/'):
+                fact.update(renderer='projectM-4.1.8',audioSource='mixed-pcm-mono',clock='live-wall-clock',
+                            seekBehaviour='restart-feedback',upstreamTargetBytesIncluded=False)
         handoffs=[dict(clip=a['clip'],routes=self.instances[a['clip']].handoff.seeded,
                       materialStrength=self.instances[a['clip']].handoff.strength)
                   for a in actors if self.instances[a['clip']].handoff]

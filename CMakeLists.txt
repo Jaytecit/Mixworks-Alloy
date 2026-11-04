@@ -104,6 +104,7 @@ target_sources(Mixworks PRIVATE Source/LibraryPreview.cpp Source/LibraryPreviewT
 
 # Visual runtime is packaged beside the executable; no reference installation is used.
 target_sources(Mixworks PRIVATE Source/VisualScenes.cpp Source/VisualArrangement.cpp Source/VisualArrangementTests.cpp Source/SceneLane.cpp Source/SceneLaneTests.cpp)
+target_sources(Mixworks PRIVATE Source/MilkDrop.cpp)
 
 
   set(alloy_original_sources
@@ -112,6 +113,8 @@ target_sources(Mixworks PRIVATE Source/VisualScenes.cpp Source/VisualArrangement
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_handoff.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_presenter.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_scene_player.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/milkdrop_scene.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/milkdrop_catalogue.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_catalogue.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_media.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_visual_gl.py")
@@ -125,3 +128,13 @@ target_sources(Mixworks PRIVATE Source/VisualScenes.cpp Source/VisualArrangement
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/previews" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/previews"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/original-scenes.json" "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/media-library.json" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Sprites" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Backgrounds")
+
+# Optional shared renderer; no NestDrop binaries or third-party presets are bundled.
+# Prepare with scripts/fetch-projectm.ps1. Ordinary owned scenes do not load this DLL.
+set(alloy_projectm "${CMAKE_CURRENT_SOURCE_DIR}/.local/deps/projectm")
+if(EXISTS "${alloy_projectm}/bin/projectM-4.dll")
+  add_custom_command(TARGET Mixworks POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/milkdrop"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${alloy_projectm}/bin/projectM-4.dll" "${alloy_projectm}/bin/glew32.dll" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/milkdrop"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${alloy_projectm}/licenses" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/milkdrop/licenses")
+endif()

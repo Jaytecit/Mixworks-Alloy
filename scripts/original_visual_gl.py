@@ -115,7 +115,7 @@ void main() {
 LOOK_GLSL = '''#version 330
 uniform sampler2D input0;
 uniform vec2 resolution;
-uniform float viewPattern,finishGlow;
+uniform float viewPattern,finishGlow,paletteStyle,paletteAmount,hue;
 uniform float travelTime,bassImpulse,midImpulse,trebleImpulse,bassHit,midHit,trebleHit,intensity;
 out vec4 colour;
 vec2 viewUV(vec2 uv){
@@ -151,6 +151,28 @@ vec3 reflectedScene(vec2 uv){
     }
     return sum/max(weight,.00001);
 }
+vec3 authoredPalette(vec3 source,int style){
+    float value=max(source.r,max(source.g,source.b));
+    float low=min(source.r,min(source.g,source.b));
+    float chroma=value-low;
+    float phase=chroma<.001?0.:(source.r==value?(source.g-source.b)/chroma:
+        source.g==value?2.+(source.b-source.r)/chroma:4.+(source.r-source.g)/chroma)/6.;
+    float x=fract(phase+hue*.32+value*.48+midImpulse*.012);
+    vec3 a,b,c;
+    if(style==1){a=vec3(.01,.95,1.);b=vec3(1.,.005,.42);c=vec3(.38,.005,1.);}
+    else if(style==2){a=vec3(.52,1.,.005);b=vec3(.3,.005,1.);c=vec3(.005,.36,1.);}
+    else if(style==3){a=vec3(1.,.015,.005);b=vec3(1.,.24,.005);c=vec3(1.,.93,.01);}
+    else if(style==4){a=vec3(.005,.76,.24);b=vec3(.8,.005,.08);c=vec3(.015,.08,1.);}
+    else if(style==5){a=vec3(1.,0.,.01);b=vec3(0.,1.,.015);c=vec3(.005,.015,1.);}
+    else if(style==6){
+        vec3 accent=.5+.5*cos(6.283185*(hue+vec3(0.,.33,.67)));
+        return mix(vec3(value),accent*value,smoothstep(.24,.55,chroma));
+    }
+    else {return mix(vec3(dot(source,vec3(.2126,.7152,.0722))),source,.48)*.72+value*.24;}
+    vec3 ink=x<.5?mix(a,b,smoothstep(0.,.5,x)):mix(b,c,smoothstep(.5,1.,x));
+    // Retain a dark floor and local contrast; neon is colour, not white bloom.
+    return ink*min(.98,pow(max(value,0.),.82)*1.22);
+}
 void main(){
     vec2 uv=viewUV(gl_FragCoord.xy/resolution),px=1./resolution;
     vec3 c=reflectedScene(uv);
@@ -170,7 +192,9 @@ void main(){
     float light=dot(c,vec3(.2126,.7152,.0722));
     vec3 tint=.5+.5*cos(angle+vec3(0.,2.094,4.189));
     rotated=mix(rotated,light*(.45+1.5*tint),.18+.22*bassHit);
-    c=mix(c,rotated,clamp(.5+.45*intensity,0.,1.));
+    int style=int(floor(paletteStyle*7.+.5));
+    if(style==0)c=mix(c,rotated,clamp(.5+.45*intensity,0.,1.));
+    else c=mix(c,authoredPalette(c,style),paletteAmount);
     colour=vec4(clamp(c,0.,1.),1.);
 }
 '''
@@ -415,7 +439,9 @@ class Scene:
                 entry['target'] = Target(*dimensions(entry), buffers=2 if entry.get('history') else 1,
                                          format=entry['format'], filter=entry.get('filter','linear'))
                 source=LOOK_GLSL if entry['id']=='sharedlook' else (scene_root/entry['shader']).read_text(encoding='utf-8')
-                entry['materialSource']=bool(entry.get('state') and 'uniform sampler2D userImage;' in source)
+                # Re-capture material atlases on an explicit image-method edit.
+                # Image-fed physical/population fields keep their accumulated state.
+                entry['materialSource']=bool(entry.get('state') and entry.get('semantic')=='premultiplied-source-atlas-v1')
                 vertex=(scene_root/entry['vertex']).read_text(encoding='utf-8') if 'vertex' in entry else VERTEX
                 entry['program'] = program(scene_source(source) if 'uniform sampler2D userImage;' in source else source,vertex)
                 names = ('resolution','sceneTime','projectBeat','beatPulse','energy','bass','mid','treble','onset','bassHit','bassTime','midHit','trebleHit','midTime','trebleTime','bassImpulse','midImpulse','trebleImpulse',
@@ -456,7 +482,7 @@ class Scene:
                       cutoutBlend=cutout[4],
                       beatPulse=math.exp(-6*(beat%1))*controlled['bass'], **controlled, **actor['controls'])
         values.setdefault('imageZoom',.35); values.setdefault('imageRotation',.5)
-        for name in ('materialMotion','materialMode','viewPattern','finishGlow'):
+        for name in ('materialMotion','materialMode','viewPattern','finishGlow','paletteStyle','paletteAmount'):
             values.setdefault(name,CONTROL_DEFAULTS[name])
         values['handoffStrength']=self.handoff.strength if self.handoff else 0.
         progress=self.handoff.progress if self.handoff else 1.

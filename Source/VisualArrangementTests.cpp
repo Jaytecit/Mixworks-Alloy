@@ -1,5 +1,6 @@
 #include "Workstation.h"
 #include "AutoArrangement.h"
+#include "MilkDrop.h"
 #include <cmath>
 #include <map>
 #if JUCE_WINDOWS
@@ -42,6 +43,44 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
     auto plan=planAutoArrangement({a,b,c},options,random);
     check(plan.error.isEmpty() && plan.project.clips.size()==3,"real music planner supplies a three-song visual fixture");
     if (plan.project.clips.size()!=3) return;
+    {
+        auto collection=discoverVisualScenes(juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("original-visualiser-runtime"));
+        VisualSceneEntry imported {"milkdrop/"+juce::String::repeatedString("a",64),"MilkDrop fixture"};
+        imported.family="milkdrop"; imported.style="MilkDrop"; imported.motif="milkdrop"; imported.controlSpecs["intensity"]={.5,0};
+        collection.push_back(imported);
+        check(automaticVisualScenes(collection).size()==203 && automaticVisualScenes(collection,VisualSceneSource::milkdrop).size()==1
+            && automaticVisualScenes(collection,VisualSceneSource::both).size()==204,"source filters select Originals, MilkDrop or Both from the same catalogue");
+        for(const auto selected : {VisualSceneSource::originals,VisualSceneSource::milkdrop,VisualSceneSource::both})
+        {
+            auto show=plan.project; show.visualImage="selected-image.png";
+            const auto music=juce::JSON::toString(projectToJson(show)["clips"]);
+            const auto made=arrangeVisualScenes(show,collection,random,selected);
+            const auto milk=std::count_if(show.visualScenes.begin(),show.visualScenes.end(),[](const auto& s){return isMilkDropKey(s.scene);});
+            check(made.wasOk() && show.visualScenes.size()==3
+                && (selected==VisualSceneSource::originals ? milk==0 : selected==VisualSceneSource::milkdrop ? milk==3 : milk==1),
+                visualSceneSourceName(selected)+" generates the requested engines even with an image selected");
+            bool controls=true,transitions=true;
+            for(size_t i=0;i<show.visualScenes.size();++i)
+            {
+                const auto& scene=show.visualScenes[i];
+                if(isMilkDropKey(scene.scene)) controls &= scene.controls.size()==1 && scene.controls.count("intensity") && scene.automation.size()==1;
+                if(i && (isMilkDropKey(scene.scene) || isMilkDropKey(show.visualScenes[i-1].scene)))
+                    transitions &= scene.transition=="dissolve" || scene.transition=="zoom" || scene.transition=="cut";
+            }
+            check(controls && transitions && validateVisualScenes(show.visualScenes).wasOk(),visualSceneSourceName(selected)+" uses supported controls and engine handovers");
+            std::vector<VisualSceneClip> reopened;
+            check(readVisualScenes(visualScenesToJson(show.visualScenes),reopened).wasOk()
+                && juce::JSON::toString(visualScenesToJson(reopened))==juce::JSON::toString(visualScenesToJson(show.visualScenes))
+                && music==juce::JSON::toString(projectToJson(show)["clips"]),visualSceneSourceName(selected)+" round-trips its visual schedule without changing music");
+        }
+        auto unchanged=plan.project;
+        const auto before=juce::JSON::toString(projectToJson(unchanged));
+        collection.pop_back();
+        check(arrangeVisualScenes(unchanged,collection,random,VisualSceneSource::milkdrop).failed()
+            && arrangeVisualScenes(unchanged,collection,random,VisualSceneSource::both).failed()
+            && before==juce::JSON::toString(projectToJson(unchanged)),"missing MilkDrop imports preserve the complete current arrangement for both explicit choices");
+        check(arrangeVisualScenes(unchanged,{imported},random,VisualSceneSource::both).failed(),"Both refuses a collection missing original scenes");
+    }
     auto before=projectToJson(plan.project); before.getDynamicObject()->removeProperty("visualScenes");
     const auto generated=arrangeVisualScenes(plan.project,pool,random);
     check(generated.wasOk() && plan.project.visualScenes.size()==3,"one editable scene is generated per arranged song");
@@ -174,13 +213,24 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
     check(dialog && dialog->getComboBoxComponent("visuals") && dialog->getComboBoxComponent("visuals")->getSelectedItemIndex()==1,"Auto Arrange defaults to keeping hand-placed visuals when the lane is populated");
     if (dialog)
     {
-        check(dialog->getComboBoxComponent("visuals")->getBottom()+8<=dialog->getButton(0)->getY(),"all visual choices remain clear of action buttons on the actual display");
+        auto* sourceChoice=dialog->getComboBoxComponent("visualSources");
+        check(sourceChoice && sourceChoice->getNumItems()==3 && sourceChoice->getSelectedId()==1 && !sourceChoice->isEnabled(),"Auto Arrange offers all sources, defaulting to Originals and disabled with Keep visual lane");
+        dialog->getComboBoxComponent("visuals")->setSelectedItemIndex(0,juce::sendNotificationSync);
+        check(sourceChoice && sourceChoice->isEnabled(),"creating a visual show enables the source selector");
+        check(sourceChoice && sourceChoice->getBottom()+8<=dialog->getButton(0)->getY(),"all visual choices remain clear of action buttons on the actual display");
         auto output=report.getSiblingFile("auto-visuals-options.png").createOutputStream(); juce::PNGImageFormat png;
         check(output && png.writeImageToStream(dialog->createComponentSnapshot(dialog->getLocalBounds()),*output),"capture actual Auto Arrange visual choices");
         dialog->exitModalState(0); pump();
     }
     AutoArrangementOptions make; make.startingId=ui.engine.library[0]->id; make.trackCount=2; make.overlapBeats=8;
     make.sectionTransitions=false; make.transitions=AutoTransitionStyle::smooth; make.createVisualScenes=true;
+    {
+        const auto before=juce::JSON::toString(projectToJson(ui.engine.project));
+        auto unavailable=make; unavailable.visualSceneSource=VisualSceneSource::milkdrop;
+        ui.startAutoArrangement(unavailable);
+        check(!ui.busy && before==juce::JSON::toString(projectToJson(ui.engine.project)) && ui.status.contains("Import a MilkDrop"),
+            "native Auto Arrange refuses absent imports before preparing or replacing music");
+    }
     const auto wait=[&]
     {
         const auto deadline=juce::Time::getMillisecondCounterHiRes()+30000;

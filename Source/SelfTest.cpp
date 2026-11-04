@@ -9,6 +9,7 @@
 
 namespace mixworks
 {
+void runMilkDropTests(const std::function<void(bool,const juce::String&)>&,const juce::File&,const juce::File&);
 void runOriginalPlaybackTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runPerformanceTakeParserTests(const std::function<void(bool,const juce::String&)>&);
@@ -290,6 +291,13 @@ int runSelfTests(const juce::String& commandLine)
     if (args.contains("--visual-arrangement-only"))
     {
         runVisualArrangementTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--milkdrop-only"))
+    {
+        const int presetIndex=args.indexOf("--milkdrop-preset");
+        const auto preset=presetIndex>=0 && presetIndex+1<args.size() ? juce::File(args[presetIndex+1].unquoted()) : juce::File();
+        runMilkDropTests(check,output,preset);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
     if (args.contains("--original-visual-only"))

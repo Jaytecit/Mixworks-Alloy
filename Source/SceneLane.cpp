@@ -1,4 +1,5 @@
 #include "SceneLane.h"
+#include "MilkDrop.h"
 #include "Workstation.h"
 #include <set>
 #include "AppWindow.h"
@@ -198,6 +199,7 @@ private:
            #endif
         };
         arguments.add("--original");
+        arguments.add("--milkdrop-library"); arguments.add(milkDropLibraryRoot().getFullPathName());
         bool started = child.start(arguments, 0);
         if (!started) fail("Could not start the visual renderer.");
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000;
@@ -311,19 +313,17 @@ private:
 class ScenePreviewTile final : public juce::Component
 {
 public:
-    ScenePreviewTile(juce::Image picture, const juce::String& title, bool kept,
-                     std::function<void()> inspectScene, std::function<void(bool)> retainScene)
+    ScenePreviewTile(juce::Image picture, const juce::String& title,
+                     std::function<void()> inspectScene)
         : image(std::move(picture)), inspect(std::move(inspectScene))
     {
-        addAndMakeVisible(name); addAndMakeVisible(retain);
+        addAndMakeVisible(name);
         name.setButtonText(title); name.setTooltip(title + " — inspect reference image");
-        name.onClick=inspect; retain.setButtonText("Retain");
-        retain.setTitle("Retain " + title); retain.setToggleState(kept,juce::dontSendNotification);
-        retain.onClick=[this, retainScene] { retainScene(retain.getToggleState()); };
+        name.onClick=inspect;
     }
     void resized() override
     {
-        auto r=getLocalBounds().reduced(4); retain.setBounds(r.removeFromBottom(24));
+        auto r=getLocalBounds().reduced(4);
         name.setBounds(r.removeFromBottom(30)); imageArea=r;
     }
     void paint(juce::Graphics& g) override
@@ -333,7 +333,6 @@ public:
         else { g.setColour(colour::muted); g.drawFittedText("Reference image unavailable",imageArea,juce::Justification::centred,2); }
     }
     void mouseUp(const juce::MouseEvent& e) override { if(imageArea.contains(e.position.toInt()) && inspect) inspect(); }
-    juce::ToggleButton retain;
 private:
     juce::Image image; juce::TextButton name; juce::Rectangle<int> imageArea;
     std::function<void()> inspect;
@@ -344,28 +343,31 @@ class SceneBrowser final : public juce::Component, public juce::ListBoxModel, pu
 public:
     explicit SceneBrowser(SceneLane& l) : lane(l)
     {
-        reviewFile=lane.owner.workspacePreference.getSiblingFile("scene-retention-review.json");
-        if(reviewFile.existsAsFile())
-        {
-            const auto saved=juce::JSON::parse(reviewFile);
-            reviewReadable=saved.isObject() && (int)saved["schema"]==1 && saved["retained"].isArray();
-            if(reviewReadable) for(const auto& item:*saved["retained"].getArray())
-                if(item["key"].isString() && item["title"].isString()) retained[item["key"].toString()]=item["title"].toString();
-        }
-        addAndMakeVisible(viewMode); addAndMakeVisible(onlyRetained); addAndMakeVisible(reviewCount);
-        addAndMakeVisible(gallery); addAndMakeVisible(retainSelected);
+        addAndMakeVisible(viewMode); addAndMakeVisible(reviewCount);
+        addAndMakeVisible(gallery);
         gallery.setViewedComponent(&galleryContent,false); gallery.setScrollBarsShown(true,false);
         viewMode.addItem("Scene overview",1); viewMode.addItem("Selected scene image",2); viewMode.addItem("Live mix",3);
         viewMode.setSelectedId(1,juce::dontSendNotification); viewMode.setTitle("Scene library view");
         viewMode.setComponentID("visual-library-view");
         viewMode.onChange=[this] { updateView(); };
-        onlyRetained.setButtonText("Retained only"); onlyRetained.onClick=[this] { filter(); };
-        retainSelected.setButtonText("Retain this scene"); retainSelected.onClick=[this]
-        { const int index=selectedIndex(); if(index>=0) setRetained(index,retainSelected.getToggleState()); };
         reviewCount.setColour(juce::Label::textColourId,colour::muted);
         addAndMakeVisible(search); addAndMakeVisible(list); addAndMakeVisible(add); addAndMakeVisible(match); addAndMakeVisible(help); addAndMakeVisible(quality);
         addAndMakeVisible(outputButton); addAndMakeVisible(outputDisplay);
         addAndMakeVisible(imageButton); addAndMakeVisible(clearImage);
+        addAndMakeVisible(importMilkDrop);
+        importMilkDrop.setButtonText("Import MilkDrop..."); importMilkDrop.setComponentID("visual-milkdrop-import");
+        importMilkDrop.setTooltip("Import a .milk preset into your local library. Its supporting textures stay in their original folders. MilkDrop currently supports live playback; seeks restart its feedback.");
+        importMilkDrop.onClick=[this]
+        {
+            milkDropChooser=std::make_unique<juce::FileChooser>("Import a MilkDrop preset",juce::File(),"*.milk");
+            milkDropChooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
+                [safe=juce::Component::SafePointer<SceneBrowser>(this)](const juce::FileChooser& chooser)
+                {
+                    if(!safe || !chooser.getResult().existsAsFile()) return;
+                    if(safe->lane.importMilkDrop(chooser.getResult())) { safe->search.setText("MilkDrop"); safe->filter(); }
+                    safe->help.setText(safe->lane.owner.status,juce::dontSendNotification);
+                });
+        };
         imageButton.setComponentID("visual-image-open"); clearImage.setComponentID("visual-image-clear");
         imageButton.setTooltip("Sprites change automatically on musical phrases. Choose one image here to override that pool. Clear returns to Sprites. Close and reopen Visuals after adding files to the Sprites folder.");
         clearImage.setButtonText("Clear"); clearImage.onClick=[this] { lane.setImage({}); };
@@ -395,14 +397,20 @@ public:
         quality.onChange=[this] { lane.owner.getProperties().set("visualPreviewWidth",quality.getSelectedId()); };
         search.setTextToShowWhenEmpty("Search scenes or families", colour::muted); search.onTextChange = [this] { filter(); };
         search.setTitle("Search visual scenes"); list.setModel(this); list.setRowHeight(30); list.setTitle("Visual scene library");
+        search.setComponentID("visual-scene-search");
         add.setButtonText("Add at playhead"); add.onClick = [this] { addSelected(); };
         addAndMakeVisible(presetChoice); presetChoice.setTitle("Preset for added scene");
         presetChoice.setComponentID("visual-scene-preset");
         presetChoice.setTooltip("Compare a reference image for each look, then add, double-click or drag the scene. Right-click a timeline scene to change its preset or image/view method.");
         presetChoice.onChange=[this] { loadSelectedReference(); if(selectedIndex()>=0) viewMode.setSelectedId(2); repaint(); };
         match.setButtonText("Match mix"); match.onClick = [this] { lane.matchMix(); };
+        addAndMakeVisible(sceneSources); sceneSources.setTitle("Automatic scene sources"); sceneSources.setComponentID("visual-scene-sources");
+        sceneSources.addItem("Originals",1); sceneSources.addItem("MilkDrop",2); sceneSources.addItem("Both",3);
+        sceneSources.setSelectedId((int)visualSceneSourceFromId((int)lane.owner.getProperties().getWithDefault("visualSceneSource",1)),juce::dontSendNotification);
+        sceneSources.setTooltip("Scene sources for Match mix and Auto Arrange. Both balances originals and imported MilkDrop presets. Images apply to original scenes.");
+        sceneSources.onChange=[this] { lane.owner.getProperties().set("visualSceneSource",sceneSources.getSelectedId()); };
         match.setTooltip("Create scenes across the existing music, with blends over its transitions. This replaces the visual lane; Undo restores it.");
-        help.setText("Reference images. Click to inspect; Retain saves your development shortlist.", juce::dontSendNotification);
+        help.setText("Choose a scene and look, then add it at the playhead or drag it onto the visual lane.", juce::dontSendNotification);
         help.setColour(juce::Label::textColourId, colour::muted); filter(); setSize(1000, 620);
     }
     ~SceneBrowser() override { list.setModel(nullptr); gallery.setViewedComponent(nullptr,false); }
@@ -429,6 +437,7 @@ public:
     }
     void updateOutput()
     {
+        sceneSources.setSelectedId((int)visualSceneSourceFromId((int)lane.owner.getProperties().getWithDefault("visualSceneSource",1)),juce::dontSendNotification);
         const auto path=lane.owner.engine.project.visualImage;
         const int sprites=(int)lane.previewFacts["spriteCount"];
         imageButton.setButtonText(path.isEmpty() ? (sprites>0 ? juce::String((int)lane.previewFacts["backgroundCount"])+" backgrounds / "
@@ -453,8 +462,9 @@ public:
         const int previous=selectedIndex();
         visible.clear(); for (int i = 0; i < (int)lane.catalogue().size(); ++i)
             if ((lane.catalogue()[(size_t)i].title.containsIgnoreCase(search.getText())
-                 || lane.catalogue()[(size_t)i].style.containsIgnoreCase(search.getText()))
-                && (!onlyRetained.getToggleState() || retained.count(lane.catalogue()[(size_t)i].key))) visible.push_back(i);
+                 || lane.catalogue()[(size_t)i].style.containsIgnoreCase(search.getText())
+                 || lane.catalogue()[(size_t)i].family.containsIgnoreCase(search.getText())
+                 || lane.catalogue()[(size_t)i].family.replaceCharacter('-',' ').containsIgnoreCase(search.getText()))) visible.push_back(i);
         list.updateContent();
         auto found=std::find(visible.begin(),visible.end(),previous);
         if(!visible.empty()) list.selectRow(found==visible.end()?0:(int)std::distance(visible.begin(),found)); else list.deselectAllRows();
@@ -473,8 +483,6 @@ public:
         }
         presetChoice.setEnabled(presetChoice.getNumItems()>0);
         loadSelectedReference();
-        retainSelected.setEnabled(index>=0 && reviewReadable);
-        retainSelected.setToggleState(index>=0 && retained.count(lane.catalogue()[(size_t)index].key),juce::dontSendNotification);
         repaint();
     }
     void listBoxItemClicked(int, const juce::MouseEvent&) override { viewMode.setSelectedId(2); }
@@ -506,17 +514,20 @@ public:
     {
         auto r = getLocalBounds().reduced(14); auto library = r.removeFromLeft(250); r.removeFromLeft(14);
         search.setBounds(library.removeFromTop(30)); library.removeFromTop(8);
+        importMilkDrop.setBounds(library.removeFromTop(30)); library.removeFromTop(8);
         auto imageRow=library.removeFromTop(30); clearImage.setBounds(imageRow.removeFromRight(52)); imageRow.removeFromRight(4); imageButton.setBounds(imageRow); library.removeFromTop(8);
         outputButton.setBounds(library.removeFromBottom(30)); library.removeFromBottom(5);
         outputDisplay.setBounds(library.removeFromBottom(30)); library.removeFromBottom(10);
-        match.setBounds(library.removeFromBottom(30)); library.removeFromBottom(5); add.setBounds(library.removeFromBottom(30)); library.removeFromBottom(5);
+        match.setBounds(library.removeFromBottom(30)); library.removeFromBottom(5);
+        sceneSources.setBounds(library.removeFromBottom(30)); library.removeFromBottom(10);
+        add.setBounds(library.removeFromBottom(30)); library.removeFromBottom(5);
         presetChoice.setBounds(library.removeFromBottom(30)); library.removeFromBottom(8); list.setBounds(library);
         auto footer=r.removeFromBottom(54); quality.setBounds(footer.removeFromRight(170).reduced(0,12));
         footer.removeFromRight(8); help.setBounds(footer);
         auto toolbar=r.removeFromTop(34); viewMode.setBounds(toolbar.removeFromLeft(190).reduced(0,2));
-        onlyRetained.setBounds(toolbar.removeFromRight(140)); reviewCount.setBounds(toolbar);
+        reviewCount.setBounds(toolbar.reduced(8,0));
         r.removeFromTop(6); canvas = r; gallery.setBounds(canvas); layoutGallery();
-        retainSelected.setBounds(canvas.withTop(canvas.getBottom()-34).withWidth(220)); updateView();
+        updateView();
     }
     void paint(juce::Graphics& g) override
     {
@@ -528,11 +539,11 @@ public:
         }
         if(viewMode.getSelectedId()==2)
         {
-            auto area=canvas.withHeight(std::max(0,canvas.getHeight()-66)).reduced(8);
+            auto area=canvas.withHeight(std::max(0,canvas.getHeight()-42)).reduced(8);
             if(selectedImage.isValid()) { g.setImageResamplingQuality(juce::Graphics::highResamplingQuality); g.drawImageWithin(selectedImage,area.getX(),area.getY(),area.getWidth(),area.getHeight(),juce::RectanglePlacement::centred); }
             g.setColour(colour::text); g.setFont(15.f);
             const int index=selectedIndex();
-            g.drawFittedText(index>=0 ? lane.catalogue()[(size_t)index].title+" / "+referenceLook+(selectedImage.isValid()?" — reference image":" — reference image unavailable") : "Select a scene",canvas.withTop(canvas.getBottom()-64).withHeight(28),juce::Justification::centred,2);
+            g.drawFittedText(index>=0 ? lane.catalogue()[(size_t)index].title+" / "+referenceLook+(selectedImage.isValid()?" — reference image":" — reference image unavailable") : "Select a scene",canvas.withTop(canvas.getBottom()-36).withHeight(28),juce::Justification::centred,2);
             return;
         }
         if (lane.preview.isValid())
@@ -561,13 +572,12 @@ private:
     void updateView()
     {
         gallery.setVisible(viewMode.getSelectedId()==1 && !visible.empty());
-        retainSelected.setVisible(viewMode.getSelectedId()==2);
         quality.setEnabled(viewMode.getSelectedId()==3 || outputVisible()); repaint();
     }
     void layoutGallery()
     {
         const int width=std::max(1,gallery.getWidth()-16),columns=std::max(1,width/210),tileWidth=width/columns;
-        const int tileHeight=juce::roundToInt((tileWidth-8)*9./16.)+62;
+        const int tileHeight=juce::roundToInt((tileWidth-8)*9./16.)+38;
         galleryContent.setSize(width,((int)tiles.size()+columns-1)/columns*tileHeight);
         for(int i=0;i<(int)tiles.size();++i) tiles[(size_t)i]->setBounds((i%columns)*tileWidth,(i/columns)*tileHeight,tileWidth-6,tileHeight-6);
     }
@@ -579,30 +589,12 @@ private:
             const int index=visible[(size_t)row]; const auto& entry=lane.catalogue()[(size_t)index];
             auto found=thumbnails.find(entry.key);
             if(found==thumbnails.end()) thumbnails[entry.key]=juce::ImageFileFormat::loadFrom(previewFile(entry)).rescaled(320,180);
-            auto tile=std::make_unique<ScenePreviewTile>(thumbnails[entry.key],entry.title,retained.count(entry.key)!=0,
-                [this,row] { list.selectRow(row); viewMode.setSelectedId(2); },
-                [this,index](bool kept) { setRetained(index,kept); });
-            tile->retain.setEnabled(reviewReadable); galleryContent.addAndMakeVisible(*tile); tiles.push_back(std::move(tile));
+            auto tile=std::make_unique<ScenePreviewTile>(thumbnails[entry.key],entry.title,
+                [this,row] { list.selectRow(row); viewMode.setSelectedId(2); });
+            galleryContent.addAndMakeVisible(*tile); tiles.push_back(std::move(tile));
         }
-        reviewCount.setText(juce::String((int)visible.size())+" scenes / "+juce::String((int)retained.size())+" retained",juce::dontSendNotification);
-        if(!reviewReadable) help.setText("Review file could not be read. Existing selections were preserved.",juce::dontSendNotification);
+        reviewCount.setText(juce::String((int)visible.size())+" scenes",juce::dontSendNotification);
         layoutGallery(); updateView();
-    }
-    void setRetained(int index,bool kept)
-    {
-        if(!reviewReadable || index<0 || index>=(int)lane.catalogue().size()) return;
-        auto next=retained; const auto& entry=lane.catalogue()[(size_t)index];
-        if(kept) next[entry.key]=entry.title; else next.erase(entry.key);
-        auto* data=new juce::DynamicObject(); data->setProperty("schema",1); juce::Array<juce::var> choices;
-        for(const auto& item:next) { auto* choice=new juce::DynamicObject(); choice->setProperty("key",item.first); choice->setProperty("title",item.second); choices.add(juce::var(choice)); }
-        data->setProperty("retained",choices); const juce::var value(data);
-        juce::TemporaryFile temporary(reviewFile);
-        const bool saved=reviewFile.getParentDirectory().createDirectory().wasOk()
-            && temporary.getFile().replaceWithText(juce::JSON::toString(value),false,false,"\n") && temporary.overwriteTargetFileWithTemporary();
-        if(saved) retained=std::move(next);
-        help.setText(saved?"Shortlist saved automatically. Unchecked scenes remain available.":"Could not save shortlist. Your previous selections were kept.",juce::dontSendNotification);
-        // Rebuild after this checkbox's callback returns, not while it is active.
-        juce::MessageManager::callAsync([safe=juce::Component::SafePointer<SceneBrowser>(this)] { if(safe) safe->filter(); });
     }
     void showOutput()
     {
@@ -645,20 +637,17 @@ private:
     SceneLane& lane;
     juce::TextEditor search;
     juce::ListBox list;
-    juce::ComboBox viewMode, presetChoice;
-    juce::ToggleButton onlyRetained,retainSelected;
+    juce::ComboBox viewMode, presetChoice, sceneSources;
     juce::Label reviewCount;
     juce::Viewport gallery;
     juce::Component galleryContent;
     std::vector<std::unique_ptr<ScenePreviewTile>> tiles;
     std::map<juce::String,juce::Image> thumbnails;
-    std::map<juce::String,juce::String> retained;
     juce::Image selectedImage;
     juce::String referenceLook;
-    juce::File reviewFile;
-    bool reviewReadable=true;
     juce::TextButton add, match, outputButton, imageButton, clearImage;
-    std::unique_ptr<juce::FileChooser> imageChooser;
+    juce::TextButton importMilkDrop;
+    std::unique_ptr<juce::FileChooser> imageChooser, milkDropChooser;
     juce::ComboBox quality, outputDisplay;
     std::unique_ptr<SceneOutputWindow> output;
     juce::Image outputImage;
@@ -671,6 +660,8 @@ private:
 
 SceneLane::SceneLane(Workstation& w) : owner(w), scenes(discoverVisualScenes(sceneInstall()))
 {
+    const auto imported=discoverMilkDropScenes(milkDropLibraryRoot());
+    scenes.insert(scenes.end(),imported.begin(),imported.end());
     setTitle("Visual scene timeline lane"); setWantsKeyboardFocus(true);
     setTooltip("Drag scenes here from Visuals / scenes. Move blocks or drag their edges to trim; right-click for Duplicate or Remove.");
     browserButton.setTooltip("Open the scene library and a preview driven by your mix."); browserButton.onClick = [this] { showBrowser(); };
@@ -679,6 +670,22 @@ SceneLane::SceneLane(Workstation& w) : owner(w), scenes(discoverVisualScenes(sce
 SceneLane::~SceneLane()
 {
     stopTimer(); owner.engine.visualSpectrum.enabled = false; worker.reset(); browser.reset();
+}
+bool SceneLane::importMilkDrop(const juce::File& source)
+{
+    if(owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) return false;
+    if(!rendererRoot().getChildFile("milkdrop/projectM-4.dll").existsAsFile())
+    { owner.setStatus("MilkDrop support is unavailable in this build. Install the optional projectM runtime first."); return false; }
+    juce::String key;
+    const auto imported=importMilkDropPreset(source,milkDropLibraryRoot(),key);
+    if(imported.failed()) { owner.setStatus(imported.getErrorMessage()); return false; }
+    scenes.erase(std::remove_if(scenes.begin(),scenes.end(),[](const auto& e){return isMilkDropKey(e.key);}),scenes.end());
+    const auto entries=discoverMilkDropScenes(milkDropLibraryRoot());
+    scenes.insert(scenes.end(),entries.begin(),entries.end());
+    // A new worker reads the committed imports; playback and original assets are untouched.
+    worker.reset();
+    owner.setStatus("MilkDrop preset imported. Select it and Add at playhead, then choose Live mix.");
+    return true;
 }
 bool SceneLane::hasSelectedScene() const
 {
@@ -695,7 +702,10 @@ void SceneLane::matchMix()
     if (owner.busy || owner.engine.playing || owner.engine.exporting || owner.engine.capturingPerformance())
     { owner.setStatus("Pause playback and wait for preparation before matching visuals."); return; }
     auto candidate = owner.engine.project; juce::Random random;
-    const auto result = arrangeVisualScenes(candidate, scenes, random);
+    const auto source=visualSceneSourceFromId((int)owner.getProperties().getWithDefault("visualSceneSource",1));
+    if(source!=VisualSceneSource::originals && !milkDropRendererAvailable())
+    { owner.setStatus("MilkDrop support is unavailable in this build. The current visual lane was kept."); return; }
+    const auto result = arrangeVisualScenes(candidate, scenes, random,source);
     if (result.failed()) { owner.setStatus(result.getErrorMessage()); return; }
     const auto before = juce::JSON::toString(projectToJson(owner.engine.project));
     auto apply = [safe = juce::Component::SafePointer<SceneLane>(this), before, planned = candidate.visualScenes]() mutable
@@ -873,23 +883,30 @@ void SceneLane::mouseDown(const juce::MouseEvent& e)
         std::vector<VisualScenePreset> looks;
         const auto entry=std::find_if(scenes.begin(),scenes.end(),[&](const auto& s){return s.key==dragOriginal->scene;});
         if (entry!=scenes.end()) looks=entry->presets;
-        juce::PopupMenu presets, views, materials;
+        juce::PopupMenu presets, views, materials, palettes;
         auto current=dragOriginal->controls;
         if(entry!=scenes.end()) for(const auto& [name,spec]:entry->controlSpecs) current.emplace(name,spec.initial);
         for (size_t i=0;i<looks.size();++i) presets.addItem(100+(int)i,looks[i].title,true,dragOriginal->automation.empty() && current==looks[i].controls);
         const juce::StringArray viewNames {"Original composition","Mirror pair","Four-way reflection","Six-sector kaleidoscope","Ten-sector kaleidoscope"};
         const juce::StringArray materialNames {"Scene material","Flowing image","Turning image tiles","Travelling image ribbons"};
+        const juce::StringArray paletteNames {"Original colours","Electric neon","Acid lime","Solar fire","Jewel tones","Laser primaries","Mono with accent","Soft colours"};
         for (int i=0;i<viewNames.size();++i) views.addItem(200+i,viewNames[i],true,juce::roundToInt(current["viewPattern"]*4.)==i);
         for (int i=0;i<materialNames.size();++i) materials.addItem(300+i,materialNames[i],true,juce::roundToInt(current["materialMode"]*3.)==i);
-        m.addSeparator(); m.addSubMenu("Preset",presets); m.addSubMenu("View method",views); m.addSubMenu("Image method",materials);
+        for (int i=0;i<paletteNames.size();++i) palettes.addItem(400+i,paletteNames[i],true,juce::roundToInt(current["paletteStyle"]*7.)==i);
+        if(!isMilkDropKey(dragOriginal->scene))
+        {
+            m.addSeparator(); m.addSubMenu("Preset",presets); m.addSubMenu("View method",views); m.addSubMenu("Image method",materials);
+            m.addSubMenu("Colour palette",palettes);
+        }
         const auto clipId=selection;
-        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe = juce::Component::SafePointer<SceneLane>(this),clipId,looks,viewNames,materialNames](int action)
+        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe = juce::Component::SafePointer<SceneLane>(this),clipId,looks,viewNames,materialNames,paletteNames](int action)
         {
             if (!safe) return;
             if (action == 1) safe->duplicateSelected(); if (action == 2) safe->removeSelected(); if (action == 3) safe->showBrowser();
             if (action>=100 && action<100+(int)looks.size()) { const auto& p=looks[(size_t)(action-100)]; safe->applyLook(clipId,p.controls,true,p.title); }
             if (action>=200 && action<205) safe->applyLook(clipId,{{"viewPattern",(action-200)/4.}},false,viewNames[action-200]);
             if (action>=300 && action<304) safe->applyLook(clipId,{{"materialMode",(action-300)/3.}},false,materialNames[action-300]);
+            if (action>=400 && action<408) safe->applyLook(clipId,{{"paletteStyle",(action-400)/7.},{"paletteAmount",1.}},false,paletteNames[action-400]);
         }); dragOriginal.reset(); return;
     }
     dragX = e.position.x; dragRemembered = false; dragEdge = 0;

@@ -9,7 +9,7 @@ from visual_catalogue import catalogue
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ('original_visual_gl.py', 'original_scene_player.py', 'visual_catalogue.py',
            'visual_compositor.py', 'visual_handoff.py', 'visual_media.py',
-           'visual_presenter.py', 'visual_scene_worker.py')
+           'visual_presenter.py', 'visual_scene_worker.py', 'milkdrop_catalogue.py', 'milkdrop_scene.py')
 
 
 def stage(output):
@@ -21,11 +21,19 @@ def stage(output):
     output.mkdir(parents=True, exist_ok=False)
     for name in ('original-scenes.json', 'media-library.json'):
         shutil.copy2(source / name, output / name)
+    if (source/'image-collection.json').is_file():
+        shutil.copy2(source/'image-collection.json',output/'image-collection.json')
     for key in entries:
         slug = key.split('/')[1]
         shutil.copytree(source / 'scenes' / slug, output / 'scenes' / slug)
     for name in MODULES:
         shutil.copy2(ROOT / 'scripts' / name, output / name)
+    dependency=ROOT/'.local/deps/projectm'
+    if (dependency/'bin/projectM-4.dll').is_file():
+        target=output/'milkdrop'; target.mkdir()
+        for name in ('projectM-4.dll','glew32.dll'):
+            shutil.copy2(dependency/'bin'/name,target/name)
+        shutil.copytree(dependency/'licenses',target/'licenses')
     hashes = {p.relative_to(output).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in output.rglob('*') if p.is_file()}
     (output / 'identities.json').write_text(json.dumps(hashes, indent=2), encoding='utf-8')

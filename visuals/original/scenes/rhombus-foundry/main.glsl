@@ -1,232 +1,81 @@
 #version 330
-#define FAMILY 13
-#define VARIANT 1
-// Original layered relief compositions. Recipe inserts FAMILY and VARIANT.
+#define GLASS_KIND 0
+// One continuous source behind distinct glass carriers. GLASS_KIND 0/1.
 uniform vec2 resolution;
 uniform sampler2D userImage;
 uniform int hasImage;
-uniform float sceneTime,bassTime,midTime,trebleTime,bassImpulse,midImpulse,trebleImpulse;
-uniform float bassHit,midHit,trebleHit,bass,mid,treble;
-uniform float scale,detail,imageMix,hue,intensity,pulse,warp;
+uniform float bassHit,midHit,trebleHit,bassImpulse,midImpulse,trebleImpulse;
+uniform float bassTime,midTime,trebleTime,pulse,scale,warp,detail,hue,imageMix,intensity;
 out vec4 colour;
 mat2 turn(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-float band(float d,float width){return 1.-smoothstep(width,width+.035,abs(d));}
-vec3 tint(float x){return .055+.82*pow(.5+.5*cos(6.283185*(vec3(.02,.32,.61)+hue+x)),vec3(1.6));}
-// Height, coverage, local material coordinate. Each branch has its own topology.
-vec3 relief(vec2 p,float layer){
-    float v=float(VARIANT),t=travelTime*.17,lo=bassImpulse*pulse*2.4,mi=midImpulse*pulse*2.1,hi=trebleImpulse*pulse*1.8;
-    float h=0.,mask=0.,id=0.;
-    p*=.85+scale*.65;
-    // Music changes the geometry: bass opens depth, mids shear the structures,
-    // treble sends a travelling bend. Family variation avoids a universal zoom.
-    p/=1.+bassHit*pulse*(.16+.04*mod(float(FAMILY),3.));
-    p.x+=midHit*pulse*.22*sin(p.y*(1.5+mod(float(FAMILY),4.))+mi);
-    p.y+=trebleHit*pulse*.12*sin(p.x*3.-hi);
-    p+=vec2(.13*layer,-.1*layer);
-#if FAMILY == 0 // woven strata: straight, bowed, fan, basket
-    if(VARIANT==1)p.y+=.35*sin(p.x*2.-lo*.6);
-    if(VARIANT==2)p=vec2(atan(p.y,p.x)*1.2,length(p)*1.4);
-    if(VARIANT==3)p=turn(.78)*p+vec2(.2*sin(p.y*3.+mi),0);
-    float a=p.y*4.+t+lo*.32,b=p.x*3.-t*.7-mi*.28;
-    float wa=band(fract(a)-.5,.29),wb=band(fract(b)-.5,.23);
-    float over=step(.5,mod(floor(a)+floor(b),2.));
-    h=wa*(.28+.12*cos(a*6.283))+wb*(.18+.15*over);mask=max(wa,wb);id=floor(a)*.09+floor(b)*.13;
-#elif FAMILY == 1 // accordion: terraces, radial fan, zigzag, divided sails
-    vec2 q=p;if(VARIANT==1)q=vec2(atan(p.y,p.x)*1.3,length(p));
-    if(VARIANT==2)q.x+=abs(fract(p.y*1.7)-.5)*.7;
-    if(VARIANT==3)q.x+=sign(p.y)*.45;
-    float f=q.x*(3.+v*.6)+t*.5+mi*.45;
-    h=(1.-abs(fract(f)*2.-1.))*(.35+.13*sin(q.y*2.+lo));
-    mask=band(fract(q.y*(VARIANT==3?1.8:.6))-.5,.43);id=floor(f)*.13;
-#elif FAMILY == 2 // lanterns: staggered orchard, suspended chains, bouquet, crowns
-    vec2 q=p;
-    if(VARIANT==2)q=vec2(atan(p.y,p.x)*1.2,length(p)*1.5);
-    if(VARIANT==3)q.y+=.3*cos(p.x*3.+lo*.5);
-    q*=vec2(VARIANT==1?3.:2.1,VARIANT==1?1.25:2.1);
-    q.y-=t*.45+lo*.18;q.x+=.22*sin(floor(q.y)*2.+mi*.6);
-    vec2 cell=floor(q),f=fract(q)-.5;id=hash(cell);
-    float r=length(f*vec2(1.,VARIANT==1?.65:1.));
-    mask=1.-smoothstep(.35,.39,r);h=sqrt(max(0.,.15-r*r))*(.9+.25*sin(mi+id*6.));
-    float stem=band(f.x,.015)*step(f.y,0.);mask=max(mask,stem*.65);
-#elif FAMILY == 3 // shutters: rotating panels, iris, chevrons, counter-sliding gates
-    vec2 q=p;if(VARIANT==1)q=vec2(atan(p.y,p.x),length(p));
-    if(VARIANT==2)q=turn(.785)*q;
-    q*=vec2(2.4,VARIANT==3?1.4:2.4);vec2 cell=floor(q),f=fract(q)-.5;id=hash(cell);
-    float a=mi*.65+id*2.;
-    if(VARIANT==3)f.x+=.22*sin(a+lo*.5);else f=turn(a)*f;
-    float width=.2+.12*sin(lo*.65+id*5.);
-    mask=band(f.x,width)*band(f.y,.43);h=mask*(.2+.18*(f.x+.5));
-#elif FAMILY == 4 // porcelain: scallops, shell fans, crossed breakers, nested bowls
-    vec2 q=p;
-    if(VARIANT==1)q=vec2(atan(p.y,p.x)*.9,length(p));
-    if(VARIANT==2)q=turn(.7)*q;
-    float f=q.y*5.+sin(q.x*(VARIANT==3?5.:2.7))*1.3-t-lo*.5;
-    if(VARIANT==3)f=length(q)*7.+sin(atan(q.y,q.x)*6.)*.5-t-lo*.4;
-    float ridge=.5+.5*cos(f*3.14159);h=pow(ridge,2.)*.42;
-    mask=.8+.2*ridge;id=floor(f)*.08;
-#elif FAMILY == 5 // contour terraces: islands, fault line, basin, river valley
-    vec2 q=p;float terrain=sin(q.x*2.+t)*cos(q.y*2.3-mi*.3);
-    if(VARIANT==1)terrain+=abs(q.x)*.8+step(0.,q.x)*.4;
-    if(VARIANT==2)terrain=length(q)*.75+.2*sin(atan(q.y,q.x)*5.+mi*.4);
-    if(VARIANT==3)terrain=abs(q.y+.35*sin(q.x*2.+t))+.2*sin(q.x*4.);
-    terrain+=lo*.08;float stepper=terrain*5.;
-    h=(floor(stepper)+smoothstep(.75,.95,fract(stepper)))*.075;
-    mask=.98;id=floor(stepper)*.11;
-#elif FAMILY == 6 // rotors: disc, twin gears, orbital rings, eccentric petals
-    vec2 q=p;
-    if(VARIANT==1)q.x=abs(q.x)-.85;
-    if(VARIANT==2)q=turn(.32)*q*vec2(.72,1.3);
-    if(VARIANT==3)q-=vec2(.3*cos(t),.18*sin(t));
-    float r=length(q),a=atan(q.y,q.x)+mi*.4+t*.2;
-    float sectors=VARIANT==3?5.:8.+v*2.;
-    float rr=r+.06*sin(a*sectors+lo*.6);
-    mask=band(fract(rr*2.2-t*.2)-.5,.3)*band(fract(a/6.283*sectors)-.5,.4);
-    h=mask*(.23+.17*sin(a*sectors)+.08*cos(rr*12.-lo));id=floor(rr*2.2)*.18+a*.04;
-#elif FAMILY == 7 // switchyard: parallel junctions, meanders, overpass, radial interchange
-    vec2 q=p;
-    if(VARIANT==2)q=turn(.55)*q;
-    if(VARIANT==3)q=vec2(atan(p.y,p.x)*1.2,length(p));
-    float road=q.y*3.+sin(q.x*(1.4+v*.3)-t)*(.7+v*.15)-lo*.15;
-    float d=fract(road)-.5;mask=band(d,.28);h=mask*(.24+.1*cos(d*8.));
-    if(VARIANT==0 || VARIANT==2){float cross=band(fract(q.x*2.+t*.4+mi*.2)-.5,.12);h=max(h,cross*.42);mask=max(mask,cross);}
-    id=floor(road)*.15+q.x*.08;
-#elif FAMILY == 8 // flotilla: diamond channels, offset barges, radial fleet, zigzag sails
-    vec2 q=p;if(VARIANT==2)q=vec2(atan(p.y,p.x)*1.2,length(p)*1.3);
-    q*=vec2(2.,1.8);q.x-=t+lo*.3;
-    q.y+=.25*sin(floor(q.x)*1.7+mi*.4);
-    vec2 cell=floor(q),f=fract(q)-.5;id=hash(cell);
-    if(VARIANT==3)f=turn(sign(sin(id*10.))*.6)*f;
-    float d=VARIANT==1?max(abs(f.x)*.8,abs(f.y)*1.4):abs(f.x)+abs(f.y)*(.6+id*.6);
-    mask=1.-smoothstep(.39,.43,d);h=mask*(.42-d*.6);
-#elif FAMILY == 9 // optics: lenticular wall, spherical instruments, prisms, focus ripples
-    vec2 q=p*vec2(VARIANT==0?4.:2.,VARIANT==0?1.:2.);
-    q+=vec2(t*.25+mi*.18,lo*.12);vec2 cell=floor(q),f=fract(q)-.5;id=hash(cell);
-    float d=VARIANT==0?abs(f.x):length(f);
-    if(VARIANT==2)d=max(abs(f.x)*.866+f.y*.5,-f.y);
-    if(VARIANT==3)d=abs(fract(length(p)*1.7-t*.12-mi*.08)-.5)*.86;
-    mask=1.-smoothstep(.4,.46,d);h=sqrt(max(0.,.2-d*d))*.8;
-#elif FAMILY == 10 // coral: branching fans, fern beds, river roots, radial anemone
-    vec2 q=p;if(VARIANT==3)q=vec2(atan(p.y,p.x),length(p));
-    if(VARIANT==1)q.x+=floor(q.y*1.2)*.5;
-    if(VARIANT==2)q=q.yx;
-    q.x+=.12*sin(q.y*2.+t+lo*.3);
-    float root=abs(fract(q.x*1.4)-.5),branch=abs(sin(q.y*7.+mi*.3))* .38;
-    float d=min(root,abs(root-branch));
-    mask=1.-smoothstep(.035,.075,d);h=mask*(.24+.12*cos(q.y*3.-t));id=floor(q.x*1.4)*.15+q.y*.09;
-#elif FAMILY == 11 // rain pavilion: curtains, waterfall steps, diagonal rain, converging falls
-    vec2 q=p;if(VARIANT==2)q=turn(.5)*q;
-    if(VARIANT==3)q.x*=1.+max(-.7,q.y)*.35;
-    q.x+=.08*sin(q.y*3.+mi*.5);
-    float lane=floor(q.x*7.),f=fract(q.x*7.)-.5;
-    float drop=fract(q.y*(VARIANT==1?3.:1.3)+t*(.8+hash(vec2(lane))*.5)+lo*.35);
-    mask=band(f,.3)*smoothstep(0.,.16,drop)*(1.-smoothstep(.7,1.,drop));
-    h=mask*(.3+.1*cos(f*7.));id=lane*.12;
-#elif FAMILY == 12 // paper theatre: scalloped layers, mountain wings, cloud stage, revolving fans
-    vec2 q=p;if(VARIANT==3)q=vec2(atan(p.y,p.x)*1.2,length(p));
-    float edge=VARIANT==1?abs(sin(q.x*2.+t)):.5+.5*sin(q.x*(VARIANT==2?4.:2.)+t+mi*.2);
-    float tier=q.y*2.5+edge*.9+lo*.17;
-    float f=fract(tier);mask=smoothstep(.03,.1,f);h=(floor(tier)*.04+.3*exp(-f*3.))*mask;id=floor(tier)*.13;
-#else // mosaic kiln: staggered bricks, rhombus relief, hex-like scales, spinning stamps
-    vec2 q=p;if(VARIANT==1)q=turn(.785)*q;
-    q*=vec2(3.,VARIANT==2?3.5:2.4);q.x+=mod(floor(q.y),2.)*.5;
-    q.y+=t*.3+lo*.12;vec2 cell=floor(q),f=fract(q)-.5;id=hash(cell);
-    if(VARIANT==3)f=turn(mi*.4+id*2.)*f;
-    float d=VARIANT==2?max(abs(f.x)*.866+abs(f.y)*.5,abs(f.y)):max(abs(f.x),abs(f.y));
-    mask=1.-smoothstep(.38,.44,d);h=mask*(.2+.14*sin(id*8.+mi*.6)+.12*cos(d*6.));
-#endif
-    return vec3(h,mask,id);
-}
-vec3 imageMaterial(vec2 uv,float id){
-    vec3 base=tint(id*.2);
-    if(hasImage==0)return base;
-#if FAMILY == 13
-    {
-    // One complete, contained image per tile; no nested fragments.
-    vec4 wholeArt=sampleFittedMedia(uv);
-    vec4 cut=sampleCutout(uv);
-    return mix(base,mix(wholeArt.rgb,cut.rgb,cut.a),max(wholeArt.a,cut.a)*min(1.,imageMix*1.5));
-    }
-#endif
-    uv=1.-abs(mod(uv,2.)-1.);
-    vec3 art=texture(userImage,uv).rgb;
-    vec2 q=uv*3.,cell=floor(q),p=fract(q)-.5;
-    vec2 child=turn(midImpulse*.65+midTime*.18+id)*p;
-    float edge=max(abs(child.x),abs(child.y));
-    vec3 nested=texture(userImage,child*.85+.5).rgb;
-    vec2 grand=turn(-trebleImpulse*1.1-trebleTime*.2)*(child-vec2(.12,-.08))*2.6;
-    nested=mix(nested,texture(userImage,grand+.5).rgb,(1.-smoothstep(.19,.25,length(grand)))*.8);
-    art=mix(art,nested,(1.-smoothstep(.3,.36,edge))*.65);
-    vec4 cut=sampleCutout(uv);art=mix(art,cut.rgb,cut.a*.7);
-    return mix(base,art,imageMix*.72);
+vec3 palette(float phase){return .06+.82*pow(.5+.5*cos(6.283185*(vec3(.02,.32,.61)+hue+phase)),vec3(1.3));}
+vec3 picture(vec2 uv){
+    vec3 base=palette(.35)*(.055+.035*(1.-uv.y));
+    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=sampleCutout(materialDomain(uv));
+    return mix(base,mix(a.rgb,b.rgb,b.a),max(a.a,b.a)*min(1.,imageMix*1.5));
 }
 void main(){
-    vec2 p=(2.*gl_FragCoord.xy-resolution)/resolution.y;
-    vec2 uv=gl_FragCoord.xy/resolution;
-    vec3 bg=tint(.42)*(.13+.18*(1.-uv.y));
-    float back=.5+.5*sin(p.x*7.+sin(p.y*5.-travelTime*.2)+midTime*.18);
-    bg+=tint(.7)*pow(back,10.)*.055;
-    vec3 c=bg;
-#if FAMILY == 13
-    // Selected looks are glass over one continuous image. The image remains
-    // visible through the gaps as the moving tile normals refract its surface.
-    float glassAmount=(VARIANT==1 || VARIANT==2) ? .9 : .9*smoothstep(.62,.92,warp);
-    glassAmount*=min(1.,imageMix*1.5);
-    float imagePump=.86+.10*bassHit*pulse;
-    vec2 backdropUV=(uv-.5)/imagePump+.5;
-    vec4 backdrop=hasImage!=0?sampleFittedMedia(backdropUV):vec4(0);
-    vec4 backdropCut=sampleCutout(backdropUV);
-    backdrop=vec4(mix(backdrop.rgb,backdropCut.rgb,backdropCut.a),max(backdrop.a,backdropCut.a));
-    c=mix(c,backdrop.rgb,backdrop.a*glassAmount);
+    vec2 uv=gl_FragCoord.xy/resolution,p=(2.*gl_FragCoord.xy-resolution)/resolution.y;
+    float low=bassHit*pulse,mi=midHit*pulse,hi=trebleHit*pulse,t=travelTime;
+#if GLASS_KIND == 1
+    // View the entire scale array and its one continuous source at an oblique angle.
+    // Plane aspect matches the renderer, so perspective does not stretch the image.
+    vec3 eye=vec3(0,0,4.3),ray=normalize(vec3(p,-2.8));
+    vec3 u=vec3(cos(.42),0,-sin(.42)),v=vec3(0,1,0),n=cross(u,v);
+    float divisor=dot(ray,n);
+    if(abs(divisor)<.05){colour=vec4(.005,.008,.018,1.);return;}
+    vec3 hit=eye+ray*(dot(-eye,n)/divisor);
+    p=vec2(dot(hit,u),dot(hit,v));
+    vec2 size=vec2(2.,2.*resolution.y/resolution.x);
+    if(any(greaterThan(abs(p),size))){colour=vec4(.005,.008,.018,1.);return;}
+    uv=p/(2.*size)+.5;
 #endif
-    for(int layer=1;layer>=0;layer--){
-        float l=float(layer);vec2 q=p*(1.+l*.25)+vec2(l*.2,-l*.08);
-        vec3 s=relief(q,l);float eps=.004;
-        vec2 grad=vec2(relief(q+vec2(eps,0),l).x-relief(q-vec2(eps,0),l).x,relief(q+vec2(0,eps),l).x-relief(q-vec2(0,eps),l).x)/(2.*eps);
-        vec3 n=normalize(vec3(-grad*.6,1.));
-        float light=.28+.72*max(0.,dot(n,normalize(vec3(-.45,.7,1.))));
-        float spec=pow(max(0.,dot(n,normalize(vec3(-.4,.5,1.)))),26.);
-        vec2 material=q*.27+.5+grad*.014*warp+vec2(bassImpulse*.018,midImpulse*.013);
-#if FAMILY == 5 || FAMILY == 12
-        // Each terrace carries its own image chart and directional shadow.
-        // This breaks up a flat screen-wide photograph into physical layers.
-        material=turn(s.z*.8)*(material-.5)*1.35+.5+vec2(s.z*.8,s.z*1.3);
-        // Keep broad shaded faces readable; retain directional layer edges.
-        light=max(.48,light)*(.82+.18*smoothstep(.015,.18,abs(s.x-relief(q+vec2(.04,.08),l).x)));
-#elif FAMILY == 13
-        // Reconstruct the same local tile chart used by relief(), including its
-        // musical transform, so imagery stays attached to its moving carrier.
-        vec2 tile=q*(.85+scale*.65);
-        tile/=1.+bassHit*pulse*(.16+.04*mod(float(FAMILY),3.));
-        tile.x+=midHit*pulse*.22*sin(tile.y*(1.5+mod(float(FAMILY),4.))+midImpulse*pulse*2.1);
-        tile.y+=trebleHit*pulse*.12*sin(tile.x*3.-trebleImpulse*pulse*1.8);
-        tile+=vec2(.13*l,-.1*l);
-        if(VARIANT==1)tile=turn(.785)*tile;
-        tile*=vec2(3.,VARIANT==2?3.5:2.4);tile.x+=mod(floor(tile.y),2.)*.5;
-        tile.y+=travelTime*.17*.3+bassImpulse*pulse*2.4*.12;
-        tile=fract(tile)-.5;
-        if(VARIANT==3)tile=turn(midImpulse*pulse*2.1*.4+s.z*2.)*tile;
-        material=tile/.76+.5;
-#elif FAMILY == 2 || FAMILY == 3 || FAMILY == 8 || FAMILY == 9
-        material=turn(s.z*1.7)*(material-.5)+.5+vec2(s.z*.6,-s.z*.4);
-#endif
-        vec3 body=imageMaterial(material,s.z)*light+tint(s.z+.5)*spec*(.13+.35*intensity);
-        float rim=pow(clamp(length(grad)*.12,0.,1.),2.);
-        body+=tint(s.z+trebleImpulse*.03)*rim*(.12+.65*trebleHit*pulse);
-#if FAMILY == 13
-        vec2 bend=n.xy*(.025+.055*warp)*(1.+.35*midHit*pulse);
-        bend+=.008*warp*vec2(sin(q.y*4.+midImpulse),cos(q.x*4.-trebleImpulse));
-        vec2 glassUV=backdropUV+bend;
-        vec4 transmitted=hasImage!=0?sampleFittedMedia(glassUV):vec4(0);
-        vec4 transmittedCut=sampleCutout(glassUV);
-        transmitted=vec4(mix(transmitted.rgb,transmittedCut.rgb,transmittedCut.a),max(transmitted.a,transmittedCut.a));
-        vec3 glass=mix(bg,transmitted.rgb,transmitted.a)*(.86+.14*light);
-        glass+=tint(s.z+.3)*(spec*.12+min(rim,.4)*(.035+.08*trebleHit));
-        body=mix(body,glass,glassAmount);
-#endif
-        body*=1.-l*.6;
-        c=mix(c,body,clamp(s.y*(1.-l*.4),0.,1.));
+    vec3 c=picture(uv);
+#if GLASS_KIND == 0
+    // Large staggered diamond panes glide over a stationary continuous image.
+    float density=1.1+scale*.8;
+    vec2 q=turn(.785398)*(p+vec2(t*.38+midImpulse*.12,0))*density;
+    q.x+=mod(floor(q.y),2.)*.5;
+    vec2 id=floor(q),f=fract(q)-.5;
+    float edge=.43-max(abs(f.x),abs(f.y));
+    float mask=smoothstep(-.008,.008,edge),rim=1.-smoothstep(.005,.045,edge);
+    float seed=hash(id);
+    vec2 tilt=turn(-.785398)*(vec2(.16*sin(seed*9.),.11*cos(seed*7.))*(.6+low*.8)+f*.18);
+    vec2 bend=tilt*(.025+.04*warp);
+    vec3 glass=picture(clamp(uv+bend,0.,1.))*(.90+.08*(f.x+f.y));
+    glass+=palette(seed*.18)*(.035+rim*.13);
+    glass+=vec3(.35,.55,.65)*pow(max(0.,.65+tilt.x-tilt.y),25.)*(.03+.3*hi);
+    c*=1.-mask*.09;
+    c=mix(c,glass,mask*.88);
+    c+=palette(.5+seed*.1)*rim*mask*(.055+.20*hi);
+#else
+    // Oblique staggered rows of curved scales, overlapping and hinged at the top.
+    float density=.95+scale*.55;
+    vec2 q=vec2(p.x*1.18+p.y*.42,p.y*1.82)*density;
+    vec2 base=floor(q);
+    for(int row=-1;row<=1;row++){
+        float y=base.y+float(row),offset=mod(y,2.)*.5;
+        for(int column=-1;column<=1;column++){
+            vec2 id=vec2(floor(q.x-offset)+float(column),y);
+            vec2 centre=vec2(id.x+offset+.5,y+.5),f=q-centre;
+            float seed=hash(id),wave=sin(midImpulse*2.2-y*.9+id.x*.35+t*.6);
+            float opening=.12+low*.66+(.10+.20*mi)*(.5+.5*wave);
+            vec2 local=f;local.y=.48+(f.y-.48)/cos(opening);
+            float shape=max(length(vec2(local.x/.64,(local.y-.20)/.95))-1.,(local.y-.48)*1.5);
+            float mask=1.-smoothstep(-.01,.015,shape),rim=exp(-abs(shape)*36.);
+            float bulge=sqrt(max(0.,1.-local.x*local.x/(.68*.68)));
+            vec3 normal=normalize(vec3(local.x*.40,sin(opening)*.65+(local.y-.05)*.20,cos(opening)));
+            vec2 bend=normal.xy*(.028+.045*warp);
+            vec3 glass=picture(clamp(uv+bend,0.,1.))*(.91+.06*bulge);
+            float sheen=pow(max(0.,dot(normal,normalize(vec3(-.4,.6,1.)))),42.);
+            glass+=palette(seed*.12)*(.030+rim*.11)+vec3(.22,.45,.55)*sheen*(.025+.18*hi);
+            float shade=1.-smoothstep(.025,.085,shape);
+            c*=1.-shade*.09;
+            c=mix(c,glass,mask*.85);
+            c+=palette(.38+seed*.12)*rim*mask*(.055+.09*hi);
+        }
     }
-    c*=.86+.14*(1.-smoothstep(.3,1.3,length(p)*.55));
-    colour=vec4(clamp(c,0.,1.),1.);
+#endif
+    colour=vec4(clamp(c*(.94+.06*intensity),0.,1.),1.);
 }

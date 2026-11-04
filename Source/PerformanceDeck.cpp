@@ -13,11 +13,19 @@ MidiAction padAction(int i)
 {
     return i < 8 ? MidiAction {MidiActionKind::cyclePot, i} : MidiAction {i < 12 ? MidiActionKind::mute : MidiActionKind::solo, i % 4};
 }
+bool editingControl(const juce::Slider& slider)
+{
+    if (slider.isMouseButtonDown()) return true;
+    for (int i = 0; i < slider.getNumChildComponents(); ++i)
+        if (auto* label = dynamic_cast<juce::Label*>(slider.getChildComponent(i)))
+            if (label->getCurrentTextEditor()) return true;
+    return false;
+}
 }
 PerformanceDeck::PerformanceDeck(Engine& e) : engine(e)
 {
     setName("Alloy live performance controller");
-    for (auto* c : std::initializer_list<juce::Component*> {&title, &state, &hint, &learn, &cancelLearn, &setup, &skip, &controls}) addAndMakeVisible(c);
+    for (auto* c : std::initializer_list<juce::Component*> {&title, &state, &hint, &learn, &cancelLearn, &setup, &skip, &controls, &followTimeline}) addAndMakeVisible(c);
     title.setComponentID("active-midi-profile");
     title.setText("ALLOY / LIVE DESK", juce::dontSendNotification); title.setFont(juce::FontOptions(13).withStyle("Bold"));
     title.setColour(juce::Label::textColourId, colour::orange);
@@ -30,6 +38,8 @@ PerformanceDeck::PerformanceDeck(Engine& e) : engine(e)
     skip.setTooltip("Skip this guided setup step without changing its existing mapping."); skip.onClick = [this] { engine.skipControllerStep(); };
     learn.setTooltip("Enable Learn, use an on-screen control, then move its matching controller control. Use Custom Mode on FLkey.");
     learn.onClick = [this] { engine.setMidiLearnEnabled(learn.getToggleState()); refresh(isEnabled()); };
+    followTimeline.setTooltip("On-screen controls follow each lane's track at the playhead, including track and transition automation. During overlaps the selected playing track wins, otherwise the newest playing track. Empty lanes use mixer-lane controls. MIDI mappings, mute/solo and menu resets remain lane-owned.");
+    followTimeline.onClick = [this] { resized(); refresh(isEnabled()); };
     for (int i = 0; i < 8; ++i)
     {
         pots[(size_t) i].configure("Pot " + juce::String(i + 1), 0);
@@ -139,6 +149,7 @@ void PerformanceDeck::performLaunchMenu(int command, const LaunchSettings& expec
 }
 void PerformanceDeck::configure(juce::Slider& s, int slot, MidiAction a, AutomationAddress address, const juce::String& name)
 {
+    displayedAddresses[(size_t) slot] = address;
     addAndMakeVisible(s); addAndMakeVisible(names[(size_t) slot]);
     names[(size_t) slot].setText(name, juce::dontSendNotification); names[(size_t) slot].setFont(juce::FontOptions(10));
     names[(size_t) slot].setJustificationType(juce::Justification::centred);
@@ -169,18 +180,36 @@ void PerformanceDeck::configure(juce::Slider& s, int slot, MidiAction a, Automat
         const auto lane = slot < 8 ? engine.deskLanes[(size_t) slot] : address.track;
         if (engine.isMidiLearnEnabled()) { engine.beginLearn(midiActionId(a), true); return; }
         gestures[(size_t) slot] = true;
-        gestureAddresses[(size_t) slot] = slot < 8 ? engine.deskPotAddress(slot) : address;
+        gestureAddresses[(size_t) slot] = displayedAddresses[(size_t) slot];
         if (!engine.canWriteAutomation(lane) && remember) remember();
     };
-    s.onDragEnd = [this, slot] { gestures[(size_t) slot] = false; };
+    s.onDragEnd = [this, slot] { gestures[(size_t) slot] = false; refresh(isEnabled()); };
     s.onValueChange = [this, &s, slot, a, address]
     {
         if (updating) return;
         if (engine.isMidiLearnEnabled()) { engine.beginLearn(midiActionId(a), true); return; }
-        const auto target = gestures[(size_t) slot] ? gestureAddresses[(size_t) slot] : slot < 8 ? engine.deskPotAddress(slot) : address;
+        const auto target = gestures[(size_t) slot] ? gestureAddresses[(size_t) slot] : displayedAddresses[(size_t) slot];
+        // A removed displayed/held track must never silently become a lane edit.
+        if (target.clipId.isNotEmpty() && !engine.project.clipFor(target.clipId)) return;
         if (!gestures[(size_t) slot] && !engine.canWriteAutomation(target.track) && remember) remember();
         if (engine.setControlValue(target, (float) s.getValue()) && changed) changed();
     };
+}
+AutomationAddress PerformanceDeck::timelineAddress(int lane, AutomationTarget target) const
+{
+    AutomationAddress address {lane, target};
+    if (!followTimeline.getToggleState() || lane < 0) return address;
+    const double position = engine.position.load();
+    const Clip* chosen = nullptr;
+    for (const auto& clip : engine.project.clips)
+    {
+        const double time = engine.liveClipTime(clip.id, position);
+        if (clip.track != lane || time < clip.start || time >= clip.end()) continue;
+        if (clip.id == engine.selectedClip) { chosen = &clip; break; }
+        if (!chosen || clip.start > chosen->start) chosen = &clip;
+    }
+    if (chosen) address.clipId = chosen->id;
+    return address;
 }
 void PerformanceDeck::trigger(MidiAction a)
 {
@@ -191,7 +220,7 @@ void PerformanceDeck::trigger(MidiAction a)
 void PerformanceDeck::refresh(bool available, bool visibleOnly)
 {
     if (visibleOnly && !isShowing()) return;
-    struct SliderView { int lane = 0; AutomationTarget target {}; juce::String owner; float value = 0; bool enabled = false; };
+    struct SliderView { int lane = 0; AutomationTarget target {}; AutomationAddress address; juce::String owner, trackName; float value = 0; bool enabled = false; };
     struct CueView { juce::String title, tooltip; bool saved = false, queued = false, enabled = false; };
     struct View
     {
@@ -202,6 +231,9 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
         bool mapping = false, canSkip = false, voices = false, playing = false, armed = false, snap = false, pauseEnabled = false, pausePending = false;
         juce::String pauseName, pauseTooltip, timingName, timingTitle, state, mappingText, launchText, launchTitle, help;
     } view;
+    std::array<bool, 17> editing {};
+    for (int slot = 0; slot < 17; ++slot)
+        editing[(size_t) slot] = gestures[(size_t) slot] || editingControl(slot < 8 ? static_cast<juce::Slider&>(pots[(size_t) slot]) : slot < 16 ? faders[(size_t) slot - 8] : master);
     {
         // Take only a display snapshot. Never wait behind the audio callback,
         // and never notify accessibility/layout/component listeners under its lock.
@@ -212,10 +244,20 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
         view.armed = engine.automationRecordMode != AutomationRecordMode::read; view.snap = engine.project.snap;
         auto sample = [&](int slot, int lane, AutomationTarget target)
         {
-            auto& s = view.sliders[(size_t) slot]; s.lane = lane; s.target = target;
+            auto& s = view.sliders[(size_t) slot];
+            s.address = editing[(size_t) slot] ? displayedAddresses[(size_t) slot] : timelineAddress(lane, target);
+            s.lane = lane = s.address.track; s.target = target = s.address.target;
             s.owner = lane < 0 ? juce::String("Master") : "Mixer lane " + juce::String(lane + 1);
-            s.value = engine.automationValue({lane, target}, engine.position.load());
-            s.enabled = available && !engine.project.automationLocked({lane, target});
+            double time = engine.position.load();
+            const auto* clip = engine.project.clipFor(s.address.clipId);
+            if (clip)
+            {
+                s.trackName = clip->media->libraryTitle();
+                s.owner = "Track / " + s.trackName + " / lane " + juce::String(lane + 1);
+                time = engine.liveClipTime(clip->id, time);
+            }
+            s.value = s.address.clipId.isEmpty() || clip ? engine.automationValue(s.address, time) : 0.f;
+            s.enabled = available && (s.address.clipId.isEmpty() || clip) && !engine.project.automationLocked(s.address);
         };
         for (int i = 0; i < 8; ++i)
         {
@@ -269,30 +311,44 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
     for (auto* c : {&setup, &skip, &cancelLearn}) c->setVisible(view.mapping);
     if (layoutChanged) resized();
     learn.setEnabled(available); setup.setEnabled(available); skip.setEnabled(available && view.canSkip);
-    auto sync = [&](juce::Slider& slider, const SliderView& s)
+    followTimeline.setEnabled(available && !view.mapping && std::none_of(editing.begin(), editing.end(), [](bool v) { return v; }));
+    auto sync = [&](juce::Slider& slider, const SliderView& s, int slot)
     {
-        bool editing = slider.isMouseButtonDown();
-        for (int slot = 0; slot < 8; ++slot) if (&slider == &pots[(size_t) slot]) editing |= gestures[(size_t) slot];
-        for (int i = 0; i < slider.getNumChildComponents(); ++i)
-            if (auto* l = dynamic_cast<juce::Label*>(slider.getChildComponent(i))) editing |= l->getCurrentTextEditor() != nullptr;
+        displayedAddresses[(size_t) slot] = s.address;
         auto& properties = slider.getProperties();
         if (!properties.contains("alloyOwnerBaseHint")) { properties.set("alloyOwnerBaseHint", slider.getTooltip()); properties.set("alloyOwnerBaseName", slider.getName()); }
         const auto caption = properties["alloyOwnerBaseName"].toString() + " / " + s.owner + " / " + automationName(s.target);
         slider.setName(caption); slider.setTitle(caption); slider.setTooltip(s.owner + " / " + automationName(s.target) + ". " + properties["alloyOwnerBaseHint"].toString());
-        if (!editing) slider.setValue(s.value, juce::dontSendNotification);
+        if (!editing[(size_t) slot])
+        {
+            // Track curves can reach +12 dB. Do not clip their displayed value
+            // to the lane desk's normal +6 dB fader travel.
+            if (s.target == AutomationTarget::volume)
+            {
+                const double maximum = s.address.clipId.isEmpty() ? 6 : 12;
+                if (slider.getMaximum() != maximum) slider.setRange(-60, maximum, .1);
+            }
+            slider.setValue(s.value, juce::dontSendNotification);
+        }
         slider.setEnabled(s.enabled);
     };
     for (int i = 0; i < 8; ++i)
     {
-        const int lane = view.lanes[(size_t) i]; sync(pots[(size_t) i], view.sliders[(size_t) i]);
-        names[(size_t) i].setText(juce::String(potNames[i / 2]) + (i % 2 ? " B" : " A") + " / " + juce::String(lane + 1), juce::dontSendNotification);
+        const int lane = view.lanes[(size_t) i]; const auto& pot = view.sliders[(size_t) i];
+        sync(pots[(size_t) i], pot, i);
+        names[(size_t) i].setText(juce::String(potNames[i / 2]) + (i % 2 ? " B" : " A") + " / " + juce::String(lane + 1)
+            + (followTimeline.getToggleState() ? "\n" + (pot.trackName.isEmpty() ? juce::String("Mixer lane") : pot.trackName) : juce::String()), juce::dontSendNotification);
+        names[(size_t) i].setTooltip(pot.owner);
         names[(size_t) i].setColour(juce::Label::textColourId, colour::tracks[(size_t) lane]);
         pads[(size_t) i].setButtonText(juce::String(potNames[i / 2]) + (i % 2 ? " B" : " A") + " / " + juce::String(lane + 1));
         pads[(size_t) i].setColour(juce::TextButton::buttonColourId, colour::tracks[(size_t) lane].withAlpha(.18f));
         pads[(size_t) i].setTooltip("Cycle this pot between three lanes; its partner keeps its own lane. Current lane " + juce::String(lane + 1) + ". MIDI Learn maps this lane selector.");
-        sync(faders[(size_t) i], view.sliders[(size_t) i + 8]);
+        const auto& fader = view.sliders[(size_t) i + 8]; sync(faders[(size_t) i], fader, i + 8);
+        names[(size_t) i + 8].setText(juce::String(i % 4 + 1) + (i < 4 ? " / LEVEL" : " / PAN")
+            + (followTimeline.getToggleState() ? "\n" + (fader.trackName.isEmpty() ? juce::String("Lane") : fader.trackName) : juce::String()), juce::dontSendNotification);
+        names[(size_t) i + 8].setTooltip(fader.owner);
     }
-    sync(master, view.sliders[16]);
+    sync(master, view.sliders[16], 16);
     for (int i = 0; i < 16; ++i)
     {
         pads[(size_t) i].setEnabled(available && (i >= 8 || (!gestures[(size_t) i] && !gestures[(size_t) (i ^ 1)])));
@@ -326,7 +382,8 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
 void PerformanceDeck::resized()
 {
     auto area = getLocalBounds().reduced(12, 8); auto top = area.removeFromTop(26);
-    title.setBounds(top.removeFromLeft(500)); controls.setBounds(top.removeFromLeft(120).reduced(3, 1));
+    title.setBounds(top.removeFromLeft(juce::jlimit(180, 380, getWidth() - 850))); controls.setBounds(top.removeFromLeft(120).reduced(3, 1));
+    followTimeline.setBounds(top.removeFromLeft(144));
     if (learn.getToggleState()) { cancelLearn.setBounds(top.removeFromRight(100)); skip.setBounds(top.removeFromRight(48)); setup.setBounds(top.removeFromRight(108)); }
     learn.setBounds(top.removeFromRight(110)); state.setBounds(top);
     hint.setBounds({}); area.removeFromTop(7);
@@ -340,13 +397,13 @@ void PerformanceDeck::resized()
         buttons[transportOrder[slot]].setBounds(cluster.getX() + (int) (slot % 4) * 56, cluster.getY() + (int) (slot / 4) * bh, 53, bh - 3);
     auto left = area.removeFromLeft((int) (area.getWidth() * .56)); area.removeFromLeft(16);
     auto potRow = left.removeFromTop(std::max(91, left.getHeight() / 2)); const int pw = potRow.getWidth() / 8;
-    for (int i = 0; i < 8; ++i) { auto cell = potRow.removeFromLeft(pw); names[(size_t) i].setBounds(cell.removeFromTop(17)); pots[(size_t) i].setBounds(cell); }
+    for (int i = 0; i < 8; ++i) { auto cell = potRow.removeFromLeft(pw); names[(size_t) i].setBounds(cell.removeFromTop(followTimeline.getToggleState() ? 31 : 17)); pots[(size_t) i].setBounds(cell); }
     left.removeFromTop(7); const int padWidth = left.getWidth() / 8, padHeight = left.getHeight() / 2;
     for (int i = 0; i < 16; ++i) pads[(size_t) i].setBounds(left.getX() + (i % 8) * padWidth + 2, left.getY() + (i / 8) * padHeight + 2, padWidth - 4, padHeight - 4);
     const int fw = area.getWidth() / 9;
     for (int i = 0; i < 9; ++i)
     {
-        auto cell = area.removeFromLeft(fw); names[(size_t) (i + 8)].setBounds(cell.removeFromTop(16));
+        auto cell = area.removeFromLeft(fw); names[(size_t) (i + 8)].setBounds(cell.removeFromTop(followTimeline.getToggleState() ? 30 : 16));
         channelButtons[(size_t) i].setBounds(cell.removeFromBottom(22).reduced(2, 0)); cell.removeFromBottom(3);
         (i < 8 ? faders[(size_t) i] : master).setBounds(cell.reduced(2, 0));
     }

@@ -1,0 +1,728 @@
+{
+  "schema": 1,
+  "title": "Image Instruments",
+  "scenes": [
+    {
+      "key": "original/neon-culture",
+      "title": "Chromaflora",
+      "family": "chromatic-organisms",
+      "composition": 0,
+      "signature": "Accepted image-fed chemistry",
+      "approvedExample": true,
+      "palette": 0.2857142857142857
+    },
+    {
+      "key": "original/prism-spores",
+      "title": "Prism Spores",
+      "family": "chromatic-organisms",
+      "composition": 1,
+      "signature": "Transported annular colonies",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/velvet-mycelium",
+      "title": "Velvet Mycelium",
+      "family": "chromatic-organisms",
+      "composition": 2,
+      "signature": "Anisotropic branching nutrient field",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/coral-cipher",
+      "title": "Coral Cipher",
+      "family": "chromatic-organisms",
+      "composition": 3,
+      "signature": "Edge-fed crossing colonies",
+      "approvedExample": false,
+      "palette": 0.2857142857142857
+    },
+    {
+      "key": "original/petal-circuit",
+      "title": "Petal Circuit",
+      "family": "chromatic-organisms",
+      "composition": 4,
+      "signature": "Polar cell growth with radial source feed",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/ember-orchard",
+      "title": "Ember Orchard",
+      "family": "chromatic-organisms",
+      "composition": 5,
+      "signature": "Compartmental organism patches",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/tidal-lichen",
+      "title": "Tidal Lichen",
+      "family": "chromatic-organisms",
+      "composition": 6,
+      "signature": "Advected chemical shoreline",
+      "approvedExample": false,
+      "palette": 0.2857142857142857
+    },
+    {
+      "key": "original/lantern-plankton",
+      "title": "Lantern Plankton",
+      "family": "chromatic-organisms",
+      "composition": 7,
+      "signature": "Travelling alternating growth fronts",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/chromatic-shoal",
+      "title": "Kinetic Bloom",
+      "family": "sprite-particles",
+      "composition": 0,
+      "signature": "Accepted interacting source-neighbour flock",
+      "approvedExample": true,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/ribbon-rookery",
+      "title": "Ribbon Rookery",
+      "family": "sprite-particles",
+      "composition": 1,
+      "signature": "Opposed row flocks",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/aurora-couriers",
+      "title": "Aurora Couriers",
+      "family": "sprite-particles",
+      "composition": 2,
+      "signature": "Edge-guided travelling couriers",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/ion-ballet",
+      "title": "Ion Ballet",
+      "family": "sprite-particles",
+      "composition": 3,
+      "signature": "Four moving attraction poles",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/scarlet-relay",
+      "title": "Scarlet Relay",
+      "family": "sprite-particles",
+      "composition": 4,
+      "signature": "Velocity-facing source filaments",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/spectral-migration",
+      "title": "Spectral Migration",
+      "family": "sprite-particles",
+      "composition": 5,
+      "signature": "Travelling lateral migrations",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/halo-caravan",
+      "title": "Halo Caravan",
+      "family": "sprite-particles",
+      "composition": 6,
+      "signature": "Depth-separated orbital bands",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/prismatic-waltz",
+      "title": "Prismatic Waltz",
+      "family": "sprite-particles",
+      "composition": 7,
+      "signature": "Two exchanging spiral flocks",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/terrain-prism",
+      "title": "Lucent Ranges",
+      "family": "luminous-landscapes",
+      "composition": 0,
+      "signature": "Accepted triangulated image landscape",
+      "approvedExample": true,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/opaline-dunes",
+      "title": "Opaline Dunes",
+      "family": "luminous-landscapes",
+      "composition": 1,
+      "signature": "Image-driven wind ridges",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/chromatic-ravine",
+      "title": "Chromatic Ravine",
+      "family": "luminous-landscapes",
+      "composition": 2,
+      "signature": "Carved central valley with raised walls",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/glass-delta",
+      "title": "Glass Delta",
+      "family": "luminous-landscapes",
+      "composition": 3,
+      "signature": "Terraced image islands and channels",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/cinder-mesa",
+      "title": "Cinder Mesa",
+      "family": "luminous-landscapes",
+      "composition": 4,
+      "signature": "Discrete rising plateaux",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/sapphire-archipelago",
+      "title": "Sapphire Archipelago",
+      "family": "luminous-landscapes",
+      "composition": 5,
+      "signature": "Radial island chains and orbiting view",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/polar-canopy",
+      "title": "Polar Canopy",
+      "family": "luminous-landscapes",
+      "composition": 6,
+      "signature": "Crossed suspended-looking ridges",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/lucid-escarpment",
+      "title": "Lucid Escarpment",
+      "family": "luminous-landscapes",
+      "composition": 7,
+      "signature": "Asymmetric steep image escarpment",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/liquid-memory",
+      "title": "Mercurial Echo",
+      "family": "liquid-sculptures",
+      "composition": 0,
+      "signature": "Accepted persistent liquid height field",
+      "approvedExample": true,
+      "palette": 0.5714285714285714
+    },
+    {
+      "key": "original/satin-vortex",
+      "title": "Satin Vortex",
+      "family": "liquid-sculptures",
+      "composition": 1,
+      "signature": "Source-driven radial circulation",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/pressure-garden",
+      "title": "Pressure Garden",
+      "family": "liquid-sculptures",
+      "composition": 2,
+      "signature": "Four interacting pressure sources",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/chrome-tides",
+      "title": "Chrome Tides",
+      "family": "liquid-sculptures",
+      "composition": 3,
+      "signature": "Oblique travelling pressure fronts",
+      "approvedExample": false,
+      "palette": 0.5714285714285714
+    },
+    {
+      "key": "original/oilprint",
+      "title": "Oilprint",
+      "family": "liquid-sculptures",
+      "composition": 4,
+      "signature": "Chromatic forcing and shear",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/glass-tremor",
+      "title": "Glass Tremor",
+      "family": "liquid-sculptures",
+      "composition": 5,
+      "signature": "Source-edge lens shocks",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/pearl-undertow",
+      "title": "Pearl Undertow",
+      "family": "liquid-sculptures",
+      "composition": 6,
+      "signature": "Converging circular current",
+      "approvedExample": false,
+      "palette": 0.5714285714285714
+    },
+    {
+      "key": "original/folding-estuary",
+      "title": "Folding Estuary",
+      "family": "liquid-sculptures",
+      "composition": 7,
+      "signature": "Counter-moving paddles and liquid folds",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/signal-fracture",
+      "title": "Broken Spectrum",
+      "family": "signal-collage",
+      "composition": 0,
+      "signature": "Accepted persistent region/raster instrument",
+      "approvedExample": true,
+      "palette": 0.7142857142857143
+    },
+    {
+      "key": "original/prism-datastream",
+      "title": "Prism Datastream",
+      "family": "signal-collage",
+      "composition": 1,
+      "signature": "Narrow source bands with vertical relays",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/glass-interlace",
+      "title": "Glass Interlace",
+      "family": "signal-collage",
+      "composition": 2,
+      "signature": "Interleaved temporal image columns",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/chromatic-splice",
+      "title": "Chromatic Splice",
+      "family": "signal-collage",
+      "composition": 3,
+      "signature": "Diagonal live/history splices",
+      "approvedExample": false,
+      "palette": 0.7142857142857143
+    },
+    {
+      "key": "original/afterimage-static",
+      "title": "Afterimage Static",
+      "family": "signal-collage",
+      "composition": 4,
+      "signature": "Quantised blocks of retained colour",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/spectrum-shards",
+      "title": "Spectrum Shards",
+      "family": "signal-collage",
+      "composition": 5,
+      "signature": "Rotating wedge apertures into image memory",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/raster-roulette",
+      "title": "Raster Roulette",
+      "family": "signal-collage",
+      "composition": 6,
+      "signature": "Rolling scan and delayed channels",
+      "approvedExample": false,
+      "palette": 0.7142857142857143
+    },
+    {
+      "key": "original/circuit-confetti",
+      "title": "Circuit Confetti",
+      "family": "signal-collage",
+      "composition": 7,
+      "signature": "Travelling image patches with region-owned gates",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/fluorescent-nursery",
+      "title": "Fluorescent Nursery",
+      "family": "cellular-gardens",
+      "composition": 0,
+      "signature": "Image-seeded continuous cell population",
+      "approvedExample": false,
+      "palette": 0.2857142857142857
+    },
+    {
+      "key": "original/petri-constellation",
+      "title": "Petri Constellation",
+      "family": "cellular-gardens",
+      "composition": 1,
+      "signature": "Six communicating source-fed nurseries",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/soma-lanterns",
+      "title": "Soma Lanterns",
+      "family": "cellular-gardens",
+      "composition": 2,
+      "signature": "Polar neighbourhood growth",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/velvet-spores",
+      "title": "Velvet Spores",
+      "family": "cellular-gardens",
+      "composition": 3,
+      "signature": "Advected organisms with local survival",
+      "approvedExample": false,
+      "palette": 0.2857142857142857
+    },
+    {
+      "key": "original/luminous-atoll",
+      "title": "Luminous Atoll",
+      "family": "cellular-gardens",
+      "composition": 4,
+      "signature": "Wide annular growth neighbourhood",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/cellular-lace",
+      "title": "Cellular Lace",
+      "family": "cellular-gardens",
+      "composition": 5,
+      "signature": "Anisotropic inner/outer neighbourhoods",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/plasma-orchard",
+      "title": "Plasma Orchard",
+      "family": "cellular-gardens",
+      "composition": 6,
+      "signature": "Staggered source-population compartments",
+      "approvedExample": false,
+      "palette": 0.2857142857142857
+    },
+    {
+      "key": "original/living-mosaic",
+      "title": "Living Mosaic",
+      "family": "cellular-gardens",
+      "composition": 7,
+      "signature": "Alternating cellular transport strips",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/chroma-monsoon",
+      "title": "Chroma Monsoon",
+      "family": "pigment-weather",
+      "composition": 0,
+      "signature": "Radial vector advection of source pigment",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/velvet-cyclone",
+      "title": "Velvet Cyclone",
+      "family": "pigment-weather",
+      "composition": 1,
+      "signature": "Two counter-rotating pigment storms",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/copper-silt",
+      "title": "Copper Silt",
+      "family": "pigment-weather",
+      "composition": 2,
+      "signature": "Directional neighbour selection and settling",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/iridescent-wake",
+      "title": "Iridescent Wake",
+      "family": "pigment-weather",
+      "composition": 3,
+      "signature": "Source jet with transverse wake",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/nebula-press",
+      "title": "Nebula Press",
+      "family": "pigment-weather",
+      "composition": 4,
+      "signature": "Opposing pigment compression",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/pigment-carnival",
+      "title": "Pigment Carnival",
+      "family": "pigment-weather",
+      "composition": 5,
+      "signature": "Four coupled vortex compartments",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/saffron-undertow",
+      "title": "Saffron Undertow",
+      "family": "pigment-weather",
+      "composition": 6,
+      "signature": "Colour-driven buoyant pigment",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/chromatic-fault",
+      "title": "Chromatic Fault",
+      "family": "pigment-weather",
+      "composition": 7,
+      "signature": "Opposed shear across a source fault",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/opal-reactor",
+      "title": "Opal Reactor",
+      "family": "soft-volumes",
+      "composition": 0,
+      "signature": "Smooth-unioned image-bearing lobes",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/mercury-cathedral",
+      "title": "Mercury Cathedral",
+      "family": "soft-volumes",
+      "composition": 1,
+      "signature": "Image-modulated porous solid",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/gelatine-satellites",
+      "title": "Gelatine Satellites",
+      "family": "soft-volumes",
+      "composition": 2,
+      "signature": "Source-sized orbiting droplets",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/aether-nuclei",
+      "title": "Aether Nuclei",
+      "family": "soft-volumes",
+      "composition": 3,
+      "signature": "Moving cellular implicit volume",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/chromatic-torso",
+      "title": "Chromatic Torso",
+      "family": "soft-volumes",
+      "composition": 4,
+      "signature": "Curving image-bearing capsule",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/liquid-torus",
+      "title": "Liquid Torus",
+      "family": "soft-volumes",
+      "composition": 5,
+      "signature": "Modulated toroidal solid",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/velvet-geode",
+      "title": "Velvet Geode",
+      "family": "soft-volumes",
+      "composition": 6,
+      "signature": "Hollow cut-away faceted shell",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/pulse-cocoon",
+      "title": "Pulse Cocoon",
+      "family": "soft-volumes",
+      "composition": 7,
+      "signature": "Intertwining smooth capsule lattice",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/hexa-resonator",
+      "title": "Hexa Resonator",
+      "family": "spatial-instruments",
+      "composition": 0,
+      "signature": "Source-height hexagonal solid field",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/lattice-pilgrimage",
+      "title": "Lattice Pilgrimage",
+      "family": "spatial-instruments",
+      "composition": 1,
+      "signature": "Travel through orthogonal/diagonal trusses",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/facet-voyager",
+      "title": "Facet Voyager",
+      "family": "spatial-instruments",
+      "composition": 2,
+      "signature": "Image-bearing truncated planet",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/prism-switchboard",
+      "title": "Prism Switchboard",
+      "family": "spatial-instruments",
+      "composition": 3,
+      "signature": "Counter-rotating local solid gates",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/crystal-pendulum",
+      "title": "Crystal Pendulum",
+      "family": "spatial-instruments",
+      "composition": 4,
+      "signature": "Suspended swinging pyramid field",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/kinetic-vault",
+      "title": "Kinetic Vault",
+      "family": "spatial-instruments",
+      "composition": 5,
+      "signature": "Travelling arched structural ribs",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/octa-current",
+      "title": "Octa Current",
+      "family": "spatial-instruments",
+      "composition": 6,
+      "signature": "Rotating octahedral cells",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/honeylight-causeway",
+      "title": "Honeylight Causeway",
+      "family": "spatial-instruments",
+      "composition": 7,
+      "signature": "Twisting hexagonal open frames",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/chromatic-salon",
+      "title": "Chromatic Salon",
+      "family": "optical-memories",
+      "composition": 0,
+      "signature": "Perspective image room with recurrent colour",
+      "approvedExample": false,
+      "palette": 0.5714285714285714
+    },
+    {
+      "key": "original/prism-rosarium",
+      "title": "Prism Rosarium",
+      "family": "optical-memories",
+      "composition": 1,
+      "signature": "Radial gradient/mandala memory",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/velvet-apertures",
+      "title": "Velvet Apertures",
+      "family": "optical-memories",
+      "composition": 2,
+      "signature": "Six lens windows into optical history",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/chroma-escalier",
+      "title": "Chroma Escalier",
+      "family": "optical-memories",
+      "composition": 3,
+      "signature": "Oblique recursive image stair",
+      "approvedExample": false,
+      "palette": 0.5714285714285714
+    },
+    {
+      "key": "original/spectral-carousel",
+      "title": "Spectral Carousel",
+      "family": "optical-memories",
+      "composition": 4,
+      "signature": "Counter-rotating temporal sectors",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    },
+    {
+      "key": "original/catoptric-tide",
+      "title": "Catoptric Tide",
+      "family": "optical-memories",
+      "composition": 5,
+      "signature": "Curved reflected image corridor",
+      "approvedExample": false,
+      "palette": 0.14285714285714285
+    },
+    {
+      "key": "original/lenticular-dreams",
+      "title": "Lenticular Dreams",
+      "family": "optical-memories",
+      "composition": 6,
+      "signature": "Interleaved temporal viewpoints",
+      "approvedExample": false,
+      "palette": 0.5714285714285714
+    },
+    {
+      "key": "original/afterglow-atlas",
+      "title": "Afterglow Atlas",
+      "family": "optical-memories",
+      "composition": 7,
+      "signature": "Gradient-guided optical memory",
+      "approvedExample": false,
+      "palette": 0.42857142857142855
+    }
+  ],
+  "counting": "80 compositions including the five approved examples; palette presets are not extra scenes",
+  "provenance": "Owned implementations and original public names; reference associations remain in development notes"
+}

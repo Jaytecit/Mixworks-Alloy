@@ -6,6 +6,22 @@ Current guide for 0.55.64. [Earlier desk notes (archived)](MAINTENANCE-20261103.
 
 Controller provides transport, four mixer lanes, paired EQ/cutoff routing, levels/pans, mute/solo and HC1–HC9. Lane-selector labels name each pot's programme target; private selection never retargets programme MIDI. Selected original-track controls can be shared across split pieces; a mixer-lane control affects that lane's audio/instruments, and master affects programme output. Read the owner label rather than assuming every knob acts on the selected waveform.
 
+**Follow timeline** switches the on-screen pots, levels and pans to the track at
+the playhead on their assigned lane. The controls display that track's automation,
+including transition-preset nodes, and show its name; adjustments use the same
+named owner. In an overlap the selected playing track takes priority, otherwise
+the most recently starting track is followed. Pausing holds the displayed values;
+seeking updates them. With no track at the cursor, the label explicitly returns
+to Mixer lane. Master stays master-owned. Turn Follow timeline off for the normal
+lane-only desk. The mode is local to this Controller instance, not saved in the mix.
+
+A drag or open value editor holds its displayed owner until it finishes. Removing
+that owner disables the held control rather than redirecting it. Merely watching
+or switching follow mode does not write automation. Existing Read/Touch/Latch and
+performance-capture rules still govern an actual adjustment. MIDI mappings,
+mute/solo pads and the explicitly named mixer-lane menu resets keep their lane
+targets; Follow timeline changes on-screen parameter controls only.
+
 The cutoff is centre-off: left is low-pass, right high-pass. Precise entry accepts Off/LP/HP and frequencies. Lane-header/desk cutoff remains lane-owned, so a finished selected segment cannot capture another segment's live lane cutoff. Transition Filter presets and original-track Filter automation have separate named owners.
 
 The small right desk pads use Spare/Spare/Undo/Redo then Play/Stop/Record/Snap. Historical physical FLkey messages were measured; no factory CC assignments should be guessed or installed during maintenance. Keys can drive an enabled live VST instrument. Hosting is in-process; active reported-latency inserts are blocked pending compensation.

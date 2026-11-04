@@ -1,4 +1,5 @@
 #include "VisualScenes.h"
+#include "MilkDrop.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -16,7 +17,7 @@ bool originalKey(const juce::String& key)
 }
 bool validKey(const juce::String& key)
 {
-    return originalKey(key);
+    return originalKey(key) || isMilkDropKey(key);
 }
 bool number(const juce::var& v)
 { return (v.isDouble() || v.isInt() || v.isInt64()) && std::isfinite((double)v); }
@@ -62,12 +63,17 @@ std::vector<VisualSceneEntry> discoverVisualScenes(const juce::File& install)
                 item.imageReady=(bool)entry["imageReady"]; item.imageControls={{"imageMix",.5}};
                 const auto descriptor=juce::JSON::parse(directory.getChildFile("scene.json"));
                 item.family=descriptor["family"].toString();
+                item.motif=descriptor["visualMotif"].toString();
+                if(item.motif.isEmpty()) item.motif=item.family.startsWith("relief-") ? "layered-relief" : item.family;
                 if (const auto* controls=descriptor["controls"].getDynamicObject())
                     for (const auto& prop : controls->getProperties())
                         if (number(prop.value["default"]) && (double)prop.value["min"]==0 && (double)prop.value["max"]==1
                             && (double)prop.value["default"]>=0 && (double)prop.value["default"]<=1)
                             item.controlSpecs[prop.name.toString()]={(double)prop.value["default"],(int)prop.value["steps"]};
                 if (item.controlSpecs.empty() || item.controlSpecs.size()>32) continue;
+                item.imageControls.clear();
+                if(const auto image=item.controlSpecs.find("imageMix");image!=item.controlSpecs.end())
+                    item.imageControls["imageMix"]=image->second.initial;
                 if (const auto* presets=descriptor["presets"].getArray(); presets && presets->size()<=16)
                 {
                     std::set<juce::String> presetIds;
@@ -93,12 +99,22 @@ std::vector<VisualSceneEntry> discoverVisualScenes(const juce::File& install)
     }
     return result;
 }
-std::vector<VisualSceneEntry> automaticVisualScenes(const std::vector<VisualSceneEntry>& entries)
+VisualSceneSource visualSceneSourceFromId(int id)
+{
+    return id==2 ? VisualSceneSource::milkdrop : id==3 ? VisualSceneSource::both : VisualSceneSource::originals;
+}
+juce::String visualSceneSourceName(VisualSceneSource source)
+{
+    return source==VisualSceneSource::milkdrop ? "MilkDrop" : source==VisualSceneSource::both ? "Both" : "Originals";
+}
+std::vector<VisualSceneEntry> automaticVisualScenes(const std::vector<VisualSceneEntry>& entries, VisualSceneSource source)
 {
     std::vector<VisualSceneEntry> result;
     std::set<juce::String> seen;
     for (const auto& entry : entries)
-        if (originalKey(entry.key) && seen.insert(entry.key).second) result.push_back(entry);
+        if (((originalKey(entry.key) && source!=VisualSceneSource::milkdrop)
+             || (isMilkDropKey(entry.key) && source!=VisualSceneSource::originals))
+            && seen.insert(entry.key).second) result.push_back(entry);
     return result;
 }
 VisualSceneFrame visualFrameAt(const std::vector<VisualSceneClip>& clips, double at)
@@ -257,6 +273,8 @@ void automateVisualScene(VisualSceneClip& scene,const VisualSceneEntry& entry,do
         scene.controls[name]=spec.initial;
         // Image choice is fixed for each scene; the pool advances on project phrases.
         if(name=="imageIndex") { scene.controls[name]=random.nextDouble();continue; }
+        // A palette is an authored choice, not another independently wandering hue.
+        if(name=="paletteStyle" || name=="paletteAmount") continue;
         VisualControlCurve curve;curve.stepped=spec.steps>1;
         for(int i=0;i<5;++i)
         {

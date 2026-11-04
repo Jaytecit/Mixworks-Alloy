@@ -18,6 +18,7 @@ public:
     void showBrowser();
     void matchMix();
     bool setImage(const juce::String& path);
+    bool importMilkDrop(const juce::File& source);
     bool place(const juce::String& scene, double start, int preset = -1);
     bool applyLook(const juce::String& id, const std::map<juce::String,double>& values, bool replace, const juce::String& title);
     bool change(const juce::String& id, double start, double length, double offset, bool remember = true);
@@ -43,6 +44,7 @@ public:
     Workstation& owner;
 private:
     friend void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend void runMilkDropTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
     std::vector<VisualSceneEntry> scenes;
     std::unique_ptr<juce::DocumentWindow> browser;
     std::unique_ptr<SceneRenderWorker> worker;

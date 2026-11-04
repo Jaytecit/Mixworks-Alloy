@@ -37,6 +37,16 @@ NumPy, Julius, safetensors and other resolved packages retain their own licences
 See [the exact local dependency and model provenance](docs/LICENSING.md) and
 [the workflow](docs/STEM-SEPARATION.md). Before distributing any runtime or model,
 audit its complete actual notices and weight redistribution provenance.
+## Optional MilkDrop renderer
+
+Optional MilkDrop import uses unmodified **libprojectM 4.1.8**, projectM Team,
+under LGPL 2.1 or later, loaded as a shared library with **GLEW 2.3.1** and
+projectM's bundled dependencies. The explicit `scripts/fetch-projectm.ps1`
+retains upstream source and collects licence texts into the optional runtime's
+`milkdrop/licenses` folder, including dependency/DLL identities. Third-party
+presets and textures are user imports with their own terms; none are bundled.
+See [MilkDrop integration](docs/MILKDROP.md) and [distribution prerequisites](docs/LICENSING.md).
+
 # Visual scene: Beats in 4D (CC0)
 
 The adapted Beats in 4D shader is by Mårten Rånge, released under CC0 1.0

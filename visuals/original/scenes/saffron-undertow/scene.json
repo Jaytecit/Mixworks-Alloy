@@ -1,0 +1,365 @@
+{
+  "schema": 1,
+  "variant": 0,
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "continuous"
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "type": "speed",
+      "label": "Motion speed"
+    },
+    "imageMix": {
+      "min": 0,
+      "max": 1,
+      "default": 0.9,
+      "type": "continuous",
+      "label": "Image influence"
+    },
+    "warp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.55,
+      "type": "continuous",
+      "label": "Deformation"
+    },
+    "detail": {
+      "min": 0,
+      "max": 1,
+      "default": 0.55,
+      "type": "continuous",
+      "label": "Surface detail"
+    },
+    "pulse": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "type": "pulse",
+      "label": "Music response"
+    },
+    "feedback": {
+      "min": 0,
+      "max": 1,
+      "default": 0.67,
+      "type": "continuous",
+      "label": "Memory"
+    },
+    "imageZoom": {
+      "min": 0,
+      "max": 1,
+      "default": 0.35,
+      "type": "continuous",
+      "label": "Source framing"
+    },
+    "hue": {
+      "min": 0,
+      "max": 1,
+      "default": 0.15,
+      "type": "continuous"
+    },
+    "bassDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Bass response",
+      "type": "continuous"
+    },
+    "midDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "label": "Mid response",
+      "type": "continuous"
+    },
+    "trebleDrive": {
+      "min": 0,
+      "max": 1,
+      "default": 0.62,
+      "label": "Treble response",
+      "type": "continuous"
+    },
+    "momentum": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7,
+      "label": "Release momentum",
+      "type": "continuous"
+    },
+    "materialMotion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.15,
+      "label": "Image movement",
+      "type": "continuous"
+    },
+    "materialMode": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "label": "Image method",
+      "type": "choice",
+      "steps": 4
+    },
+    "viewPattern": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "label": "View method",
+      "type": "choice",
+      "steps": 5
+    },
+    "finishGlow": {
+      "min": 0,
+      "max": 1,
+      "default": 0.12,
+      "label": "Soft highlight glow",
+      "type": "continuous"
+    },
+    "paletteStyle": {
+      "min": 0,
+      "max": 1,
+      "default": 0.42857142857142855,
+      "type": "choice",
+      "steps": 8,
+      "label": "Colour palette"
+    },
+    "paletteAmount": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "continuous",
+      "label": "Palette amount"
+    }
+  },
+  "passSchema": 2,
+  "passes": [
+    {
+      "id": "vector",
+      "shader": "vector.glsl",
+      "size": [
+        192,
+        108
+      ],
+      "format": "rgba32f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "advected-velocity-curl-v1",
+      "history": true,
+      "inputs": [
+        {
+          "pass": "vector",
+          "frame": "previous"
+        }
+      ]
+    },
+    {
+      "id": "pigment",
+      "shader": "pigment.glsl",
+      "size": [
+        320,
+        180
+      ],
+      "format": "rgba16f",
+      "filter": "linear",
+      "state": true,
+      "semantic": "premultiplied-pigment-v1",
+      "history": true,
+      "inputs": [
+        {
+          "pass": "pigment",
+          "frame": "previous"
+        },
+        {
+          "pass": "vector",
+          "frame": "current"
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "inputs": [
+        {
+          "pass": "pigment",
+          "frame": "current"
+        },
+        {
+          "pass": "vector",
+          "frame": "current"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "signature",
+      "title": "Signature",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.62,
+        "imageMix": 0.9,
+        "warp": 0.55,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "feedback": 0.67,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.15,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.42857142857142855,
+        "paletteAmount": 1.0
+      }
+    },
+    {
+      "id": "electric",
+      "title": "Electric neon",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.62,
+        "imageMix": 0.9,
+        "warp": 0.55,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "feedback": 0.67,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.15,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.14285714285714285,
+        "paletteAmount": 1.0
+      }
+    },
+    {
+      "id": "acid",
+      "title": "Acid lime",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.62,
+        "imageMix": 0.9,
+        "warp": 0.55,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "feedback": 0.67,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.15,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.2857142857142857,
+        "paletteAmount": 1.0
+      }
+    },
+    {
+      "id": "laser",
+      "title": "Laser primaries",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.62,
+        "imageMix": 0.9,
+        "warp": 0.55,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "feedback": 0.67,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.15,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.7142857142857143,
+        "paletteAmount": 1.0
+      }
+    },
+    {
+      "id": "jewel",
+      "title": "Jewel tones",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.62,
+        "imageMix": 0.9,
+        "warp": 0.55,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "feedback": 0.67,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.15,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.5714285714285714,
+        "paletteAmount": 1.0
+      }
+    },
+    {
+      "id": "mono",
+      "title": "Mono with accent",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.62,
+        "imageMix": 0.9,
+        "warp": 0.55,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "feedback": 0.67,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.15,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.8571428571428571,
+        "paletteAmount": 1.0
+      }
+    }
+  ],
+  "key": "original/saffron-undertow",
+  "title": "Saffron Undertow",
+  "family": "pigment-weather",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original owned image-driven composition. Shared family utilities; independently authored layout and dynamics.",
+  "collection": "image-instruments-v1",
+  "composition": 6,
+  "visualMotif": "pigment-weather",
+  "motionProfile": "Colour-driven buoyant pigment",
+  "mediaRole": "image-derived generation",
+  "imageReady": true,
+  "cutoutReady": true
+}

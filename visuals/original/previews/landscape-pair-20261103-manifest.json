@@ -1,0 +1,317 @@
+{
+  "kind": "Landscape pair actual look references",
+  "entries": [
+    {
+      "key": "original/opaline-dunes",
+      "title": "Opaline Dunes",
+      "presets": [
+        {
+          "id": "signature",
+          "title": "Signature",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.85,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.8,
+            "midDrive": 0.85,
+            "trebleDrive": 0.8,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.42857142857142855,
+            "paletteAmount": 1.0
+          },
+          "preview": "opaline-dunes.jpg"
+        },
+        {
+          "id": "electric",
+          "title": "Electric neon",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.14285714285714285,
+            "paletteAmount": 1.0
+          },
+          "preview": "opaline-dunes--electric.jpg"
+        },
+        {
+          "id": "acid",
+          "title": "Acid lime",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.2857142857142857,
+            "paletteAmount": 1.0
+          },
+          "preview": "opaline-dunes--acid.jpg"
+        },
+        {
+          "id": "laser",
+          "title": "Laser primaries",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.7142857142857143,
+            "paletteAmount": 1.0
+          },
+          "preview": "opaline-dunes--laser.jpg"
+        },
+        {
+          "id": "jewel",
+          "title": "Jewel tones",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.5714285714285714,
+            "paletteAmount": 1.0
+          },
+          "preview": "opaline-dunes--jewel.jpg"
+        },
+        {
+          "id": "mono",
+          "title": "Mono with accent",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.8571428571428571,
+            "paletteAmount": 1.0
+          },
+          "preview": "opaline-dunes--mono.jpg"
+        }
+      ],
+      "sourceHashes": {
+        "height.glsl": "08a79126cabc5e37ade757245172ed00bfd48979c360772b959eaabb992a7e9d",
+        "main.glsl": "77ac7a8ef67a4a3b1574956beb7c5edd0616a7403f6e3476df414008098bba9b",
+        "scene.json": "e4ad81541f30b0968f2187bdf13277ad71f9e51dd5886e93703c375fdbc4a303"
+      }
+    },
+    {
+      "key": "original/lucid-escarpment",
+      "title": "Lucid Escarpment",
+      "presets": [
+        {
+          "id": "signature",
+          "title": "Signature",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.85,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.8,
+            "midDrive": 0.75,
+            "trebleDrive": 0.85,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.42857142857142855,
+            "paletteAmount": 1.0
+          },
+          "preview": "lucid-escarpment.jpg"
+        },
+        {
+          "id": "electric",
+          "title": "Electric neon",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.14285714285714285,
+            "paletteAmount": 1.0
+          },
+          "preview": "lucid-escarpment--electric.jpg"
+        },
+        {
+          "id": "acid",
+          "title": "Acid lime",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.2857142857142857,
+            "paletteAmount": 1.0
+          },
+          "preview": "lucid-escarpment--acid.jpg"
+        },
+        {
+          "id": "laser",
+          "title": "Laser primaries",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.7142857142857143,
+            "paletteAmount": 1.0
+          },
+          "preview": "lucid-escarpment--laser.jpg"
+        },
+        {
+          "id": "jewel",
+          "title": "Jewel tones",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.5714285714285714,
+            "paletteAmount": 1.0
+          },
+          "preview": "lucid-escarpment--jewel.jpg"
+        },
+        {
+          "id": "mono",
+          "title": "Mono with accent",
+          "controls": {
+            "intensity": 0.7,
+            "motion": 0.65,
+            "imageMix": 0.9,
+            "detail": 0.55,
+            "pulse": 0.7,
+            "imageZoom": 0.35,
+            "hue": 0.15,
+            "bassDrive": 0.62,
+            "midDrive": 0.6,
+            "trebleDrive": 0.62,
+            "momentum": 0.7,
+            "materialMotion": 0.0,
+            "materialMode": 0.0,
+            "viewPattern": 0.0,
+            "finishGlow": 0.12,
+            "paletteStyle": 0.8571428571428571,
+            "paletteAmount": 1.0
+          },
+          "preview": "lucid-escarpment--mono.jpg"
+        }
+      ],
+      "sourceHashes": {
+        "height.glsl": "08a79126cabc5e37ade757245172ed00bfd48979c360772b959eaabb992a7e9d",
+        "main.glsl": "79717831241962145df2398661b72831877a2d10e34cc3cd26e19d1965d66197",
+        "scene.json": "8fe0de9212038b119f4f8f1820ce2d0b9edbc2c5ec6eacd80ac8ff5fe4143ff5"
+      }
+    }
+  ],
+  "musicSha256": "fd96bda6301925aa37cae33c80d9a6b048934ccd85e5ca5d789fff2e36ca4658",
+  "artSha256": "52be27bc0ac94ab4778812e7d0398659a5b6c92e4532b06391edf9da5e92227e"
+}

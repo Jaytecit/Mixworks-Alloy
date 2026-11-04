@@ -16,7 +16,7 @@
     "motion": {
       "min": 0,
       "max": 1,
-      "default": 0.5,
+      "default": 0.42,
       "type": "continuous"
     },
     "imageMix": {
@@ -58,7 +58,7 @@
     "bassDrive": {
       "min": 0,
       "max": 1,
-      "default": 0.62,
+      "default": 0.85,
       "label": "Bass response",
       "type": "continuous"
     },
@@ -72,14 +72,14 @@
     "trebleDrive": {
       "min": 0,
       "max": 1,
-      "default": 0.62,
+      "default": 0.55,
       "label": "Treble response",
       "type": "continuous"
     },
     "momentum": {
       "min": 0,
       "max": 1,
-      "default": 0.62,
+      "default": 0.45,
       "label": "Release momentum",
       "type": "continuous"
     },
@@ -112,6 +112,21 @@
       "default": 0.2,
       "label": "Soft highlight glow",
       "type": "continuous"
+    },
+    "paletteStyle": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 8,
+      "label": "Colour palette"
+    },
+    "paletteAmount": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "continuous",
+      "label": "Palette amount"
     }
   },
   "passSchema": 2,
@@ -125,32 +140,34 @@
   ],
   "composition": "Depth-travelling rectangular frames",
   "audioMapping": {
-    "bass": "Depth travel and complete image scale",
-    "mid": "Solid frame turns and image plane movement",
-    "treble": "Frame aperture and local refraction"
+    "bass": "Lightbox frame depth and brightness; image stays frontal",
+    "mid": "A travelling light chase around the fixed frame",
+    "treble": "Corner brackets and fine rim glints"
   },
-  "mediaRole": "Complete fitted image with musical plane motion and surrounding solid geometry",
+  "mediaRole": "One source image in a frontal lightbox",
   "presets": [
     {
       "id": "signature",
       "title": "Signature",
       "controls": {
         "intensity": 0.65,
-        "motion": 0.5,
+        "motion": 0.42,
         "imageMix": 0.95,
         "scale": 0.34,
         "detail": 0.65,
         "hue": 0.0,
         "pulse": 0.85,
         "warp": 0.5,
-        "bassDrive": 0.62,
+        "bassDrive": 0.85,
         "midDrive": 0.6,
-        "trebleDrive": 0.62,
-        "momentum": 0.62,
+        "trebleDrive": 0.55,
+        "momentum": 0.45,
         "materialMotion": 0.35,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.2
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -172,7 +189,9 @@
         "materialMotion": 0.4,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.24
+        "finishGlow": 0.24,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -194,7 +213,9 @@
         "materialMotion": 0.7,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.32
+        "finishGlow": 0.32,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -216,7 +237,9 @@
         "materialMotion": 0.65,
         "materialMode": 0.0,
         "viewPattern": 0.25,
-        "finishGlow": 0.18
+        "finishGlow": 0.18,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -238,7 +261,9 @@
         "materialMotion": 0.8,
         "materialMode": 0.3333333333333333,
         "viewPattern": 0.0,
-        "finishGlow": 0.27
+        "finishGlow": 0.27,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -260,9 +285,13 @@
         "materialMotion": 0.55,
         "materialMode": 0.0,
         "viewPattern": 0.75,
-        "finishGlow": 0.38
+        "finishGlow": 0.38,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     }
   ],
-  "sharedLookVersion": 1
+  "sharedLookVersion": 1,
+  "refinementRevision": "stage-glass-20261103-v1",
+  "motionProfile": "Distinct image carrier and local geometry respond to independent bands; exact pause"
 }

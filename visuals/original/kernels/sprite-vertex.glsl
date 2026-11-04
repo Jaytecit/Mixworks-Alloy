@@ -42,10 +42,10 @@ vec3 current=shape(FAMILY,kind,state,home,vec2(size),scale);
  angle=prior.z+difference*generationBlend;
  angle+=generationBlend*(midImpulse*.65+trebleImpulse*.9)*(mod(float(cell.x+cell.y),3.)-1.);
  halfSize*=1.+generationBlend*(bassHit*.32+trebleHit*.15);
- float phase=mod(projectBeat,16.);
- float recall=smoothstep(9.,12.,phase)*(1.-smoothstep(14.,16.,phase));
- // Rejoin adjacent source texels exactly during the hold, then release smoothly.
- state.xy=mix(state.xy,home,recall);halfSize=mix(halfSize,.5/vec2(size),recall);
+ float passage=sin(mod(projectBeat-12.,32.)*.1963495408);
+ float recall=exp(-passage*passage*28.);
+ // Cross home with nonzero displacement slope; alignment has no flat hold.
+ state.xy=home+(state.xy-home)*passage;halfSize=mix(halfSize,.5/vec2(size),recall);
  sourceUV=mix(sourceUV,home+corner*.5/vec2(size),recall);angle*=1.-recall;
  // Rotate in pixel space so non-square outputs preserve fragment proportions.
  vec2 offset=corner*halfSize*resolution;

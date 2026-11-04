@@ -16,19 +16,19 @@
     "motion": {
       "min": 0,
       "max": 1,
-      "default": 0.5,
+      "default": 0.52,
       "type": "continuous"
     },
     "imageMix": {
       "min": 0,
       "max": 1,
-      "default": 0.66,
+      "default": 0.9,
       "type": "continuous"
     },
     "scale": {
       "min": 0,
       "max": 1,
-      "default": 0.48,
+      "default": 0.38,
       "type": "continuous"
     },
     "detail": {
@@ -46,7 +46,7 @@
     "pulse": {
       "min": 0,
       "max": 1,
-      "default": 0.85,
+      "default": 0.8,
       "type": "continuous"
     },
     "warp": {
@@ -59,28 +59,28 @@
     "bassDrive": {
       "min": 0,
       "max": 1,
-      "default": 0.62,
+      "default": 0.55,
       "label": "Bass response",
       "type": "continuous"
     },
     "midDrive": {
       "min": 0,
       "max": 1,
-      "default": 0.6,
+      "default": 0.85,
       "label": "Mid response",
       "type": "continuous"
     },
     "trebleDrive": {
       "min": 0,
       "max": 1,
-      "default": 0.62,
+      "default": 0.7,
       "label": "Treble response",
       "type": "continuous"
     },
     "momentum": {
       "min": 0,
       "max": 1,
-      "default": 0.62,
+      "default": 0.65,
       "label": "Release momentum",
       "type": "continuous"
     },
@@ -113,6 +113,21 @@
       "default": 0.2,
       "label": "Soft highlight glow",
       "type": "continuous"
+    },
+    "paletteStyle": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 8,
+      "label": "Colour palette"
+    },
+    "paletteAmount": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "continuous",
+      "label": "Palette amount"
     }
   },
   "passSchema": 2,
@@ -126,9 +141,11 @@
   ],
   "composition": "Staggered bricks, diagonal rhombi, hexagonal scales and independently turning stamps",
   "audioMapping": {
-    "description": "Bass lifts courses; mids turn or raise tiles; treble illuminates bevels"
+    "bass": "Diamond-pane tilt changes refraction",
+    "mid": "Coherent lateral pane travel across a stationary complete image",
+    "treble": "Straight diamond bevels and pane glints"
   },
-  "mediaRole": "Whole images per tile, or a complete image behind refracting glass tiles",
+  "mediaRole": "One source image behind gliding diamond glass panes",
   "recipe": {
     "mechanism": "Mosaic relief",
     "topology": 1,
@@ -140,21 +157,23 @@
       "title": "Signature",
       "controls": {
         "intensity": 0.65,
-        "motion": 0.5,
-        "imageMix": 0.66,
-        "scale": 0.48,
+        "motion": 0.52,
+        "imageMix": 0.9,
+        "scale": 0.38,
         "detail": 0.65,
         "hue": 0.9920000000000002,
-        "pulse": 0.85,
+        "pulse": 0.8,
         "warp": 0.5,
-        "bassDrive": 0.62,
-        "midDrive": 0.6,
-        "trebleDrive": 0.62,
-        "momentum": 0.62,
+        "bassDrive": 0.55,
+        "midDrive": 0.85,
+        "trebleDrive": 0.7,
+        "momentum": 0.65,
         "materialMotion": 0.35,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.2
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -176,7 +195,9 @@
         "materialMotion": 0.4,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.24
+        "finishGlow": 0.24,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -198,7 +219,9 @@
         "materialMotion": 0.7,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.32
+        "finishGlow": 0.32,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -220,7 +243,9 @@
         "materialMotion": 0.65,
         "materialMode": 0.6666666666666666,
         "viewPattern": 0.0,
-        "finishGlow": 0.18
+        "finishGlow": 0.18,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -242,7 +267,9 @@
         "materialMotion": 0.8,
         "materialMode": 1.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.27
+        "finishGlow": 0.27,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -264,9 +291,13 @@
         "materialMotion": 0.55,
         "materialMode": 0.3333333333333333,
         "viewPattern": 0.75,
-        "finishGlow": 0.38
+        "finishGlow": 0.38,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     }
   ],
-  "sharedLookVersion": 1
+  "sharedLookVersion": 1,
+  "refinementRevision": "stage-glass-20261103-v1",
+  "motionProfile": "Distinct image carrier and local geometry respond to independent bands; exact pause"
 }

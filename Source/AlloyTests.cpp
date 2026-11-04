@@ -51,7 +51,71 @@ void runAudioUiTests(const std::function<void(bool, const juce::String&)>& check
     deck.refresh(true); const auto elapsed = juce::Time::getMillisecondCounterHiRes() - started;
     release.signal(); owner.join();
     check(updates == 0 && elapsed < 1000, "busy engine skips a display refresh instead of blocking the message thread");
-    deck.cueSelected = {}; runAudioSettingsUiTests(check, report);
+    deck.cueSelected = {};
+    {
+        // Display and input must name the same source; watching a timeline must
+        // never write automation or redirect a held control at a handover.
+        auto media = std::make_shared<Media>(); media->name = "Copper Pulse";
+        media->sampleRate = 8000; media->samples.setSize(1, 80000); media->samples.clear();
+        auto incomingMedia = std::make_shared<Media>(); incomingMedia->name = "Steel Drive";
+        incomingMedia->sampleRate = 8000; incomingMedia->samples.setSize(1, 80000); incomingMedia->samples.clear();
+        Clip first; first.media = media; first.length = 8;
+        Clip incoming; incoming.media = incomingMedia; incoming.start = 4; incoming.length = 6;
+        engine.project = {}; engine.project.clips = {first, incoming};
+        auto& original = engine.project.effectSettings(engine.project.clips[0]);
+        original.automation[0] = {true, {{0, -24}, {8, 0}}};
+        original.automation[1] = {true, {{0, -18}, {8, 6}}};
+        original.automation[4] = {true, {{0, -1}, {8, 1}}};
+        original.automation[5] = {true, {{0, -.8f}, {8, .8f}}};
+        auto& next = engine.project.effectSettings(engine.project.clips[1]);
+        next.automation[0] = {true, {{0, -12}, {6, 0}}};
+        engine.project.tracks[0].gainDb = -3;
+        engine.project.masterAutomation = {true, {{0, -6}, {8, 0}}};
+        engine.selectedClip = first.id; engine.position = 2;
+        const auto beforeFollow = juce::JSON::toString(projectToJson(engine.project));
+        deck.setVisible(true); deck.followTimeline.setToggleState(true, juce::dontSendNotification); deck.resized(); deck.refresh(true);
+        check(std::abs(deck.faders[0].getValue() + 18) < .001 && std::abs(deck.pots[0].getValue() + 12) < .001
+            && std::abs(deck.faders[4].getValue() + .5) < .001 && std::abs(deck.pots[6].getValue() + .4) < .001,
+            "Follow timeline moves level, EQ, pan and cutoff to the current track curves");
+        check(deck.faders[0].getTitle().contains("Copper Pulse") && std::abs(deck.master.getValue() + 4.5) < .001,
+            "follow controls name their actual track and master remains master-owned");
+        engine.position = 6; deck.refresh(true);
+        check(std::abs(deck.faders[0].getValue() + 6) < .001 && deck.faders[0].getTitle().contains("Copper Pulse"),
+            "selected playing track wins an overlap and paused seeking refreshes its values");
+        check(juce::JSON::toString(projectToJson(engine.project)) == beforeFollow && !engine.recordingAutomation(),
+            "mode selection and moving displays do not edit the project or start recording");
+        auto capture = [&](const juce::String& name)
+        {
+            auto stream = report.getSiblingFile(name).createOutputStream();
+            check(stream && juce::PNGImageFormat().writeImageToStream(deck.createComponentSnapshot(deck.getLocalBounds()), *stream), "capture " + name);
+        };
+        capture("controller-follow-outgoing.png");
+        engine.selectedClip.clear(); deck.refresh(true);
+        check(deck.faders[0].getTitle().contains("Steel Drive") && std::abs(deck.faders[0].getValue() + 8) < .001,
+            "without a playing selection follow chooses the newest track and uses its local curve clock");
+        deck.faders[0].onDragStart(); engine.position = 1; deck.refresh(true);
+        check(deck.faders[0].getTitle().contains("Steel Drive") && !deck.followTimeline.isEnabled(),
+            "held fader keeps its named target across seeks and mode changes are disabled");
+        deck.faders[0].setValue(-10, juce::sendNotificationSync);
+        check(engine.project.manualValue({0, AutomationTarget::volume, {}, {}, incoming.id}) == -10
+            && engine.project.tracks[0].gainDb == -3 && engine.project.effectSettings(engine.project.clips[0]).automation[0].active(),
+            "follow adjustment changes only the displayed track, preserving lane and outgoing automation");
+        deck.faders[0].onDragEnd();
+        check(deck.faders[0].getTitle().contains("Copper Pulse"), "release resumes following the playhead");
+        engine.position = 9; deck.refresh(true); capture("controller-follow-incoming.png");
+        deck.pots[0].onDragStart(); engine.project.clips.erase(engine.project.clips.begin() + 1); deck.refresh(true);
+        check(!deck.pots[0].isEnabled(), "removed gesture owner disables the held control");
+        deck.pots[0].setValue(-9, juce::sendNotificationSync); deck.pots[0].onDragEnd();
+        check(engine.project.tracks[0].eqDb[0] == 0, "removed track never redirects an adjustment into mixer-lane EQ");
+        engine.position = 9; deck.refresh(true);
+        check(deck.faders[0].getTitle().contains("Mixer lane 1") && deck.faders[0].getValue() == -3,
+            "empty timeline span names and displays the fallback mixer lane");
+        deck.followTimeline.setToggleState(false, juce::dontSendNotification); engine.position = 2; deck.resized(); deck.refresh(true);
+        check(deck.faders[0].getTitle().contains("Mixer lane 1") && deck.faders[0].getValue() == -3,
+            "turning follow off restores lane control even while a track is present");
+        engine.project = {}; engine.selectedClip.clear(); engine.position = 0;
+    }
+    runAudioSettingsUiTests(check, report);
 }
 void runAttractTests(Workstation&, const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runPlaylistTransitionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);

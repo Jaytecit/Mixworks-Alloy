@@ -93,8 +93,8 @@ void main(){
     }else if(mirror>.5){
         vec4 other=texture(input0,vec2(1.-uv.x,uv.y));fragments+=other*(1.-fragments.a);
     }
-    float phase=mod(projectBeat,16.);
-    float recall=smoothstep(9.,12.,phase)*(1.-smoothstep(14.,16.,phase));
+    float passage=sin(mod(projectBeat-12.,32.)*.1963495408);
+    float recall=exp(-passage*passage*28.);
     fragments=mix(fragments,texture(input0,uv),recall);
     vec3 bg=setting(q);
     vec2 px=1./resolution;

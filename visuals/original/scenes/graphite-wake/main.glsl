@@ -1,127 +1,82 @@
-// Original Mixworks Graphite Wake; shared advected-pigment algorithm, composition 0.
 #version 330
-uniform float bassImpulse,midImpulse,trebleImpulse;
-#define FAMILY 20
-#define VARIANT 0
+#define FLOW_KIND 0
+// Owned feedback instruments. FLOW_KIND: 0 ink wake, 1 rising embers, 2 smoke.
 uniform vec2 resolution;
-uniform float sceneTime,projectBeat,beatPulse,energy,bass,mid,treble,onset,audioMotion,intensity,motion,imageMix;
 uniform sampler2D userImage;
 uniform int hasImage;
-out vec4 colour;
-// Owned Mixworks primitives and lighting. No third-party shader includes.
-uniform float scale,warp,detail,hue,symmetry,orbit,focusX,focusY;
-uniform float colourR,colourG,colourB,pulse,mode,mirror,feedback;
 uniform sampler2D historyImage;
 uniform int historyValid;
-uniform float bassHit,midHit,trebleHit,bassTime,midTime,trebleTime;
-// Project beats give 120â€“160 BPM articulation; measured bands supply its strength.
-// Independent accumulated band phases carry movement between attacks. No global zoom.
-float lowSwing(){return .85*sin(bassTime*1.1+bassImpulse*4.2+float(VARIANT)*.73);}
-float midSwing(){return .8*sin(midTime*.9+midImpulse*3.8+float(VARIANT)*1.17);}
-float highSwing(){return .65*sin(trebleTime*1.2+trebleImpulse*5.+float(VARIANT)*.41);}
-float drive(){return bassHit*pulse;}
-vec3 linearRGB(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
-mat2 rot(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
+uniform float deltaTime,bass,mid,treble,bassHit,midHit,trebleHit;
+uniform float bassTime,midTime,trebleTime,bassImpulse,midImpulse,trebleImpulse;
+uniform float scale,warp,detail,hue,imageMix,intensity,pulse,feedback,orbit,focusX,focusY;
+uniform float colourR,colourG,colourB;
+out vec4 colour;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.13,311.71)))*43757.37);}
-float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);float a=hash(i.xy+i.z*37.);float b=hash(i.xy+vec2(1,0)+i.z*37.);float c=hash(i.xy+vec2(0,1)+i.z*37.);float d=hash(i.xy+vec2(1)+i.z*37.);float e=hash(i.xy+(i.z+1.)*37.);float g=hash(i.xy+vec2(1,0)+(i.z+1.)*37.);float h=hash(i.xy+vec2(0,1)+(i.z+1.)*37.);float j=hash(i.xy+vec2(1)+(i.z+1.)*37.);return mix(mix(mix(a,b,f.x),mix(c,d,f.x),f.y),mix(mix(e,g,f.x),mix(h,j,f.x),f.y),f.z);}
-float fbm(vec3 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=noise(p)*a;p=p*2.03+vec3(2,7,3);a*=.5;}return v;}
-vec3 palette(float v){vec3 c=.48+.48*cos(6.283*(v+vec3(.04,.32,.58)+hue+float(VARIANT)*.071));return pow(c,vec3(1.65))*mix(vec3(.5),vec3(colourR,colourG,colourB)*1.5,.6);}
-vec2 domain(){vec2 p=(2.*gl_FragCoord.xy-resolution)/resolution.y;p-=vec2(focusX-.5,focusY-.5)*.8;p*=.65+scale*1.4;if(mirror>.5)p.x=abs(p.x);float n=floor(symmetry*6.99);if(n>0.){float a=atan(p.y,p.x),r=length(p);a=abs(mod(a+3.14159/(n+2.),6.28318/(n+2.))-3.14159/(n+2.));p=vec2(cos(a),sin(a))*r;}return rot((orbit-.5)*.4*sin(travelTime*.13))*p;}
-float clockTime(){return travelTime+bassImpulse*1.8+midImpulse*.7;}
-// World-plane UVs use equal units on both axes. Convert once to screen aspect.
-// Reflect at photograph boundaries rather than stretching border pixels.
-// Original Alloy material composition. Child charts inherit their parent chart,
-// then turn, advect and refract independently; the grandchild inherits the child.
-mat2 nestedTurn(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
-vec3 nestedLinear(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
-vec3 nestedInk(vec2 uv){
-    uv=1.-abs(mod(uv,2.)-1.);
-    vec3 bg=mix(nestedLinear(textureLod(userImage,uv,0.).rgb),nestedLinear(textureLod(nextImage,uv,0.).rgb),imageBlend);
-    vec4 cut=sampleCutout(uv);
-    return mix(bg,nestedLinear(cut.rgb),cut.a*.85);
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
+float cloud(vec2 p){return noise(p)*.57+noise(p*2.03+7.1)*.28+noise(p*4.1+13.)*.15;}
+vec3 ink(float phase){return (.06+.94*pow(.5+.5*cos(6.283185*(phase+hue+vec3(.03,.32,.61))),vec3(1.4)))*mix(vec3(.6),vec3(colourR,colourG,colourB)*1.6,.55);}
+vec3 sourceInk(vec2 uv,vec3 fallback){
+    vec4 a=hasImage!=0?sampleMedia(uv):vec4(0),b=sampleCutout(uv);
+    vec3 art=mix(a.rgb,b.rgb,b.a);
+    return mix(fallback,art,max(a.a,b.a)*imageMix*.55);
 }
-vec3 nestedMaterial(vec2 uv,vec3 parent,float style){
-    vec2 chart=(uv-.5)*(2.4+mod(style,3.)*.55);
-    vec2 cell=floor(chart+.5),p=fract(chart+.5)-.5;
-    float id=dot(cell,vec2(1.71,2.93))+style;
-    float turn=midImpulse*(.8+mod(style,3.)*.28)+midTime*.25;
-    vec2 child=nestedTurn(turn+id*.37)*p;
-    // Liquid inlays, angular frames and ribbon windows have distinct domains.
-    if(mod(style,3.)<1.)child+=.07*vec2(sin(child.y*9.-bassImpulse*3.),cos(child.x*8.+trebleImpulse*4.));
-    else if(mod(style,3.)<2.)child.x+=.12*sin(child.y*6.+bassImpulse*2.);
-    else child=nestedTurn(.3*sin(length(child)*8.-bassImpulse*3.))*child;
-    float shape=mod(style,3.)<1.?length(child):max(abs(child.x),abs(child.y));
-    float mask=1.-smoothstep(.31,.36,shape);
-    vec3 ink=nestedInk(child/(.65+.13*bassHit)+.5);
-    vec2 grand=nestedTurn(-trebleImpulse*1.9-trebleTime*.4)*(child-vec2(.12*sin(id),.1*cos(id)))*2.8;
-    float inner=1.-smoothstep(.22,.29,max(abs(grand.x),abs(grand.y)));
-    ink=mix(ink,nestedInk(grand+.5),inner*.85);
-    vec3 rim=.5+.5*cos(vec3(0,2.1,4.2)+id*.4+trebleImpulse*.35);
-    ink+=rim*exp(-abs(shape-.32)*100.)*(.15+.8*trebleHit);
-    return mix(parent,ink,mask*.78);
-}
-
-vec3 imagePlane(vec2 uv){
-    vec2 p=rot((imageRotation-.5)*6.283185)*(uv-.5)/(1.+imageZoom*.25);
-    p.x/=resolution.x/resolution.y;
-    vec2 a=1.-abs(mod(p*mediaAspect+.5,2.)-1.);
-    vec2 b=1.-abs(mod(p*nextMediaAspect+.5,2.)-1.);
-    return nestedMaterial(uv,mix(linearRGB(textureLod(userImage,a,0.).rgb),linearRGB(textureLod(nextImage,b,0.).rgb),imageBlend),20.0);
-}
-vec4 alphaPixel(sampler2D tex,ivec2 p,ivec2 size){if(any(lessThan(p,ivec2(0)))||any(greaterThanEqual(p,size)))return vec4(0);vec4 c=texelFetch(tex,p,0);return vec4(linearRGB(c.rgb)*c.a,c.a);}
-vec4 alphaArt(sampler2D tex,vec2 uv,vec2 aspect){ivec2 s=textureSize(tex,0);vec2 p=((uv-.5)*aspect+.5)*vec2(s)-.5;ivec2 i=ivec2(floor(p));vec2 f=fract(p);return mix(mix(alphaPixel(tex,i,s),alphaPixel(tex,i+ivec2(1,0),s),f.x),mix(alphaPixel(tex,i+ivec2(0,1),s),alphaPixel(tex,i+ivec2(1),s),f.x),f.y);}
-vec4 cutoutArt(vec2 uv){if(hasCutout==0)return vec4(0);vec4 c=mix(alphaArt(cutoutImage,uv,cutoutAspect),alphaArt(nextCutoutImage,uv,nextCutoutAspect),cutoutBlend);return vec4(c.rgb/max(c.a,.00001),c.a);}
-vec3 media(vec2 uv,vec3 fallback){
-    if(hasImage==0)return fallback;
-    vec3 src=imagePlane(uv);float m=floor(mode*3.99);
-    if(m==1.)src=fallback*smoothstep(.15,.65,dot(src,vec3(.21,.72,.07)))*1.7;
-    else if(m==2.)src=abs(imagePlane(uv+vec2(.004,0))-imagePlane(uv-vec2(.004,0)))*8.+fallback*.2;
-    else if(m==3.)src=imagePlane(uv+(src.rg-.5)*warp*.025);
-    return mix(fallback,src,imageMix);
-}
-vec3 material(vec3 p,vec3 n,float id){float diff=max(0.,dot(n,normalize(vec3(-.6,.8,1.))));float rim=pow(1.-abs(n.z),3.);float spec=pow(max(0.,dot(reflect(normalize(vec3(.6,-.8,-1.)),n),vec3(0,0,1))),24.+detail*40.);vec3 albedo=palette(id*.11+fbm(p*2.)*.3);albedo=media(p.xy*.18+.5,albedo);
-#if FAMILY == 4 || FAMILY == 5
-vec4 decal=cutoutArt(p.xy*.35+.5);albedo=mix(albedo,decal.rgb,decal.a*imageMix);
-#endif
-return albedo*(.13+diff*.85)+palette(id*.1+.3)*rim*.45+vec3(spec)*.5;}
-void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colour=vec4(max(c,vec3(0)),1);}
-
-// Bounded temporal field. This is a new simulation, not reference simulation code.
-uniform float deltaTime;
-void main(){vec2 uv=gl_FragCoord.xy/resolution;vec2 p=domain();float t=clockTime();vec2 px=1./resolution;float style=float(VARIANT%5);vec2 flow=vec2(sin(p.y*(2.+style*.7)+t*.2),cos(p.x*(2.5+style*.4)-t*.17));
-    if(VARIANT%3==1)flow=vec2(-p.y,p.x)/(length(p)+.4);if(VARIANT%3==2)flow=rot(t*.1)*vec2(sin(p.y*5.),.5);
-    // Alternating jets, snare shear and high-frequency eddies move the history.
-    flow=rot(midImpulse*.7+.2*midSwing())*flow*(.4+1.8*bass+3.2*bassHit);
-    flow+=vec2(1.8*lowSwing()*cos(p.y*2.),1.4*midSwing()*sin(p.x*2.));
-    flow+=.7*treble*vec2(sin(p.y*9.-trebleTime*8.),cos(p.x*8.+trebleTime*7.));
+void main(){
+    vec2 uv=gl_FragCoord.xy/resolution,aspect=vec2(resolution.x/resolution.y,1.);
+    vec2 p=(uv-.5)*2.*aspect;
+    p-=vec2(focusX-.5,focusY-.5)*.8;p*=.8+scale*.7;
+    float t=travelTime,lo=bassHit*pulse,mi=midHit*pulse,hi=trebleHit*pulse;
     float stepSize=clamp(deltaTime*60.,0.,3.);
-    vec2 at=uv+flow*(.001+warp*.003)*stepSize;vec3 prev=historyValid!=0?texture(historyImage,clamp(at,0.,1.)).rgb:vec3(0);
-    vec3 c;
-#if FAMILY == 17
-    // Reaction-like diffusion: local Laplacian and bounded nonlinear growth.
-    vec3 lap=texture(historyImage,clamp(at+vec2(px.x,0),0.,1.)).rgb+texture(historyImage,clamp(at-vec2(px.x,0),0.,1.)).rgb+texture(historyImage,clamp(at+vec2(0,px.y),0.,1.)).rgb+texture(historyImage,clamp(at-vec2(0,px.y),0.,1.)).rgb-4.*prev;
-    vec2 source=p+vec2(.28*lowSwing(),.24*midSwing());
-    float n=fbm(vec3(source*2.,t*.13+trebleTime));
-    float field;
-    if(VARIANT==0)field=.5+.5*sin(source.x*9.+n*9.+source.y*2.);
-    else if(VARIANT==1)field=pow(.5+.5*cos(source.x*7.+n*4.)*cos(source.y*7.-n*4.),2.);
-    else if(VARIANT==2)field=smoothstep(.32,.67,fbm(vec3(source*3.,midTime*.7)));
-    else if(VARIANT==3)field=.5+.5*sin(source.y*12.+sin(source.x*3.+midTime)*3.+n*3.);
-    else if(VARIANT==4)field=pow(abs(sin(source.x*7.+n*6.)*sin(source.y*6.-n*6.)),.45);
-    else if(VARIANT==5){vec2 tile=fract(source*4.+n*.3)-.5;field=exp(-dot(tile,tile)*22.);}
-    else if(VARIANT==6)field=.5+.5*sin(length(source)*13.+atan(source.y,source.x)*3.-bassTime*4.+n*4.);
-    else field=pow(.5+.5*sin(source.x*14.+sin(source.y*7.+n*3.)*3.),5.);
-    vec3 seed=palette(field*.45+float(VARIANT)*.13)*(.025+.65*field);
-    c=clamp(prev+lap*min(.20,.08*stepSize)+(seed-prev)*min(.16,.07*stepSize),0.,1.6);
-    if(historyValid==0)c=seed;
+    vec2 flow;vec3 injection;float decay;
+#if FLOW_KIND == 0
+    // A thin continuous calligraphic stroke, carried sideways into a long wake.
+    float bend=.24*sin(p.x*1.8-t*.52+midImpulse*.8)+.075*sin(p.x*5.5+midTime*.8);
+    bend+=.014*hi*sin(p.x*72.-trebleImpulse*3.);
+    float width=.012+.013*(1.-detail)+.008*mi;
+    float stroke=exp(-pow((p.y-bend)/width,2.));
+    stroke+=.24*exp(-pow((p.y-bend-.085)/(.006+width*.4),2.));
+    float nib=exp(-pow((p.x-1.05)*1.2,2.));
+    injection=sourceInk(vec2(p.x*.22+.5,bend*.5+.5),ink(p.x*.10+.2))*stroke*(.07+.30*mid+.24*mi)*(nib*.7+.3);
+    flow=vec2(-.0042,.0008*sin(p.x*2.+midImpulse))*(.7+warp*.6);
+    decay=.90+feedback*.075;
+#elif FLOW_KIND == 1
+    // Separate ballistic jets, rather than a continuous sinusoidal ribbon.
+    float sparks=0.;
+    for(int i=0;i<14;i++){
+        float seed=hash(vec2(i,5)),phase=fract(t*(.23+seed*.19)+seed+bassImpulse*(.06+seed*.04));
+        float x=(float(i)/13.-.5)*3.0+.10*sin(phase*5.+midImpulse+seed*12.)*(.4+warp);
+        float y=-.83+phase*(1.25+.45*bass);
+        float dx=(p.x-x)*(.8+seed*.5),dy=p.y-y;
+        float head=exp(-dx*dx*9000.-dy*dy*2200.);
+        float tail=exp(-dx*dx*3500.)*exp(min(0.,dy)*25.)*step(dy,0.)*smoothstep(-.17,0.,dy);
+        sparks+=(head+tail*.45)*pow(1.-phase,1.6)*(.12+1.9*lo+.25*bass);
+    }
+    injection=sourceInk(vec2(uv.x,.45),ink(.02+uv.y*.08))*sparks;
+    injection+=ink(.13)*sparks*hi*.35;
+    flow=vec2(.0008*sin(p.y*5.+midImpulse)*(.3+mi),-.0045-.003*bass);
+    decay=.64+feedback*.18;
 #else
-    p=rot(midImpulse*.45)*p+vec2(.25*lowSwing(),.18*highSwing());
-    float ribbon=exp(-abs(p.y-.5*sin(p.x*(2.+style)+t*.7+bassTime*3.)-.15*sin(p.x*11.-trebleTime*7.))*(18.+detail*24.));
-    if(VARIANT%3==1)ribbon=exp(-abs(length(p)-.7-.18*sin(atan(p.y,p.x)*(3.+style)+t))*30.);
-    if(VARIANT%3==2)ribbon=pow(fbm(vec3(p*(3.+style),t*.2)),8.)*5.;
-    vec3 injection=palette(p.x*.15+t*.03)*ribbon*(.1+mid*.4+bassHit*.7*pulse);
-    c=prev*pow(.85+feedback*.12,stepSize)+injection*stepSize;
-    if(historyValid==0)c=injection;
+    // Broad, softly lit billows. Mids roll the volume; bass adds local pressure.
+    vec2 q=p;
+    q.x+=.30*sin(q.y*2.-t*.13+midImpulse*.22)*( .3+warp);
+    float n=cloud(q*2.2+vec2(t*.055,-t*.16));
+    q+=vec2(n-.5,cloud(q.yx*1.8-t*.07)-.5)*(.45+warp*.35);
+    float body=exp(-pow(q.x/(.43+.24*clamp(q.y+.8,0.,1.7)),2.))*smoothstep(-1.0,-.62,q.y)*(1.-smoothstep(.35,1.05,q.y));
+    float billow=smoothstep(.24,.76,cloud(q*3.1+vec2(-t*.035,-midTime*.45)));
+    float density=body*(.28+.72*billow);
+    float light=.35+.65*cloud(q*2.8+vec2(.3,.4)-t*.04);
+    injection=sourceInk(uv,ink(.42+n*.15))*density*(.012+.025*mid+.013*mi)*light;
+    injection+=ink(.62)*density*lo*.009;
+    flow=vec2(.0014*sin(p.y*2.-midImpulse*.3)*( .3+warp),-.0013-.0010*mid);
+    decay=.938+feedback*.049;
 #endif
-    c=mix(c,media(uv+flow*.03,c),hasImage!=0?.025:0.);colour=vec4(c,1);
+    vec2 chart=uv+flow*stepSize;
+    vec3 previous=historyValid!=0?texture(historyImage,clamp(chart,0.,1.)).rgb:vec3(0);
+#if FLOW_KIND == 2
+    vec2 px=1./resolution;
+    vec3 diffuse=(texture(historyImage,clamp(chart+vec2(px.x*2.,0),0.,1.)).rgb+texture(historyImage,clamp(chart-vec2(px.x*2.,0),0.,1.)).rgb+texture(historyImage,clamp(chart+vec2(0,px.y*2.),0.,1.)).rgb+texture(historyImage,clamp(chart-vec2(0,px.y*2.),0.,1.)).rgb)*.25;
+    if(historyValid!=0)previous=mix(previous,diffuse,.15*min(stepSize,1.));
+#endif
+    vec3 c=previous*pow(decay,stepSize)+injection*stepSize;
+    if(historyValid==0)c=injection;
+    colour=vec4(clamp(c*(.94+intensity*.08),0.,2.),1.);
 }

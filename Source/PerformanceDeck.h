@@ -41,6 +41,7 @@ public:
     std::array<HotcueButton, 9> channelButtons;
     juce::TextButton controls {"Cues / resets..."};
     juce::ToggleButton learn {"MIDI Learn"};
+    juce::ToggleButton followTimeline {"Follow timeline"};
     juce::TextButton cancelLearn {"Cancel learn"};
     juce::TextButton setup {"Map live desk"}, skip {"Skip"};
 private:
@@ -51,6 +52,8 @@ private:
     juce::Label title, state, hint, launchState;
     std::array<bool, 17> gestures {};
     std::array<AutomationAddress, 17> gestureAddresses;
+    std::array<AutomationAddress, 17> displayedAddresses;
+    AutomationAddress timelineAddress(int lane, AutomationTarget) const;
     void configure(juce::Slider&, int slot, MidiAction, AutomationAddress, const juce::String&);
     void trigger(MidiAction);
 };

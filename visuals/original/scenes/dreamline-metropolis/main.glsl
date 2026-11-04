@@ -1,205 +1,116 @@
-// Original Mixworks Dreamline Metropolis; shared city algorithm, composition 1.
 #version 330
-uniform float bassImpulse,midImpulse,trebleImpulse;
-#define FAMILY 18
-#define VARIANT 1
+#define CITY_KIND 1
+// Owned city instruments. Expanded with CITY_KIND into the two scene folders.
+// 0: lateral waterfront skyline; 1: forward street canyon. No shared camera pulse.
 uniform vec2 resolution;
-uniform float sceneTime,projectBeat,beatPulse,energy,bass,mid,treble,onset,audioMotion,intensity,motion,imageMix;
 uniform sampler2D userImage;
 uniform int hasImage;
+uniform float bass,mid,treble,bassHit,midHit,trebleHit;
+uniform float bassTime,midTime,trebleTime,bassImpulse,midImpulse,trebleImpulse;
+uniform float scale,warp,detail,hue,intensity,pulse,orbit,focusX,focusY;
+uniform float colourR,colourG,colourB,imageMix;
 out vec4 colour;
-// Owned Mixworks primitives and lighting. No third-party shader includes.
-uniform float scale,warp,detail,hue,symmetry,orbit,focusX,focusY;
-uniform float colourR,colourG,colourB,pulse,mode,mirror,feedback;
-uniform sampler2D historyImage;
-uniform int historyValid;
-uniform float bassHit,midHit,trebleHit,bassTime,midTime,trebleTime;
-// Project beats give 120â€“160 BPM articulation; measured bands supply its strength.
-// Independent accumulated band phases carry movement between attacks. No global zoom.
-float lowSwing(){return .85*sin(bassTime*1.1+bassImpulse*4.2+float(VARIANT)*.73);}
-float midSwing(){return .8*sin(midTime*.9+midImpulse*3.8+float(VARIANT)*1.17);}
-float highSwing(){return .65*sin(trebleTime*1.2+trebleImpulse*5.+float(VARIANT)*.41);}
-float drive(){return bassHit*pulse;}
-vec3 linearRGB(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
-mat2 rot(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.13,311.71)))*43757.37);}
-float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);float a=hash(i.xy+i.z*37.);float b=hash(i.xy+vec2(1,0)+i.z*37.);float c=hash(i.xy+vec2(0,1)+i.z*37.);float d=hash(i.xy+vec2(1)+i.z*37.);float e=hash(i.xy+(i.z+1.)*37.);float g=hash(i.xy+vec2(1,0)+(i.z+1.)*37.);float h=hash(i.xy+vec2(0,1)+(i.z+1.)*37.);float j=hash(i.xy+vec2(1)+(i.z+1.)*37.);return mix(mix(mix(a,b,f.x),mix(c,d,f.x),f.y),mix(mix(e,g,f.x),mix(h,j,f.x),f.y),f.z);}
-float fbm(vec3 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=noise(p)*a;p=p*2.03+vec3(2,7,3);a*=.5;}return v;}
-vec3 palette(float v){vec3 c=.48+.48*cos(6.283*(v+vec3(.04,.32,.58)+hue+float(VARIANT)*.071));return pow(c,vec3(1.65))*mix(vec3(.5),vec3(colourR,colourG,colourB)*1.5,.6);}
-vec2 domain(){vec2 p=(2.*gl_FragCoord.xy-resolution)/resolution.y;p-=vec2(focusX-.5,focusY-.5)*.8;p*=.65+scale*1.4;if(mirror>.5)p.x=abs(p.x);float n=floor(symmetry*6.99);if(n>0.){float a=atan(p.y,p.x),r=length(p);a=abs(mod(a+3.14159/(n+2.),6.28318/(n+2.))-3.14159/(n+2.));p=vec2(cos(a),sin(a))*r;}return rot((orbit-.5)*.4*sin(travelTime*.13))*p;}
-float clockTime(){return travelTime+bassImpulse*1.8+midImpulse*.7;}
-// World-plane UVs use equal units on both axes. Convert once to screen aspect.
-// Reflect at photograph boundaries rather than stretching border pixels.
-// Original Alloy material composition. Child charts inherit their parent chart,
-// then turn, advect and refract independently; the grandchild inherits the child.
-mat2 nestedTurn(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
-vec3 nestedLinear(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
-vec3 nestedInk(vec2 uv){
-    uv=1.-abs(mod(uv,2.)-1.);
-    vec3 bg=mix(nestedLinear(textureLod(userImage,uv,0.).rgb),nestedLinear(textureLod(nextImage,uv,0.).rgb),imageBlend);
-    vec4 cut=sampleCutout(uv);
-    return mix(bg,nestedLinear(cut.rgb),cut.a*.85);
-}
-vec3 nestedMaterial(vec2 uv,vec3 parent,float style){
-    vec2 chart=(uv-.5)*(2.4+mod(style,3.)*.55);
-    vec2 cell=floor(chart+.5),p=fract(chart+.5)-.5;
-    float id=dot(cell,vec2(1.71,2.93))+style;
-    float turn=midImpulse*(.8+mod(style,3.)*.28)+midTime*.25;
-    vec2 child=nestedTurn(turn+id*.37)*p;
-    // Liquid inlays, angular frames and ribbon windows have distinct domains.
-    if(mod(style,3.)<1.)child+=.07*vec2(sin(child.y*9.-bassImpulse*3.),cos(child.x*8.+trebleImpulse*4.));
-    else if(mod(style,3.)<2.)child.x+=.12*sin(child.y*6.+bassImpulse*2.);
-    else child=nestedTurn(.3*sin(length(child)*8.-bassImpulse*3.))*child;
-    float shape=mod(style,3.)<1.?length(child):max(abs(child.x),abs(child.y));
-    float mask=1.-smoothstep(.31,.36,shape);
-    vec3 ink=nestedInk(child/(.65+.13*bassHit)+.5);
-    vec2 grand=nestedTurn(-trebleImpulse*1.9-trebleTime*.4)*(child-vec2(.12*sin(id),.1*cos(id)))*2.8;
-    float inner=1.-smoothstep(.22,.29,max(abs(grand.x),abs(grand.y)));
-    ink=mix(ink,nestedInk(grand+.5),inner*.85);
-    vec3 rim=.5+.5*cos(vec3(0,2.1,4.2)+id*.4+trebleImpulse*.35);
-    ink+=rim*exp(-abs(shape-.32)*100.)*(.15+.8*trebleHit);
-    return mix(parent,ink,mask*.78);
-}
-
-vec3 imagePlane(vec2 uv){
-    vec2 p=rot((imageRotation-.5)*6.283185)*(uv-.5)/(1.+imageZoom*.25);
-    p.x/=resolution.x/resolution.y;
-    vec2 a=1.-abs(mod(p*mediaAspect+.5,2.)-1.);
-    vec2 b=1.-abs(mod(p*nextMediaAspect+.5,2.)-1.);
-    return nestedMaterial(uv,mix(linearRGB(textureLod(userImage,a,0.).rgb),linearRGB(textureLod(nextImage,b,0.).rgb),imageBlend),18.0);
-}
-vec4 alphaPixel(sampler2D tex,ivec2 p,ivec2 size){if(any(lessThan(p,ivec2(0)))||any(greaterThanEqual(p,size)))return vec4(0);vec4 c=texelFetch(tex,p,0);return vec4(linearRGB(c.rgb)*c.a,c.a);}
-vec4 alphaArt(sampler2D tex,vec2 uv,vec2 aspect){ivec2 s=textureSize(tex,0);vec2 p=((uv-.5)*aspect+.5)*vec2(s)-.5;ivec2 i=ivec2(floor(p));vec2 f=fract(p);return mix(mix(alphaPixel(tex,i,s),alphaPixel(tex,i+ivec2(1,0),s),f.x),mix(alphaPixel(tex,i+ivec2(0,1),s),alphaPixel(tex,i+ivec2(1),s),f.x),f.y);}
-vec4 cutoutArt(vec2 uv){if(hasCutout==0)return vec4(0);vec4 c=mix(alphaArt(cutoutImage,uv,cutoutAspect),alphaArt(nextCutoutImage,uv,nextCutoutAspect),cutoutBlend);return vec4(c.rgb/max(c.a,.00001),c.a);}
-vec3 media(vec2 uv,vec3 fallback){
-    if(hasImage==0)return fallback;
-    vec3 src=imagePlane(uv);float m=floor(mode*3.99);
-    if(m==1.)src=fallback*smoothstep(.15,.65,dot(src,vec3(.21,.72,.07)))*1.7;
-    else if(m==2.)src=abs(imagePlane(uv+vec2(.004,0))-imagePlane(uv-vec2(.004,0)))*8.+fallback*.2;
-    else if(m==3.)src=imagePlane(uv+(src.rg-.5)*warp*.025);
-    return mix(fallback,src,imageMix);
-}
-vec3 material(vec3 p,vec3 n,float id){float diff=max(0.,dot(n,normalize(vec3(-.6,.8,1.))));float rim=pow(1.-abs(n.z),3.);float spec=pow(max(0.,dot(reflect(normalize(vec3(.6,-.8,-1.)),n),vec3(0,0,1))),24.+detail*40.);vec3 albedo=palette(id*.11+fbm(p*2.)*.3);albedo=media(p.xy*.18+.5,albedo);
-#if FAMILY == 4 || FAMILY == 5
-vec4 decal=cutoutArt(p.xy*.35+.5);albedo=mix(albedo,decal.rgb,decal.a*imageMix);
-#endif
-return albedo*(.13+diff*.85)+palette(id*.1+.3)*rim*.45+vec3(spec)*.5;}
-void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colour=vec4(max(c,vec3(0)),1);}
-
-// Signed-distance sculptural families: occlusion, normals, ambient shadow and fog.
 float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
-float sdf(vec3 p){
-    float t=clockTime();
-#if FAMILY == 0
-    p.xy-=vec2(.30*midSwing()*sin(p.z*.65),(.24*highSwing()+.12*trebleHit)*cos(p.z));
-    p.xy=rot(.22*lowSwing()*sin(p.z*.8-bassTime*2.))*p.xy;
-#elif FAMILY == 2
-    p.xy=rot(.34*midSwing()+.18*sin(midTime*2.+p.z*.7)*mid)*p.xy;
-    p+=.12*treble* sin(p.yzx*2.5-trebleTime*6.);
-#elif FAMILY == 3
-    p.x+=.45*midSwing()*sin(p.z*.9-midTime*2.);
-#elif FAMILY == 4
-    p.xy=rot(.6*lowSwing())*p.xy;
-    p.yz=rot(.65*midSwing())*p.yz;
-    p.xz=rot(.45*highSwing()+.16*trebleHit)*p.xz;
-    p.z+=.10*treble*sin(p.x*5.-trebleTime*7.);
-#elif FAMILY == 5
-    p.xz=rot(.85*lowSwing())*p.xz;
-    p.yz=rot(.75*midSwing())*p.yz;
-    p.xy=rot(.28*highSwing())*p.xy;
-#elif FAMILY == 19
-    p.yz=rot(.65*lowSwing())*p.yz;
-    p.xz=rot(.5*midSwing())*p.xz;
-    p+=.09*treble*sin(p.zxy*4.-trebleTime*5.);
-#endif
-    // Corridor axes remain fixed; local structures carry motion.
-#if FAMILY == 0
-    // Undulating mineral cave, holes and hanging columns.
-    float wall=2.1-length(p.xy)+.35*sin(p.z*1.7+t)*sin(p.x*2.3)+warp*(fbm(p*2.)-.5);
-    vec3 q=p;q.xy-=vec2(1.3*sin(floor(p.z/2.)*3.),.8);q.z=mod(q.z,2.)-1.;
-    if(VARIANT==1){vec3 c=p;c.x=mod(c.x,3.)-1.5;c.z=mod(c.z+1.5,3.)-1.5;return min(min(length(c.xz)-.22,p.y+1.5),1.6-p.y);}
-    if(VARIANT==2)return 1.6-length(p.xy)+.18*sin(p.z*4.+t)*sin(atan(p.y,p.x)*7.)+noise(p*3.)*.25;
-    if(VARIANT==3){float roof=2.-length(vec2(p.x,p.y*.7));vec3 c=p;c.z=mod(c.z+1.,2.)-1.;return min(roof,length(vec2(abs(c.x)-1.5,c.z))-.18);}
-    return min(wall,length(q.xz)-(.12+.13*bass));
-#elif FAMILY == 1
-    // Repeated structural portal, changes cross-section and twists along flight.
-    p.xy=rot(p.z*(.09+warp*.2)+t*.12)*p.xy;float z=mod(p.z,1.7)-.85;
-    float ring=(VARIANT%3==0?length(p.xy):max(abs(p.x),abs(p.y)));
-    return max(abs(ring-(1.25+.15*bass))-.055,abs(z)-(.08+.10*detail));
-#elif FAMILY == 2
-    // Infinite cubic scaffolding / crossed rods.
-    vec3 q=mod(p+1.,2.)-1.;float r=.05+detail*.10+bass*.05;
-    float rods=min(length(q.xy),min(length(q.yz),length(q.zx)))-r;
-    if(VARIANT==1)return max(min(rods,length(q)-(.24+warp*.15)),.24-length(p.xy-vec2(.5)));
-    if(VARIANT==2){vec3 edge=abs(q)-.72;return min(length(edge.xy),min(length(edge.yz),length(edge.xz)))-.065;}
-    return rods;
-#elif FAMILY == 3
-    // Displaced landscape; stepped plateaux and wire ridges vary the topology.
-    float h=fbm(vec3(p.xz*(.5+warp),t*.05))*1.3;
-    h+=.27*bass*sin(p.z*2.4-bassTime*5.)+.13*mid*sin(p.x*3.+midTime*3.)+(.10*treble+.025*trebleHit)*sin(p.x*11.+p.z*7.-trebleTime*9.);
-    if(VARIANT%3==1)h=floor(h*6.)/6.;
-    return (p.y+1.1-h-bass*.25)*.65;
-#elif FAMILY == 4
-    // Interlocking polished tori with a hollow axial core.
-    p.xz=rot(t*.13)*p.xz;p.yz=rot(t*.11)*p.yz;
-    float a=length(vec2(length(p.xy)-1.,p.z))-(.17+.11*bass);
-    float b=length(vec2(length(p.yz)-.78,p.x))-(.12+warp*.12);
-    if(VARIANT==0)b=length(p)-(.58+.12*sin(t));
-    if(VARIANT==1){p.xy=rot(p.z*1.6+t*.12)*p.xy;return length(vec2(length(p.xy)-.75,p.z))-.17;}
-    if(VARIANT==2)return min(a,min(b,length(vec2(length(p.xz)-.95,p.y))-.10));
-    if(VARIANT==3)return min(a,min(length(p)-.35,length(vec2(length(p.xz)-1.4,p.y))-.055));
-    return min(a,b);
-#elif FAMILY == 5
-    // Faceted convex solids, satellites, displaced crystalline core.
-    p.xz=rot(t*.14)*p.xz;p.yz=rot(t*.19)*p.yz;
-    float d=(abs(p.x)+abs(p.y)+abs(p.z)-1.45-bass*.2)*.577;
-    if(VARIANT==1)d=length(p)-1.05+(fbm(p*4.)-.5)*.14;
-    if(VARIANT==2)d=max(box(p,vec3(.75)),-box(p,vec3(.84,.38,.38)));
-    if(VARIANT==3)d=max(box(p,vec3(.8)),-box(p,vec3(.66,.66,.95)));
-    vec3 q=p; q.xy-=vec2(1.35*cos(t*.4+.7*lowSwing()),1.35*sin(t*.4+.7*lowSwing()));
-    return min(d, length(q)-.17-warp*.1);
-#elif FAMILY == 18
-    // Repeated city blocks of different heights, narrow glowing street grid.
-    vec2 cell=floor(p.xz);vec3 q=vec3(fract(p.x)-.5,p.y,fract(p.z)-.5);
-    float h=.25+hash(cell)*1.8+(.25+.22*sin(cell.x*2.+cell.y-bassTime*4.))*bass;
-    q.xz=rot(.22*midSwing()*sin(cell.x+cell.y))*q.xz;
-    q.x+=(.12*highSwing()+.10*trebleHit)*sin(q.y*4.);
-    return min(box(q-vec3(0,h*.5-1.,0),vec3(.31,h*.5,.31)),p.y+1.);
+vec3 ink(float phase){return (.12+.88*pow(.5+.5*cos(6.283185*(phase+hue+vec3(.02,.32,.61))),vec3(1.35)))*mix(vec3(.65),vec3(colourR,colourG,colourB)*1.6,.55);}
+vec3 imageInk(vec2 uv,vec3 fallback){
+    vec4 a=hasImage!=0?sampleMedia(uv):vec4(0),b=sampleCutout(uv);
+    return mix(fallback,mix(a.rgb,b.rgb,b.a),max(a.a,b.a)*imageMix*.65);
+}
+// Return the lot identity and the local facade chart without moving its walls.
+vec3 lot(vec3 p,out vec2 id){
+#if CITY_KIND == 0
+    id=floor(vec2(p.x/2.8,(p.z-4.)/2.6));
+    return vec3((fract(p.x/2.8)-.5)*2.8,p.y,(fract((p.z-4.)/2.6)-.5)*2.6);
 #else
-    // Isosurface shell with folded chambers.
-    float g=dot(sin(p*(2.5+float(VARIANT)*.8)+t*.1),cos(p.zxy*(2.5+float(VARIANT)*.8)));
-    if(VARIANT==1){vec3 q=p;float d=box(q,vec3(1.25));float s=1.;for(int i=0;i<3;i++){q=mod(p*s+1.,2.)-1.;s*=3.;vec3 r=abs(1.-3.*abs(q));float hole=(min(max(r.x,r.y),min(max(r.y,r.z),max(r.z,r.x)))-1.)/s;d=max(d,hole);}return d;}
-    if(VARIANT==2)return max(abs(g)*.20-.035,box(p,vec3(1.15)));
-    if(VARIANT==3)return max(abs(length(p)-1.35)-.055,abs(sin(p.y*7.+t*.2))*.12-.04);
-    return max(abs(g)*.20-.035,length(p)-1.6);
+    float side=p.x<0.?-1.:1.;
+    float row=floor(max(0.,abs(p.x)-1.5)/2.25);
+    id=vec2(side*(row+1.),floor(p.z/2.6));
+    return vec3(p.x-side*(2.4+row*2.25),p.y,(fract(p.z/2.6)-.5)*2.6);
 #endif
 }
-void main(){vec2 p=domain();float t=clockTime();vec3 ro=vec3(0,0,3.4);vec3 rd=normalize(vec3(p*.65,-1.8));
-#if FAMILY <= 2 || FAMILY == 3 || FAMILY == 18
-    // Two-beat surge/recoil, lateral syncopation and a longer curved route.
-    float route=t*.35+bassTime*2.4+bassImpulse*4.5;
-    ro=vec3(.10*sin(midImpulse*.3),.07*sin(trebleImpulse*.3),-route*(.65+float(VARIANT%3)*.25));
-    rd=normalize(vec3(rot(.12*midSwing())*p,1.7));
-#if FAMILY == 2
-    ro.xy=vec2(.50,.50)+vec2(.035*sin(midImpulse*.4),.035*sin(trebleImpulse*.3));rd=normalize(vec3(rot(.2*lowSwing())*p*.65,1.7));
-#elif FAMILY == 3
-    ro.y=1.3+.15*drive();rd=normalize(vec3(p.x+.2*midSwing(),p.y-.38,1.7));
-#elif FAMILY == 18
-    ro.x=.0;ro.y=2.9+.08*sin(midImpulse*.3);rd=normalize(vec3(p.x+.25*midSwing(),p.y-.4,1.7));
+float city(vec3 p){
+    vec2 id;vec3 q=lot(p,id);float seed=hash(id);
+#if CITY_KIND == 0
+    float height=1.1+seed*5.4+step(.87,seed)*2.3;
+    float width=.48+hash(id+9.)*.37;
+    float building=box(q-vec3(0,height*.5,0),vec3(width,height*.5,.72));
+    // A clear waterfront foreground and a bounded, readable skyline silhouette.
+    building=max(building,max(4.-p.z,p.z-24.));
+    return min(building,p.y);
+#else
+    float height=3.2+seed*6.2;
+    float width=.65+hash(id+8.)*.2;
+    float building=box(q-vec3(0,height*.5,0),vec3(width,height*.5,.92));
+    float crown=box(q-vec3(0,height+.16,0),vec3(width*.66,.16,.70));
+    return min(min(building,crown),p.y);
 #endif
+}
+vec3 facade(vec3 q,vec3 n,float distance){
+    vec2 id;vec3 local=lot(q,id);float seed=hash(id);
+    float face=abs(n.x)>.5?local.z:local.x;
+    float rows=step(.30,fract(q.y*3.8))*step(.32,fract(face*5.));
+    float low=bassHit*pulse,mi=midHit*pulse,hi=trebleHit*pulse;
+#if CITY_KIND == 0
+    float district=.5+.5*sin(id.x*.9+id.y*1.7-bassImpulse*2.8);
+    float occupied=step(.32,hash(floor(vec2(face*5.,q.y*3.8))+id*11.));
+    vec3 light=ink(seed*.6+.18)*rows*occupied*(.24+low*district*1.25);
+    float sweep=exp(-pow(fract(q.y*.12-midImpulse*.10)-.5,2.)*160.);
+    light+=ink(.68)*sweep*mi*.22;
+    float roof=pow(max(n.y,0.),8.)*(.015+.22*hi);
+    vec3 body=vec3(.018,.026,.06)*(.35+.65*max(0.,dot(n,normalize(vec3(-.5,.8,-.4)))));
+    return body+light+ink(.42)*roof;
+#else
+    vec3 body=vec3(.025,.018,.065)*(.3+.7*max(0.,dot(n,normalize(vec3(.6,.9,-.5)))));
+    vec3 light=ink(seed*.7)*rows*(.18+.16*mid+.28*mi);
+    float signPanel=step(abs(q.y-(1.9+seed*1.8)),.24)*step(abs(face),.62);
+    vec2 chart=vec2(face*.7+.5,(q.y-1.9-seed*1.8)*1.5+.5);
+    light+=imageInk(chart,ink(.6+seed*.2))*signPanel*(.65+.55*mi);
+    light+=ink(.1)*exp(-abs(abs(local.x)-(.65+hash(id+8.)*.2))*90.)*hi*.24;
+    return body+light;
 #endif
-    float dist=0.;bool hit=false;vec3 q;
-    for(int i=0;i<64;i++){q=ro+rd*dist;float d=sdf(q);if(d<.0025*(1.+dist*.1)){hit=true;break;}dist+=max(.004,d*.7);if(dist>22.)break;}
-    vec3 c=vec3(.004,.007,.018)+palette(.4)*.025*exp(-length(p));
-    if(hit){vec2 e=vec2(.004,0);vec3 n=normalize(vec3(sdf(q+e.xyy)-sdf(q-e.xyy),sdf(q+e.yxy)-sdf(q-e.yxy),sdf(q+e.yyx)-sdf(q-e.yyx)));
-    float ao=clamp(sdf(q+n*.14)/.14,.18,1.);c=material(q,n,float(VARIANT)+dist*.08)*ao;
-    vec3 reflection=reflect(rd,n);float env=pow(fbm(reflection*3.+vec3(t*.04)),3.);
-#if FAMILY == 4 || FAMILY == 5
-    c=c*.6+palette(env*.4)*env*.75+vec3(pow(max(0.,dot(reflection,normalize(vec3(-.4,.7,-.6)))),50.))*1.2;
+}
+void main(){
+    vec2 p=(2.*gl_FragCoord.xy-resolution)/resolution.y;
+    p-=vec2(focusX-.5,focusY-.5)*.65;p*=.78+scale*.7;
+    vec3 eye,forward;
+#if CITY_KIND == 0
+    // Slow lateral dolly. Bass changes districts, never the horizon or roofs.
+    eye=vec3(travelTime*.18,2.65,-5.5);
+    forward=normalize(vec3(.10+.08*sin(travelTime*.025)*(orbit+.15),.035,1.));
+#else
+    // Camera clearance: |eye.x| <= .46; the nearest facade starts beyond 1.55.
+    float steer=.23*sin(midImpulse*.7)+.12*sin(travelTime*.14);
+    eye=vec3(steer,.85,travelTime*2.2+bassImpulse*pulse*.24);
+    forward=normalize(vec3(.17*sin(midImpulse*.7)+.06*sin(travelTime*.14),.045,1.));
 #endif
-#if FAMILY == 18
-    float windows=step(.65,fract(q.y*7.))*step(.5,fract((q.x+q.z)*8.));c=c*.18+palette(q.y*.2)*windows*(.5+treble)+vec3(.01,.02,.03);
+    vec3 right=normalize(cross(forward,vec3(0,1,0))),up=cross(right,forward);
+    vec3 ray=normalize(forward*1.55+right*p.x+up*p.y);
+    float distance=.01;vec3 q=eye;bool hit=false;
+    for(int i=0;i<86;i++){
+        q=eye+ray*distance;float d=city(q);
+        if(d<.0035*(1.+distance*.04)){hit=true;break;}
+        distance+=max(.004,d*.75);if(distance>55.)break;
+    }
+    vec3 sky=mix(vec3(.055,.018,.11),vec3(.003,.008,.025),smoothstep(-.12,.65,ray.y));
+    sky+=ink(.68)*exp(-abs(ray.y+.025)*20.)*.055;
+    vec3 c=sky;
+    if(hit){
+        float e=.006;vec3 n=normalize(vec3(city(q+vec3(e,0,0))-city(q-vec3(e,0,0)),city(q+vec3(0,e,0))-city(q-vec3(0,e,0)),city(q+vec3(0,0,e))-city(q-vec3(0,0,e))));
+        if(q.y<.025){
+#if CITY_KIND == 0
+            float reflections=pow(.5+.5*sin(q.x*2.7+sin(q.z*5.+midTime*.4)*(.15+warp*.25)),7.);
+            c=vec3(.006,.012,.035)+ink(q.x*.035)*reflections*(.06+.16*bassHit*pulse)*exp(-abs(q.z-3.)*.13);
+            c+=ink(.45)*pow(.5+.5*sin(q.z*21.+trebleTime*.3),20.)*.025;
+#else
+            float lane=exp(-pow((abs(q.x)-.55)*42.,2.));
+            float dash=step(.65,fract(q.z*.5));
+            float traffic=pow(.5+.5*cos(q.z*2.1-trebleTime*10.-trebleImpulse*2.),20.);
+            c=vec3(.012,.016,.028)+ink(.65)*lane*(.08+dash*.10+traffic*(.5+1.2*trebleHit*pulse));
+            c+=ink(.16)*exp(-abs(q.x)*15.)*step(.78,fract(q.z*.38))*(.05+.45*bassHit*pulse);
 #endif
-    float seams=pow(.5+.5*sin(q.x*12.+sin(q.z*9.-trebleTime*5.)+q.y*9.),24.);c+=palette(.8)*seams*.26;
-    c=mix(c,vec3(.005,.01,.025),1.-exp(-dist*.075));}
-    finish(c,p);}
+        }else c=facade(q,n,distance);
+        c=mix(c,sky,1.-exp(-distance*.022));
+    }
+    colour=vec4(clamp(c*(.7+intensity*.8),0.,1.),1.);
+}

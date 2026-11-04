@@ -13,11 +13,13 @@ Bass can drive depth/expansion, mids turns/bends and treble local articulation;
 use integrated phases and momentum where release should slow rather than reverse
 movement. A numerical pixel difference is not proof of musical quality.
 
-Prefer solid/geometric compositions in the direction of Beats in 4D over a
+Prefer solid/geometric compositions in the direction of Dimensional Pulse over a
 particle-heavy show. Keep the retained shortlist. Variants, mirrors/kaleidoscopes,
 image choices and distinct palettes are welcome; disclose shared mechanisms and
 do not count named looks as independent scenes. The active library currently has
-123 scenes and six executable looks per scene.
+203 scenes and six executable looks per scene. Jay accepted the five examples
+and authorised the full eighty additions, now [implemented and ready for review](VISUAL-EIGHTY-20261103.md).
+The [catalogue](IMAGE-INSTRUMENTS.md) records ten families of eight.
 
 ## Images and materials
 
@@ -38,6 +40,23 @@ and effects, and periodically resolve the particles into the complete source ima
 Travel cameras must preserve clearance through structures under strong input.
 
 ## Kaleidoscopes and colour
+
+Jay's latest feedback requests selectable stronger palettes including bright neon,
+less repetition of wavy surface veins across a mix, and particle trajectories
+that continue through complete-image assembly without a full-image pause.
+Palette changes alone do not count as new scenes. The expansion target is around
+200 scenes, with about 80 additions departing from existing formulas. See the
+[ten-family proposal](VISUAL-EXPANSION-203-PROPOSAL.md); its concepts and selection
+rules remain proposed. The five-example checkpoint implements palette selection
+and continuous particle passage; further expansion awaits visual feedback.
+
+Jay subsequently supplied twenty preferred image-using Synesthesia references,
+recorded in that proposal. Give image-driven generation greater priority when
+refining the eighty additions: images can seed evolving systems and shape motion
+or geometry as well as supply visible materials. Existing study associations do
+not establish reference parity; compare characteristic moving behaviour using
+matched inputs. This refines the expansion rather than cancelling its variety,
+stronger palettes, readable-image moments or continuous particle assembly.
 
 Use kaleidoscope treatments especially when a scene has less inherent musical
 movement. Preserve complete-image readability where it is the composition's point;

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "origin": "Retained catalogue plus relief compositions and three complete-image solid instruments",
+  "origin": "Original retained catalogue plus eighty image-driven compositions in ten distinct instrument families",
   "scenes": [
     {
       "key": "original/prism-bloom",
@@ -42,7 +42,7 @@
     },
     {
       "key": "original/beats-in-4d",
-      "title": "Beats in 4D",
+      "title": "Dimensional Pulse",
       "style": "Electric",
       "energy": 0.8,
       "imageReady": true,
@@ -1283,6 +1283,726 @@
       "cutoutReady": true,
       "family": "image-stage",
       "collection": "motion-20261103"
+    },
+    {
+      "key": "original/neon-culture",
+      "title": "Chromaflora",
+      "style": "Electric",
+      "energy": 0.61,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/chromatic-shoal",
+      "title": "Kinetic Bloom",
+      "style": "Electric",
+      "energy": 0.71,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/terrain-prism",
+      "title": "Lucent Ranges",
+      "style": "Prismatic",
+      "energy": 0.51,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/liquid-memory",
+      "title": "Mercurial Echo",
+      "style": "Fluid",
+      "energy": 0.51,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/signal-fracture",
+      "title": "Broken Spectrum",
+      "style": "Electric",
+      "energy": 0.76,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/prism-spores",
+      "title": "Prism Spores",
+      "style": "Electric",
+      "energy": 0.65,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/velvet-mycelium",
+      "title": "Velvet Mycelium",
+      "style": "Electric",
+      "energy": 0.6900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/coral-cipher",
+      "title": "Coral Cipher",
+      "style": "Electric",
+      "energy": 0.61,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/petal-circuit",
+      "title": "Petal Circuit",
+      "style": "Electric",
+      "energy": 0.65,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/ember-orchard",
+      "title": "Ember Orchard",
+      "style": "Electric",
+      "energy": 0.6900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/tidal-lichen",
+      "title": "Tidal Lichen",
+      "style": "Electric",
+      "energy": 0.61,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/lantern-plankton",
+      "title": "Lantern Plankton",
+      "style": "Electric",
+      "energy": 0.65,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "chromatic-organisms"
+    },
+    {
+      "key": "original/ribbon-rookery",
+      "title": "Ribbon Rookery",
+      "style": "Electric",
+      "energy": 0.75,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/aurora-couriers",
+      "title": "Aurora Couriers",
+      "style": "Electric",
+      "energy": 0.79,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/ion-ballet",
+      "title": "Ion Ballet",
+      "style": "Electric",
+      "energy": 0.71,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/scarlet-relay",
+      "title": "Scarlet Relay",
+      "style": "Electric",
+      "energy": 0.75,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/spectral-migration",
+      "title": "Spectral Migration",
+      "style": "Electric",
+      "energy": 0.79,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/halo-caravan",
+      "title": "Halo Caravan",
+      "style": "Electric",
+      "energy": 0.71,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/prismatic-waltz",
+      "title": "Prismatic Waltz",
+      "style": "Electric",
+      "energy": 0.75,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "sprite-particles"
+    },
+    {
+      "key": "original/opaline-dunes",
+      "title": "Opaline Dunes",
+      "style": "Prismatic",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/chromatic-ravine",
+      "title": "Chromatic Ravine",
+      "style": "Prismatic",
+      "energy": 0.5900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/glass-delta",
+      "title": "Glass Delta",
+      "style": "Prismatic",
+      "energy": 0.51,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/cinder-mesa",
+      "title": "Cinder Mesa",
+      "style": "Prismatic",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/sapphire-archipelago",
+      "title": "Sapphire Archipelago",
+      "style": "Prismatic",
+      "energy": 0.5900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/polar-canopy",
+      "title": "Polar Canopy",
+      "style": "Prismatic",
+      "energy": 0.51,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/lucid-escarpment",
+      "title": "Lucid Escarpment",
+      "style": "Prismatic",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "luminous-landscapes"
+    },
+    {
+      "key": "original/satin-vortex",
+      "title": "Satin Vortex",
+      "style": "Fluid",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/pressure-garden",
+      "title": "Pressure Garden",
+      "style": "Fluid",
+      "energy": 0.5900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/chrome-tides",
+      "title": "Chrome Tides",
+      "style": "Fluid",
+      "energy": 0.51,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/oilprint",
+      "title": "Oilprint",
+      "style": "Fluid",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/glass-tremor",
+      "title": "Glass Tremor",
+      "style": "Fluid",
+      "energy": 0.5900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/pearl-undertow",
+      "title": "Pearl Undertow",
+      "style": "Fluid",
+      "energy": 0.51,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/folding-estuary",
+      "title": "Folding Estuary",
+      "style": "Fluid",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "liquid-sculptures"
+    },
+    {
+      "key": "original/prism-datastream",
+      "title": "Prism Datastream",
+      "style": "Electric",
+      "energy": 0.8,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/glass-interlace",
+      "title": "Glass Interlace",
+      "style": "Electric",
+      "energy": 0.8400000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/chromatic-splice",
+      "title": "Chromatic Splice",
+      "style": "Electric",
+      "energy": 0.76,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/afterimage-static",
+      "title": "Afterimage Static",
+      "style": "Electric",
+      "energy": 0.8,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/spectrum-shards",
+      "title": "Spectrum Shards",
+      "style": "Electric",
+      "energy": 0.8400000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/raster-roulette",
+      "title": "Raster Roulette",
+      "style": "Electric",
+      "energy": 0.76,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/circuit-confetti",
+      "title": "Circuit Confetti",
+      "style": "Electric",
+      "energy": 0.8,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "signal-collage"
+    },
+    {
+      "key": "original/fluorescent-nursery",
+      "title": "Fluorescent Nursery",
+      "style": "Fluid",
+      "energy": 0.41000000000000003,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/petri-constellation",
+      "title": "Petri Constellation",
+      "style": "Fluid",
+      "energy": 0.45,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/soma-lanterns",
+      "title": "Soma Lanterns",
+      "style": "Fluid",
+      "energy": 0.49,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/velvet-spores",
+      "title": "Velvet Spores",
+      "style": "Fluid",
+      "energy": 0.41000000000000003,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/luminous-atoll",
+      "title": "Luminous Atoll",
+      "style": "Fluid",
+      "energy": 0.45,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/cellular-lace",
+      "title": "Cellular Lace",
+      "style": "Fluid",
+      "energy": 0.49,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/plasma-orchard",
+      "title": "Plasma Orchard",
+      "style": "Fluid",
+      "energy": 0.41000000000000003,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/living-mosaic",
+      "title": "Living Mosaic",
+      "style": "Fluid",
+      "energy": 0.45,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "cellular-gardens"
+    },
+    {
+      "key": "original/chroma-monsoon",
+      "title": "Chroma Monsoon",
+      "style": "Fluid",
+      "energy": 0.5599999999999999,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/velvet-cyclone",
+      "title": "Velvet Cyclone",
+      "style": "Fluid",
+      "energy": 0.6,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/copper-silt",
+      "title": "Copper Silt",
+      "style": "Fluid",
+      "energy": 0.64,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/iridescent-wake",
+      "title": "Iridescent Wake",
+      "style": "Fluid",
+      "energy": 0.5599999999999999,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/nebula-press",
+      "title": "Nebula Press",
+      "style": "Fluid",
+      "energy": 0.6,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/pigment-carnival",
+      "title": "Pigment Carnival",
+      "style": "Fluid",
+      "energy": 0.64,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/saffron-undertow",
+      "title": "Saffron Undertow",
+      "style": "Fluid",
+      "energy": 0.5599999999999999,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/chromatic-fault",
+      "title": "Chromatic Fault",
+      "style": "Fluid",
+      "energy": 0.6,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "pigment-weather"
+    },
+    {
+      "key": "original/opal-reactor",
+      "title": "Opal Reactor",
+      "style": "Prismatic",
+      "energy": 0.61,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/mercury-cathedral",
+      "title": "Mercury Cathedral",
+      "style": "Prismatic",
+      "energy": 0.65,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/gelatine-satellites",
+      "title": "Gelatine Satellites",
+      "style": "Prismatic",
+      "energy": 0.6900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/aether-nuclei",
+      "title": "Aether Nuclei",
+      "style": "Prismatic",
+      "energy": 0.61,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/chromatic-torso",
+      "title": "Chromatic Torso",
+      "style": "Prismatic",
+      "energy": 0.65,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/liquid-torus",
+      "title": "Liquid Torus",
+      "style": "Prismatic",
+      "energy": 0.6900000000000001,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/velvet-geode",
+      "title": "Velvet Geode",
+      "style": "Prismatic",
+      "energy": 0.61,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/pulse-cocoon",
+      "title": "Pulse Cocoon",
+      "style": "Prismatic",
+      "energy": 0.65,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "soft-volumes"
+    },
+    {
+      "key": "original/hexa-resonator",
+      "title": "Hexa Resonator",
+      "style": "Electric",
+      "energy": 0.71,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/lattice-pilgrimage",
+      "title": "Lattice Pilgrimage",
+      "style": "Electric",
+      "energy": 0.75,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/facet-voyager",
+      "title": "Facet Voyager",
+      "style": "Electric",
+      "energy": 0.79,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/prism-switchboard",
+      "title": "Prism Switchboard",
+      "style": "Electric",
+      "energy": 0.71,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/crystal-pendulum",
+      "title": "Crystal Pendulum",
+      "style": "Electric",
+      "energy": 0.75,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/kinetic-vault",
+      "title": "Kinetic Vault",
+      "style": "Electric",
+      "energy": 0.79,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/octa-current",
+      "title": "Octa Current",
+      "style": "Electric",
+      "energy": 0.71,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/honeylight-causeway",
+      "title": "Honeylight Causeway",
+      "style": "Electric",
+      "energy": 0.75,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "spatial-instruments"
+    },
+    {
+      "key": "original/chromatic-salon",
+      "title": "Chromatic Salon",
+      "style": "Prismatic",
+      "energy": 0.46,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/prism-rosarium",
+      "title": "Prism Rosarium",
+      "style": "Prismatic",
+      "energy": 0.5,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/velvet-apertures",
+      "title": "Velvet Apertures",
+      "style": "Prismatic",
+      "energy": 0.54,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/chroma-escalier",
+      "title": "Chroma Escalier",
+      "style": "Prismatic",
+      "energy": 0.46,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/spectral-carousel",
+      "title": "Spectral Carousel",
+      "style": "Prismatic",
+      "energy": 0.5,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/catoptric-tide",
+      "title": "Catoptric Tide",
+      "style": "Prismatic",
+      "energy": 0.54,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/lenticular-dreams",
+      "title": "Lenticular Dreams",
+      "style": "Prismatic",
+      "energy": 0.46,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
+    },
+    {
+      "key": "original/afterglow-atlas",
+      "title": "Afterglow Atlas",
+      "style": "Prismatic",
+      "energy": 0.5,
+      "imageReady": true,
+      "cutoutReady": true,
+      "family": "optical-memories"
     }
   ]
 }

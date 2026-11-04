@@ -5,6 +5,9 @@
 
 namespace mixworks
 {
+enum class VisualSceneSource { originals=1, milkdrop=2, both=3 };
+VisualSceneSource visualSceneSourceFromId(int);
+juce::String visualSceneSourceName(VisualSceneSource);
 struct VisualControlPoint { double at=0, value=0; };
 struct VisualControlCurve { bool stepped=false; std::vector<VisualControlPoint> points; };
 struct VisualControlSpec { double initial=.5; int steps=0; };
@@ -31,7 +34,7 @@ struct VisualSceneEntry
     std::map<juce::String, double> imageControls;
     std::map<juce::String, VisualControlSpec> controlSpecs;
     std::vector<VisualScenePreset> presets;
-    juce::String family;
+    juce::String family, motif;
 };
 std::map<juce::String,double> visualControlsAt(const VisualSceneClip&, double localTime);
 double visualMotionTime(const VisualSceneClip&, double localTime);
@@ -47,11 +50,11 @@ struct VisualSceneFrame
     const VisualSceneClip* primary() const { return incoming ? incoming : outgoing; }
 };
 std::vector<VisualSceneEntry> discoverVisualScenes(const juce::File& install);
-std::vector<VisualSceneEntry> automaticVisualScenes(const std::vector<VisualSceneEntry>&);
+std::vector<VisualSceneEntry> automaticVisualScenes(const std::vector<VisualSceneEntry>&, VisualSceneSource = VisualSceneSource::originals);
 VisualSceneFrame visualFrameAt(const std::vector<VisualSceneClip>&, double seconds);
 juce::Result validateVisualScenes(const std::vector<VisualSceneClip>&);
 juce::var visualScenesToJson(const std::vector<VisualSceneClip>&);
 juce::Result readVisualScenes(const juce::var&, std::vector<VisualSceneClip>&);
 struct Project;
-juce::Result arrangeVisualScenes(Project&, const std::vector<VisualSceneEntry>&, juce::Random&);
+juce::Result arrangeVisualScenes(Project&, const std::vector<VisualSceneEntry>&, juce::Random&, VisualSceneSource = VisualSceneSource::originals);
 }

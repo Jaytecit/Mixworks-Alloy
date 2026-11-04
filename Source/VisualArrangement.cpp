@@ -1,14 +1,18 @@
 #include "Model.h"
 #include "EnergySections.h"
+#include "MilkDrop.h"
 #include <algorithm>
 #include <cmath>
 #include <map>
 
 namespace mixworks
 {
-juce::Result arrangeVisualScenes(Project& project, const std::vector<VisualSceneEntry>& library, juce::Random& random)
+juce::Result arrangeVisualScenes(Project& project, const std::vector<VisualSceneEntry>& library, juce::Random& random, VisualSceneSource source)
 {
-    auto pool = automaticVisualScenes(library);
+    auto pool = automaticVisualScenes(library,source);
+    const auto hasMilkDrop=[](const auto& entries) { return std::any_of(entries.begin(),entries.end(),[](const auto& e){return isMilkDropKey(e.key);}); };
+    if(source!=VisualSceneSource::originals && !hasMilkDrop(pool))
+        return juce::Result::fail("Import a MilkDrop preset in Visuals / scenes before choosing MilkDrop or Both. The current mix was kept.");
     if (pool.empty()) return juce::Result::fail("No music visual scenes are available. Keep the visual lane or install the scene collection.");
     if (project.clips.empty()) return juce::Result::fail("Add music before matching visual scenes.");
     const auto transitions = project.validateTransitionLinks(); if (transitions.failed()) return transitions;
@@ -156,30 +160,44 @@ juce::Result arrangeVisualScenes(Project& project, const std::vector<VisualScene
     const juce::String family=mean<.4 ? "Fluid" : mean>.65 ? "Electric" : "Prismatic";
     if (project.visualImage.isNotEmpty())
     {
-        pool.erase(std::remove_if(pool.begin(),pool.end(),[](const auto& entry) { return !entry.imageReady; }),pool.end());
+        pool.erase(std::remove_if(pool.begin(),pool.end(),[](const auto& entry) { return !entry.imageReady && !isMilkDropKey(entry.key); }),pool.end());
         if (pool.empty()) return juce::Result::fail("No image-integrating scenes are available in this collection.");
     }
+    const bool hasOriginals=std::any_of(pool.begin(),pool.end(),[](const auto& e){return !isMilkDropKey(e.key);});
+    if(source==VisualSceneSource::both && !hasOriginals)
+        return juce::Result::fail("Both needs original scenes as well as imported MilkDrop presets. The current mix was kept.");
     std::map<juce::String,int> sceneUses, transitionUses;
-    const bool hasSolidScenes=std::any_of(pool.begin(),pool.end(),[](const auto& e){return e.family!="sprite-particles";});
+    std::vector<juce::String> recentFamilies, recentMotifs;
+    const bool hasSolidScenes=std::any_of(pool.begin(),pool.end(),[](const auto& e){return !isMilkDropKey(e.key) && e.family!="sprite-particles";});
     std::vector<VisualSceneClip> result;
     for (size_t i = 0; i < songs.size(); ++i)
     {
         size_t selected=0; double best=1.e9;
         for (size_t n=0;n<pool.size();++n)
         {
+            // Balance engines before choosing a look within each engine. A large
+            // owned library must not crowd a few imports out of a short show.
+            if(source==VisualSceneSource::both && isMilkDropKey(pool[n].key)!=(i%2==1)) continue;
             // Particle scenes are occasional accents, at most one in five when
             // solid/image choices exist. Manual access to every scene remains.
             if (hasSolidScenes && pool[n].family=="sprite-particles" && i%5!=4) continue;
-            const double score=sceneUses[pool[n].key]*2+std::abs(pool[n].energy-songs[i]->energy)+random.nextDouble()*.18
+            double repetition=0.;
+            for(size_t age=0;age<recentFamilies.size() && age<8;++age) {
+                const auto previous=recentFamilies.size()-1-age;
+                if(pool[n].family.isNotEmpty() && pool[n].family==recentFamilies[previous]) repetition+=age==0?8.:2.2/(1.+age*.3);
+                if(pool[n].motif.isNotEmpty() && pool[n].motif==recentMotifs[previous]) repetition+=2.4/(1.+age*.25);
+            }
+            const double score=sceneUses[pool[n].key]*2+repetition+std::abs(pool[n].energy-songs[i]->energy)+random.nextDouble()*.18
                 +(pool[n].style==family ? 0 : .15)
                 +(!result.empty() && pool[n].key==result.back().scene && pool.size()>1 ? 2 : 0);
             if (score<best) { best=score; selected=n; }
         }
         const auto& entry = pool[selected];
+        recentFamilies.push_back(entry.family); recentMotifs.push_back(entry.motif);
         ++sceneUses[entry.key];
         VisualSceneClip scene; scene.scene = entry.key; scene.title = entry.title;
         scene.style=entry.style.isEmpty() ? "Varied" : entry.style;
-        if (project.visualImage.isNotEmpty()) scene.controls=entry.imageControls;
+        if (project.visualImage.isNotEmpty() && !isMilkDropKey(entry.key)) scene.controls=entry.imageControls;
         scene.start = i==0 ? begin : windows[i-1].getStart();
         scene.length = (i+1==songs.size() ? end : windows[i].getEnd())-scene.start;
         automateVisualScene(scene,entry,songs[i]->energy,random);
@@ -221,6 +239,8 @@ juce::Result arrangeVisualScenes(Project& project, const std::vector<VisualScene
             // Extended track handovers need a direct blend, including filtered
             // music transitions. Keep spatial reveals for short section changes.
             if (window.getLength()>4. || beats>8.) scene.transition="dissolve";
+            if((isMilkDropKey(scene.scene) || isMilkDropKey(result.back().scene))
+                && scene.transition!="dissolve" && scene.transition!="zoom" && scene.transition!="cut") scene.transition="dissolve";
             ++transitionUses[scene.transition];
             if (swap && window.getLength()>0)
                 scene.pivot=juce::jlimit(.05,.95,(((*swap)[0]+(*swap)[1])*.5-window.getStart())/window.getLength());

@@ -50,6 +50,7 @@ def main():
     parser.add_argument('--height', type=int, default=720)
     parser.add_argument('--owner-pid', type=int, default=0)
     parser.add_argument('--original', action='store_true')
+    parser.add_argument('--milkdrop-library', type=Path)
     args = parser.parse_args()
     # Bind locally before loading OpenGL; parent sees readiness or a startup error.
     with socket.socket() as server:
@@ -89,7 +90,8 @@ def main():
                         try:
                             if player is None:
                                 from original_scene_player import OriginalScenePlayer
-                                player = OriginalScenePlayer(args.renderer_root, args.install, args.width, args.height, args.owner_pid)
+                                player = OriginalScenePlayer(args.renderer_root, args.install, args.width, args.height, args.owner_pid,
+                                                             milkdrop_library=args.milkdrop_library)
                                 # Import/context startup can take seconds. Drop the old
                                 # request and let Alloy submit its current clock/PCM.
                                 send(connection, dict(ok=True, initialised=True))

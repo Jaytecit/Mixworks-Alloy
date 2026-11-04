@@ -89,13 +89,10 @@ void main(){
  vec2 stream=vec2(sin(home.y*8.+midImpulse*2.),cos(home.x*7.-trebleImpulse*2.));
  target+=stream*d*(.22+.65*m)+tangent*d*b*.7;
  force+=stream*(midHit*.9+trebleHit*.5)*pulse;
- // Each 16-beat phrase recalls the complete source; eased hold then release.
- float phase=mod(projectBeat,16.);
- float recall=smoothstep(9.,12.,phase)*(1.-smoothstep(14.,16.,phase));
- target=mix(target,home,recall);force*=1.-recall;
- spring=mix(spring,32.,recall);drag=mix(drag,10.,recall);
+ // Keep the physical flock moving; the display crosses its source plane.
+
  // Source-derived edge/colour forces and persistent damping; no frame history blur.
- force+=safe(grad+vec2(.001))*hi*edge*d*.6*(1.-recall);
+ force+=safe(grad+vec2(.001))*hi*edge*d*.6;
  float dt=stepDelta*(.35+1.3*motion);
  v=(v+(spring*(target-p)+force)*dt*(.15+.85*generationBlend))*exp(-drag*dt);
  float speed=length(v);v*=min(1.,.8/max(.001,speed));p+=v*dt;

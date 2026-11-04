@@ -6,6 +6,7 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--runtime',type=Path,required=True);ap.add_argument('--out',type=Path,required=True)
     ap.add_argument('--music',type=Path,required=True)
+    ap.add_argument('--image',type=Path,help='Explicit owned review artwork instead of the configured media pool')
     ap.add_argument('--only-preset',help='Generate only this named look after a targeted correction')
     ap.add_argument('--scene',action='append',help='Only these scene slugs for a scoped correction')
     args=ap.parse_args();args.out.mkdir(parents=True,exist_ok=False)
@@ -28,7 +29,7 @@ def main():
                 for frame in range(39):
                     t=frame/15;end=round(t*44100);block=pcm[max(0,end-2048):end]
                     q=dict(protocol=6,position=t,beat=(112+t-.200405)*121.98/60,bpm=121.98,rate=44100,
-                        generation=1,mix=0.,image='',capture=frame==38,pcm=base64.b64encode(block.tobytes()).decode(),
+                        generation=1,mix=0.,image=str(args.image.resolve()) if args.image else '',capture=frame==38,pcm=base64.b64encode(block.tobytes()).decode(),
                         scenes=[dict(clip='reference',scene=key,revision=preset['id'],time=t,controls=preset['controls'])])
                     facts,raw=p.render(q);assert facts['ok'] and not facts.get('mediaError'),facts
                 im=Image.frombytes('RGBA',(640,360),raw,'raw','BGRA').transpose(Image.Transpose.FLIP_TOP_BOTTOM).convert('RGB')

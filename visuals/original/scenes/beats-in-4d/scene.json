@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "key": "original/beats-in-4d",
-  "title": "Beats in 4D",
+  "title": "Dimensional Pulse",
   "author": "M\u00e5rten R\u00e5nge; Alloy adaptation",
   "license": "CC0-1.0",
   "controls": {
@@ -130,6 +130,21 @@
       "default": 0.2,
       "label": "Soft highlight glow",
       "type": "continuous"
+    },
+    "paletteStyle": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "choice",
+      "steps": 8,
+      "label": "Colour palette"
+    },
+    "paletteAmount": {
+      "min": 0,
+      "max": 1,
+      "default": 1.0,
+      "type": "continuous",
+      "label": "Palette amount"
     }
   },
   "passSchema": 1,
@@ -181,7 +196,9 @@
         "materialMotion": 0.35,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.2
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -206,7 +223,9 @@
         "materialMotion": 0.4,
         "materialMode": 0.3333333333333333,
         "viewPattern": 0.0,
-        "finishGlow": 0.24
+        "finishGlow": 0.24,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -231,7 +250,9 @@
         "materialMotion": 0.7,
         "materialMode": 0.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.32
+        "finishGlow": 0.32,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -256,7 +277,9 @@
         "materialMotion": 0.65,
         "materialMode": 0.6666666666666666,
         "viewPattern": 0.0,
-        "finishGlow": 0.18
+        "finishGlow": 0.18,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -281,7 +304,9 @@
         "materialMotion": 0.8,
         "materialMode": 1.0,
         "viewPattern": 0.0,
-        "finishGlow": 0.27
+        "finishGlow": 0.27,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     },
     {
@@ -306,7 +331,9 @@
         "materialMotion": 0.55,
         "materialMode": 0.3333333333333333,
         "viewPattern": 0.75,
-        "finishGlow": 0.38
+        "finishGlow": 0.38,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0
       }
     }
   ],

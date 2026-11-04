@@ -2,6 +2,7 @@
 #include "UiMessages.h"
 #include "AutoArrangement.h"
 #include "Beatmatch.h"
+#include "MilkDrop.h"
 #include <cmath>
 #include <climits>
 #include <set>
@@ -48,6 +49,11 @@ void Workstation::showAutoArrangement()
     dialog->addComboBox("visuals", {"Create automatic visual show", "Keep visual lane"}, "Visuals");
     dialog->getComboBoxComponent("visuals")->setSelectedItemIndex(engine.project.visualScenes.empty() ? 0 : 1, juce::dontSendNotification);
     dialog->getComboBoxComponent("visuals")->setTooltip("Choose a coherent visual family and transitions following music handovers. Uses the image selected in Visuals / scenes. Replaces existing visual blocks.");
+    dialog->addComboBox("visualSources", {"Originals", "MilkDrop", "Both"}, "Scene sources");
+    dialog->getComboBoxComponent("visualSources")->setSelectedId((int)visualSceneSourceFromId((int)getProperties().getWithDefault("visualSceneSource",1)),juce::dontSendNotification);
+    dialog->getComboBoxComponent("visualSources")->setTooltip("Use original scenes, your imported MilkDrop presets, or a balanced mix of both. Images apply to original scenes; imported presets keep their own appearance.");
+    dialog->getComboBoxComponent("visualSources")->onChange=[safe=juce::Component::SafePointer<Workstation>(this),dialog]
+    { if(safe) safe->getProperties().set("visualSceneSource",dialog->getComboBoxComponent("visualSources")->getSelectedId()); };
     dialog->getTextEditor("amount")->setInputRestrictions(7, "0123456789.");
     dialog->getComboBoxComponent("mode")->onChange = [dialog, previousMode = dialog->getComboBoxComponent("mode")->getSelectedItemIndex()]() mutable
     {
@@ -69,6 +75,7 @@ void Workstation::showAutoArrangement()
         const bool extend = dialog->getComboBoxComponent("action")->getSelectedItemIndex() == 1;
         dialog->getComboBoxComponent("start")->setEnabled(!extend);
         const bool visuals = dialog->getComboBoxComponent("visuals")->getSelectedItemIndex() == 0;
+        dialog->getComboBoxComponent("visualSources")->setEnabled(visuals);
         dialog->setMessage((extend ? "Add songs after the existing mix. "
             : "Replace the current music arrangement. ") + juce::String(visuals
             ? "Replace visual blocks with scenes blended across music transitions."
@@ -77,11 +84,11 @@ void Workstation::showAutoArrangement()
         dialog->getTextEditor("amount")->setTooltip(extend ? "Additional songs or additional minutes. Total mix limit: 180 minutes." : "Songs or total minutes for the new mix.");
         // AlertWindow caps its height to the display, but retains fixed 50px rows.
         // Own the form spacing within that available area so every field remains usable.
-        const std::array<juce::Component*,8> fields {dialog->getComboBoxComponent("action"), dialog->getComboBoxComponent("start"),
+        const std::array<juce::Component*,9> fields {dialog->getComboBoxComponent("action"), dialog->getComboBoxComponent("start"),
             dialog->getComboBoxComponent("mode"), dialog->getTextEditor("amount"), dialog->getComboBoxComponent("transitions"),
-            dialog->getComboBoxComponent("energy"), dialog->getComboBoxComponent("genre"), dialog->getComboBoxComponent("visuals")};
+            dialog->getComboBoxComponent("energy"), dialog->getComboBoxComponent("genre"), dialog->getComboBoxComponent("visuals"),dialog->getComboBoxComponent("visualSources")};
         const int firstY=fields.front()->getY();
-        const int step=std::min(50,(dialog->getButton(0)->getY()-12-firstY-fields.back()->getHeight())/7);
+        const int step=std::min(50,(dialog->getButton(0)->getY()-12-firstY-fields.back()->getHeight())/8);
         for (size_t i=0;i<fields.size();++i) fields[i]->setTopLeftPosition(fields[i]->getX(),firstY+(int)i*step);
     };
     dialog->getComboBoxComponent("visuals")->onChange = [dialog] { dialog->getComboBoxComponent("action")->onChange(); };
@@ -98,6 +105,7 @@ void Workstation::showAutoArrangement()
         { safe->setStatus("Enter a positive whole song count, or minutes up to 180. The current mix was kept."); return; }
         AutoArrangementOptions options;
         options.createVisualScenes = dialog->getComboBoxComponent("visuals")->getSelectedItemIndex() == 0;
+        options.visualSceneSource=visualSceneSourceFromId(dialog->getComboBoxComponent("visualSources")->getSelectedId());
         options.extendExisting = dialog->getComboBoxComponent("action")->getSelectedItemIndex() == 1;
         if (options.extendExisting && before != juce::JSON::toString(projectToJson(safe->engine.project)))
         { safe->setStatus("The arrangement changed. Open Auto Arrange again before extending it."); return; }
@@ -122,7 +130,10 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
         || engine.automationRecordMode != AutomationRecordMode::read))
     { setStatus("Choose an existing arrangement, stop rehearsal and finish automation in Read before extending."); return; }
     const auto visualLibrary = sceneLane ? sceneLane->catalogue() : std::vector<VisualSceneEntry>();
-    if (options.createVisualScenes && automaticVisualScenes(visualLibrary).empty())
+    if(options.createVisualScenes && options.visualSceneSource!=VisualSceneSource::originals
+        && (!milkDropRendererAvailable() || automaticVisualScenes(visualLibrary,VisualSceneSource::milkdrop).empty()))
+    { setStatus("Import a MilkDrop preset in Visuals / scenes and install MilkDrop support before choosing MilkDrop or Both. The current mix was kept."); return; }
+    if (options.createVisualScenes && automaticVisualScenes(visualLibrary,options.visualSceneSource).empty())
     { setStatus("No music visual scenes are available. Choose Keep visual lane to arrange only music."); return; }
     const auto original = engine.project;
     const auto before = options.extendExisting ? juce::JSON::toString(projectToJson(original)) : juce::String();
@@ -229,11 +240,11 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
         {
             juce::Random visualRandom;
             result.project.visualImage=original.visualImage;
-            const auto visuals = arrangeVisualScenes(result.project, visualLibrary, visualRandom);
+            const auto visuals = arrangeVisualScenes(result.project, visualLibrary, visualRandom,options.visualSceneSource);
             if (visuals.failed()) result.error = visuals.getErrorMessage();
-            else result.summary += " Visuals: " + juce::String((int)result.project.visualScenes.size()) + " scenes in "
-                + result.project.visualScenes.front().style + " style, with music-matched transitions"
-                + juce::String(original.visualImage.isNotEmpty() ? " and your image inside the scenes." : ".");
+            else result.summary += " Visuals: " + juce::String((int)result.project.visualScenes.size()) + " scenes / "
+                + visualSceneSourceName(options.visualSceneSource) + ", with music-matched transitions"
+                + juce::String(original.visualImage.isNotEmpty() && options.visualSceneSource!=VisualSceneSource::milkdrop ? " and your image inside original scenes." : ".");
         }
         juce::MessageManager::callAsync([safe, cancelled, result = std::move(result), energyUpdates = std::move(energyUpdates), options, before, prefix = original.clips.size()]() mutable
         {
