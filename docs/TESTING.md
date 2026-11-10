@@ -1,5 +1,15 @@
 # Proportionate testing
 
+10 November .90 repairs the shared native export-test stack frame using heap
+owners (121,424 bytes, previously 876,416; the 1 MiB process stack is unchanged).
+Final export57, destination111, export-target75, bars34, live74 and seek90 pass
+serially through retained checks, stress off. `--bar-navigation-only` runs the
+bounded native bar-menu/tempo/guard/history checks without the broader timeline
+suite. The live selector now probes actual callback PCM at bar-jump UI refresh
+as well as node editing, retaining its held-lock negative control. The .89 bar32/2
+fixture failures survive separately; final setup explicitly uses the movement
+lock and canonical effect controls. See [Handover](../HANDOVER.md).
+
 10 November .88 focused checkpoint: menu11, seek90, live72, Studio26, composite94,
 shaped105 and bridge39 passed, plus actual GL24 and live bridge45. Normal UI WAV
 export/reopen/PCM and actual large-library menu response were demonstrated. The

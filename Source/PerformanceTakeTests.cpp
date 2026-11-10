@@ -139,6 +139,8 @@ void runPerformanceTakeParserTests(const std::function<void(bool,const juce::Str
 }
 void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>& check,const juce::File& report)
 {
+    // This dispatcher shares one native stack frame across its branches. Keep
+    // large UI/engine owners on the heap so chooser calls have stack headroom.
     if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--mode-seek-ui-only") || juce::JUCEApplicationBase::getCommandLineParameters().contains("--take-seek-lifecycle-only"))
     {
         auto owned=std::make_unique<Workstation>(false); auto& ui=*owned; ui.stopTimer(); ui.setSize(1250,800); ui.engine.prepareRender(8000,128);
@@ -300,7 +302,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
         || juce::JUCEApplicationBase::getCommandLineParameters().contains("--destination-safety-only")
         || juce::JUCEApplicationBase::getCommandLineParameters().contains("--save-export-workflow-only"))
     {
-        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800); ui.engine.prepareRender(8000,128);
+        auto ownedUi = std::make_unique<Workstation>(false); auto& ui = *ownedUi; ui.stopTimer(); ui.setSize(1250,800); ui.engine.prepareRender(8000,128);
         ui.workspacePreference = report.getSiblingFile("save-folder-workspace.json");
         ui.layout.saveFolder = report.getSiblingFile("save-outputs").getFullPathName();
         auto pump=[]
@@ -666,7 +668,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
     }
     if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--private-popup-only"))
     {
-        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800);
+        auto ownedUi = std::make_unique<Workstation>(false); auto& ui = *ownedUi; ui.stopTimer(); ui.setSize(1250,800);
         auto pump=[]
         {
             const auto until=juce::Time::getMillisecondCounterHiRes()+40;
@@ -760,7 +762,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
     }
     if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--performance-take-ui-only"))
     {
-        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800);
+        auto ownedUi = std::make_unique<Workstation>(false); auto& ui = *ownedUi; ui.stopTimer(); ui.setSize(1250,800);
         auto pump=[]
         {
             const auto until=juce::Time::getMillisecondCounterHiRes()+40;
@@ -859,10 +861,10 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
     media->analysis.bpm=120; media->analysis.tempoConfidence=1; media->analysis.key=0; media->analysis.keyConfidence=1; media->analysis.downbeatOrigin=0;
     media->analysisSource={audioDigest(media->file),media->file.getSize(),rate,frames,2}; media->peaks.resize(4000,.2f);
     check(writeAnalysisRecord(media->file,media->analysisRecord()).isEmpty(),"isolated performance source reuses analysis on reopen");
-    Engine engine({},false); engine.prepareRender(rate,block); engine.project.masterDb=0; engine.library={media};
+    auto engineOwner = std::make_unique<Engine>(juce::File{}, false); auto& engine = *engineOwner; engine.prepareRender(rate,block); engine.project.masterDb=0; engine.library={media};
     Clip clip; clip.media=media; clip.length=2; engine.project.clips={clip}; engine.prepareClipProcessing(); engine.selectedClip=clip.id;
     {
-        Engine capture({},false); capture.prepareRender(rate,block); capture.library={media}; capture.project.clips={clip}; capture.prepareClipProcessing();
+        auto captureOwner = std::make_unique<Engine>(juce::File{}, false); auto& capture = *captureOwner; capture.prepareRender(rate,block); capture.library={media}; capture.project.clips={clip}; capture.prepareClipProcessing();
         const auto started=capture.beginPerformance();
         check(started.wasOk(),"start isolated synthetic-audio capture for the snapshot admission guard: "+started.getErrorMessage());
         if (started.wasOk())
@@ -910,7 +912,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
     check(seeked && seekError<1.e-6,"seeking reconstructs preceding controls and source-jump history before rendering");
     std::unique_ptr<juce::AudioFormatReader> live(engine.formats.createReaderFor(engine.masterRecordingDestination));
     check(live && live->lengthInSamples==(int64_t)heard.size(),"bounded live writer finalises the exact captured frame count");
-    Engine reopened({},false); reopened.prepareRender(rate,block); const auto saved=juce::JSON::toString(engine.captureProject());
+    auto reopenedOwner = std::make_unique<Engine>(juce::File{}, false); auto& reopened = *reopenedOwner; reopened.prepareRender(rate,block); const auto saved=juce::JSON::toString(engine.captureProject());
     check(reopened.restoreProject(saved).isEmpty() && reopened.project.performanceTakes.size()==1,"current session saves/reopens both arrangement and editable chronology");
     auto exportTake=reopened.prepareTakeReplay(0,error);
     if (exportTake) { const auto written=exportTake->writeWav(report.getSiblingFile("take-export.wav"),{}); check(written.wasOk() && written.writtenFrames==take.frames,"offline take WAV uses the same event renderer and duration: "+written.error); }
@@ -925,7 +927,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
     auto malformed=takeToJson(take); malformed.getDynamicObject()->setProperty("initial",engine.captureProject()); PerformanceTake rejected;
     check(readTake(malformed,rejected).failed(),"nested take snapshots cannot recursively expand session parsing");
     {
-        Engine cue({},false); cue.prepareRender(rate,block); cue.library={media}; cue.project.clips={clip}; cue.project.masterDb=0; cue.project.launch.timing=LaunchTiming::nextBeat;
+        auto cueOwner = std::make_unique<Engine>(juce::File{}, false); auto& cue = *cueOwner; cue.prepareRender(rate,block); cue.library={media}; cue.project.clips={clip}; cue.project.masterDb=0; cue.project.launch.timing=LaunchTiming::nextBeat;
         auto* volume=cue.project.curve({0,AutomationTarget::volume,{},{},clip.id}); volume->enabled=true; volume->setPoint(0,0); volume->setPoint(2,-6);
         check(cue.project.putHotcue(clip.id,0,0).wasOk(),"save a real source cue for the ending-boundary performance fixture");
         cue.prepareClipProcessing(); cue.setWorkMode(WorkMode::recordPerform); cue.setPlaying(true); std::vector<float> heardCue;
@@ -940,7 +942,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
         check(render && delta<1.e-6,"audible hotcue/source repetition and original-track automation replay identically through the old ending: "+error+" / "+juce::String(delta,9));
     }
     {
-        Engine launch({},false); launch.prepareRender(rate,block); launch.library={media}; launch.project.clips={clip}; launch.project.masterDb=0; launch.project.launch.timing=LaunchTiming::nextBeat; launch.prepareClipProcessing();
+        auto launchOwner = std::make_unique<Engine>(juce::File{}, false); auto& launch = *launchOwner; launch.prepareRender(rate,block); launch.library={media}; launch.project.clips={clip}; launch.project.masterDb=0; launch.project.launch.timing=LaunchTiming::nextBeat; launch.prepareClipProcessing();
         PrivatePreparation preparation(launch); check(preparation.prepareTrack(clip.id).wasOk() && preparation.setControl({0,AutomationTarget::volume,{},{},clip.id},-18).wasOk(),"prepare an independent private control treatment for explicit launch"); preparation.seek(.1);
         launch.setWorkMode(WorkMode::recordPerform); launch.setPlaying(true); check(preparation.apply(true).wasOk(),"private edits queue explicitly for the next programme beat");
         std::vector<float> heardLaunch; juce::AudioBuffer<float> pcm(2,block); float* channels[]{pcm.getWritePointer(0),pcm.getWritePointer(1)};
@@ -950,7 +952,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
         check(render && delta<1.e-6,"private launch snapshot, cue clock and take events share the audible commit path: "+error+" / "+juce::String(delta,9));
     }
     {
-        Engine failure({},false); failure.prepareRender(rate,block); failure.library={media}; failure.project.clips={clip}; failure.project.masterDb=0; failure.prepareClipProcessing();
+        auto failureOwner = std::make_unique<Engine>(juce::File{}, false); auto& failure = *failureOwner; failure.prepareRender(rate,block); failure.library={media}; failure.project.clips={clip}; failure.project.masterDb=0; failure.prepareClipProcessing();
         failure.setWorkMode(WorkMode::recordPerform); failure.setPlaying(true);
         check(failure.masterRecorder.start(report.getSiblingFile("incomplete-master.wav"),rate,32).wasOk(),"open a tiny bounded writer failure fixture");
         juce::AudioBuffer<float> output(2,block); float* channels[]{output.getWritePointer(0),output.getWritePointer(1)};
@@ -959,7 +961,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
         failure.stop(); check(!failure.project.performanceTakes[0].complete && failure.project.performanceTakes[0].issue.contains("Incomplete master WAV"),"failed writer retains partial WAV and marks the take visibly incomplete");
     }
     {
-        Engine routing({},false); routing.devices.addAudioDeviceType(std::make_unique<FourChannelType>());
+        auto routingOwner = std::make_unique<Engine>(juce::File{}, false); auto& routing = *routingOwner; routing.devices.addAudioDeviceType(std::make_unique<FourChannelType>());
         check(routing.devices.initialise(0,2,nullptr,false,"Interface").isEmpty(),"open only fake four-channel interface");
         routing.prepareRender(rate,block); routing.library={media}; routing.project.clips={clip}; routing.project.masterDb=0; routing.prepareClipProcessing();
         LibraryPreview preview(routing); preview.inventory.addAudioDeviceType(std::make_unique<FourChannelType>()); preview.setPrivateOutput(true); PrivateConstant privateAudio;
@@ -979,7 +981,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
         check(at>=0 && at+1<args.size(),"finite VST fixture supplied for continuous shared automation");
         if (at>=0 && at+1<args.size())
         {
-            Engine fx({},false); fx.prepareRender(rate,block); fx.library={media}; fx.project.masterDb=0; auto source=clip; source.length=.5; fx.project.clips={source}; fx.selectedClip=source.id;
+            auto fxOwner = std::make_unique<Engine>(juce::File{}, false); auto& fx = *fxOwner; fx.prepareRender(rate,block); fx.library={media}; fx.project.masterDb=0; auto source=clip; source.length=.5; fx.project.clips={source}; fx.selectedClip=source.id;
             const auto loaded=fx.addPlugin(0,juce::File(args[at+1].unquoted())); check(loaded.isEmpty(),"load existing real finite-delay VST: "+loaded);
             if (loaded.isEmpty())
             {
@@ -998,7 +1000,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
                 fx.project.clips[0]=source.slice(0,.1); fx.project.clips[1]=source.slice(.3,.2); fx.project.clips[1].id=last.id;
                 const auto gap=render(block); check(gap.getMagnitude(0,1600,600)>.001f,"finite VST state continues through a deleted source gap");
                 auto duplicate=last; duplicate.id=juce::Uuid().toString(); const auto copied=fx.cloneClipEffects(duplicate); check(copied.isEmpty() && duplicate.effects!=last.effects,"independent placements clone the original controls and processors");
-                auto saved=fx.captureProject(); Engine roundtrip({},false); roundtrip.prepareRender(rate,block); const auto opened=roundtrip.restoreProject(juce::JSON::toString(saved));
+                auto saved=fx.captureProject(); auto roundtripOwner = std::make_unique<Engine>(juce::File{}, false); auto& roundtrip = *roundtripOwner; roundtrip.prepareRender(rate,block); const auto opened=roundtrip.restoreProject(juce::JSON::toString(saved));
                 check(opened.isEmpty() && roundtrip.project.clips.size()==2 && effectsIdentity(roundtrip.project.clips[0].effects)==effectsIdentity(source.effects)
                     && roundtrip.project.curve({0,AutomationTarget::volume,{},{},roundtrip.project.clips[0].id})==roundtrip.project.curve({0,AutomationTarget::volume,{},{},roundtrip.project.clips[1].id}),"original owner identity and built-in/VST sharing survive save/reopen: "+opened);
                 fx.setWorkMode(WorkMode::recordPerform); fx.setPlaying(true);
@@ -1021,7 +1023,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
             }
         }
     }
-    Workstation ui(false); ui.stopTimer(); ui.setSize(1440,900);
+    auto ownedUi = std::make_unique<Workstation>(false); auto& ui = *ownedUi; ui.stopTimer(); ui.setSize(1440,900);
     auto capture=[&](const juce::String& name) { auto image=ui.createComponentSnapshot(ui.getLocalBounds()); juce::PNGImageFormat png; auto stream=report.getSiblingFile(name+".png").createOutputStream(); return stream && png.writeImageToStream(image,*stream); };
     check(capture("arrange-mode"),"capture actual Arrange controls"); ui.engine.setWorkMode(WorkMode::recordPerform); ui.workModeButton.setButtonText("Record/Perform");
     check(capture("record-perform-mode"),"capture actual Record/Perform controls");

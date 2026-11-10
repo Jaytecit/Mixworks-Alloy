@@ -23,6 +23,11 @@ repeat/crop/replace, unlink and loop-marker prerequisites.
 | Invalid loop end | Mark a start, then an end later in the same segment. |
 | Menu target removed or document changed | Select the current audio and reopen the menu. |
 
+Mix-bar jumps and track moves also recheck busy/export admission. Direct commands
+name the operation to finish or the export to finish/cancel, without a popup or
+partial edit; export disables their menu groups. Missing track selection asks for
+a selection. The .90 focused bar suite verifies these status/atomicity paths.
+
 Transition preset replacement separately names the pair, affected parameter and
 time range, preserves exterior nodes and mixer-lane curves, and offers Cancel.
 Confirmation checks for a changed target/document and a newly unavailable state.

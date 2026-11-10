@@ -14,6 +14,7 @@ void runMilkDropTests(const std::function<void(bool,const juce::String&)>&,const
 void runOriginalPlaybackTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runPerformanceTakeParserTests(const std::function<void(bool,const juce::String&)>&);
+void runBarNavigationTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runTargetedAnalysisTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runImportScanTests(const std::function<void(bool,const juce::String&)>&, const juce::File&, const juce::StringArray&);
 void runLibraryStartupTests(const std::function<void(bool,const juce::String&)>&, const juce::File&);
@@ -96,6 +97,12 @@ int runSelfTests(const juce::String& commandLine)
     analysisStoreRoot(testRoot.getSiblingFile(testRoot.getFileName() + "-analysis"));
     auto check = [&](bool condition, const juce::String& name) { ++tests; if (!condition) ++failures; report += juce::String(condition ? "PASS " : "FAIL ") + name + "\n"; output.replaceWithText(report); };
     auto near = [](double a, double b, double tolerance = 0.0001) { return std::abs(a - b) < tolerance; };
+    if (args.contains("--bar-navigation-only"))
+    {
+        runBarNavigationTests(check,output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
     if (args.contains("--recovery-only"))
     {
         runRecoveryTests(check, output);

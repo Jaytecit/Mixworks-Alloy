@@ -15,7 +15,7 @@ bool validStep(int bars, int direction) { return (bars == 4 || bars == 8 || bars
 void Workstation::addBarMenus(juce::PopupMenu& menu, bool moveTrack)
 {
     const auto* clip = currentClip();
-    const bool ready = !busy && pendingTempo <= 0 && !tempoPreparationPending && !engine.project.hasPendingPlacement();
+    const bool ready = !busy && !engine.exporting && pendingTempo <= 0 && !tempoPreparationPending && !engine.project.hasPendingPlacement();
     const bool enabled = ready && (moveTrack ? clip && !clip->media->sourceDetailsPending && !engine.project.clipTransitionLocked(clip->id) : engine.project.audibleEnd() > 0);
     menu.addSeparator();
     for (int direction : {-1, 1})
@@ -35,21 +35,32 @@ bool Workstation::performBarMenuAction(int id)
 }
 void Workstation::jumpBars(int bars, int direction)
 {
-    if (!validStep(bars, direction) || busy) return;
+    if (!validStep(bars, direction)) return;
+    if (engine.exporting) { setStatus("Finish or cancel export before jumping by mix bars."); return; }
+    if (busy) { setStatus("Wait for the current operation before jumping by mix bars."); return; }
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement())
     { setStatus("Wait for preparation before jumping by mix bars."); return; }
-    const juce::ScopedLock guard(engine.lock);
-    const auto clock = engine.project.gridClock();
-    const double target = clock.timeAtBeat(clock.beatsAt(engine.position) + direction * bars * 4.);
+    double target = 0, end = 0;
+    {
+        const juce::ScopedLock guard(engine.lock);
+        const auto clock = engine.project.gridClock();
+        target = clock.timeAtBeat(clock.beatsAt(engine.position) + direction * bars * 4.);
+        end = engine.project.audibleEnd();
+    }
     if (!std::isfinite(target)) { setStatus("This bar position is unavailable."); return; }
-    const double destination = juce::jlimit(0., engine.project.audibleEnd(), target);
+    const double destination = juce::jlimit(0., end, target);
+    // Destination preparation owns its snapshot/publication locks. View changes
+    // and notification must never retain a caller's audio render lock.
     if (engine.seek(destination).failed()) return;
     viewport.setViewPosition(std::max(0, (int) (destination * timeline.pixelsPerSecond) - viewport.getViewWidth() / 2), viewport.getViewPositionY());
     setStatus(juce::String(engine.seekPending ? "Preparing " : "Jumped ") + juce::String(bars) + " mix bars " + (direction < 0 ? "backward." : "forward.")); refresh();
 }
 void Workstation::moveTrackBars(int bars, int direction)
 {
-    if (!validStep(bars, direction) || busy || !currentClip()) return;
+    if (!validStep(bars, direction)) return;
+    if (engine.exporting) { setStatus("Finish or cancel export before moving tracks by bars."); return; }
+    if (busy) { setStatus("Wait for the current operation before moving tracks by bars."); return; }
+    if (!currentClip()) { setStatus("Select a track before moving it by bars."); return; }
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement() || currentClip()->media->sourceDetailsPending)
     { setStatus("Wait for preparation before moving tracks by bars."); return; }
     engine.flushMidiControls(); engine.finishAutomation(); const juce::ScopedLock guard(engine.lock);

@@ -55,20 +55,33 @@ void runBarNavigationTests(const std::function<void(bool, const juce::String&)>&
     reset(); ui.engine.project.setTransitionLocked(selected, true); const auto locked = json(ui.engine.project); bool enabled = true;
     const auto lockedCommand = command(1, "Move linked track forward", 4, &enabled); ui.menuItemSelected(lockedCommand, 1);
     check(!enabled && json(ui.engine.project) == locked && ui.undoHistory.empty(), "native disabled move menu and handler enforce transition locks");
-    reset(); ui.engine.project.moveClip(base.clips[0].id, 0, false, 0, false); const auto edge = json(ui.engine.project);
+    reset();
+    check(ui.engine.project.setTransitionMovementLocked(selected,true).wasOk(),"edge fixture explicitly joins both tracks into one movement group");
+    check(ui.engine.project.moveClip(base.clips[0].id,0,false,0,false).wasOk(),"edge fixture places the linked predecessor at the mix start");
+    const auto edge = json(ui.engine.project);
     ui.moveTrackBars(32, -1); check(json(ui.engine.project) == edge && ui.undoHistory.empty(), "a whole bar step cannot push a linked predecessor before the mix");
     reset(); const auto waiting = json(ui.engine.project); ui.pendingTempo = 121; ui.jumpBars(4, 1); ui.moveTrackBars(4, 1);
     bool pendingEnabled = true; command(2, "Jump forward", 4, &pendingEnabled);
     check(!pendingEnabled && ui.engine.position == 120 && json(ui.engine.project) == waiting && ui.undoHistory.empty(), "pending preparation disables menus and rejects bar commands");
     ui.pendingTempo = 0; ui.busy = true; ui.jumpBars(4, 1); ui.moveTrackBars(4, 1);
     check(ui.engine.position == 120 && json(ui.engine.project) == waiting && ui.undoHistory.empty(), "busy workflow retains position and arrangement");
+    check(ui.status.contains("Wait for the current operation"), "busy bar command explains how to retry without a popup");
+    reset(); ui.engine.exporting = true;
+    const auto exporting = json(ui.engine.project); bool exportEnabled = true;
+    command(2,"Jump forward",4,&exportEnabled); ui.jumpBars(4,1);
+    check(!exportEnabled && ui.engine.position==120 && ui.engine.playing && ui.status.contains("Finish or cancel export"),
+          "export disables navigation and direct jump gives its recovery action without stopping playback");
+    ui.moveTrackBars(4,1);
+    check(json(ui.engine.project)==exporting && ui.undoHistory.empty() && !ui.dirty && ui.status.contains("Finish or cancel export"),
+          "direct bar move cannot mutate the mix during export");
+    ui.engine.exporting = false;
     reset(); ui.jumpBars(3, 1); ui.moveTrackBars(4, 0);
     check(ui.engine.position == 120 && json(ui.engine.project) == json(base) && ui.undoHistory.empty(), "unsupported private command values leave the session unchanged");
 
     // Malformed but owned automation is still caller data. Cloning must reject
     // it without recording an arrangement edit or fabricating a replacement slot.
     reset(); ui.engine.playing = false; PluginAutomation missing; missing.slotId = "owned-unavailable-slot"; missing.parameterId = "owned-parameter";
-    ui.engine.project.clipFor(selected)->controls.pluginAutomation.push_back(missing);
+    ui.engine.project.effectSettings(*ui.engine.project.clipFor(selected)).pluginAutomation.push_back(missing);
     const auto rejected = json(ui.engine.project); const auto rejectedEffects = ui.currentClip()->effects;
     ui.duplicateClip();
     check(json(ui.engine.project) == rejected && ui.selectedClip == selected && ui.currentClip()->effects == rejectedEffects

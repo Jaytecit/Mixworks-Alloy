@@ -1,5 +1,15 @@
 # Bar jumps and linked-track moves
 
+Current .90 checkpoint: bar jumps retain a short destination-snapshot lock, then
+prepare/seek, scroll and refresh outside the caller's render lock. Focused live
+callback PCM and actual muted-device/Studio delivery pass. Busy/export direct
+commands explain the recovery action; export disables their menu groups. Ordinary
+track movement and duplication retain their separate transaction lock scopes.
+Only pairs with their movement lock enabled form a move-together group; an
+ordinary transition link alone does not imply that grouping. The malformed-clone
+fixture writes canonical Project.effectSettings, matching the actual clone owner.
+See [Handover](../HANDOVER.md) for evidence and remaining acceptance.
+
 The verified 0.43 build adds two menu groups:
 
 - **Mix → Jump backward / forward → 4 / 8 / 16 / 32 bars** seeks by mix beats from the current cursor. It clamps at session start and the selected audible end. Ordinary playback retains its running state; arriving at the ending permits the normal device callback to stop there. Jumping changes no musical data, dirty state or Undo history.

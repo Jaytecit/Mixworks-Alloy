@@ -449,6 +449,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
             void componentEnablementChanged(juce::Component& c) override { if(c.isEnabled() && call)call(); }
         } refreshCallback;
         int refreshCallbacks=0; bool refreshAudio=true; juce::Array<juce::var> callbackFacts;
+        juce::String callbackKind = "insert-refresh";
         auto* controlFact=new juce::DynamicObject(); controlFact->setProperty("kind","held-lock-control");
         controlFact->setProperty("peak",blocked.getMagnitude(0,128)); controlFact->setProperty("positionBefore",at);
         controlFact->setProperty("positionAfter",ui.engine.position.load()); callbackFacts.add(juce::var(controlFact));
@@ -466,7 +467,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
                     difference=std::max(difference,std::abs(expected.getSample(ch,i)-actual.getSample(ch,i)));
                 refreshAudio &= actual.getMagnitude(0,128)>.001f && difference<1.e-6f
                     && std::abs(ui.engine.position-(position+128./8000))<1.e-8 && ui.engine.callbackDiagnostics.snapshot().lockMisses==beforeMisses;
-                auto* fact=new juce::DynamicObject(); fact->setProperty("kind",refreshCallbacks==1 ? "insert-refresh" : "delete-refresh");
+                auto* fact=new juce::DynamicObject(); fact->setProperty("kind",callbackKind);
                 fact->setProperty("peak",actual.getMagnitude(0,128)); fact->setProperty("maxPcmError",difference);
                 fact->setProperty("positionBefore",position); fact->setProperty("positionAfter",ui.engine.position.load());
                 fact->setProperty("lockMissesBefore",(juce::int64)beforeMisses); fact->setProperty("lockMissesAfter",(juce::int64)ui.engine.callbackDiagnostics.snapshot().lockMisses);
@@ -477,9 +478,20 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         ui.automationAdd.setEnabled(false);
         check(ui.insertAutomationNode(nodeAddress,10.5,false),"insert an actual source node through the ordinary editor during playback");
         check(refreshCallbacks==1 && refreshAudio,"node insertion refresh permits real callback PCM and uninterrupted sample-clock progress");
+        callbackKind = "delete-refresh";
         ui.automationAdd.setEnabled(false);
         check(ui.deleteAutomationNode(nodeAddress,0),"delete the source node through the ordinary editor during playback");
         check(refreshCallbacks==2 && refreshAudio,"node deletion refresh permits real callback PCM and uninterrupted sample-clock progress");
+        callbackKind = "bar-jump-refresh";
+        ui.automationAdd.setEnabled(false);
+        const auto beforeJump = ui.engine.position.load(); const auto jumpProject = json(ui.engine.project);
+        const auto jumpHistory = ui.undoHistory.size();
+        ui.jumpBars(4,1);
+        check(refreshCallbacks==3 && refreshAudio,
+              "mix-bar jump refresh permits matching nonzero callback PCM without a held render lock");
+        check(ui.engine.playing && std::abs(ui.engine.position-(beforeJump+8.+128./8000))<1.e-8
+              && json(ui.engine.project)==jumpProject && ui.undoHistory.size()==jumpHistory,
+              "mix-bar jump changes only its intended clock, then advances by the observed callback block");
         ui.automationAdd.removeComponentListener(&refreshCallback);
         check(report.getSiblingFile("automation-refresh-callbacks.json").replaceWithText(juce::JSON::toString(juce::var(callbackFacts),true,17)),
             "retain independent callback PCM error, peak, clock and contention observations");

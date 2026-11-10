@@ -2,6 +2,62 @@
 
 ## Current outcome
 
+**10 November native export-test repair and bar-jump continuity verified in 0.55.90.**
+The complete local bundle is `out/releases/0.55.90-2b8fb2bac1ea`; `out/Launch.cmd`
+selects it after the retained activation checks. Previous .88 launcher rollback:
+`out/Launch.cmd.bak.version-0.55.90-20261110`. Studio remains 0.1.18.
+Executable SHA-256: `2b8fb2bac1ea9f93b717d285a3c63c92bc1b4794236cf702f28491248e813cac`.
+The visible title and Windows FileVersion/ProductVersion all match 0.55.90.
+
+The native export-test stack failure is fixed. Four large Workstation owners and
+nine Engine owners in its shared dispatcher now live on the heap, retaining their
+original lexical lifetimes. MSVC's frame fell from 876,416 to **121,424 bytes**;
+the executable's stack reserve stays **1 MiB**. The previously crashing complete
+save/export journey now passes **57 checks**, including its chooser, source-backed
+save/reopen and rendered file/PCM results. Destination safety111 and stable export-
+target/admission75 also pass. The earlier failure was not an export DSP defect.
+
+Mix-bar jumps now release their caller's audio render lock after computing the
+destination, before seek preparation, viewport changes and UI refresh. The live
+refresh-boundary probe produces matching nonzero PCM (maximum error 0) and an
+advancing exact callback clock, with no new lock misses. Its deliberately held-
+lock control still produces silence and a held clock. Direct busy/export bar
+commands explain the recovery action and preserve the session; export disables
+the corresponding menu groups. Structural track moves retain their existing
+transaction lock scope and remain separate phase-1 work.
+
+Final candidate passed **441 focused native checks**: export57, destination111,
+export-target75, bars34, live74 and seek90. Runs were serial and below normal
+priority through `verification.run_checks`, stress off, with clean retention.
+The actual exact-bundle muted-device journey delivered **321 distinct Studio
+paints and 1,221 callbacks over 12.19 seconds**, including forward/backward four-
+bar jumps and scene boundaries. It added zero lock misses, source waits/missing
+samples, callback overruns, oversized blocks or export-silence callbacks.
+Save/source-backed reopen reproduced the same 1,024-frame PCM probe. Title and
+moving pixels were inspected; the owned app was saved and closed gracefully.
+
+The separate .89 diagnostic bundle first proved export57/destination111/target75,
+live74 and seek90, but its newly isolated bar suite exposed two older fixture
+errors (32/2). One expected an unenabled pair movement group; the other injected
+bad plugin automation into shadowed raw Clip.controls rather than canonical
+Project.effectSettings. Final .90 explicitly configures both fixtures, retains
+all refusal/atomicity assertions and adds two setup assertions. No production
+movement-group or effect-cloning implementation was changed to satisfy them.
+The .89 source, bundle and failed reports remain retained and were not activated.
+
+Evidence: `.local/phase1-export-final-1110` (final source/bundle manifests,
+reports, screenshots, stack-frame evidence and activation); diagnostic failures:
+`.local/phase1-export-repair-1110`; original .88 failure evidence remains intact.
+Owned `.local/pf1jump90` was closed normally and its one exact-hash generated WAV
+removed. Production apps, original music, sessions, analysis/corrections/caches
+and protected references were untouched. No detector reset or public release.
+This is focused local acceptance, not a full regression/stress gate, physical
+MIDI/ASIO, real-track listening or sustained qualification. Phase 1 remains open
+for structural-edit lock scopes and broader W01/W04/acute W14 acceptance; keep
+phase 2 deferred. Catalogue-scale reopening remains scheduled under phase 3.
+
+## Prior .88 focused checkpoint (superseded above)
+
 **10 November phase 1 focused delivery verified in 0.55.88.**
 The complete bundle is `out/releases/0.55.88-8709abe02fcd`; `out/Launch.cmd`
 selects it after the retained local activation checks. Its previous .86 launcher

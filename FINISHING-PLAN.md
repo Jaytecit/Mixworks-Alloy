@@ -11,26 +11,23 @@ priority. These are complete outcomes, not permission to implement every item
 at once. A reported problem stays open until its actual workflow is demonstrated;
 earlier focused passes do not overrule Jay's observations.
 
-**Current checkpoint.** Alloy **0.55.88 / Studio 0.1.18** is selected by
-`out/Launch.cmd`. Prepared seeks, Studio lookahead, the Beat grids menu repair and
-analytical fades passed focused local verification. [Handover](HANDOVER.md) owns
-exact identities and scope. The actual large-library menu, ruler seek, moving
-Studio frames, source-backed reopen and normal UI WAV export were demonstrated.
-The 40-second WAV's sampled PCM matched the export renderer. Read-only callback
-facts now distinguish source waits from render-lock misses; isolated Save/Export
-choosers default inside the development workspace.
+**Current checkpoint.** Alloy **0.55.90 / Studio 0.1.18** is selected by
+`out/Launch.cmd`. The native export-test stack failure is fixed and the complete
+save/export57, destination111 and stale export-target75 journeys pass. Mix-bar
+jumps release the render lock before preparation and UI notification; callback
+PCM/clock and actual forward/backward jumps with moving Studio frames passed.
+[Handover](HANDOVER.md) owns exact identities, all 441 focused native checks,
+the .89 fixture-failure provenance, retention and scope. The earlier analytical
+fades, prepared seeks, Studio lookahead and Beat grids repair retain their scope.
 
-**Phase 1 remains in acceptance.** The direct/composite analytical fade work and
-pending .87/.88 changes now have a linked, activated local candidate. A bounded
-11.95-second live interaction passage added no lock misses, source waits or
-callback overruns. It does not close Jay's intermittent listening report or
-sustained delivery. Keep wider W04/acute W14 acceptance ahead of phase 2.
-The separate native save/export fixture exhausts its stack on both .86 and .88;
-repair its large stack-local test owners at the next build. Actual UI export is
-verified independently; no native export42 pass is claimed. Large-catalogue reopen
-also delayed a read-only bridge reply; eventual success was inspected without
-replaying Open. Retained-library startup/recovery remains phase 3 work.
-Evidence: `.local/phase1-final-1110`; earlier source checkpoints remain historical.
+**Phase 1 remains in acceptance.** The bounded 12.19-second actual-device passage
+added no lock misses, source waits or callback overruns. It does not close Jay's
+intermittent listening report or sustained delivery. Next address the remaining
+cursor-dependent structural-edit transaction lock scopes (including track moves),
+then wider W04/acute W14 refusal/recovery journeys, before phase 2. The old native
+export-test blocker is closed; both newly exposed bar fixture errors are corrected
+without weakening their refusal/atomicity assertions. Large-catalogue startup/
+reopen remains phase 3 work. Evidence: `.local/phase1-export-final-1110`.
 
 ## Delivery rules for every phase
 
