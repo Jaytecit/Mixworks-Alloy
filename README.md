@@ -4,7 +4,7 @@ Current continuity: [handover](HANDOVER.md), [visual direction](docs/VISUAL-DIRE
 
 **Work-in-progress beta.** Official project: [Jaytecit/Mixworks-Alloy](https://github.com/Jaytecit/Mixworks-Alloy). Free for personal, non-commercial testing under the [Personal Beta Licence](LICENSE); commercial use, redistribution and rebranding require written permission. Original application rights are reserved; third-party licences remain applicable. **Public binary distribution is pending dependency clearance** described in [licensing](docs/LICENSING.md).
 
-A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Source: 0.55.68 beta.** It includes source-grid A/B/C correction, editable mixing workflows and an owned visual library of **123 scenes / 738 named looks**. Whole-image and refracting-glass treatments, musical geometry/particle motion, kaleidoscopes, colour cycling and live long blends follow the [current visual direction](docs/VISUAL-DIRECTION.md). See [handover](HANDOVER.md) for exact verification and readiness limits.
+A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Source: 0.55.68 beta.** It includes source-grid A/B/C correction, editable mixing workflows and an owned visual library of **204 scenes** (203 with six named looks, plus Jumping Techno Tunnel). Whole-image and refracting-glass treatments, musical geometry/particle motion, kaleidoscopes, colour cycling and live long blends follow the [current visual direction](docs/VISUAL-DIRECTION.md). See [handover](HANDOVER.md) for exact verification and readiness limits.
 
 Run **Mixworks.cmd**, or the **Mixworks Alloy** desktop shortcut. They select the current immutable local bundle through `out/Launch.cmd`; [handover](HANDOVER.md) records its exact version/hash. The desktop shortcut uses the [Alloy launcher icon](design/alloy/alloy-launcher.ico). Keep adjacent runtime, model, notices and licences with each candidate. Updating the launcher does not restart an existing session. This local development preview is not a public binary release or complete qualification.
 
@@ -55,7 +55,7 @@ View offers saved Popup hints, grid brightness, Attract lighting and Molten spar
 
 The current [handover](HANDOVER.md) binds historical focused checks to exact candidates and records remaining imports. Auditing does not resume bulk recovery, reset analysed data, overwrite reviewed references, or restart a running session. Historical 60/90-minute fixtures and prior full receipts do not qualify this candidate. See [capacity](docs/SOURCE-CAPACITY.md) and the [audit status](docs/release-audit/STATUS.md).
 
-General real-music beat/downbeat/key accuracy and performance/fidelity thresholds remain unresolved. Listening, physical FLkey/ASIO/private routing and clean-environment package acceptance need separate evidence. Variable-tempo source detection, other meters, compressed export, editable MIDI-note recording, sequencing, built-in synth, phone controller and audiovisual integrations are outside current implemented scope. Wishlist features are tracked separately in [WISHLIST](WISHLIST.md).
+General real-music beat/downbeat/key accuracy and performance/fidelity thresholds remain unresolved. Listening, physical FLkey/ASIO/private routing and clean-environment package acceptance need separate evidence. Variable-tempo source detection, other meters, compressed export, editable MIDI-note recording, sequencing, built-in synth, phone controller and audiovisual integrations are outside current implemented scope. Outstanding work is tracked in [the roadmap](FINISHING-PLAN.md).
 
 ## Development and verification
 
@@ -88,3 +88,5 @@ Deployment requires the exact receipt through `scripts/deploy.ps1 -VerificationM
 | `build/`, `out/` | Ignored build outputs and staged releases |
 
 Use this folder's Mixworks-Alloy Git repository, not parent REA. Preserve source/evidence independently of Git and keep music, sessions, caches and generated bundles out of commits. Historical plans are context, not instructions to resume old operations.
+
+New mix saves and mix-related exports default to **Desktop / Mixworks**. Change or reset this in **File → Default save folder**; Ctrl+S continues saving the current file. See [save/export defaults](docs/EXPORTING.md#default-save-folder).

@@ -1,0 +1,38 @@
+{
+  "TITLE": "Fumarole Field / Hollow Backdraft",
+  "MEDIA": [
+    {
+      "WRAP": "clamp"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.69,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Motion transfer",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Nested",
+      "DESCRIPTION": "Sprite channels steer the reversed plume motion."
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 #version 330
+uniform sampler2D userImage;
 // Persistent travel/turn phases: release slows the movement, never reverses it.
 uniform vec2 resolution;
 uniform sampler2D input0;
@@ -9,6 +10,8 @@ void main(){
     if(simulationReset>.5){colour=vec4(id/resolution.x,id*2.399,id*.73,id*.43);return;}
     vec4 s=texelFetch(input0,ivec2(int(id),0),0);
     float speed=(.55+motion)*( .86+.22*sin(id*7.));
+    speed*=1.+.65*structureHeight(vec2((id+.5)/resolution.x,.5+.26*sin(id*2.399)));
+
     s+=stepDelta*vec4((.0025+bass*.004)*speed,
         (.035+mid*.25+(bassHit*5.5+midHit*2.4)*pulse)*speed,
         (.06+treble*.35+trebleHit*7.*pulse)*speed,

@@ -3,6 +3,7 @@
 #include "MilkDrop.h"
 #include <cmath>
 #include <map>
+#include <set>
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -44,12 +45,43 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
     check(plan.error.isEmpty() && plan.project.clips.size()==3,"real music planner supplies a three-song visual fixture");
     if (plan.project.clips.size()!=3) return;
     {
+        std::vector<VisualSceneEntry> choices;
+        for(int i=0;i<24;++i)
+        {
+            VisualSceneEntry entry {"original/variety-probe-"+juce::String(i),"Variety "+juce::String(i)};
+            entry.energy=i==0 ? .4 : .95; entry.style="Prismatic";
+            entry.family="family-"+juce::String(i); entry.motif=entry.family;
+            choices.push_back(entry);
+        }
+        std::set<juce::String> openings; bool valid=true; juce::Random seedStream(8136571);
+        for(int seed=1;seed<=32;++seed)
+        {
+            auto show=plan.project; juce::Random seeded(seedStream.nextInt64());
+            valid &= arrangeVisualScenes(show,choices,seeded).wasOk();
+            if(!show.visualScenes.empty()) openings.insert(show.visualScenes.front().scene);
+        }
+        check(valid && openings.size()>=8,"fresh random seeds explore the collection instead of always opening with the closest-energy scene: "+juce::String((int)openings.size())+" distinct openings");
+        Project longShow;
+        for(int i=0;i<48;++i) {Clip clip;clip.media=a;clip.start=i*40.;clip.length=40.;longShow.clips.push_back(clip);}
+        juce::Random seeded(718); const auto made=arrangeVisualScenes(longShow,choices,seeded);
+        std::set<juce::String> firstPass,secondPass;
+        for(size_t i=0;i<longShow.visualScenes.size();++i)
+            (i<24 ? firstPass : secondPass).insert(longShow.visualScenes[i].scene);
+        check(made.wasOk() && longShow.visualScenes.size()==48 && firstPass.size()==24 && secondPass.size()==24,
+            "a long mix uses every eligible scene before repeating, then reshuffles a complete second pass");
+        auto repeat=plan.project, same=plan.project;juce::Random first(919),second(919);
+        arrangeVisualScenes(repeat,choices,first);arrangeVisualScenes(same,choices,second);
+        bool reproducible=repeat.visualScenes.size()==same.visualScenes.size();
+        for(size_t i=0;reproducible && i<repeat.visualScenes.size();++i) reproducible &= repeat.visualScenes[i].scene==same.visualScenes[i].scene;
+        check(reproducible,"an explicit seed still reproduces scene choices for diagnostics");
+    }
+    {
         auto collection=discoverVisualScenes(juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("original-visualiser-runtime"));
         VisualSceneEntry imported {"milkdrop/"+juce::String::repeatedString("a",64),"MilkDrop fixture"};
         imported.family="milkdrop"; imported.style="MilkDrop"; imported.motif="milkdrop"; imported.controlSpecs["intensity"]={.5,0};
         collection.push_back(imported);
-        check(automaticVisualScenes(collection).size()==203 && automaticVisualScenes(collection,VisualSceneSource::milkdrop).size()==1
-            && automaticVisualScenes(collection,VisualSceneSource::both).size()==204,"source filters select Originals, MilkDrop or Both from the same catalogue");
+        check(automaticVisualScenes(collection).size()==205 && automaticVisualScenes(collection,VisualSceneSource::milkdrop).size()==1
+            && automaticVisualScenes(collection,VisualSceneSource::both).size()==206,"source filters select Originals, MilkDrop or Both from the same catalogue");
         for(const auto selected : {VisualSceneSource::originals,VisualSceneSource::milkdrop,VisualSceneSource::both})
         {
             auto show=plan.project; show.visualImage="selected-image.png";
@@ -65,7 +97,7 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
                 const auto& scene=show.visualScenes[i];
                 if(isMilkDropKey(scene.scene)) controls &= scene.controls.size()==1 && scene.controls.count("intensity") && scene.automation.size()==1;
                 if(i && (isMilkDropKey(scene.scene) || isMilkDropKey(show.visualScenes[i-1].scene)))
-                    transitions &= scene.transition=="dissolve" || scene.transition=="zoom" || scene.transition=="cut";
+                    transitions &= scene.transition=="feedback";
             }
             check(controls && transitions && validateVisualScenes(show.visualScenes).wasOk(),visualSceneSourceName(selected)+" uses supported controls and engine handovers");
             std::vector<VisualSceneClip> reopened;
@@ -98,7 +130,7 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
         const auto frame=visualFrameAt(plan.project.visualScenes,(range.getStart()+range.getEnd())*.5);
         exact &= frame.outgoing && frame.incoming && std::abs(frame.mix-.5)<1.e-8;
     }
-    check(exact,"scene fades use the actual music transition owner's phase window, with equal contribution at its midpoint");
+    check(exact,"generative scene phase uses the actual music transition owner's window and midpoint");
     check(different,"shuffled scene choices do not repeat on adjacent songs");
     {
         Project leadIn; Clip music; music.media=a; music.start=1.716633359549756; music.length=20;
@@ -137,9 +169,9 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
             && std::abs(visual.pivot-juce::jlimit(.05,.95,(((*swap)[0]+(*swap)[1])*.5-visual.start)/length))<1.e-8,
             "automatic visual midpoint follows the bass band's actual paired swap times rather than the volume band");
         show.transitionLinks.front().filter.mode=TransitionFilterMode::highToLow;
-        check(arrangeVisualScenes(show,collection,random).wasOk() && show.visualScenes[1].transition==(length>4. ? "dissolve" : "sweep"),"visual sweep follows the real music filter handover");
+        check(arrangeVisualScenes(show,collection,random).wasOk() && show.visualScenes[1].transition=="feedback","filtered music handover retains a generative visual transition");
         show.transitionLinks.front().filter.mode=TransitionFilterMode::lowToHigh;
-        check(arrangeVisualScenes(show,collection,random).wasOk() && show.visualScenes[1].transition==(length>4. ? "dissolve" : "sweep-reverse"),"opposite music filter direction reverses the visual reveal");
+        check(arrangeVisualScenes(show,collection,random).wasOk() && show.visualScenes[1].transition=="feedback","opposite filter direction also retains generative visual feedback");
         auto invalidLook=show.visualScenes; invalidLook.front().controls["bad-name"]=.5;
         check(validateVisualScenes(invalidLook).failed(),"malformed generated control identity is rejected by the visual owner");
         invalidLook=show.visualScenes; invalidLook.front().transition="unknown";
@@ -204,7 +236,31 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
     auto owned=std::make_unique<Workstation>(false); auto& ui=*owned; ui.stopTimer(); ui.setSize(1920,1080);
     ui.engine.project=plan.project; ui.engine.project.visualScenes.clear(); ui.engine.library={source("One",true),source("Two",true),source("Three",true)};
     const auto musicBefore=juce::JSON::toString(projectToJson(ui.engine.project)["clips"]);
-    ui.sceneLane->matchMix();
+    ui.sceneLane->showBrowser();
+    juce::DocumentWindow* browser = nullptr;
+    juce::TextButton* match = nullptr;
+    for (int i = 0; i < juce::TopLevelWindow::getNumTopLevelWindows() && !match; ++i)
+        if (auto* window = dynamic_cast<juce::DocumentWindow*>(juce::TopLevelWindow::getTopLevelWindow(i)))
+            if (auto* content = window->getContentComponent())
+                if (auto* button = dynamic_cast<juce::TextButton*>(content->findChildWithID("visual-match-mix")))
+                { browser = window; match = button; }
+    check(match != nullptr,"visual browser exposes the Match mix action");
+    if (match)
+    {
+        match->onClick();
+        check(!match->isEnabled() && match->getButtonText() == "Matching visuals..."
+            && ui.engine.project.visualScenes.empty(),"Match mix shows a working notification before arranging scenes");
+        auto* content = browser->getContentComponent();
+        auto image = report.getSiblingFile("match-mix-working.png").createOutputStream();
+        check(image && juce::PNGImageFormat().writeImageToStream(content->createComponentSnapshot(content->getLocalBounds()),*image),
+            "capture Match mix working notification in the visual browser");
+        const auto end = juce::Time::getMillisecondCounterHiRes()+5000;
+        while (!match->isEnabled() && juce::Time::getMillisecondCounterHiRes()<end) pump();
+        check(match->isEnabled() && match->getButtonText() == "Match mix" && ui.status.startsWith("Visual show:"),
+            "Match mix restores the button and reports the visual show when ready");
+        browser->closeButtonPressed();
+    }
+    else ui.sceneLane->matchMix();
     check(ui.engine.project.visualScenes.size()==3 && ui.undoHistory.size()==1,"Match mix populates an existing arrangement through the real command with one Undo");
     check(musicBefore==juce::JSON::toString(projectToJson(ui.engine.project)["clips"]),"Match mix command leaves existing music intact");
     ui.undo(false); check(ui.engine.project.visualScenes.empty(),"Undo restores the visual lane before Match mix"); ui.undo(true);

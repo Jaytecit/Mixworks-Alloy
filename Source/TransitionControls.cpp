@@ -5,7 +5,7 @@
 
 namespace mixworks
 {
-juce::Result Project::addTransition(const juce::String& outgoing, const juce::String& incoming, double beats, TransitionPreset preset)
+juce::Result Project::addTransition(const juce::String& outgoing, const juce::String& incoming, double beats, TransitionPreset preset, bool explicitPreset)
 {
     if (hasPendingPlacement() || !std::isfinite(beats) || beats < 0)
         return juce::Result::fail("Wait for preparation and choose a valid transition length.");
@@ -14,19 +14,27 @@ juce::Result Project::addTransition(const juce::String& outgoing, const juce::St
         || out->media->sourceDetailsPending || in->media->sourceDetailsPending)
         return juce::Result::fail("Select two ready, overlapping tracks.");
     if (clipTransitionLocked(outgoing) || clipTransitionLocked(incoming)) return juce::Result::fail("Unlock both tracks before adding a transition.");
+    if (const auto* existing = transitionFor(incoming); explicitPreset && existing && existing->outgoing == outgoing && existing->alignmentOnly)
+        return applyTransitionPreset(incoming,preset,true);
     if (std::any_of(transitionLinks.begin(),transitionLinks.end(),[&](const auto& link) { return link.outgoing == outgoing || link.incoming == incoming; }))
         return juce::Result::fail("This outgoing or incoming track already has a transition. Unlink it first.");
     const double first = std::max(out->start,in->start), end = std::min(out->end(),in->end());
     if (end <= first) return juce::Result::fail("Overlap the two tracks before adding a transition.");
     const auto clock = gridClock();
-    const double begin = beats > 0 ? std::max(first,clock.timeAtBeat(clock.beatsAt(end)-beats)) : first;
+    const double outMarker = out->start + out->transitionTime(false);
+    const double inMarker = in->start + in->transitionTime(true);
+    const bool hasJoin = std::abs(outMarker-inMarker) < 1.e-7 && outMarker >= first-1.e-7 && outMarker < end-1.e-6;
+    const double begin = explicitPreset ? (hasJoin ? std::max(first,outMarker) : first)
+        : beats > 0 ? std::max(first,clock.timeAtBeat(clock.beatsAt(end)-beats)) : first;
+    const double frameEnd = explicitPreset && beats > 0 ? std::min(end,clock.timeAtBeat(clock.beatsAt(begin)+beats)) : end;
     auto candidate = *this;
     auto* a = candidate.clipFor(outgoing); auto* b = candidate.clipFor(incoming);
     a->outroAnchor = a->sourceElapsed(begin-a->start); b->introAnchor = b->sourceElapsed(begin-b->start);
-    TransitionLink link{outgoing,incoming}; link.frame = std::array<double,2>{std::max(0.,a->sourceElapsed(begin-a->start)),std::max(0.,a->sourceElapsed(end-a->start))};
+    TransitionLink link{outgoing,incoming}; link.frame = std::array<double,2>{std::max(0.,a->sourceElapsed(begin-a->start)),std::max(0.,a->sourceElapsed(frameEnd-a->start))};
+    link.alignmentOnly = explicitPreset;
     candidate.transitionLinks.push_back(link);
     auto valid = candidate.validateTransitionLinks(); if (valid.failed()) return valid;
-    if (preset != TransitionPreset::alignOnly) { valid = candidate.applyTransitionPreset(incoming,preset); if (valid.failed()) return valid; }
+    if (preset != TransitionPreset::alignOnly) { valid = candidate.applyTransitionPreset(incoming,preset,explicitPreset); if (valid.failed()) return valid; }
     valid = validateTransitionLocks(candidate); if (valid.failed()) return valid;
     *this = std::move(candidate); return juce::Result::ok();
 }
@@ -66,7 +74,7 @@ juce::Result Project::validateTransitionLocks(const Project& candidate) const
     const auto sameCurve = [](const AutomationCurve& a, const AutomationCurve& b)
     {
         if (a.enabled != b.enabled || a.points.size() != b.points.size()) return false;
-        for (size_t i = 0; i < a.points.size(); ++i) if (a.points[i].time != b.points[i].time || a.points[i].value != b.points[i].value || a.points[i].bend != b.points[i].bend) return false;
+        for (size_t i = 0; i < a.points.size(); ++i) if (a.points[i].time != b.points[i].time || a.points[i].value != b.points[i].value || a.points[i].bend != b.points[i].bend || a.points[i].shape != b.points[i].shape) return false;
         return true;
     };
     if (!hasLockedTransitions()) return juce::Result::ok();
@@ -127,6 +135,51 @@ juce::Result Project::setTransitionLocked(const juce::String& incoming, bool loc
     for (auto& link : transitionLinks) if (link.incoming == incoming) { link.locked = locked; return juce::Result::ok(); }
     return juce::Result::fail("The transition is unavailable.");
 }
+juce::Result Project::setTransitionMovementLocked(const juce::String& incoming,bool locked)
+{
+    if(hasPendingPlacement())return juce::Result::fail("Wait for track placement before changing the pair movement lock.");
+    const auto valid=validateTransitionLinks(); if(valid.failed())return valid;
+    for(auto& link:transitionLinks)if(link.incoming==incoming) { link.movementLocked=locked; return juce::Result::ok(); }
+    return juce::Result::fail("Select a current transition pair before changing its movement lock.");
+}
+std::vector<juce::String> Project::movementGroup(const juce::String& id) const
+{
+    if(!clipFor(id))return {};
+    std::set<juce::String> group{id}; bool changed=true;
+    while(changed)
+    {
+        changed=false;
+        for(const auto& link:transitionLinks)if(link.movementLocked && (group.count(link.outgoing) || group.count(link.incoming)))
+        { changed|=group.insert(link.outgoing).second; changed|=group.insert(link.incoming).second; }
+    }
+    return {group.begin(),group.end()};
+}
+juce::Result Project::removeTransition(const juce::String& incoming,bool clearTreatment)
+{
+    const auto* selected=transitionFor(incoming);
+    if(!selected || hasPendingPlacement())return juce::Result::fail("Select a ready transition before removing it.");
+    if(clipTransitionLocked(selected->outgoing) || clipTransitionLocked(incoming))return juce::Result::fail("Turn off Protect edits for the participating tracks before removing this transition.");
+    const auto link=*selected; const auto range=transitionRange(link); Project candidate=*this;
+    const auto materialised=materialisePresetNodes(candidate,incoming); if(materialised.failed())return materialised;
+    if(clearTreatment)
+    {
+        for(int band=0;band<4;++band)
+        { const auto result=placeTransitionBandNodes(candidate,incoming,band,{}); if(result.failed())return result; }
+        const auto result=placeTransitionFilterNodes(candidate,incoming,{}); if(result.failed())return result;
+    }
+    else if(link.muteOutside)
+    {
+        auto* out=candidate.clipFor(link.outgoing); auto* in=candidate.clipFor(incoming);
+        in->fadeInAnchor=in->sourceElapsed(std::max(in->envelope().intro,range.getStart()-in->start));
+        out->fadeOutAnchor=out->sourceElapsed(std::min(out->envelope().outro,range.getEnd()-out->start));
+    }
+    candidate.clipFor(link.incoming)->introAnchor.reset(); candidate.clipFor(link.outgoing)->outroAnchor.reset();
+    auto& links=candidate.transitionLinks;
+    links.erase(std::remove_if(links.begin(),links.end(),[&](const auto& item) {return item.incoming==incoming;}),links.end());
+    const auto valid=candidate.validateTransitionLinks(); if(valid.failed())return valid;
+    const auto protection=validateTransitionLocks(candidate); if(protection.failed())return protection;
+    *this=std::move(candidate); return juce::Result::ok();
+}
 juce::Result Project::setTransitionLength(const juce::String& incoming, double bars)
 {
     if (!std::isfinite(bars) || bars <= 0) return juce::Result::fail("Choose a positive transition length.");
@@ -155,7 +208,47 @@ void Project::clearTransitionBass(TransitionLink& link, bool preservePoints)
     }
     link.bassSwap.reset();
 }
-juce::Result Project::applyTransitionPreset(const juce::String& incoming, TransitionPreset preset)
+juce::Result Project::removeOwnedTransitionPreset(const juce::String& incoming)
+{
+    const auto* link = transitionFor(incoming);
+    if (!link || hasPendingPlacement()) return juce::Result::fail("Select a ready transition first.");
+    if (clipTransitionLocked(link->outgoing) || clipTransitionLocked(incoming))
+        return juce::Result::fail("Unlock both tracks before removing the preset.");
+    if (link->presetOwner.isEmpty())
+        return link->alignmentOnly ? juce::Result::ok()
+            : juce::Result::fail("This transition has no separately owned preset. Its existing automation was kept.");
+    auto& edited = transitionLinks[(size_t)(link-transitionLinks.data())];
+    const std::array<const Clip*,2> sides{clipFor(link->outgoing),clipFor(incoming)};
+    for (size_t side = 0; side < sides.size(); ++side)
+    {
+        auto& automation = effectSettings(*sides[side]).automation;
+        if (edited.bassSwap)
+        {
+            const auto positions = *edited.bassSwap;
+            for (const auto& point : automation[(size_t)AutomationTarget::bass].points)
+                if (point.presetOwner == link->presetOwner
+                    && (point.time == positions[side*2] || point.time == positions[side*2+1]))
+                    edited.bassSwap.reset();
+        }
+        for (auto& curve : automation)
+        {
+            const auto size = curve.points.size();
+            curve.points.erase(std::remove_if(curve.points.begin(),curve.points.end(),
+                [&](const auto& point) { return point.presetOwner == link->presetOwner; }),curve.points.end());
+            if (size != curve.points.size() && curve.points.empty()) curve.enabled = false;
+        }
+    }
+    const auto range = transitionRange(edited);
+    const double join = sides[0]->start + sides[0]->transitionTime(false);
+    const double end = std::min({sides[0]->end(),sides[1]->end(),join+range.getLength()});
+    if (join >= std::max(sides[0]->start,sides[1]->start)-1.e-7 && end > join)
+        edited.frame = std::array<double,2>{sides[0]->sourceElapsed(join-sides[0]->start),sides[0]->sourceElapsed(end-sides[0]->start)};
+    edited.presetName.clear();
+    edited.presetOwner.clear();
+    edited.alignmentOnly = true;
+    return juce::Result::ok();
+}
+juce::Result Project::applyTransitionPreset(const juce::String& incoming, TransitionPreset preset, bool explicitPreset)
 {
     if (hasPendingPlacement()) return juce::Result::fail("Wait for track placement to finish.");
     if (preset != TransitionPreset::alignOnly && preset != TransitionPreset::bassSwap && preset != TransitionPreset::crossfade)
@@ -163,12 +256,14 @@ juce::Result Project::applyTransitionPreset(const juce::String& incoming, Transi
     const auto valid = validateTransitionLinks(); if (valid.failed()) return valid;
     const auto* current = transitionFor(incoming); if (!current) return juce::Result::fail("Select a transition first.");
     if (current->locked) return juce::Result::fail("Unlock this transition before applying a preset.");
+    if (explicitPreset && preset == TransitionPreset::alignOnly) return removeOwnedTransitionPreset(incoming);
     const auto range = transitionRange(*current);
     if (range.getLength() <= 1e-6) return juce::Result::fail("Set a non-zero transition length first.");
     TransitionStyle style;
     style.volume = preset == TransitionPreset::crossfade ? std::array<double,4>{0,1,0,1} : std::array<double,4>{0,0,1,1};
     if (preset == TransitionPreset::bassSwap)
         style.bands[1] = TransitionBandSettings{TransitionBandMode::swap,1,0,sectionSwapPosition(*this,*current)};
+    if (explicitPreset) return applyNamedTransitionStyle(incoming,style,preset == TransitionPreset::crossfade ? "Crossfade" : "Bass swap");
     return applyTransitionStyle(incoming,style);
 }
 }

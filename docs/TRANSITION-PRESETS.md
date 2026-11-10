@@ -1,16 +1,18 @@
 # Transition controls and presets
 
-Current guide for 0.55.64. [Ordinary preset nodes](PRESET-NODES.md) owns exact replacement/capture semantics. [Earlier transition notes (archived)](MAINTENANCE-20261103.md) preserve dated generators/formats and measurements; old procedural layering and automatic-on-add descriptions are superseded.
+Ordinary placement and OUT/IN alignment leave the tracks' treatment alone. A marked pair shows **OUT/IN | No preset** until a preset is applied. [Ordinary preset nodes](PRESET-NODES.md) covers curve editing and the automated arrangement workflows.
 
 ## Create or select a transition
 
-Ordinary tracks are independent. Use Add Transition for an overlapping pair, or Auto Arrange/Auto Arrange timeline for deliberate automatic relationships. Select the frame or navigate Previous/Next. Editing a frame/header/width does not seek; explicit navigation can reveal/seek its start.
+Ordinary tracks are independent. Use Add Transition for an overlapping pair, or Auto Arrange/Auto Arrange timeline for deliberate automatic relationships. Right-click the frame header for the pair's presets, length, locks, mute and removal. **Edit transition…** opens the optional dock for detailed treatment and **Rehearsal and presets…** opens comparison controls. Previous/Next or **Alt+Left/Right** navigate across pairs. Frame selection and direct editing preserve the playhead.
 
-Frame movement/edge resizing leaves songs fixed, within shared audio. Frames can overlap fully across four lanes without a64bar ceiling. Length accepts positive typed bars. Mute outside bounds is optional, off by default and saved/undoable. Unlink removes the relationship; see [timeline editing](TIMELINE-EDITING.md).
+An applied preset is labelled in the timeline header. Drag the header to move its two sides together within the shared audio, or drag its right edge to change duration. The tracks and their OUT/IN markers stay fixed. **Remove preset** in the header menu removes the generated nodes and keeps the alignment and manual nodes. An older frame with unlabelled automation can be unlinked while keeping its curves. Mute outside bounds is optional, off by default and saved with the pair.
+
+Deleting or replacing a whole track breaks its pairs and clears their preset and manual automation inside the former frames on surviving tracks. Manual nodes elsewhere and the surviving OUT/IN marker stay available. Undo restores the original tracks and treatment.
 
 ## Apply and edit a treatment
 
-None/alignment-only, Crossfade, Bass swap, independent bands, Filter sweeps, named/portable templates and A/B/C place ordinary source-owned nodes. Applying replaces the selected frame/parameter shape; exterior points, clocks, locks and unrelated bands stay protected. Manual keeps the editable shape. Reapplying replaces rather than stacks hidden generators. The Playlist derives built-in labels from actual shapes; edits can show Custom, and exact named presets take priority.
+Explicit Crossfade, Bass swap and saved presets place editable source nodes at the aligned OUT/IN join. Both Crossfade start nodes sit on that join. Manual nodes remain on their original tracks and may shape the curve within a preset. If a generated point would coincide with an existing point, Alloy keeps the existing curve and reports the conflict. Reapplying replaces the pair's previous owned nodes. The Playlist shows the applied preset by name. Independent band and Filter controls edit their selected curve separately.
 
 Volume/Bass/Mid/Treble rows expose supported None/Crossfade/Fade in/Fade out/Swap/Manual choices; Bass also has Bass fade handover. Strength controls attenuation depth; EQ full cut and Volume silence have distinct DSP semantics. Gap and crossing position use mix beats, including project ramps. Bass/Mid/Treble sharp swaps use sample-timed steps; Volume retains anti-click treatment. Native bends and sparse approximation points preserve continuous shapes where required.
 
@@ -18,7 +20,7 @@ Click a line/footer parameter to reveal nodes; Add inserts the requested point. 
 
 ## Section and new-track defaults
 
-New-track preset/length preferences apply to explicit planning/joins, not every ordinary placement. Section planning keeps paired source boundary identities, prefers usable changes on both tracks then a one-sided/grid fallback, and can exceed the usual preference where shared audio permits. A measured shared boundary can position Bass swap away from the midpoint. Energy hints are not semantic verse/chorus/vocal truth.
+Use **Defaults for new transitions…** from the segment or Mix menu to choose a treatment and length for future joins. The Add Transition command shows the current choices. Ordinary placements stay independent. Section planning keeps paired source boundary identities, prefers usable changes on both tracks then a one-sided/grid fallback, and can exceed the usual preference where shared audio permits. A measured shared boundary can position Bass swap away from the midpoint. Energy hints are not semantic verse/chorus/vocal truth.
 
 Auto Arrange offers seven styles, soft energy/genre preferences and Extend. New changed-BPM targets require64beat spacing; short ramp room falls back to the existing map. [Auto Arrange](AUTO-ARRANGEMENT.md) owns limits and fallback behavior.
 
@@ -34,4 +36,4 @@ In **Record/Perform**, private whole-transition A/B/C uses independent transport
 
 Locks guard participating/connected geometry and protected control edits. Global tempo/rebuild, partial pair edits, unavailable preparation and stale dialogs can refuse rather than guessing. Mutations use one Undo; selection/audition alone does not commit. Native third-party plugin state has its own limits.
 
-Current session format is41 and analysis11. Legacy compatibility is not a development requirement. Full real-music section/phrasing, physical controls/private routing and latest-build release acceptance remain open; consult the [request register](REQUEST-STATUS-20261024.md).
+Session format 50 saves preset ownership and names. Analysis stays at revision 11. Full real-music section/phrasing, physical controls/private routing and release acceptance remain open. See the [request register](REQUEST-STATUS-20261024.md).

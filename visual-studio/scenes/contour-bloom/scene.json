@@ -1,0 +1,24 @@
+{
+  "TITLE": "Contour Bloom",
+  "MEDIA": [{"WRAP": "clamp"}],
+  "PASSES": [
+    {"TARGET": "pulses", "WIDTH": 1, "HEIGHT": 1},
+    {"TARGET": "outline", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"},
+    {"TARGET": "jump32", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"},
+    {"TARGET": "jump16", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"},
+    {"TARGET": "jump8", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"},
+    {"TARGET": "jump4", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"},
+    {"TARGET": "jump2", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"},
+    {"TARGET": "nearestEdge", "WIDTH": 320, "HEIGHT": 180, "FILTER": "nearest"}
+  ],
+  "CONTROLS": [
+    {"NAME": "reach", "TYPE": "slider", "LABEL": "Bloom reach", "DEFAULT": 0.22, "MIN": 0.04, "MAX": 0.30, "UI_GROUP": "Growth"},
+    {"NAME": "travel_time", "TYPE": "slider", "LABEL": "Travel time", "DEFAULT": 0.84, "MIN": 0.25, "MAX": 1.5, "UI_GROUP": "Growth", "DESCRIPTION": "Seconds a kick wave takes to reach its outer limit."},
+    {"NAME": "detail", "TYPE": "slider", "LABEL": "Filament detail", "DEFAULT": 0.68, "MIN": 0, "MAX": 1, "UI_GROUP": "Growth"},
+    {"NAME": "backdrop", "TYPE": "slider", "LABEL": "Backdrop", "DEFAULT": 0.86, "MIN": 0, "MAX": 1, "UI_GROUP": "Growth", "DESCRIPTION": "Sets the strength of the surrounding topographic field."},
+    {"NAME": "artwork", "TYPE": "slider", "LABEL": "Artwork visibility", "DEFAULT": 0.62, "MIN": 0, "MAX": 1, "UI_GROUP": "Seed", "DESCRIPTION": "Fade the original artwork while keeping its outline active."},
+    {"NAME": "demo_seed", "TYPE": "toggle", "LABEL": "Demo outline", "DEFAULT": 1, "MIN": 0, "MAX": 1, "UI_GROUP": "Seed", "DESCRIPTION": "Use a built-in silhouette when no Nested media is active."},
+    {"NAME": "seed_colour", "TYPE": "color", "LABEL": "Seed colour", "DEF_COLOR": [0.20, 0.75, 0.82], "UI_GROUP": "Colour"},
+    {"NAME": "bloom_colour", "TYPE": "color", "LABEL": "Bloom colour", "DEF_COLOR": [1.0, 0.53, 0.23], "UI_GROUP": "Colour"}
+  ]
+}

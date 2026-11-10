@@ -179,16 +179,12 @@ double Project::snappedTime(double seconds, bool enabled) const
 }
 double Project::snappedMoveTime(double reference, double seconds, bool enabled) const
 {
-    if (!enabled) return std::max(0., seconds);
-    const auto clock = gridClock(); const double from = clock.beatsAt(reference), step = snapStep();
-    // Snap displacement, not the existing phase. Insertion establishes a grid;
-    // moving an already placed song must retain any manual alignment correction.
-    const double minimum = std::ceil((clock.beatsAt(0) - from) / step - 1e-9);
-    const double count = std::max(minimum, std::round((clock.beatsAt(std::max(0., seconds)) - from) / step));
-    return clock.timeAtBeat(from + count * step);
+    juce::ignoreUnused(reference);
+    return snappedTime(seconds,enabled);
 }
 double Project::snappedClipStart(const Clip& clip, double seconds, bool enabled, double magnetSeconds) const
 {
+    juce::ignoreUnused(magnetSeconds); // The destination lattice is always the project grid.
     if (!enabled) return std::max(0.0, seconds);
     seconds = std::max(0.0, seconds);
     const auto grid = gridClock();
@@ -202,21 +198,6 @@ double Project::snappedClipStart(const Clip& clip, double seconds, bool enabled,
     const double beat = std::max(std::ceil(minimum / step - 1.0e-9), std::round(desired / step)) * step;
     double placed = mapped ? grid.timeAtBeat(beat - phase) : grid.timeAtBeat(beat) - phase;
     placed = std::max(0.0, placed);
-    // A deliberately free-positioned neighbour may supply a closer visible pulse.
-    // Normal matched neighbours coincide with the background grid already.
-    for (const auto& other : clips)
-    {
-        if (magnetSeconds <= 0 || other.id == clip.id || other.media->bpm() <= 0) continue;
-        const double anchor = mapped ? grid.timeAtBeat(desired) : seconds + phase;
-        if (anchor < other.start || anchor >= other.end()) continue;
-        const double period = 60 / other.media->bpm() * step, first = other.sourceElapsed(other.firstBeatTime());
-        const double pulse = first + std::round((other.sourceElapsed(anchor - other.start) - first) / period) * period;
-        const double target = other.start + other.localTimeForSource(pulse);
-        if (pulse < 0 || target >= other.end()) continue;
-        if (mapped && grid.beatsAt(target) < grid.beatsAt(0) + phase) continue;
-        const double candidate = mapped ? grid.timeAtBeat(grid.beatsAt(target) - phase) : target - phase;
-        if (candidate >= 0 && std::abs(candidate - seconds) < magnetSeconds && std::abs(candidate - seconds) < std::abs(placed - seconds)) placed = candidate;
-    }
     return placed;
 }
 void Clip::adoptTimelineControls(const TrackSettings& settings)
@@ -241,7 +222,7 @@ void Clip::moveTo(double seconds)
 }
 void Clip::applyPlacement(const Clip& source)
 {
-    start = source.start; length = source.length; rate = source.rate;
+    start = source.start; length = source.length; rate = source.rate; track = source.track; routingStart = source.routingStart;
     fadeIn = source.fadeIn; fadeOut = source.fadeOut; introAnchor = source.introAnchor; outroAnchor = source.outroAnchor;
     tempoMap = source.tempoMap; tempoSourceBpm = source.tempoSourceBpm; prepared = source.prepared; preparedOffset = source.preparedOffset;
     elasticPlayback = source.elasticPlayback; elasticSource = source.elasticSource; pendingPlacement = source.pendingPlacement;
@@ -257,7 +238,7 @@ juce::Result Clip::alignAnchorTo(bool intro, double seconds)
     if (tempoMap && sourceBpm > 0)
     {
         const double beat = tempoMap->beatsAt(seconds) - source * sourceBpm / 60;
-        if (beat < -1.0e-8) return juce::Result::fail("That move would put a linked track before the start of the mix.");
+        if (beat < tempoMap->beatsAt(0) - 1.0e-8) return juce::Result::fail("That move would put a linked track before the start of the mix.");
         position = tempoMap->timeAtBeat(std::max(tempoMap->beatsAt(0), beat));
     }
     else position = seconds - source / rate;
@@ -267,6 +248,7 @@ juce::Result Clip::alignAnchorTo(bool intro, double seconds)
 }
 void Clip::retime(double seconds, std::shared_ptr<const TempoMap> map)
 {
+    if (seconds!=start) routingStart.reset(); // An explicit move chooses a new return owner clock.
     if (beatmatched && map && (tempoSourceBpm > 0 || media->bpm() > 0))
     {
         const auto fades = envelope();
@@ -299,6 +281,51 @@ juce::Result Project::setClipAudioSlip(const juce::String& id, double seconds)
     if (!clip->media || !clip->media->hasPlayback() || clip->media->sourceDetailsPending || clip->pendingPlacement != PendingPlacement::none)
         return juce::Result::fail("Wait for this track's audio before slipping it.");
     clip->audioSlip = seconds;
+    return juce::Result::ok();
+}
+
+juce::Result Project::trimClip(const juce::String& id, double begin, double end)
+{
+    auto* clip = clipFor(id);
+    if (!clip || !std::isfinite(begin) || !std::isfinite(end) || begin < 0 || end - begin < .001)
+        return juce::Result::fail("Keep at least a millisecond of audio inside the timeline.");
+    if (clipTransitionLocked(id)) return juce::Result::fail("Unlock this track's transition before trimming its audio.");
+    if (!clip->media || !clip->media->hasPlayback() || clip->media->sourceDetailsPending || hasPendingPlacement())
+        return juce::Result::fail("Wait for track audio and placement to finish before trimming.");
+    if (begin == clip->start && end == clip->end()) return juce::Result::ok();
+    for (const auto& link : transitionLinks) if (link.bassSwap && (link.outgoing == id || link.incoming == id))
+        return juce::Result::fail("Replace this older paired bass treatment with a current preset before trimming. Its markers were kept.");
+    const double delta = begin - clip->start, elapsed = clip->sourceElapsed(delta);
+    auto trimmed = clip->slice(delta, end - begin);
+    trimmed.routingStart = clip->routeStart();
+    if (trimmed.offset < -1.e-8 || trimmed.offset + trimmed.sourceSpan() > clip->media->duration() + 1.e-8)
+        return juce::Result::fail("The trim edge has reached the original audio boundary.");
+    trimmed.offset = std::max(0., trimmed.offset);
+    if (trimmed.prepared && trimmed.prepared->clipLocal
+        && (trimmed.preparedOffset < -1.e-8 || trimmed.preparedOffset + trimmed.length > trimmed.prepared->frames() / clip->media->sampleRate + 1.e-8))
+        return juce::Result::fail("This prepared passage ends here. Rebuild its audio before extending beyond the prepared range.");
+    // Both inward and outward trims retain the existing marker/fade clocks.
+    trimmed.introAnchor = clip->sourceElapsed(clip->transitionTime(true)) - elapsed;
+    trimmed.outroAnchor = clip->sourceElapsed(clip->transitionTime(false)) - elapsed;
+    const auto fades = clip->envelope();
+    trimmed.fadeInAnchor = clip->sourceElapsed(fades.intro) - elapsed;
+    trimmed.fadeOutAnchor = clip->sourceElapsed(fades.outro) - elapsed;
+    // Keep excluded stem nodes available when the edge is extended again.
+    trimmed.stemControls = clip->stemControls;
+    for (auto& settings : trimmed.stemControls) for (auto& curve : settings.automation)
+        for (auto& point : curve.points) point.time -= elapsed;
+    for (auto& link : transitionLinks) if (link.outgoing == id || link.incoming == id)
+    {
+        if (!link.frame)
+        {
+            const auto range = transitionRange(link); const auto* outgoing = clipFor(link.outgoing);
+            link.frame = std::array<double,2>{outgoing->sourceElapsed(range.getStart()-outgoing->start), outgoing->sourceElapsed(range.getEnd()-outgoing->start)};
+        }
+        if (link.outgoing == id) for (auto& value : *link.frame) value -= elapsed;
+        if (link.bassSwap) for (int side=0; side<2; ++side) if ((side==0 ? link.outgoing : link.incoming)==id)
+            for (int node=0; node<2; ++node) (*link.bassSwap)[(size_t)(side*2+node)] -= elapsed;
+    }
+    *clip = std::move(trimmed);
     return juce::Result::ok();
 }
 
@@ -454,7 +481,7 @@ Clip Clip::slice(double begin, double duration) const
     result.effectOffset += sourceBegin;
     if (loopSpan > 0) result.loopPhase = loopPosition(loopPhase + sourceBegin, loopSpan);
     else result.offset += reversed ? length * rate - sourceBegin - sourceLength : sourceBegin;
-    result.start += begin; result.length = duration;
+    result.start += begin; result.length = duration; result.routingStart=routeStart();
     result.rate = sourceLength / duration;
     if (begin > 0 || duration < length)
     {
@@ -511,6 +538,8 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
     const auto stopped = [&] { return cancelled && cancelled->load(); };
     if (stopped()) return {{}, "Audio loading cancelled."};
     if (!file.existsAsFile()) return {{}, "Missing audio file: " + file.getFullPathName()};
+    const auto initialBytes = file.getSize();
+    const auto initialModified = file.getLastModificationTime().toMilliseconds();
     if (progress) progress(MediaReadStage::lookupAnalysis);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (!reader)
@@ -527,8 +556,8 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
     auto m = std::make_shared<Media>();
     m->id = juce::Uuid().toString(); m->file = file; m->name = file.getFileNameWithoutExtension(); m->sampleRate = reader->sampleRate;
     if (progress) progress(MediaReadStage::lookupAnalysis);
-    m->analysisSource = {audioDigest(file), file.getSize(), m->sampleRate, (int) reader->lengthInSamples, channels};
-    m->sourceModified = file.getLastModificationTime().toMilliseconds();
+    m->analysisSource = {audioDigest(file), initialBytes, m->sampleRate, (int) reader->lengthInSamples, channels};
+    m->sourceModified = initialModified;
     m->assets = readLibraryAssets(file);
     if (m->assets.title.isNotEmpty()) m->name = m->assets.title;
     auto cached = readAnalysisRecord(file, m->analysisSource);
@@ -635,7 +664,12 @@ MediaResult readMedia(juce::AudioFormatManager& formats, const juce::File& file,
         m->energy = analyseMusicalEnergy(m->audioView(), m->sampleRate, cancelled);
     }
     if (stopped()) return {{}, "Audio loading cancelled."};
-    if (m->analysisSource.sha256.isNotEmpty() && audioDigest(file) != m->analysisSource.sha256) return { {}, "Audio changed while being read: " + file.getFullPathName() + ". Import it again." };
+    // Cache-only catalogue loads read the content once to verify its identity.
+    // Keep the second content check for decoded analysis and playback admission.
+    const bool verifyContentAgain = purpose != MediaReadPurpose::catalogue || analysisWanted;
+    if (file.getSize() != initialBytes || file.getLastModificationTime().toMilliseconds() != initialModified
+        || (verifyContentAgain && m->analysisSource.sha256.isNotEmpty() && audioDigest(file) != m->analysisSource.sha256))
+        return { {}, "Audio changed while being read: " + file.getFullPathName() + ". Import it again." };
     if (needsPcm && m->waveformRms.empty()) m->prepareWaveformBody();
     if (m->analysis.rhythmIssue.isNotEmpty() && m->analysis.rhythmMethod != "bounded-scan" && !focused) m->analysisCacheWarning = m->analysis.rhythmIssue;
     else if (mode != AnalysisCacheMode::readOnly && (!saved || retryTempo || retryKey || refinedTiming || cached.legacyLocation || (newEnergy && m->energy.complete()))) m->analysisCacheWarning = writeAnalysisRecord(file, m->analysisRecord());
@@ -665,6 +699,7 @@ juce::String midiActionId(MidiAction a)
         case MidiActionKind::cyclePot: return "desk-lane-" + juce::String(a.index + 1);
         case MidiActionKind::resetCutoff: return "reset-filter-" + juce::String(a.index + 1);
         case MidiActionKind::resetPans: return "reset-pans";
+        case MidiActionKind::timelineCue: return "timeline-cue-" + juce::String(a.index+1);
         case MidiActionKind::play: return "play";
         case MidiActionKind::start: return "start";
         case MidiActionKind::stop: return "stop";
@@ -699,6 +734,7 @@ juce::String midiActionId(MidiAction a)
 std::vector<MidiAction> midiActions()
 {
     std::vector<MidiAction> result;
+    for(int slot=0;slot<9;++slot) result.push_back({MidiActionKind::timelineCue,slot});
     for (auto kind : {MidiActionKind::play, MidiActionKind::start, MidiActionKind::stop, MidiActionKind::home, MidiActionKind::master,
         MidiActionKind::record, MidiActionKind::read, MidiActionKind::arm, MidiActionKind::previousTrack, MidiActionKind::nextTrack,
         MidiActionKind::previousTransition, MidiActionKind::nextTransition, MidiActionKind::undo, MidiActionKind::redo, MidiActionKind::snap, MidiActionKind::panic, MidiActionKind::armMaster, MidiActionKind::resetPans}) result.push_back({kind});
@@ -765,6 +801,145 @@ const char* automationName(AutomationTarget target)
     switch (target) { case AutomationTarget::volume: return "Volume"; case AutomationTarget::bass: return "Bass / 120 Hz"; case AutomationTarget::mid: return "Mid / 1 kHz"; case AutomationTarget::treble: return "Treble / 8 kHz"; case AutomationTarget::cutoff: return "Cutoff / LP - Off - HP"; case AutomationTarget::pan: return "Pan"; case AutomationTarget::master: return "Master volume"; case AutomationTarget::plugin: return "VST parameter"; }
     jassertfalse; return "Volume";
 }
+double AutomationShape::position(double fraction) const
+{
+    const double u = juce::jlimit(0.,1.,(fraction-inputBegin)/(inputEnd-inputBegin));
+    const double t = clock.points.empty() || u == 0 || u == 1 ? u
+        : juce::jlimit(0.,1.,forwardClock ? clock.beatsAt(u)/clock.beatsAt(1) : clock.timeAtBeat(clock.beatsAt(1)*u));
+    return from+(to-from)*t;
+}
+double AutomationShape::value(double t) const
+{
+    if (kind == 4 || kind == 6)
+    {
+        double result = 1;
+        for (const auto& term : terms)
+        { const double v = term.value(term.position(t)); result = kind == 4 ? result*v : std::min(result,v); }
+        return result;
+    }
+    if (kind == 5)
+    {
+        const double u = automationProgress(t,bend,exponential);
+        const auto gain = [](double db) { return db <= -160 ? 0. : juce::Decibels::decibelsToGain(db); };
+        const double a = gainInterpolation ? gain(first) : first, b = gainInterpolation ? gain(last) : last;
+        const double v = terms.empty() ? a+(b-a)*u : terms.front().interpolate(u,a,b);
+        return gainInterpolation ? std::max(0.,v) : gain(v);
+    }
+    if (kind == 7) return t < 1 ? (rising ? 1-strength : 1) : (rising ? 1 : 1-strength);
+    const double shaped = automationProgress(t,bend), level = rising ? shaped : 1-shaped;
+    if (kind < 2) return 1-strength*(1-(kind == 1 ? std::sin(level*juce::MathConstants<double>::halfPi) : level));
+    const double amount = strength*level;
+    const double hz = kind == 2 ? 20*std::pow(upper/20,.8*amount) : upper*std::pow(upper/20,-.8*amount);
+    return (kind == 2 ? (hz-20)/19980 : (hz-20000)/19980)*std::min(1.,amount/.02);
+}
+double AutomationShape::progress(double fraction) const
+{
+    const double a = value(position(0)), b = value(position(1));
+    return a == b ? fraction : (value(position(fraction))-a)/(b-a);
+}
+double AutomationShape::interpolate(double fraction, double a, double b) const
+{
+    if (kind != 4) return a+(b-a)*progress(fraction);
+    // Retain the full analytical interior even when the two endpoints are equal.
+    // Endpoint edits add a gain correction; they do not flatten a dip or a crest.
+    return juce::jlimit(0.,juce::Decibels::decibelsToGain(12.),value(position(fraction))
+        +(a-first)*(1-fraction)+(b-last)*(endpointStep ? (fraction>=1 ? 1. : 0.) : fraction));
+}
+AutomationShape AutomationShape::sliced(double begin, double end) const
+{
+    AutomationShape result = *this;
+    result.from = position(begin); result.to = position(end); result.endpointStep = endpointStep && end == 1;
+    result.inputBegin = 0; result.inputEnd = 1;
+    if (begin == end) { result.clock.points.clear(); if (kind==4) result.first=result.last=result.value(result.position(0)); return result; }
+    if (!clock.points.empty())
+    {
+        const double firstTime = forwardClock ? begin : clock.timeAtBeat(clock.beatsAt(1)*begin);
+        const double lastTime = forwardClock ? end : clock.timeAtBeat(clock.beatsAt(1)*end);
+        result.clock.points = clock.localPoints(firstTime,lastTime);
+        for (auto& point : result.clock.points) point.time /= lastTime-firstTime;
+    }
+    if (kind==4) { result.first=result.value(result.position(0)); result.last=result.value(result.position(1)); }
+    return result;
+}
+bool AutomationShape::valid() const
+{
+    int remaining = 512;
+    std::function<bool(const AutomationShape&,int)> check = [&](const AutomationShape& s,int depth)
+    {
+        if (--remaining < 0 || depth > 16 || s.kind < 0 || s.kind > 7 || !std::isfinite(s.strength) || s.strength <= 0 || s.strength > 1
+            || !std::isfinite(s.bend) || s.bend < -1 || s.bend > (s.kind == 5 ? 1 : std::nextafter(1.,0.))
+            || !std::isfinite(s.upper) || s.upper < 20 || s.upper > 20000 || !std::isfinite(s.from) || !std::isfinite(s.to)
+            || s.from < 0 || s.to > 1 || s.from > s.to || s.clock.points.size() > 256
+            || !std::isfinite(s.inputBegin) || !std::isfinite(s.inputEnd) || std::abs(s.inputBegin)>1.e18 || std::abs(s.inputEnd)>1.e18 || s.inputEnd<=s.inputBegin
+            || !std::isfinite(s.first) || !std::isfinite(s.last) || s.first < -160 || s.first > 12 || s.last < -160 || s.last > 12
+            || s.terms.size()>16 || ((s.kind<4 || s.kind==7) && !s.terms.empty()) || (s.kind==5 && s.terms.size()>1)
+            || ((s.kind==4 || s.kind==6) && s.terms.empty())) return false;
+        double previous = -1;
+        for (const auto& point : s.clock.points)
+        { if (!std::isfinite(point.time) || point.time<0 || point.time>1 || point.time<=previous || !std::isfinite(point.bpm) || point.bpm<20 || point.bpm>400) return false; previous=point.time; }
+        if (!s.clock.points.empty() && (s.clock.points.front().time!=0 || s.clock.points.back().time!=1)) return false;
+        if (s.kind==4 && (s.terms.front().kind!=5 || std::any_of(s.terms.begin()+1,s.terms.end(),[](const auto& t){return t.kind!=0 && t.kind!=1 && t.kind!=6 && t.kind!=7;}))) return false;
+        if (s.kind==6 && std::any_of(s.terms.begin(),s.terms.end(),[](const auto& t){return t.kind!=0 && t.kind!=7;})) return false;
+        if (s.kind==5 && !s.terms.empty() && s.terms.front().kind!=0 && s.terms.front().kind!=1 && s.terms.front().kind!=4) return false;
+        for (const auto& term : s.terms) if (!check(term,depth+1)) return false;
+        return true;
+    };
+    return check(*this,0);
+}
+bool AutomationShape::operator==(const AutomationShape& other) const
+{
+    return kind==other.kind && strength==other.strength && bend==other.bend && upper==other.upper && from==other.from && to==other.to
+        && rising==other.rising && clock.points==other.clock.points && inputBegin==other.inputBegin && inputEnd==other.inputEnd
+        && (kind!=5 || (first==other.first && last==other.last)) && forwardClock==other.forwardClock && gainInterpolation==other.gainInterpolation
+        && exponential==other.exponential && endpointStep==other.endpointStep && terms==other.terms;
+}
+juce::var automationShapeToJson(const AutomationShape& s)
+{
+    auto* data = new juce::DynamicObject();
+    data->setProperty("kind",s.kind); data->setProperty("strength",s.strength); data->setProperty("bend",s.bend);
+    data->setProperty("upper",s.upper); data->setProperty("from",s.from); data->setProperty("to",s.to); data->setProperty("rising",s.rising);
+    if (s.inputBegin!=0 || s.inputEnd!=1) { data->setProperty("inputBegin",s.inputBegin); data->setProperty("inputEnd",s.inputEnd); }
+    if (s.kind>=4)
+    {
+        if (s.kind==5) { data->setProperty("first",s.first); data->setProperty("last",s.last); }
+        data->setProperty("forwardClock",s.forwardClock);
+        data->setProperty("gainInterpolation",s.gainInterpolation); data->setProperty("exponential",s.exponential); data->setProperty("endpointStep",s.endpointStep);
+        juce::Array<juce::var> terms; for (const auto& term : s.terms) terms.add(automationShapeToJson(term)); data->setProperty("terms",terms);
+    }
+    juce::Array<juce::var> clock;
+    for (const auto& point : s.clock.points) { juce::Array<juce::var> row; row.add(point.time); row.add(point.bpm); row.add(point.ramp); clock.add(row); }
+    data->setProperty("clock",clock); return juce::var(data);
+}
+bool readAutomationShape(const juce::var& document, std::optional<AutomationShape>& result)
+{
+    int remaining=512;
+    const auto numeric=[](const juce::var& v) { return v.isInt() || v.isInt64() || v.isDouble(); };
+    std::function<bool(const juce::var&,AutomationShape&,int)> read = [&](const juce::var& data,AutomationShape& s,int depth)
+    {
+        if (--remaining<0 || depth>16 || !data.isObject() || !data["kind"].isInt() || !data["rising"].isBool() || !data["clock"].isArray() || data["clock"].size()>256) return false;
+        for (const auto* key : {"strength","bend","upper","from","to"}) if (!numeric(data[key])) return false;
+        s.kind=(int)data["kind"]; s.strength=(double)data["strength"]; s.bend=(double)data["bend"]; s.upper=(double)data["upper"];
+        s.from=(double)data["from"]; s.to=(double)data["to"]; s.rising=(bool)data["rising"];
+        for (const auto* key : {"inputBegin","inputEnd","first","last"}) if (data.hasProperty(key) && !numeric(data[key])) return false;
+        for (const auto* key : {"forwardClock","gainInterpolation","exponential","endpointStep"}) if (data.hasProperty(key) && !data[key].isBool()) return false;
+        if (data.hasProperty("inputBegin")) s.inputBegin=(double)data["inputBegin"]; if (data.hasProperty("inputEnd")) s.inputEnd=(double)data["inputEnd"];
+        s.first=(double)data["first"]; s.last=(double)data["last"]; s.forwardClock=(bool)data["forwardClock"];
+        s.gainInterpolation=(bool)data["gainInterpolation"]; s.exponential=(bool)data["exponential"]; s.endpointStep=(bool)data["endpointStep"];
+        if (data.hasProperty("terms"))
+        { if (!data["terms"].isArray() || data["terms"].size()>16) return false;
+          for (const auto& term : *data["terms"].getArray()) { s.terms.emplace_back(); if (!read(term,s.terms.back(),depth+1)) return false; } }
+        for (const auto& row : *data["clock"].getArray())
+        { if (!row.isArray() || row.size()!=3 || !numeric(row[0]) || !numeric(row[1]) || !row[2].isBool()) return false;
+          s.clock.points.push_back({(double)row[0],(double)row[1],(bool)row[2]}); }
+        return true;
+    };
+    AutomationShape shape; if (!read(document,shape,0) || !shape.valid()) return false;
+    // Endpoint caches are derived, never trusted as document instructions.
+    std::function<void(AutomationShape&)> cache = [&](AutomationShape& node)
+    { for (auto& term : node.terms) cache(term); if (node.kind==4) { node.first=node.value(node.position(0)); node.last=node.value(node.position(1)); } };
+    cache(shape); result=std::move(shape); return true;
+}
+
 double automationProgress(double fraction, double bend, bool exponential)
 {
     const double t = juce::jlimit(0.0, 1.0, fraction);
@@ -803,6 +978,7 @@ AutomationCurve AutomationCurve::sliced(double begin, double end, float fallback
             const auto& previous = *std::prev(next); const double span = next->time - previous.time;
             point.exponential = previous.exponential; point.gainSpace = previous.gainSpace;
             point.bend = slicedBend(previous.bend, (point.time - previous.time) / span, (result.points[i + 1].time - previous.time) / span, previous.exponential);
+            if (previous.shape) point.shape = previous.shape->sliced(automationProgress((point.time-previous.time)/span,previous.bend,previous.exponential),automationProgress((result.points[i+1].time-previous.time)/span,previous.bend,previous.exponential));
         }
     }
     // The last held endpoint also owns its below-floor gain representation.
@@ -828,14 +1004,15 @@ float AutomationCurve::interpolatedValue(double time, float manualValue) const
     if (next == points.end()) return previous.value;
     if (previous.bend >= 1) return previous.value;
     const double fraction = (time - previous.time) / (next->time - previous.time);
-    const double progress = automationProgress(fraction,previous.bend,previous.exponential);
+    const double u=automationProgress(fraction,previous.bend,previous.exponential);
     if (previous.gainSpace)
     {
-        const double a = previous.value <= -160 ? 0 : juce::Decibels::decibelsToGain((double) previous.value);
-        const double b = next->value <= -160 ? 0 : juce::Decibels::decibelsToGain((double) next->value);
-        return (float) juce::Decibels::gainToDecibels(a+(b-a)*progress,-160.);
+        const double a=previous.value<=-160 ? 0 : juce::Decibels::decibelsToGain((double)previous.value);
+        const double b=next->value<=-160 ? 0 : juce::Decibels::decibelsToGain((double)next->value);
+        return (float)juce::Decibels::gainToDecibels(previous.shape ? previous.shape->interpolate(u,a,b) : a+(b-a)*u,-160.);
     }
-    return (float) (previous.value + progress * (next->value - previous.value));
+    const double progress=previous.shape ? previous.shape->progress(u) : u;
+    return (float)(previous.value+progress*(next->value-previous.value));
 }
 int AutomationCurve::setPoint(double time, float value)
 {
@@ -846,14 +1023,15 @@ int AutomationCurve::setPoint(double time, float value)
     if (it != points.end() && it->time == time) it->value = value == -60 && it->gainSpace ? -160 : value;
     else
     {
-        double bend = 0; bool exponential = false, gainSpace = false;
+        double bend = 0; bool exponential = false, gainSpace = false; std::optional<AutomationShape> shape;
         if (it != points.begin() && it != points.end())
         {
             auto& previous = *std::prev(it); const double fraction = (time - previous.time) / (it->time - previous.time);
             exponential = previous.exponential; gainSpace = previous.gainSpace;
+            if (previous.shape) { const auto u = automationProgress(fraction,previous.bend,previous.exponential); shape = previous.shape->sliced(u,1); previous.shape = previous.shape->sliced(0,u); }
             bend = slicedBend(previous.bend, fraction, 1, exponential); previous.bend = slicedBend(previous.bend, 0, fraction, exponential);
         }
-        points.insert(it, {time, value == -60 && gainSpace ? -160 : value, bend, exponential, gainSpace});
+        points.insert(it, {time, value == -60 && gainSpace ? -160 : value, bend, exponential, gainSpace, {}, shape});
     }
     return index;
 }
@@ -978,6 +1156,7 @@ juce::Result Project::closeTimeRange(double begin, double end, const juce::Strin
             if (!curve.points.empty() && guardNext != original.points.end() && guardNext->time > guardTime)
             {
                 auto& last = curve.points.back();
+                if (last.shape) last.shape = last.shape->sliced(0,automationProgress((guardTime-last.time)/(guardNext->time-last.time),last.bend,last.exponential));
                 last.bend = slicedBend(last.bend, 0, (guardTime - last.time) / (guardNext->time - last.time), last.exponential);
             }
             curve.points.push_back({guardTime, original.interpolatedValue(guardTime, 0), 1, false,
@@ -986,15 +1165,16 @@ juce::Result Project::closeTimeRange(double begin, double end, const juce::Strin
         const auto right = std::lower_bound(original.points.begin(), original.points.end(), end, [](const auto& p, double t) { return p.time < t; });
         if (right == original.points.end() || right->time != end)
         {
-            double bend = 0; bool exponential = false;
+            double bend = 0; bool exponential = false; std::optional<AutomationShape> shape;
             const bool gainSpace = (right == original.points.begin() ? *right : *std::prev(right)).gainSpace;
             if (right != original.points.begin() && right != original.points.end())
             {
                 const auto& previous = *std::prev(right);
                 exponential = previous.exponential;
                 bend = slicedBend(previous.bend, (end - previous.time) / (right->time - previous.time), 1, exponential);
+                if (previous.shape) shape = previous.shape->sliced(automationProgress((end-previous.time)/(right->time-previous.time),previous.bend,previous.exponential),1);
             }
-            curve.points.push_back({begin, original.interpolatedValue(end, 0), bend, exponential, gainSpace});
+            curve.points.push_back({begin, original.interpolatedValue(end, 0), bend, exponential, gainSpace, {}, shape});
         }
         for (auto p = right; p != original.points.end(); ++p)
         { auto shifted = *p; shifted.time = fold(p->time); curve.points.push_back(shifted); }
@@ -1143,6 +1323,7 @@ void Project::updateLaneHandles()
 AutomationCurve* Project::curve(const AutomationAddress& address)
 {
     if (address.target == AutomationTarget::master) return &masterAutomation;
+    if (address.clipId.isEmpty() && address.target != AutomationTarget::plugin) return nullptr;
     auto* t = settings(address); if (!t) return nullptr;
     if (address.target != AutomationTarget::plugin) return &t->automation[(size_t) address.target];
     for (auto& lane : t->pluginAutomation) if (lane.slotId == address.slotId && lane.parameterId == address.parameterId) return &lane.curve;
@@ -1151,6 +1332,7 @@ AutomationCurve* Project::curve(const AutomationAddress& address)
 const AutomationCurve* Project::curve(const AutomationAddress& address) const
 {
     if (address.target == AutomationTarget::master) return &masterAutomation;
+    if (address.clipId.isEmpty() && address.target != AutomationTarget::plugin) return nullptr;
     const auto* t = settings(address); if (!t) return nullptr;
     if (address.target != AutomationTarget::plugin) return &t->automation[(size_t) address.target];
     for (const auto& lane : t->pluginAutomation) if (lane.slotId == address.slotId && lane.parameterId == address.parameterId) return &lane.curve;
@@ -1186,7 +1368,7 @@ namespace
 juce::var curveToJson(const AutomationCurve& curve, const LaneHandleState* handles = nullptr)
 {
     auto* lane = new juce::DynamicObject(); juce::Array<juce::var> points; lane->setProperty("enabled", curve.enabled);
-    for (const auto& point : curve.points) { auto* node = new juce::DynamicObject(); node->setProperty("time", point.time); node->setProperty("value", point.value); if (point.bend != 0) node->setProperty("bend", point.bend); if (point.exponential) node->setProperty("exponential", true); if (point.gainSpace) node->setProperty("gainSpace", true); points.add(juce::var(node)); }
+    for (const auto& point : curve.points) { auto* node = new juce::DynamicObject(); node->setProperty("time", point.time); node->setProperty("value", point.value); if (point.bend != 0) node->setProperty("bend", point.bend); if (point.exponential) node->setProperty("exponential", true); if (point.gainSpace) node->setProperty("gainSpace", true); if (point.presetOwner.isNotEmpty()) node->setProperty("presetOwner", point.presetOwner); if (point.shape) node->setProperty("shape",automationShapeToJson(*point.shape)); points.add(juce::var(node)); }
     lane->setProperty("points", points);
     if (handles && !handles->seeds.empty())
     {
@@ -1285,7 +1467,14 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
         for (const auto& link : relationships.transitionLinks)
         {
             auto* item = new juce::DynamicObject(); item->setProperty("outgoing", link.outgoing); item->setProperty("incoming", link.incoming); item->setProperty("locked", link.locked);
+            item->setProperty("movementLocked",link.movementLocked);
             item->setProperty("muteOutside", link.muteOutside);
+            if (link.alignmentOnly) item->setProperty("alignmentOnly", true);
+            if (link.presetOwner.isNotEmpty())
+            {
+                item->setProperty("presetOwner", link.presetOwner);
+                item->setProperty("presetName", link.presetName);
+            }
             if (link.frame) { juce::Array<juce::var> frame; for (auto time : *link.frame) frame.add(time); item->setProperty("frame", frame); }
             if (link.bassSwap) { juce::Array<juce::var> positions; for (auto position : *link.bassSwap) positions.add(position); item->setProperty("bassSwap", positions); }
             if (std::any_of(link.bands.begin(), link.bands.end(), [](const auto& band) { return band.has_value(); })) item->setProperty("bands", transitionBandsToJson(link));
@@ -1327,6 +1516,7 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
         obj->setProperty("pitchSemitones", c.pitchSemitones);
         obj->setProperty("tempoSourceBpm", p.followTrackTempo && c.beatmatched && c.tempoMap ? c.tempoSourceBpm : 0);
         obj->setProperty("elasticPlayback", c.elasticPlayback);
+        obj->setProperty("routingStart", c.routingStart ? juce::var(*c.routingStart) : juce::var());
         obj->setProperty("start", c.start); obj->setProperty("offset", c.offset); obj->setProperty("length", c.length); obj->setProperty("audioSlip", c.audioSlip);
         obj->setProperty("fadeIn", c.fadeIn); obj->setProperty("fadeOut", c.fadeOut); obj->setProperty("gainDb", c.gainDb);
         obj->setProperty("introAnchor", c.introAnchor ? juce::var(*c.introAnchor) : juce::var());
@@ -1383,19 +1573,22 @@ bool number(const juce::var& v, double low, double high)
     if (!(v.isDouble() || v.isInt() || v.isInt64())) return false;
     const double n = (double) v; return std::isfinite(n) && n >= low && n <= high;
 }
-bool parseCurve(const juce::var& lane, AutomationCurve& curve, juce::Range<float> range, bool legacyDb, LaneHandleState* handles = nullptr)
+bool parseCurve(const juce::var& lane, AutomationCurve& curve, juce::Range<float> range, bool legacyDb, LaneHandleState* handles = nullptr, bool sourceClock = false)
 {
     auto* points = lane["points"].getArray();
     if (!lane.isObject() || !lane["enabled"].isBool() || !points) return false;
-    curve.enabled = (bool) lane["enabled"]; double previous = -1;
+    curve.enabled = (bool) lane["enabled"]; double previous = sourceClock ? -1.e9-1 : -1;
     for (const auto& point : *points)
     {
         const auto value = point[legacyDb ? "db" : "value"];
-        if (!point.isObject() || !number(point["time"], 0, 1.0e9) || !number(value, (bool) point["gainSpace"] && range.getStart() == -60 ? -160 : range.getStart(), range.getEnd()) || (double) point["time"] <= previous) return false;
+        const bool owned = point.hasProperty("presetOwner");
+        if (owned && (!point["presetOwner"].isString() || point["presetOwner"].toString().length() != 32)) return false;
+        if (!point.isObject() || !number(point["time"], sourceClock ? -1.e9 : owned ? -.001 : 0, 1.0e9) || !number(value, (bool) point["gainSpace"] && range.getStart() == -60 ? -160 : range.getStart(), range.getEnd()) || (double) point["time"] <= previous) return false;
         if (point.hasProperty("bend") && !number(point["bend"], -1, 1)) return false;
         if (point.hasProperty("exponential") && !point["exponential"].isBool()) return false;
         if (point.hasProperty("gainSpace") && (!point["gainSpace"].isBool() || ((bool) point["gainSpace"] && range.getStart() != -60))) return false;
-        previous = (double) point["time"]; curve.points.push_back({previous, (float) value, point.hasProperty("bend") ? (double) point["bend"] : 0, (bool) point["exponential"], (bool) point["gainSpace"]});
+        previous = (double) point["time"]; curve.points.push_back({previous, (float) value, point.hasProperty("bend") ? (double) point["bend"] : 0, (bool) point["exponential"], (bool) point["gainSpace"], point["presetOwner"].toString()});
+        if (point.hasProperty("shape") && (!readAutomationShape(point["shape"],curve.points.back().shape) || (curve.points.back().shape->kind>4 || ((curve.points.back().shape->kind < 2 || curve.points.back().shape->kind == 4) ? !curve.points.back().gainSpace : range != juce::Range<float>(-1,1))))) return false;
     }
     if (lane.hasProperty("laneSeeds") || lane.hasProperty("laneGeneratedPoints"))
     {
@@ -1425,15 +1618,15 @@ bool parseFilterControl(const juce::var& t, TrackSettings& target, int version)
     if (!number(value, version >= 27 ? -1 : 20, version >= 27 ? 1 : 20000)) return false;
     target.filterCutoff = version >= 27 ? (float) value : lowPassToCutoff((float) value); return true;
 }
-bool parseControlCurve(const juce::var& automation, AutomationCurve& curve, AutomationTarget target, int version, bool legacyDb = false, LaneHandleState* handles = nullptr)
+bool parseControlCurve(const juce::var& automation, AutomationCurve& curve, AutomationTarget target, int version, bool legacyDb = false, LaneHandleState* handles = nullptr, bool sourceClock = false)
 {
     if (target != AutomationTarget::cutoff || version >= 27)
-        return parseCurve(automation[automationId(target)], curve, automationRange(target), legacyDb, handles);
+        return parseCurve(automation[automationId(target)], curve, automationRange(target), legacyDb, handles, sourceClock);
     if (!parseCurve(automation["low-pass"], curve, {20, 20000}, false)) return false;
     for (auto& point : curve.points) point.value = lowPassToCutoff(point.value);
     return true;
 }
-bool parseClipControls(const juce::var& c, Clip& clip, std::set<juce::String>& pluginIds, int version)
+bool parseClipControls(const juce::var& c, Clip& clip, std::set<juce::String>& pluginIds, int version, bool sourceClock = false)
 {
     const auto& t = c["controls"]; auto& target = clip.controls;
     auto* plugins = c["plugins"].getArray(); auto* eq = t["eqDb"].getArray(); auto* controls = t["pluginControls"].getArray(); auto* lanes = t["pluginAutomation"].getArray();
@@ -1442,7 +1635,7 @@ bool parseClipControls(const juce::var& c, Clip& clip, std::set<juce::String>& p
     if (!parseFilterControl(t, target, version)) return false;
     for (int n = 0; n < 3; ++n) { if (!number((*eq)[n], -60, 12)) return false; target.eqDb[(size_t) n] = (float) (*eq)[n]; }
     for (int n = 0; n < (version >= 23 ? trackAutomationCount : 5); ++n)
-        if (!parseControlCurve(t["automation"], target.automation[(size_t) n], (AutomationTarget) n, version)) return false;
+        if (!parseControlCurve(t["automation"], target.automation[(size_t) n], (AutomationTarget) n, version, false, nullptr, sourceClock)) return false;
     std::set<juce::String> slots; std::set<std::pair<juce::String, juce::String>> targets;
     for (const auto& p : *plugins)
     {
@@ -1705,6 +1898,9 @@ ProjectResult parseProject(const juce::String& text)
             || !number(c["fadeIn"], 0, (int) d["version"] >= 9 && !c[(int) d["version"] >= 10 ? "fadeInAnchor" : "introAnchor"].isVoid() ? 1.0e9 : (double) c["length"]) || !number(c["fadeOut"], 0, (int) d["version"] >= 9 && !c[(int) d["version"] >= 10 ? "fadeOutAnchor" : "outroAnchor"].isVoid() ? 1.0e9 : (double) c["length"]) || !number(c["gainDb"], -60, 12)) return fail("Invalid segment settings.");
         ClipReference reference; auto& clip = reference.clip;
         clip.id = c["id"].toString(); clip.track = (int) c["track"]; clip.start = (double) c["start"]; clip.offset = (double) c["offset"]; clip.length = (double) c["length"];
+        if ((int)d["version"]>=48 && !c["routingStart"].isVoid())
+        { if (!number(c["routingStart"],-1.e9,1.e9)) return fail("Invalid shared return routing clock."); clip.routingStart=(double)c["routingStart"]; }
+
         if ((int) d["version"] >= 32)
         {
             if (!c.hasProperty("hotcues") || (!c["hotcues"].isVoid() && !c["hotcues"].isArray())) return fail("Invalid hotcue slots.");
@@ -1748,7 +1944,7 @@ ProjectResult parseProject(const juce::String& text)
         if ((int) d["version"] >= 11 && (!c["automaticBass"].isBool() || !parseClipControls(c, clip, pluginIds, (int) d["version"]))) return fail("Invalid audio-track automation or effects.");
         if ((int)d["version"] >= 40)
         {
-            if (!c["effectOwner"].isString() || !number(c["effectOffset"], 0, 1.e9)) return fail("Invalid shared track effects.");
+            if (!c["effectOwner"].isString() || !number(c["effectOffset"], -1.e9, 1.e9)) return fail("Invalid shared track effects.");
             clip.effectOffset = (double)c["effectOffset"];
             const auto owner = c["effectOwner"].toString();
             if (owner.isNotEmpty())
@@ -1780,7 +1976,7 @@ ProjectResult parseProject(const juce::String& text)
             {
                 Clip parsed; auto* wrapper = new juce::DynamicObject(); wrapper->setProperty("controls", (*settings)[i]);
                 wrapper->setProperty("plugins", juce::Array<juce::var>());
-                if (!parseClipControls(juce::var(wrapper), parsed, pluginIds, (int) d["version"])) return fail("Invalid stem controls.");
+                if (!parseClipControls(juce::var(wrapper), parsed, pluginIds, (int) d["version"], true)) return fail("Invalid stem controls.");
                 if (!parsed.controls.pluginAutomation.empty() || parsed.controls.filterCutoff != 0
                     || parsed.controls.eqDb != std::array<float, 3>{}) return fail("Unsupported stem effects.");
                 for (int j : {1, 2, 3, 5}) if (!parsed.controls.automation[(size_t) j].points.empty()) return fail("Unsupported stem automation.");
@@ -1869,6 +2065,17 @@ ProjectResult parseProject(const juce::String& text)
         {
             if (!item.isObject() || !item["outgoing"].isString() || !item["incoming"].isString()) return fail("Invalid transition link.");
             r.project.transitionLinks.push_back({item["outgoing"].toString(), item["incoming"].toString()});
+            auto& link = r.project.transitionLinks.back();
+            if (item.hasProperty("alignmentOnly") && !item["alignmentOnly"].isBool()) return fail("Invalid alignment state.");
+            link.alignmentOnly = (bool)item["alignmentOnly"];
+            if (item.hasProperty("presetOwner"))
+            {
+                if (!item["presetOwner"].isString() || item["presetOwner"].toString().length() != 32
+                    || !item["presetName"].isString() || item["presetName"].toString().isEmpty() || link.alignmentOnly)
+                    return fail("Invalid transition preset ownership.");
+                link.presetOwner = item["presetOwner"].toString();
+                link.presetName = item["presetName"].toString();
+            }
             if ((int)d["version"] >= 39)
             {
                 if (!item["muteOutside"].isBool()) return fail("Invalid transition mute setting.");
@@ -1876,7 +2083,7 @@ ProjectResult parseProject(const juce::String& text)
                 if (item.hasProperty("frame"))
                 {
                     const auto frame = item["frame"];
-                    if (!frame.isArray() || frame.size() != 2 || !number(frame[0],0,1.e9) || !number(frame[1],(double)frame[0],1.e9)) return fail("Invalid transition frame.");
+                    if (!frame.isArray() || frame.size() != 2 || !number(frame[0],-1.e9,1.e9) || !number(frame[1],(double)frame[0],1.e9)) return fail("Invalid transition frame.");
                     r.project.transitionLinks.back().frame = std::array<double,2>{(double)frame[0],(double)frame[1]};
                 }
             }
@@ -1884,6 +2091,11 @@ ProjectResult parseProject(const juce::String& text)
             {
                 if (!item["locked"].isBool()) return fail("Invalid transition lock.");
                 r.project.transitionLinks.back().locked = (bool) item["locked"];
+                if((int)d["version"]>=49)
+                {
+                    if(!item["movementLocked"].isBool())return fail("Invalid transition movement lock.");
+                    r.project.transitionLinks.back().movementLocked=(bool)item["movementLocked"];
+                }
             }
             if ((int) d["version"] >= 14 && item.hasProperty("bassSwap"))
             {

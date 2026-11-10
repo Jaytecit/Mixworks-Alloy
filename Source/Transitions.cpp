@@ -395,6 +395,57 @@ juce::Result Project::editTransition(const juce::String& incoming, TransitionEdi
     const double target = candidate.snappedMoveTime(reference, reference + delta, snapping);
     delta = target - reference;
     if (std::abs(delta) < 1e-9) return juce::Result::ok();
+    if (link->presetOwner.isNotEmpty())
+    {
+        if (edit == TransitionEdit::moveOutgoing || edit == TransitionEdit::moveIncoming)
+            return juce::Result::fail("Use the track title or its IN/OUT marker to align audio.");
+        const double first = std::max(out->start,in->start), last = std::min(out->end(),in->end());
+        constexpr double minimum = .001;
+        if (last-first < minimum || end-begin < minimum)
+            return juce::Result::fail("Leave room inside both tracks for the preset.");
+        if (edit == TransitionEdit::moveWindow)
+        {
+            if (end-begin > last-first + 1.e-7) return juce::Result::fail("Shorten the preset to fit inside both tracks.");
+            delta = juce::jlimit(first-begin,std::max(first-begin,last-end),delta);
+            begin += delta; end += delta;
+        }
+        else if (edit == TransitionEdit::resizeEnd)
+            end = juce::jlimit(begin+minimum,std::max(begin+minimum,last),target);
+        else
+            begin = juce::jlimit(first,std::max(first,end-minimum),target);
+        if (begin < first-1.e-7 || end > last+1.e-7)
+            return juce::Result::fail("Keep the preset inside both tracks.");
+        const double scale = (end-begin)/oldRange.getLength();
+        auto paired = link->bassSwap;
+        size_t movedBassEndpoints = 0;
+        for (auto* clip : {out,in})
+            for (int band = 0; band < trackAutomationCount; ++band)
+            {
+                const AutomationAddress address{clip->track,(AutomationTarget)band,{},{},clip->id};
+                auto& points = candidate.effectSettings(*clip).automation[(size_t)band].points;
+                for (auto& point : points) if (point.presetOwner == link->presetOwner)
+                {
+                    const double time = candidate.automationSessionTime(address,point.time);
+                    const double oldSource = point.time;
+                    point.time = candidate.automationTime(address,begin+(time-oldRange.getStart())*scale);
+                    if (paired && band == (int)AutomationTarget::bass)
+                        for (size_t index : {clip == out ? 0u : 2u,clip == out ? 1u : 3u})
+                            if (oldSource == (*link->bassSwap)[index])
+                            { (*paired)[index] = point.time; ++movedBassEndpoints; }
+                }
+                std::sort(points.begin(),points.end(),[](const auto& a,const auto& b) { return a.time < b.time; });
+                for (size_t i = 1; i < points.size(); ++i)
+                    if (points[i].time-points[i-1].time < 1.e-9
+                        && (points[i].presetOwner == link->presetOwner || points[i-1].presetOwner == link->presetOwner))
+                        return juce::Result::fail("A preset node meets another automation node. Try another position or length.");
+            }
+        link->bassSwap = movedBassEndpoints == 0 || movedBassEndpoints == 4 ? paired : std::nullopt;
+        link->frame = std::array<double,2>{out->sourceElapsed(begin-out->start),out->sourceElapsed(end-out->start)};
+        const auto checked = candidate.validateTransitionLinks(); if (checked.failed()) return checked;
+        const auto protection = validateTransitionLocks(candidate); if (protection.failed()) return protection;
+        *this = std::move(candidate);
+        return juce::Result::ok();
+    }
     // Remove only the explicitly owned endpoints before changing geometry.
     // Their values and relative positions travel with the transition window;
     // unrelated source automation keeps its original coordinates.
@@ -515,6 +566,9 @@ juce::Result Project::applyPlacements(const Project& candidate)
             return juce::Result::fail("The source changed during this gesture. Drag again.");
     }
     const auto result = candidate.validateTransitionLinks(); if (result.failed()) return result;
+    for(const auto& link:transitionLinks)
+        if(const auto* proposed=candidate.transitionFor(link.incoming);proposed && proposed->movementLocked!=link.movementLocked)
+            return juce::Result::fail("A pair movement lock changed during this gesture. Release and drag again.");
     Project applied = *this;
     for (auto& clip : applied.clips)
     {
@@ -546,14 +600,14 @@ juce::Result Project::validateTransitionLinks() const
         if (link.frame)
         {
             const auto& frame = *link.frame;
-            if (!std::isfinite(frame[0]) || !std::isfinite(frame[1]) || frame[0] < -1.e-7 || frame[1] < frame[0])
+            if (!std::isfinite(frame[0]) || !std::isfinite(frame[1]) || std::abs(frame[0]) > 1.e9 || frame[1] < frame[0])
                 return juce::Result::fail("Invalid transition frame.");
             const auto* out = clipFor(link.outgoing); const auto* in = clipFor(link.incoming);
             if (out->media && in->media)
             {
                 const auto range = transitionRange(link);
-                if (range.getStart() < std::max(out->start,in->start)-1.e-7 || range.getEnd() > std::min(out->end(),in->end())+1.e-7)
-                    return juce::Result::fail("Keep the transition inside both tracks' audio.");
+                if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getStart() < -1.e-7)
+                    return juce::Result::fail("Keep the transition markers inside the timeline.");
             }
         }
         const auto bands = validateTransitionBands(link); if (bands.failed()) return bands;
@@ -598,10 +652,65 @@ juce::Result Project::linkClips(const juce::String& outgoing, const juce::String
     if (result.failed()) transitionLinks.pop_back();
     return result;
 }
-void Project::detachTransitionLinks(const juce::String& id)
+void Project::clearDeletedTrackTransitions(const std::vector<juce::String>& ids)
 {
+    if (ids.empty()) return;
     ensureTransitionLinks();
-    transitionLinks.erase(std::remove_if(transitionLinks.begin(), transitionLinks.end(), [&](const auto& link) { return link.outgoing == id || link.incoming == id; }), transitionLinks.end());
+    const auto deleted = [&](const juce::String& id) { return std::find(ids.begin(),ids.end(),id) != ids.end(); };
+    const auto broken = [&](const TransitionLink& link) { return deleted(link.outgoing) || deleted(link.incoming); };
+    for (const auto& link : transitionLinks) if (broken(link))
+    {
+        const auto range = transitionRange(link);
+        for (bool incoming : {false,true})
+        {
+            auto* clip = clipFor(incoming ? link.incoming : link.outgoing);
+            if (!clip) continue;
+            const bool survives = !deleted(clip->id);
+            const AutomationAddress address{clip->track,AutomationTarget::volume,{},{},clip->id};
+            auto& settings = effectSettings(*clip);
+            std::vector<double> protectedBass;
+            for (const auto& other : transitionLinks) if (!broken(other) && other.bassSwap)
+            {
+                const auto* out = clipFor(other.outgoing);
+                const auto* in = clipFor(other.incoming);
+                if (out && out->effects == clip->effects)
+                    protectedBass.insert(protectedBass.end(),other.bassSwap->begin(),other.bassSwap->begin()+2);
+                if (in && in->effects == clip->effects)
+                    protectedBass.insert(protectedBass.end(),other.bassSwap->begin()+2,other.bassSwap->end());
+            }
+            constexpr double epsilon = 1.e-7; // Include guards at the edge of unlabelled preset curves.
+            const size_t side = incoming ? 2 : 0;
+            const auto clear = [&](AutomationCurve& curve,double begin,double end,bool bass = false)
+            {
+                const auto before = curve.points.size();
+                curve.points.erase(std::remove_if(curve.points.begin(),curve.points.end(),[&](const auto& point)
+                {
+                    if (point.presetOwner.isNotEmpty()) return point.presetOwner == link.presetOwner;
+                    const auto at = [&](double time) { return std::abs(point.time-time) <= epsilon; };
+                    if (bass && std::any_of(protectedBass.begin(),protectedBass.end(),at)) return false;
+                    if (bass && link.bassSwap && (at((*link.bassSwap)[side]) || at((*link.bassSwap)[side+1]))) return true;
+                    return survives && point.time >= begin-epsilon && point.time <= end+epsilon;
+                }),curve.points.end());
+                if (before != curve.points.size() && curve.points.empty()) curve.enabled = false;
+            };
+            const double begin = automationTime(address,range.getStart()), end = automationTime(address,range.getEnd());
+            for (size_t band = 0; band < settings.automation.size(); ++band)
+                clear(settings.automation[band],begin,end,band == (size_t)AutomationTarget::bass);
+            if (!survives) continue;
+            for (auto& plugin : settings.pluginAutomation) clear(plugin.curve,begin,end);
+            const double stemBegin = clip->sourceElapsed(range.getStart()-clip->start), stemEnd = clip->sourceElapsed(range.getEnd()-clip->start);
+            for (auto& stem : clip->stemControls)
+                for (auto& curve : stem.automation)
+                    clear(curve,stemBegin,stemEnd);
+            const auto envelope = clip->envelope();
+            if (incoming && range.expanded(1.e-7).contains(clip->start+envelope.intro))
+            { clip->fadeIn = 0; clip->fadeInAnchor.reset(); }
+            if (!incoming && (range.expanded(1.e-7).contains(clip->start+envelope.outro)
+                || range.expanded(1.e-7).contains(clip->start+envelope.outro+clip->fadeOut)))
+            { clip->fadeOut = 0; clip->fadeOutAnchor.reset(); }
+        }
+    }
+    transitionLinks.erase(std::remove_if(transitionLinks.begin(),transitionLinks.end(),broken),transitionLinks.end());
 }
 juce::Result Project::unlinkClips(const std::vector<juce::String>& ids)
 {
@@ -646,100 +755,117 @@ juce::Result Project::unlinkClips(const std::vector<juce::String>& ids)
     const auto locks = validateTransitionLocks(candidate); if (locks.failed()) return locks;
     *this = std::move(candidate); return juce::Result::ok();
 }
-juce::Result Project::moveClip(const juce::String& id, double seconds, bool snapping, double magnetSeconds, bool adoptMarkedNeighbours)
+juce::Result Project::moveClip(const juce::String& id,double seconds,bool snapping,double magnetSeconds,bool adoptMarkedNeighbours)
 {
-    if (!std::isfinite(seconds) || seconds < 0 || !clipFor(id)) return juce::Result::fail("The track position is invalid.");
-    Project candidate = *this; candidate.ensureTransitionLinks();
-    const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) return valid;
-    juce::ignoreUnused(adoptMarkedNeighbours); // Relationships are always explicit.
-    auto* selected = candidate.clipFor(id);
-    // Existing movement retains manual phase; source/neighbor phase acquisition
-    // belongs to insertion, not to a drag of an already aligned song.
-    juce::ignoreUnused(magnetSeconds);
-    selected->moveTo(candidate.snappedMoveTime(selected->start, seconds, snapping));
-    auto current = id;
-    for (;;)
-    {
-        const auto link = std::find_if(candidate.transitionLinks.begin(), candidate.transitionLinks.end(), [&](const auto& item) { return item.incoming == current; });
-        if (link == candidate.transitionLinks.end()) break;
-        const auto* next = candidate.clipFor(current); auto* previous = candidate.clipFor(link->outgoing);
-        const auto result = previous->alignAnchorTo(false, next->start + next->transitionTime(true));
-        if (result.failed()) return result;
-        current = previous->id;
-    }
-    current = id;
-    for (;;)
-    {
-        const auto link = std::find_if(candidate.transitionLinks.begin(), candidate.transitionLinks.end(), [&](const auto& item) { return item.outgoing == current; });
-        if (link == candidate.transitionLinks.end()) break;
-        const auto* previous = candidate.clipFor(current); auto* next = candidate.clipFor(link->incoming);
-        const auto result = next->alignIntroTo(previous->start + previous->transitionTime(false));
-        if (result.failed()) return result;
-        current = next->id;
-    }
-    const auto bass = candidate.reconcileBassSwaps(); if (bass.failed()) return bass;
-    const auto protection = validateTransitionLocks(candidate); if (protection.failed()) return protection;
-    *this = std::move(candidate); return juce::Result::ok();
+    juce::ignoreUnused(magnetSeconds,adoptMarkedNeighbours);
+    const auto* clip=clipFor(id); if(!clip)return juce::Result::fail("Select an available track before moving it.");
+    return moveClipGroup({id},id,seconds,clip->track,snapping);
 }
 juce::Result Project::moveClipGroup(const std::vector<juce::String>& ids, const juce::String& anchor, double seconds, int track, bool snapping)
 {
-    const std::set<juce::String> selected(ids.begin(), ids.end());
+    std::set<juce::String> selected(ids.begin(), ids.end());
     const auto* reference = clipFor(anchor);
-    if (selected.size() < 2 || selected.size() != ids.size() || !selected.count(anchor) || !reference
+    if (selected.empty() || selected.size() != ids.size() || !selected.count(anchor) || !reference || !reference->media
         || !std::isfinite(seconds) || seconds < 0 || track < 0 || track >= trackCount)
         return juce::Result::fail("Choose a valid group destination inside the timeline.");
-    const double delta = snappedMoveTime(reference->start, seconds, snapping) - reference->start;
+    for(const auto& id:ids)for(const auto& member:movementGroup(id))selected.insert(member);
+    const double delta = snappedClipStart(*reference, seconds, snapping,0) - reference->start;
     const int lanes = track - reference->track;
+    // A single track gesture, including its locked partners, follows the mix
+    // clock. An explicit multi-selection still moves as a rigid block.
+    const bool musicalMove = ids.size() == 1 && followTrackTempo && delta != 0;
+    const double beatDelta = musicalMove ? tempo.beatsFromStart(reference->start + delta) - tempo.beatsFromStart(reference->start) : 0;
     Project candidate = *this; candidate.ensureTransitionLinks();
-    for (const auto& link : candidate.transitionLinks)
-        if (selected.count(link.outgoing) != selected.count(link.incoming))
-            return juce::Result::fail("Select both ends of every linked transition before moving the group.");
-    for (const auto& id : ids)
+    // Catalogue planning reconciles links at their existing positions before
+    // loading audio. Validate that no-op without admitting an actual gesture.
+    if (delta == 0 && lanes == 0)
+    {
+        for (const auto& id : selected)
+            if (!candidate.clipFor(id) || !candidate.clipFor(id)->media)
+                return juce::Result::fail("A selected source is unavailable or still preparing.");
+        return candidate.validateTransitionLinks();
+    }
+    for (const auto& id : selected)
     {
         auto* clip = candidate.clipFor(id);
         if (!clip || !clip->media || !clip->media->hasPlayback() || clip->media->sourceDetailsPending
             || clip->pendingPlacement != PendingPlacement::none)
             return juce::Result::fail("A selected source is unavailable or still preparing.");
-        if (candidate.clipTransitionLocked(id)) return juce::Result::fail("Unlock the selected transitions before moving the group.");
-        const auto original = *clip;
-        clip->start += delta; clip->track += lanes;
+        if (candidate.clipTransitionLocked(id)) return juce::Result::fail("Turn off Protect edits for the participating transition before moving its track.");
+        const double originalStart = clip->start;
+        const bool retime = musicalMove && clip->beatmatched && clip->tempoMap;
+        if (retime)
+        {
+            const double beat = tempo.beatsFromStart(originalStart) + beatDelta;
+            if (beat < -1e-8) return juce::Result::fail("The complete group must fit inside the timeline and four mixer lanes.");
+            clip->moveTo(id == anchor ? originalStart + delta : tempo.timeFromStartBeat(beat));
+        }
+        else
+        {
+            clip->start += delta;
+            if (delta != 0) clip->routingStart.reset();
+        }
+        clip->track += lanes;
         if (!std::isfinite(clip->end()) || clip->start < 0 || clip->end() > 1.e9 || clip->track < 0 || clip->track >= trackCount)
             return juce::Result::fail("The complete group must fit inside the timeline and four mixer lanes.");
-        if (clip->tempoMap && delta != 0)
+        const bool capturedClockDiffers = retime
+            && (clip->tempoMap->points != tempo.points || clip->tempoMap->fallback != tempo.fallback);
+        if (clip->tempoMap && delta != 0 && (!retime || capturedClockDiffers))
         {
-            // Preserve the complete local source clock and prepared audio. A
-            // destination with a different tempo shape needs explicit retiming,
-            // not a hidden stretch of individual members during a rigid move.
+            // A rigid move keeps the local source clock. A musical move may
+            // retime it, but the destination still has to agree with the mix
+            // clock that a reopened session will use.
             const double low = std::min(0., -clip->audioSlip), high = clip->length + std::max(0., -clip->audioSlip);
-            const auto before = clip->tempoMap->localPoints(original.start + low, original.start + high);
             const auto after = clip->tempoMap->localPoints(clip->start + low, clip->start + high);
             const auto saved = tempo.localPoints(clip->start + low, clip->start + high);
             auto agrees = [&](double local)
             {
-                const double a = original.start + local, b = clip->start + local;
-                return std::abs(clip->tempoMap->bpmAt(a) - clip->tempoMap->bpmAt(b)) < 1.e-9
+                const double a = originalStart + local, b = clip->start + local;
+                return (retime || std::abs(clip->tempoMap->bpmAt(a) - clip->tempoMap->bpmAt(b)) < 1.e-9)
                     && (!followTrackTempo || std::abs(clip->tempoMap->bpmAt(a) - tempo.bpmAt(b)) < 1.e-9);
             };
             std::set<double> boundaries {low, high};
-            for (const auto& point : before) boundaries.insert(low + point.time);
+            if (!retime)
+                for (const auto& point : clip->tempoMap->localPoints(originalStart + low, originalStart + high)) boundaries.insert(low + point.time);
             for (const auto& point : after) boundaries.insert(low + point.time);
             if (followTrackTempo) for (const auto& point : saved) boundaries.insert(low + point.time);
             bool same = true; double previous = low;
             for (double local : boundaries)
             { same = same && agrees(local) && agrees((previous + local) / 2); previous = local; }
-            if (!same) return juce::Result::fail("Group movement keeps source timing. Choose a destination with the same tempo curve.");
+            if (!same) return juce::Result::fail(retime ? "This track still uses an earlier playback clock. Reopen the mix before moving it into the new tempo curve."
+                : "Group movement keeps source timing. Choose a destination with the same tempo curve.");
         }
         // Elastic streams use absolute programme time. Rebind the immutable
         // source through the same placement rule as Clip::retime.
-        if (delta != 0 && clip->elasticPlayback) clip->elasticSource = std::make_shared<const ElasticSource>(*clip);
+        if (delta != 0 && !retime && clip->elasticPlayback) clip->elasticSource = std::make_shared<const ElasticSource>(*clip);
     }
-    // No-op admission may inspect inferred legacy links, but must not publish
-    // that metadata or require an existing overlap to be resolved first.
-    if (delta == 0 && lanes == 0) return candidate.validateTransitionLinks();
-    for (const auto& c : candidate.clips) if (selected.count(c.id))
+    for (const auto& c : candidate.clips) if (selected.size()>1 && selected.count(c.id))
         for (const auto& other : candidate.clips) if (!selected.count(other.id) && other.track == c.track
             && c.start < other.end() - 1.e-9 && c.end() > other.start + 1.e-9)
             return juce::Result::fail("The group overlaps an unselected segment. Choose empty destination lanes/times.");
+    for(size_t i=0;i<candidate.transitionLinks.size();++i)
+    {
+        auto& link=candidate.transitionLinks[i];
+        const bool outMoved=selected.count(link.outgoing)!=0,inMoved=selected.count(link.incoming)!=0;
+        if (!outMoved && !inMoved) continue;
+        auto* out=candidate.clipFor(link.outgoing); auto* in=candidate.clipFor(link.incoming);
+        const bool retimedPair = musicalMove && ((outMoved && out->beatmatched && out->tempoMap) || (inMoved && in->beatmatched && in->tempoMap));
+        if (outMoved && inMoved && !retimedPair) continue;
+        const auto oldRange=transitionRange(transitionLinks[i]);
+        const auto* oldMover = clipFor(outMoved ? link.outgoing : link.incoming);
+        const auto* mover = outMoved ? out : in;
+        const auto movedTime = [&](double time)
+        {
+            return retimedPair ? mover->start + mover->localTimeForSource(oldMover->sourceElapsed(time - oldMover->start)) : time + delta;
+        };
+        const double begin = movedTime(oldRange.getStart());
+        double end = movedTime(oldRange.getEnd());
+        if (retimedPair && oldRange.getEnd() <= std::min(clipFor(link.outgoing)->end(), clipFor(link.incoming)->end()) + 1e-7)
+            end = std::max(begin, std::min({end, out->end(), in->end()}));
+        out->outroAnchor=out->sourceElapsed(begin-out->start); in->introAnchor=in->sourceElapsed(begin-in->start);
+        link.frame=std::array<double,2>{out->sourceElapsed(begin-out->start),out->sourceElapsed(end-out->start)};
+    }
+    const auto swaps=candidate.reconcileBassSwaps(); if(swaps.failed())return swaps;
     const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) return valid;
     const auto locks = validateTransitionLocks(candidate); if (locks.failed()) return locks;
     *this = std::move(candidate); return juce::Result::ok();
@@ -805,57 +931,49 @@ juce::Result Project::moveClipFollowing(const juce::String& id, double seconds, 
     *this = std::move(candidate); return juce::Result::ok();
 }
 
-juce::Result Project::moveTransitionAnchor(const juce::String& id, bool intro, double time, bool snapping)
+juce::Result Project::moveTransitionAnchor(const juce::String& id,bool intro,double time,bool snapping)
 {
-    auto found = std::find_if(clips.begin(), clips.end(), [&](const auto& clip) { return clip.id == id; });
-    if (found == clips.end() || !std::isfinite(time)) return juce::Result::fail("The alignment track is unavailable.");
-    if (hasPendingPlacement()) return juce::Result::fail("Wait for track placement to finish.");
-    const size_t selected = (size_t) std::distance(clips.begin(), found);
-    Project candidate = *this;
-    candidate.ensureTransitionLinks();
-    const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) return valid;
-    auto& clip = candidate.clips[selected];
-    double local = juce::jlimit(0.0, clip.length, time - clip.start);
-    if (snapping)
+    const auto* original=clipFor(id);
+    if(!original || !std::isfinite(time) || hasPendingPlacement())return juce::Result::fail("Select a ready track before adjusting IN/OUT.");
+    const auto clock=gridClock(); const double step=snapStep();
+    double target=juce::jlimit(original->start,original->end(),time);
+    if(snapping)
     {
-        const auto clock = candidate.gridClock(); const double step = candidate.snapStep();
-        const double phase = clock.beatsAt(clip.start + clip.transitionTime(intro));
-        const double first = std::ceil((clock.beatsAt(clip.start) - phase) / step - 1e-9);
-        const double last = std::floor((clock.beatsAt(clip.end()) - phase) / step + 1e-9);
-        if (first > last) return juce::Result::fail("No beat fits inside this track.");
-        const double count = juce::jlimit(first, last, std::round((clock.beatsAt(time) - phase) / step));
-        local = juce::jlimit(0., clip.length, clock.timeAtBeat(phase + count * step) - clip.start);
+        const double first=std::ceil(clock.beatsAt(original->start)/step-1.e-9),last=std::floor(clock.beatsAt(original->end())/step+1.e-9);
+        if(first>last)return juce::Result::fail("No timeline beat fits inside this track. Hold Alt for a free adjustment.");
+        target=clock.timeAtBeat(juce::jlimit(first,last,std::round(clock.beatsAt(target)/step))*step);
     }
-    if (std::abs(local - clip.transitionTime(intro)) >= 1.0e-9)
-        (intro ? clip.introAnchor : clip.outroAnchor) = clip.sourceElapsed(local);
-    // Once paired, identity owns adjacency even if a long pickup moves a clip's
-    // file edge before its predecessor. Playlist order and screen position do
-    // not reinterpret the relationship on each drag.
-    auto previous = std::find_if(candidate.transitionLinks.begin(), candidate.transitionLinks.end(), [&](const auto& link) { return link.incoming == id; });
-    auto next = std::find_if(candidate.transitionLinks.begin(), candidate.transitionLinks.end(), [&](const auto& link) { return link.outgoing == id; });
-    if (!intro && next != candidate.transitionLinks.end() && next->frame)
-        (*next->frame)[0] = clip.sourceElapsed(local);
-    if (intro)
+    if(std::abs(target-(original->start+original->transitionTime(intro)))<1.e-9)return juce::Result::ok();
+    const auto pair=std::find_if(transitionLinks.begin(),transitionLinks.end(),[&](const auto& link) {return intro ? link.incoming==id : link.outgoing==id;});
+    if(pair!=transitionLinks.end() && pair->movementLocked)return juce::Result::fail("Unlock this pair before adjusting its IN/OUT alignment. Locked tracks move together by their headers.");
+    Project candidate=*this; const double source=original->sourceElapsed(target-original->start);
+    if(pair==transitionLinks.end())
     {
-        previous = std::find_if(candidate.transitionLinks.begin(), candidate.transitionLinks.end(), [&](const auto& link) { return link.incoming == id; });
-        if (previous != candidate.transitionLinks.end())
-        {
-            const auto* out = candidate.clipFor(previous->outgoing);
-            const auto result = clip.alignIntroTo(out->start + out->transitionTime(false)); if (result.failed()) return result;
-        }
+        auto* clip=candidate.clipFor(id); (intro ? clip->introAnchor : clip->outroAnchor)=source;
     }
-    auto current = id;
-    for (;;)
+    else if(intro)
     {
-        next = std::find_if(candidate.transitionLinks.begin(), candidate.transitionLinks.end(), [&](const auto& link) { return link.outgoing == current; });
-        if (next == candidate.transitionLinks.end()) break;
-        const auto* out = candidate.clipFor(current); auto* in = candidate.clipFor(next->incoming);
-        const auto result = in->alignIntroTo(out->start + out->transitionTime(false)); if (result.failed()) return result;
-        current = in->id;
+        // Choose a different incoming source point beneath the fixed join.
+        const auto* outgoing=clipFor(pair->outgoing); const double join=outgoing->start+outgoing->transitionTime(false);
+        auto shifted=*original; shifted.introAnchor=source;
+        const auto aligned=shifted.alignIntroTo(join); if(aligned.failed())return aligned;
+        const auto moved=candidate.moveClip(id,shifted.start,false); if(moved.failed())return moved;
+        candidate.clipFor(id)->introAnchor=source;
+        candidate.clipFor(pair->outgoing)->outroAnchor=outgoing->outroAnchor;
+        for(auto& link:candidate.transitionLinks)if(link.incoming==id)link.frame=pair->frame;
     }
-    const auto bass = candidate.reconcileBassSwaps(); if (bass.failed()) return bass;
-    const auto protection = validateTransitionLocks(candidate); if (protection.failed()) return protection;
-    *this = std::move(candidate);
-    return juce::Result::ok();
+    else
+    {
+        // OUT changes in its stationary track; only the next track and its
+        // explicitly locked followers move to put their IN at that join.
+        const auto* incoming=clipFor(pair->incoming); auto shifted=*incoming;
+        const auto aligned=shifted.alignIntroTo(target); if(aligned.failed())return aligned;
+        const auto moved=candidate.moveClip(incoming->id,shifted.start,false); if(moved.failed())return moved;
+        candidate.clipFor(id)->outroAnchor=source;
+    }
+    const auto swaps=candidate.reconcileBassSwaps(); if(swaps.failed())return swaps;
+    const auto valid=candidate.validateTransitionLinks(); if(valid.failed())return valid;
+    const auto protectedResult=validateTransitionLocks(candidate); if(protectedResult.failed())return protectedResult;
+    *this=std::move(candidate); return juce::Result::ok();
 }
 }

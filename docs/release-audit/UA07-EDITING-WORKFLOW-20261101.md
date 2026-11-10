@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Editing workflow — 1 November 2026
 
 Jay's review of ua05 rejected the Editing tab's hierarchy and purpose. The primary

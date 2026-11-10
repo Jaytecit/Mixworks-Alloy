@@ -1,0 +1,64 @@
+{
+  "TITLE": "Barograph / Foldout Record",
+  "MEDIA": [
+    {
+      "WRAP": "clamp"
+    }
+  ],
+  "PASSES": [
+    {
+      "TARGET": "chart",
+      "WIDTH": 560,
+      "HEIGHT": 315,
+      "FLOAT": false,
+      "WRAP": "clamp"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.77,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Relief height",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Nested",
+      "DESCRIPTION": "The folded chart rises and catches a bevel wherever the image is bright."
+    },
+    {
+      "NAME": "paper_rate",
+      "TYPE": "slider",
+      "LABEL": "Paper feed",
+      "DEFAULT": 0.65,
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Recorder"
+    },
+    {
+      "NAME": "reset_trace",
+      "TYPE": "bang",
+      "LABEL": "Clear chart",
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Recorder"
+    }
+  ]
+}

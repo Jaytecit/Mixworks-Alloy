@@ -340,7 +340,17 @@ void runGridAlignmentTests(const std::function<void(bool, const juce::String&)>&
     editor.reset();
     auto reopened = std::make_unique<GridCorrectionEditor>(*engine, media, "", [](const SourceCorrection&, bool) { return juce::Result::fail("owned failure"); });
     check(reopened->draft.bpm == 128 && reopened->draft.downbeat == 8 && reopened->draft.key == 13, "reopened editor starts from saved timing and key");
-    reopened->advancedPage.onClick(); reopened->later.onClick(); reopened->save.onClick();
+    reopened->alignSecond(37.913);
+    reopened->undoGrid.onClick();
+    reopened->redoGrid.onClick();
+    check(reopened->bpm.getText() == "128.372" && std::abs(reopened->secondAnchor() - 37.913) < 1.e-9,
+          "three-decimal BPM display retains the exact measured grid through Undo and Redo");
+    reopened->advancedPage.onClick();
+    auto preciseCapture = report.getSiblingFile("grid-bpm-precision.png").createOutputStream();
+    check(preciseCapture && juce::PNGImageFormat().writeImageToStream(reopened->createComponentSnapshot(reopened->getLocalBounds()), *preciseCapture),
+          "capture the BPM / Key editor with a fractional measurement");
+    reopened->undoGrid.onClick();
+    reopened->later.onClick(); reopened->save.onClick();
     check(!reopened->closed && reopened->draft.downbeat > 8 && media->manualBeatOrigin == 8, "failed save retains the unsaved alignment draft");
     reopened->cancel.onClick(); check(reopened->closed && media->manualBeatOrigin == 8, "Cancel discards alignment without modifying saved source facts");
     auto undetected = media->catalogueCopy(); undetected->analysis.bpm = 0; undetected->manualBpm = 0; undetected->manualBeatOrigin = -1;

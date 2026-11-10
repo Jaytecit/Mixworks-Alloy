@@ -234,7 +234,7 @@ void EarPassage::mouseUp(const juce::MouseEvent&)
 }
 EarToolWindow::EarToolWindow(juce::Component* content, const juce::String& title) : AlloyPopupWindow(title, colour::background, true)
 {
-    setUsingNativeTitleBar(true); setContentOwned(content, true); setResizable(false, false); centreWithSize(content->getWidth(), content->getHeight());
+    setUsingNativeTitleBar(false); setContentOwned(content, true); setResizable(false, false); centreWithSize(content->getWidth(), content->getHeight());
 }
 void EarToolWindow::closeButtonPressed()
 {

@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Prismatic Assembly — third visual direction proof
 
 **Superseding feedback:** Jay found its beat response weak, sideways travel hid

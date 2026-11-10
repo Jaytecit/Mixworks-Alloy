@@ -11,7 +11,7 @@ import sys
 import time
 
 SCENES = ('neon-culture', 'chromatic-shoal', 'terrain-prism', 'liquid-memory', 'signal-fracture')
-PALETTES = ('Original', 'Electric neon', 'Acid lime', 'Solar fire', 'Jewel tones', 'Laser primaries', 'Mono with accent', 'Soft')
+PALETTES = ('Original', 'Teal and silver', 'Acid lime', 'Copper and slate', 'Jewel tones', 'Laser primaries', 'Mono with accent', 'Soft')
 
 
 def main():

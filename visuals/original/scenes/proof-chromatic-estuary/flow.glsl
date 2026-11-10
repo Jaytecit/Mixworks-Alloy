@@ -24,6 +24,8 @@ void main(){
     vec4 old=texture(input0,uv),c=texture(input0,clamp(uv-old.xy*stepDelta*px,0.,1.));
     vec2 drive=current(p)*(12.+35.*bass+38.*bassHit*pulse)*(.5+motion);
     drive+=vec2(-g.y,g.x)*(35.+60.*mid)*feedback;
+    drive+=structureCurrent(uv)*26.;
+
     drive+=vec2(sin(p.y*23.),cos(p.x*19.))*trebleHit*8.*pulse;
     vec2 v=mix(c.xy,drive,1.-exp(-stepDelta*(1.3+mid)));
     v*=smoothstep(vec2(0),px*4.,uv)*smoothstep(vec2(0),px*4.,1.-uv);

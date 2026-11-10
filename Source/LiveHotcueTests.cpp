@@ -2,6 +2,12 @@
 #include "Hotcues.h"
 #include "Beatmatch.h"
 #include <cmath>
+#if JUCE_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace mixworks
 {
@@ -26,6 +32,58 @@ void runLiveHotcueTests(const std::function<void(bool,const juce::String&)>& che
     Clip other = neighbour; other.id = juce::Uuid().toString(); other.track = 2; other.offset = .25;
     base.clips = {target,neighbour,other}; const auto id = target.id, second = other.id;
     base.putHotcue(id,0,4.25); base.putHotcue(id,1,6.125); base.putHotcue(second,0,8.25);
+    auto timelineJourney=[&]
+    {
+        check(writeAnalysisRecord(media->file,media->analysisRecord()).isEmpty(),"seed owned cue fixture analysis without detector work");
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1440,940); ui.engine.sampleRate=8000; ui.engine.project=base; ui.engine.library={media}; ui.selectedClip=id; ui.selectTrack(0);
+        auto pump=[] {
+            #if JUCE_WINDOWS
+            MSG message; while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+            #endif
+        };
+        const auto original=json(ui.engine.project);
+        for(bool playing:{false,true})
+        {
+            ui.engine.seek(1.49); ui.engine.setPlaying(playing); ui.refresh();
+            ui.performance->channelButtons[0].onClick();
+            check(std::abs(ui.engine.position.load()-4.25)<1.e-9 && ui.engine.playing==playing && json(ui.engine.project)==original,
+                "native cue pad jumps whole programme immediately with transport state kept / "+juce::String((int)playing));
+            check(!ui.engine.hasLiveHotcueVoices() && ui.performance->channelButtons[0].getTooltip().contains("whole mix"),"cue action cannot silently relaunch only one voice");
+        }
+        ui.engine.seek(1.1); const auto keyboard=ui.keyPressed(juce::KeyPress('1',juce::ModifierKeys(juce::ModifierKeys::altModifier),0));
+        check(keyboard && ui.engine.position==4.25 && ui.engine.playing,"Alt+1 uses the same running timeline jump");
+        Engine oracle; oracle.sampleRate=8000; oracle.project=base; juce::AudioBuffer<float> actual(2,128),expected(2,128); juce::MidiBuffer midi;
+        oracle.render(expected,128,4.25,midi); float* outputs[]{actual.getWritePointer(0),actual.getWritePointer(1)};
+        ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,outputs,2,128,{}); float difference=0;
+        for(int ch=0;ch<2;++ch)for(int i=0;i<128;++i)difference=std::max(difference,std::abs(expected.getSample(ch,i)-actual.getSample(ch,i)));
+        check(difference<1.e-6f && actual.getMagnitude(0,128)>.001f,"all-lane callback PCM follows the jumped programme position");
+        const auto parsedAction=parseMidiAction("timeline-cue-1");
+        check(parsedAction && parsedAction->kind==MidiActionKind::timelineCue && parsedAction->index==0,"timeline cue is a durable typed MIDI action");
+        ui.engine.setMidiLearnEnabled(true); ui.performance->channelButtons[0].onClick();
+        ui.engine.testMidi(juce::MidiMessage::controllerEvent(1,77,127)); ui.engine.flushMidiControls(); ui.engine.setMidiLearnEnabled(false);
+        ui.engine.seek(1.25); ui.engine.testMidi(juce::MidiMessage::controllerEvent(1,77,0)); ui.engine.flushMidiControls();
+        ui.engine.testMidi(juce::MidiMessage::controllerEvent(1,77,127)); ui.engine.flushMidiControls(); pump();
+        check(ui.engine.position==4.25 && ui.engine.playing,"virtually learned MIDI cue uses the same programme jump without a physical port");
+        ui.engine.project.clips[0].start=10; ui.engine.seek(1); ui.refresh();
+        check(ui.performance->channelButtons[0].isEnabled(),"future timeline cues remain available while another passage plays");
+        ui.locateHotcue(0); check(ui.engine.position==14.25 && ui.engine.playing,"future cue jumps programme and other lanes to its actual placement");
+        ui.engine.setPlaying(false); ui.engine.project=base; ui.engine.project.clips[0].offset=10; ui.engine.project.clips[0].length=3; ui.engine.seek(1); ui.refresh();
+        const auto trimmed=json(ui.engine.project); ui.locateHotcue(0);
+        check(ui.engine.position==1 && json(ui.engine.project)==trimmed && ui.status.contains("outside"),"trimmed-out cue explains its unavailable source range without restoring audio");
+        ui.engine.project=base; ui.engine.setWorkMode(WorkMode::recordPerform); ui.engine.seek(1); ui.engine.setPlaying(true); ui.refresh();
+        check(ui.engine.capturingPerformance(),"Record/Perform starts an actual take for timeline cue acceptance");
+        ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,outputs,2,64,{}); ui.locateHotcue(0);
+        check(std::any_of(ui.engine.project.performanceTakes[0].events.begin(),ui.engine.project.performanceTakes[0].events.end(),[](const auto& e){return e.kind==TakeEventKind::seek && e.value==4.25;}),"global cue records a programme seek in editable chronology");
+        ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,outputs,2,128,{}); ui.engine.finalisePerformance(); juce::String error; auto replay=ui.engine.prepareTakeReplay(0,error);
+        check(replay && error.isEmpty(),"timeline-seek take admits replay: "+error);
+        if(replay) { juce::AudioBuffer<float> heard(2,128); replay->renderTake(heard,128,64./8000); float errorPcm=0;
+            for(int ch=0;ch<2;++ch)for(int i=0;i<128;++i)errorPcm=std::max(errorPcm,std::abs(heard.getSample(ch,i)-actual.getSample(ch,i)));
+            check(errorPcm<2.e-6f,"take replay reproduces cue-jumped callback PCM"); }
+        auto image=report.getSiblingFile("timeline-cues.png").createOutputStream();
+        check(image && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*image),"capture native timeline cue controls");
+    };
+
+    if(juce::JUCEApplicationBase::getCommandLineParameters().contains("--timeline-cues-only")) { timelineJourney(); return; }
     for (double rate : {8000.,44100.,48000.}) for (int block : {1,31,173,512})
     {
         auto engine = std::make_unique<Engine>(juce::File(),false), reference = std::make_unique<Engine>(juce::File(),false);
@@ -192,34 +250,7 @@ void runLiveHotcueTests(const std::function<void(bool,const juce::String&)>& che
             "message-thread transport service retires cancelled media snapshots while preserving visible cancellation status");
     }
 
-    Workstation ui(false); ui.stopTimer(); ui.engine.project=base; ui.engine.library={media}; ui.selectedClip=id; ui.selectTrack(0);
-    ui.engine.project.clips[0].controls.automation[0]={true,{{0,0},{2,0},{3,-6},{10,-6}}};
-    ui.engine.position=1.49; ui.engine.setPlaying(true); ui.dirty=false; ui.refresh();
-    const auto before=json(ui.engine.project); const auto history=ui.undoHistory.size();
-    ui.performance->channelButtons[0].onClick();
-    check(ui.performance->channelButtons[0].isEnabled() && ui.performance->channelButtons[0].getButtonText().contains("@")
-        && ui.engine.liveHotcueStatus(id).state==LiveHotcueState::pending && ui.engine.position==1.49
-        && before==json(ui.engine.project) && history==ui.undoHistory.size() && !ui.dirty,"native live pad exposes target queue/boundary without document/history/global seek");
-    for(int width:{1250,1920})
-    {
-        ui.setSize(width,1080); ui.showToolPage(0); ui.refresh();
-        auto stream=report.getSiblingFile("live-hotcue-queued-"+juce::String(width)+".png").createOutputStream(); juce::PNGImageFormat png;
-        check(stream && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*stream),"capture visible live target cue queue / width "+juce::String(width));
-        ui.performanceViewport.setViewPosition(ui.performance->getWidth(),ui.performance->getHeight());
-        auto controls=report.getSiblingFile("live-hotcue-queued-controls-"+juce::String(width)+".png").createOutputStream();
-        check(controls && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*controls),"capture revealed hotcue pads and programme boundary / width "+juce::String(width));
-    }
-    const auto expected=ui.engine.project.launch; ui.performance->performLaunchMenu(401,expected,id);
-    check(ui.engine.liveHotcueStatus(id).state==LiveHotcueState::cancelled && ui.engine.playing && before==json(ui.engine.project),"native timing-menu Cancel cancels only its captured target");
-    ui.engine.setLaunchSettings({LaunchTiming::immediate,16});ui.performance->channelButtons[0].onClick();
-    ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,outputs,2,31,{});ui.refresh();
-    check(!ui.performance->buttons[5].isEnabled() && ui.performance->buttons[5].getTooltip().contains("Stop"),"native Record explains the unrecorded live-cursor restriction instead of replacing programme playback");
-    check(std::abs(ui.performance->faders[0].getValue()+6)<1.e-5 && ui.engine.position<2,
-        "Controller source-owned fader follows the live source automation while programme time remains before that shape");
-    ui.engine.stop();
-    ui.engine.project.clips[0].start=10;ui.engine.position=1;ui.engine.setPlaying(true);ui.refresh();
-    check(!ui.performance->channelButtons[0].isEnabled() && ui.engine.triggerLiveHotcue(id,0).failed() && ui.engine.position==1,
-        "a selected future segment has visibly unavailable live pads and cannot start implicitly or seek the programme");
-    ui.engine.stop();
+    timelineJourney();
+
 }
 }

@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # MixMeister and DJ.Studio grid accuracy investigation plan
 
 **Status:** Planned investigation, 19 October 2026. No tracks have qualified under this protocol yet. No detector changes, reference-app runs or production-data resets are part of writing this plan.

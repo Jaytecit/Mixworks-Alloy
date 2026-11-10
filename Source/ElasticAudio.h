@@ -5,7 +5,7 @@
 
 namespace mixworks
 {
-bool requestOriginalClip(const Clip&, double at, double before, double after);
+bool requestOriginalClip(const Clip&, double at, double before, double after, bool prepare = false);
 // Immutable placement facts. Splits share their original mapping so a cut cannot
 // change the sound. Construction performs no decoding, analysis or stretching.
 struct ElasticSource
@@ -26,6 +26,7 @@ public:
     void beginBlock() { ++clock; }
     void add(juce::AudioBuffer<float>&, int frames, double at, double outputRate, const Clip&, int stem = -1);
     void prepare(const Clip&, double at, double outputRate, int frames); // Message thread; private live-cue stream only.
+    void prepare(const std::vector<Clip>&, double at, double outputRate, int frames);
     void reset();
     uint64_t windowsRendered() const { return rendered; }
 private:

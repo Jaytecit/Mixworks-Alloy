@@ -15,10 +15,13 @@ void main(){
     vec4 cut=sampleCutout(materialDomain(uv));
     vec3 ink=(hasImage!=0||hasCutout!=0)?mix(background.rgb,cut.rgb,cut.a):vec3(.5+.3*sin(uv.x*17.)*cos(uv.y*13.));
     float source=dot(ink,vec3(.2126,.7152,.0722))-.35;
+    if(hasCutout!=0)source=mix(source,structureHeight(uv)-.20,.72);
     if(simulationReset>.5){colour=vec4(0.,0.,source,1.);return;}
     vec2 grad=vec2(height(uv+vec2(px.x,0))-height(uv-vec2(px.x,0)),height(uv+vec2(0,px.y))-height(uv-vec2(0,px.y)));
     vec2 spin=vec2(-grad.y,grad.x);
     vec2 drift=vec2(sin(uv.y*7.+simulationTime*.23),cos(uv.x*6.-simulationTime*.19));
+    drift+=structureCurrent(uv)*6.;
+
     
 #if COMPOSITION == 1
     vec2 radial=uv-.5;drift+=vec2(-radial.y,radial.x)*3.;

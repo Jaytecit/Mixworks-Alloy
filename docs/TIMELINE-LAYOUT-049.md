@@ -1,6 +1,6 @@
 # Four lane timeline layout
 
-Current guide for 0.55.64. All four lanes remain available; eight-lane and early-format instructions are historical. Current session format is41; legacy compatibility is not a development requirement.
+Workflow reference; exact current candidate and verification limits are in [HANDOVER](../HANDOVER.md). All four lanes remain available; eight-lane and early-format instructions are historical. Current session format is41; legacy compatibility is not a development requirement.
 
 ## Resize and navigation
 

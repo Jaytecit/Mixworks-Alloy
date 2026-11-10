@@ -87,6 +87,8 @@ return albedo*(.13+diff*.85)+palette(id*.1+.3)*rim*.45+vec3(spec)*.5;}
 void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colour=vec4(max(c,vec3(0)),1);}
 
 float relief(vec2 p,float t){
+    p+=.29*structureCurrent(p*.31+.5);
+
 #if FAMILY == 6
     vec2 centre=.4*vec2(sin(midTime*1.7),cos(midTime*1.3));
     p=centre+rot(.65*midSwing()*exp(-length(p-centre)*.45))*(p-centre);

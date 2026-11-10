@@ -53,25 +53,29 @@ void Workstation::editHotcue(const juce::String& id, int slot)
 }
 void Workstation::locateHotcue(int slot)
 {
-    if (busy || engine.exporting || pendingTempo > 0 || tempoPreparationPending || engine.rehearsalActive()) return;
-    const juce::ScopedLock guard(engine.lock);
-    const auto* clip = currentClip();
-    if (!clip || clip->track != engine.selectedTrack) { setStatus("Select the song segment that owns this hotcue."); return; }
-    if (engine.playing)
+    if(slot<0 || slot>=9) return;
+    if(engine.isMidiLearnEnabled()) { engine.beginLearn(midiActionId({MidiActionKind::timelineCue,slot}),true); refresh(); return; }
+    if (busy || engine.exporting || pendingTempo>0 || tempoPreparationPending || engine.rehearsalActive())
+    { setStatus("Finish preparation, export or transition rehearsal before jumping to a timeline cue."); return; }
+    juce::String id,title; std::optional<double> time; bool empty=false;
     {
-        const auto result = engine.triggerLiveHotcue(clip->id,slot);
-        setStatus(result.failed() ? result.getErrorMessage() : engine.liveHotcueText(clip->id)); refresh(); return;
+        const juce::ScopedLock guard(engine.lock);
+        const auto* clip=currentClip();
+        if(!clip || clip->track!=engine.selectedTrack) { setStatus("Select the track that owns this timeline cue."); return; }
+        id=clip->id; title=clip->media->libraryTitle(); empty=hotcueFor(*clip,slot)==nullptr;
+        if(!empty)
+        {
+            time=hotcueTimelineTime(*clip,slot,engine.position);
+            if(!time) { setStatus("HC"+juce::String(slot+1)+" is outside this placement's audio. Extend its trim edge or edit the cue in Cues / resets."); return; }
+        }
     }
-    if (engine.recordingAutomation()) { setStatus("Finish the current automation take before locating a cue."); return; }
-    if (engine.isMidiLearnEnabled()) { setStatus("Hotcue MIDI launch mapping is not available yet. Reset actions remain learnable from Cues / resets."); return; }
-    if (!hotcueFor(*clip, slot)) { editHotcue(clip->id, slot); return; }
-    const auto time = hotcueTimelineTime(*clip, slot, engine.position);
-    if (!time) { setStatus("HC" + juce::String(slot + 1) + " is saved outside this segment. Use Cues / resets to edit it."); return; }
-    engine.seek(*time); setFollowPlayhead(false);
-    viewport.setViewPosition(std::max(0, Clip::gridPixel(*time, timeline.pixelsPerSecond) - viewport.getViewWidth() / 2), viewport.getViewPositionY());
-    const auto flags = timeline.hotcueFlags(true);
-    for (const auto& flag : flags) if (flag.clipId == clip->id && flag.slot == slot) { timeline.selectHotcue(flag); break; }
-    setStatus("HC" + juce::String(slot + 1) + " / " + clip->media->libraryTitle() + " / located on programme timeline; playback stays stopped.");
+    if(empty) { editHotcue(id,slot); return; }
+    if (engine.seek(*time).failed()) return; // Global seek is captured in the current editable take.
+    setFollowPlayhead(false);
+    viewport.setViewPosition(std::max(0,Clip::gridPixel(*time,timeline.pixelsPerSecond)-viewport.getViewWidth()/2),viewport.getViewPositionY());
+    for(const auto& flag:timeline.hotcueFlags(true)) if(flag.clipId==id && flag.slot==slot) { timeline.selectHotcue(flag); break; }
+    setStatus("HC"+juce::String(slot+1)+" / "+title+(engine.seekPending ? " / preparing whole mix at " : " / whole mix jumped to ")+timeText(*time)
+        +juce::String(engine.playing ? "; playback continues on all lanes." : "; playback stays stopped.")+" Timeline cues jump immediately; launch quantisation does not delay them.");
     refresh();
 }
 }

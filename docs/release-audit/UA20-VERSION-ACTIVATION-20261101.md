@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Version0.55.66 and A/B/C activation — 1 November 2026
 
 Jay requested: "Activate and update, including the v number in the app UI".

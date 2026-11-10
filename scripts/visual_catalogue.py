@@ -10,8 +10,26 @@ CONTROL_DEFAULTS = dict(intensity=.7, motion=.5, imageMix=.5, scale=.5,
     imageZoom=.35, imageRotation=.5, imageIndex=0., feedback=.65,
     bassDrive=.5, midDrive=.5, trebleDrive=.5, momentum=.5,
     materialMotion=.35, materialMode=0., viewPattern=0., finishGlow=.2,
-    paletteStyle=0., paletteAmount=1.)
+    paletteStyle=0., paletteAmount=1., reliefDepth=.65, meltWarp=0., displacementColour=0.,
+    lattice=0.)
 DISCRETE = {'mode': 4, 'mirror': 2, 'symmetry': 7}
+FIELD_MORPH_FAMILIES = {'soft-volumes','spatial-instruments'}
+RELIEF_FAMILIES = {f'relief-{i}':i for i in range(13)}
+
+
+def field_identity(descriptor):
+    family=descriptor.get('family','')
+    if family in RELIEF_FAMILIES:
+        variant=descriptor.get('variant')
+        if type(variant) is not int or not 0<=variant<=3:
+            raise ValueError('Invalid relief variant')
+        return 'layered-relief',RELIEF_FAMILIES[family]*4+variant
+    if family in FIELD_MORPH_FAMILIES:
+        composition=descriptor.get('composition')
+        if type(composition) is not int or not 0<=composition<=7:
+            raise ValueError('Invalid field composition')
+        return family,composition
+    return '',-1
 
 def catalogue(root):
     root=Path(root)
@@ -48,5 +66,15 @@ def catalogue(root):
                 raise ValueError('Unknown scene preset control')
             if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or not 0<=v<=1 for v in values.values()):
                 raise ValueError('Invalid scene preset value')
-        result[key]=dict(entry,controls=controls,presets=presets)
+        # A transparent asset belongs to a scene's geometry/material contract.
+        family=descriptor.get('family','')
+        sprite_geometry=descriptor.get('spriteGeometry',
+            'particles' if family=='sprite-particles' else
+            'relief' if family in RELIEF_FAMILIES else
+            'surface' if family in ('soft-volumes','spatial-instruments','luminous-landscapes','liquid-sculptures') else '')
+        if sprite_geometry not in ('','relief','particles','surface'):
+            raise ValueError('Invalid scene-local sprite geometry')
+        morph_family,composition=field_identity(descriptor)
+        result[key]=dict(entry,controls=controls,presets=presets,spriteGeometry=sprite_geometry,
+                         composition=composition,morphFamily=morph_family)
     return result

@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Launcher activation and save/export journey — ua08
 
 Jay explicitly requested updating the launcher to the latest build and continuing

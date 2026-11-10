@@ -1,0 +1,139 @@
+--- a/src/api/include/projectM-4/render_opengl.h
++++ b/src/api/include/projectM-4/render_opengl.h
+@@ -49,6 +49,14 @@
+ PROJECTM_EXPORT void projectm_opengl_render_frame_with_feedback(
+     projectm_handle instance, projectm_feedback_input input, void* user_data);
+ 
++/** Render with live offsets applied to the preset's feedback mesh.
++ * The neutral values for decay, zoom, rotation and warp are 0, 1, 0 and 0.
++ * The optional feedback callback has the same contract as above.
++ */
++PROJECTM_EXPORT void projectm_opengl_render_frame_with_controls(
++    projectm_handle instance, projectm_feedback_input input, void* user_data,
++    float decay_offset, float zoom_scale, float rotation_offset, float warp_offset);
++
+ #ifdef __cplusplus
+ } // extern "C"
+ #endif
+--- a/src/libprojectM/Renderer/RenderContext.hpp
++++ b/src/libprojectM/Renderer/RenderContext.hpp
+@@ -8,6 +8,14 @@
+ namespace Renderer {
+ 
+ class TextureManager;
++
++struct FeedbackControls
++{
++    float decayOffset{0.0f};
++    float zoomScale{1.0f};
++    float rotationOffset{0.0f};
++    float warpOffset{0.0f};
++};
+ 
+ /**
+  * @brief Holds all global data of the current rendering context, which can change from frame to frame.
+@@ -31,6 +39,7 @@
+ 
+     void (*feedbackInput)(void*){nullptr};
+     void* feedbackUserData{nullptr};
++    FeedbackControls feedbackControls;
+ 
+     TextureManager* textureManager{nullptr}; //!< Holds all loaded textures for shader access.
+ };
+--- a/src/libprojectM/ProjectM.hpp
++++ b/src/libprojectM/ProjectM.hpp
+@@ -101,7 +101,8 @@
+ 
+     void ResetTextures();
+ 
+-    void RenderFrame(void (*feedbackInput)(void*) = nullptr, void* feedbackUserData = nullptr);
++    void RenderFrame(void (*feedbackInput)(void*) = nullptr, void* feedbackUserData = nullptr,
++                     const Renderer::FeedbackControls& feedbackControls = {});
+ 
+     void SetBeatSensitivity(float sensitivity);
+ 
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -90,7 +90,8 @@
+     m_textureManager = std::make_unique<Renderer::TextureManager>(m_textureSearchPaths);
+ }
+ 
+-void ProjectM::RenderFrame(void (*feedbackInput)(void*), void* feedbackUserData)
++void ProjectM::RenderFrame(void (*feedbackInput)(void*), void* feedbackUserData,
++                           const Renderer::FeedbackControls& feedbackControls)
+ {
+     // Don't render if window area is zero.
+     if (m_windowWidth == 0 || m_windowHeight == 0)
+@@ -149,6 +150,7 @@
+     auto renderContext = GetRenderContext();
+     renderContext.feedbackInput = feedbackInput;
+     renderContext.feedbackUserData = feedbackUserData;
++    renderContext.feedbackControls = feedbackControls;
+ 
+     if (m_transition != nullptr && m_transitioningPreset != nullptr)
+     {
+--- a/src/libprojectM/ProjectMCWrapper.cpp
++++ b/src/libprojectM/ProjectMCWrapper.cpp
+@@ -4,6 +4,8 @@
+ 
+ #include <Audio/AudioConstants.hpp>
+ 
++#include <algorithm>
++#include <cmath>
+ #include <cstring>
+ #include <sstream>
+ 
+@@ -176,6 +178,19 @@
+     handle_to_instance(instance)->RenderFrame(input, user_data);
+ }
+ 
++void projectm_opengl_render_frame_with_controls(projectm_handle instance, projectm_feedback_input input,
++                                                  void* user_data, float decay_offset, float zoom_scale,
++                                                  float rotation_offset, float warp_offset)
++{
++    const auto bounded = [](float value, float low, float high, float neutral) {
++        return std::isfinite(value) ? std::clamp(value, low, high) : neutral;
++    };
++    const libprojectM::Renderer::FeedbackControls controls{
++        bounded(decay_offset, -.12f, .06f, 0.0f), bounded(zoom_scale, .94f, 1.06f, 1.0f),
++        bounded(rotation_offset, -.06f, .06f, 0.0f), bounded(warp_offset, -1.5f, 1.5f, 0.0f)};
++    handle_to_instance(instance)->RenderFrame(input, user_data, controls);
++}
++
+ void projectm_set_beat_sensitivity(projectm_handle instance, float sensitivity)
+ {
+     auto projectMInstance = handle_to_instance(instance);
+--- a/src/libprojectM/MilkdropPreset/PerPixelMesh.cpp
++++ b/src/libprojectM/MilkdropPreset/PerPixelMesh.cpp
+@@ -231,6 +231,7 @@
+     float sx = static_cast<float>(*perFrameContext.sx);
+     float sy = static_cast<float>(*perFrameContext.sy);
+ 
++    const auto& controls = presetState.renderContext.feedbackControls;
+     int vertex = 0;
+ 
+     // Can't make this multithreaded as per-pixel code may use gmegabuf or regXX vars.
+@@ -285,6 +286,10 @@
+                 curVertex.stretchY = sy;
+             }
+ 
++            // Adjust the finished mesh after the preset's per-vertex equations.
++            curVertex.zoom *= controls.zoomScale;
++            curVertex.rot += controls.rotationOffset;
++            curVertex.warp += controls.warpOffset;
+             vertex++;
+         }
+     }
+@@ -304,7 +309,12 @@
+     };
+ 
+     // Decay
++    const float decayOffset = presetState.renderContext.feedbackControls.decayOffset;
+     float decay = std::min(static_cast<float>(*perFrameContext.decay), 1.0f);
++    if (decayOffset != 0.0f)
++    {
++        decay = std::clamp(decay + decayOffset, 0.0f, 1.0f);
++    }
+ 
+     // No blending between presets here, so we make sure blending is disabled.
+     glDisable(GL_BLEND);

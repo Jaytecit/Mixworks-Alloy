@@ -58,15 +58,27 @@ Normalization handles case/punctuation and explicit Hip-Hop/hiphop, D&B/dnb/drum
 
 | Style | Actual treatment |
 | --- | --- |
-| Balanced | Section-aware bass handover; gentle filters where recording-level changes justify them. Plain fade with unknown level evidence. |
+| Balanced | Equal-power volume curves with a section-aware bass handover and gentle filters when measured changes warrant them. Equal-power blend when level evidence is missing. |
 | Smooth | Linear full-band volume crossfade. |
-| Bold | Bass handover, stronger filters at smaller recording-level changes, plus mid/high fades. Plain fade with unknown evidence. |
+| Bold | Equal-power volume curves with bass handover, stronger filters at smaller recording-level changes, and mid/high fades. |
 | Use my settings | Selected insertion preset, overlap and section setting; alignment-only works without overlap measurements. |
-| Constant power | Equal-power envelope, no automatic bass/filter. It does not normalise levels or guarantee constant perceived loudness/peaks. |
+| Constant power | Equal-power volume curves across the full band. |
 | Hard cuts only | Midpoint cut with a short click-prevention ramp, no automatic bass/filter. |
-| DJ set (varied) | Supported phrase fades, rhythmic bass handovers and restrained filters, using actual local musical activity and recent choices. |
+| DJ set (varied) | Equal-power phrase blends, rhythmic bass handovers and restrained filters, using actual local musical activity and recent choices. |
 
-DJ set falls back to a plain fade with missing activity. Rhythmic bass on both sources favours a bass handover. Dense changing activity can justify a filter at depth0.3, followed by two joins without another automatic filter handover. A substantial incoming lift may prefer eight bars, but actual placement/section feasibility wins; only an actually short window is reported as Quick phrase blend. Safe treatments may repeat. Completion reports counts; verification evidence retains reasons.
+DJ set falls back to an equal-power blend with missing activity. Rhythmic bass on both sources favours a bass handover. Dense changing activity can justify a filter at depth 0.3, followed by two joins without another automatic filter handover. A substantial incoming lift may prefer eight bars. The actual placed window determines whether the report calls it a Quick phrase blend. Safe treatments may repeat. Completion details list the generated techniques.
+
+Auto Arrange applies attenuation-only segment gain using the middle 80% of each
+song and its measured sample peaks. It aims for −18 dBFS RMS and caps measured
+source peaks at −6 dBFS where the measurements are available. Extensions can
+lower the RMS target to −24 dBFS to match a quieter tail and apply trims only to appended songs. These
+targets leave headroom for the handover. Final levels also depend on source
+dynamics, stretch, mixer gain and effects. Segment gain can be adjusted in the
+clip inspector.
+
+New joins are movement-locked. Consecutive locked pairs move as a group, and
+**Unlock pair** allows an individual timing move. The transition curves remain
+editable. Extending a mix preserves the earlier pairs' lock choices.
 
 All generated treatments are ordinary editable automation nodes. No new delay/loop/stem DSP or vocal/drop classifier is implied. RMS change flags remain activity suggestions; a bar grid alone does not prove phrasing. Genre-specific technique palettes, Wave/Journey curves, advanced routing and the remaining [technique catalogue](research/DJ-ARRANGEMENT-TARGETS-20261023.md#technique-catalogue) are targets, not shipped capabilities.
 

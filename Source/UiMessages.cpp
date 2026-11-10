@@ -1,7 +1,18 @@
 #include "UiMessages.h"
+#include <cmath>
 
 namespace mixworks
 {
+juce::String wholeBpmText(double bpm)
+{
+    return juce::String(std::lround(bpm));
+}
+
+juce::String preciseBpmText(double bpm)
+{
+    return juce::String(bpm, 3).trimCharactersAtEnd("0").trimCharactersAtEnd(".");
+}
+
 juce::String shortUiMessage(const juce::String& input, int words, int characters)
 {
     const auto parts = juce::StringArray::fromTokens(input.replaceCharacters("\r\n\t", "   "), false);

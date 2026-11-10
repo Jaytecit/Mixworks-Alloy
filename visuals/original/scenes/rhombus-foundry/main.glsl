@@ -39,6 +39,8 @@ void main(){
     q.x+=mod(floor(q.y),2.)*.5;
     vec2 id=floor(q),f=fract(q)-.5;
     float edge=.43-max(abs(f.x),abs(f.y));
+    edge+=.24*structureHeight(uv);
+
     float mask=smoothstep(-.008,.008,edge),rim=1.-smoothstep(.005,.045,edge);
     float seed=hash(id);
     vec2 tilt=turn(-.785398)*(vec2(.16*sin(seed*9.),.11*cos(seed*7.))*(.6+low*.8)+f*.18);
@@ -63,6 +65,8 @@ void main(){
             float opening=.12+low*.66+(.10+.20*mi)*(.5+.5*wave);
             vec2 local=f;local.y=.48+(f.y-.48)/cos(opening);
             float shape=max(length(vec2(local.x/.64,(local.y-.20)/.95))-1.,(local.y-.48)*1.5);
+            shape-=.26*structureHeight(uv);
+
             float mask=1.-smoothstep(-.01,.015,shape),rim=exp(-abs(shape)*36.);
             float bulge=sqrt(max(0.,1.-local.x*local.x/(.68*.68)));
             vec3 normal=normalize(vec3(local.x*.40,sin(opening)*.65+(local.y-.05)*.20,cos(opening)));

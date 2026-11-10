@@ -59,9 +59,10 @@ void Workstation::publishSourceSectionDefaults(const std::shared_ptr<Media>& sou
         const juce::ScopedLock guard(engine.lock);
         auto apply = [&](const std::shared_ptr<Media>& media)
         { if (media && media->analysisSource == source->analysisSource) { media->sectionTemplate = sections; media->sectionTemplateError.clear(); } };
-        apply(source); for (auto& media : engine.library) apply(media); for (auto& clip : engine.project.clips) apply(clip.media);
+        apply(source);
+        for (auto& media : engine.library) if (media->analysisSource == source->analysisSource) { apply(media); markCatalogueChanged(media); }
+        for (auto& clip : engine.project.clips) apply(clip.media);
     }
-    markCatalogueChanged();
 }
 bool Workstation::persistSourceSectionDefaults(const std::shared_ptr<Media>& source, const SourceSections& sections)
 {

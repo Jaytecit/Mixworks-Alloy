@@ -29,11 +29,16 @@ void main(){
     vec2 flow;vec3 injection;float decay;
 #if FLOW_KIND == 0
     // A thin continuous calligraphic stroke, carried sideways into a long wake.
-    float bend=.24*sin(p.x*1.8-t*.52+midImpulse*.8)+.075*sin(p.x*5.5+midTime*.8);
+    float bend=.72*sin(p.x*1.1-t*.95+midImpulse*.8)+.075*sin(p.x*5.5+midTime*.8);
     bend+=.014*hi*sin(p.x*72.-trebleImpulse*3.);
-    float width=.012+.013*(1.-detail)+.008*mi;
+    float width=.018+.020*(1.-detail)+.055*mi;
     float stroke=exp(-pow((p.y-bend)/width,2.));
     stroke+=.24*exp(-pow((p.y-bend-.085)/(.006+width*.4),2.));
+    // Two lighter counter-strokes give the calligraphy a separate outer cadence.
+    float other=.70*sin(p.x*.85+t*.63+1.9);
+    stroke+=.30*exp(-pow((p.y-other)/(.020+.035*lo),2.));
+    float wash=cloud(p*1.7+vec2(t*.10,-t*.07));
+    stroke+=.018*pow(wash,3.);
     float nib=exp(-pow((p.x-1.05)*1.2,2.));
     injection=sourceInk(vec2(p.x*.22+.5,bend*.5+.5),ink(p.x*.10+.2))*stroke*(.07+.30*mid+.24*mi)*(nib*.7+.3);
     flow=vec2(-.0042,.0008*sin(p.x*2.+midImpulse))*(.7+warp*.6);
@@ -69,6 +74,9 @@ void main(){
     flow=vec2(.0014*sin(p.y*2.-midImpulse*.3)*( .3+warp),-.0013-.0010*mid);
     decay=.938+feedback*.049;
 #endif
+    vec4 deposit=structurePigment(uv);
+    injection+=deposit.rgb*(.012+.022*spriteStructurePush);
+    flow+=structureCurrent(uv)*.007;
     vec2 chart=uv+flow*stepSize;
     vec3 previous=historyValid!=0?texture(historyImage,clamp(chart,0.,1.)).rgb:vec3(0);
 #if FLOW_KIND == 2

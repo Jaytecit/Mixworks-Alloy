@@ -126,7 +126,7 @@ bool Workstation::commitArrangementInsertion(ArrangementInsertion proposal, cons
     }
     selectedClip = proposal.inserted; selectedTransition.clear(); correctionFromLibrary = false; timeline.selectedLabel.clear(); timeline.selectedSection.reset();
     playlistTable.table.getHeader().setSortColumnId(3, true);
-    markCatalogueChanged(); selectTrack(lane); refresh(); setFollowPlayhead(false); viewport.setViewPosition(std::max(0, Clip::gridPixel(start, timeline.pixelsPerSecond) - 70), viewport.getViewPositionY());
+    markCatalogueChanged(source); selectTrack(lane); refresh(); setFollowPlayhead(false); viewport.setViewPosition(std::max(0, Clip::gridPixel(start, timeline.pixelsPerSecond) - 70), viewport.getViewPositionY());
     setStatus("Song inserted. Later segments and their transitions moved together. Undo restores the previous mix."); return true;
 }
 }

@@ -256,7 +256,8 @@ namespace
 {
 // Clip-owned pending intent survives hydration and undo. Construct the shared
 // tempo map once, then use the normal preparation path for every affected clip.
-struct PendingPlacements { std::vector<std::pair<size_t, size_t>> transitions; juce::String error; };
+struct PendingTransition { size_t outgoing, incoming; bool markedJoin; };
+struct PendingPlacements { std::vector<PendingTransition> transitions; juce::String error; };
 // Default targets may finish after IN; placement stays on its requested beat.
 // Never shorten the ramp to fit a small source or squeeze it against a manual
 // neighbour. Such sources follow the existing clock without adding a target.
@@ -334,12 +335,9 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
         const bool valid = reliableTempo(clip);
         const double bpm = valid ? clip.media->bpm() : map.bpmAt(clip.start), span = clip.length * clip.rate;
         Clip source = clip; source.rate = 1; source.length = span; source.tempoMap.reset();
-        const double downbeat = source.firstDownbeatTime();
-        const bool alignBar = downbeat >= 0 && (index == 0 || selectedOverlap >= 4 || selectedPreset == TransitionPreset::alignOnly);
-        const double phase = (alignBar ? downbeat : source.firstBeatTime()) * bpm / 60;
-        const double quantum = alignBar ? 4.0 : 1.0;
         double desired = map.beatsAt(clip.start);
         size_t previous = project.clips.size();
+        size_t marked = project.clips.size();
         for (size_t i = 0; i < project.clips.size(); ++i)
         {
             if (i == index || project.clips[i].pendingPlacement != PendingPlacement::none) continue;
@@ -347,15 +345,34 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
             if (intent == PendingPlacement::append)
             { if (previous == project.clips.size() || endBeat(other) > endBeat(project.clips[previous])) previous = i; }
             else if (startBeat(other) <= desired && (previous == project.clips.size() || startBeat(other) > startBeat(project.clips[previous]))) previous = i;
+            if (i < index && other.outroAnchor
+                && (intent == PendingPlacement::append || (!automatic && intent == PendingPlacement::drop
+                    && other.track != clip.track && clip.start >= other.start && clip.start <= other.end()))
+                && std::none_of(project.transitionLinks.begin(), project.transitionLinks.end(), [&](const auto& link) { return link.outgoing == other.id; })
+                && std::none_of(transitions.begin(), transitions.end(), [&](const auto& pair) { return pair.outgoing == i; }))
+                marked = i;
         }
+        // An explicit OUT can receive an append or a drop across its track.
+        // Keep the join ahead of the playhead and inside the arrangement.
+        const double downbeat = source.firstDownbeatTime();
+        const double cue = valid ? (downbeat >= 0 ? downbeat : source.firstBeatTime()) : 0;
+        const double joinBeat = marked == project.clips.size() ? 0
+            : map.beatsAt(project.clips[marked].start + project.clips[marked].transitionTime(false));
+        const double joinStart = joinBeat - cue * bpm / 60;
+        const bool markedJoin = !automatic && marked != project.clips.size() && (intent == PendingPlacement::append
+            || (joinStart >= map.beatsAt(0) && (!livePosition || joinStart > map.beatsAt(*livePosition))));
+        if (markedJoin || (intent == PendingPlacement::append && marked != project.clips.size())) previous = marked;
+        const bool alignBar = downbeat >= 0 && (index == 0 || selectedOverlap >= 4 || selectedPreset == TransitionPreset::alignOnly);
+        const double phase = markedJoin ? cue * bpm / 60 : (alignBar ? downbeat : source.firstBeatTime()) * bpm / 60;
+        const double quantum = alignBar ? 4.0 : 1.0;
         if (automatic && intent == PendingPlacement::append)
         {
             // Append after the end of an established transition chain. A long
             // earlier recording must not steal its existing OUT partner.
             for (size_t visited = 0; previous != project.clips.size() && visited < project.clips.size(); ++visited)
             {
-                const auto pending = std::find_if(transitions.begin(), transitions.end(), [&](const auto& item) { return item.first == previous; });
-                if (pending != transitions.end()) { previous = pending->second; continue; }
+                const auto pending = std::find_if(transitions.begin(), transitions.end(), [&](const auto& item) { return item.outgoing == previous; });
+                if (pending != transitions.end()) { previous = pending->incoming; continue; }
                 const auto link = std::find_if(project.transitionLinks.begin(), project.transitionLinks.end(), [&](const auto& item) { return item.outgoing == project.clips[previous].id; });
                 if (link == project.transitionLinks.end()) break;
                 const auto tail = std::find_if(project.clips.begin(), project.clips.end(), [&](const auto& item) { return item.id == link->incoming; });
@@ -395,6 +412,7 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
             const auto& out = project.clips[previous];
             desired = map.beatsAt(out.start + out.transitionTime(false)) - phase;
         }
+        if (markedJoin) desired = joinStart;
         if (automatic && selectedPreset == TransitionPreset::bassSwap && previous != project.clips.size() && intent != PendingPlacement::move)
             for (const auto& link : project.transitionLinks) if (link.incoming == project.clips[previous].id && link.bassSwap)
             {
@@ -406,7 +424,8 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
         if (desired < earliestBeat) desired = std::ceil((earliestBeat + phase) / quantum) * quantum - phase;
         if (sections && previous != project.clips.size() && endBeat(project.clips[previous]) - desired < 32 - 1e-7)
             desired -= std::ceil((32 - (endBeat(project.clips[previous]) - desired)) / quantum) * quantum;
-        if (livePosition && intent != PendingPlacement::move) desired = std::max(desired, (std::floor((map.beatsAt(*livePosition) + phase) / quantum) + 1) * quantum - phase);
+        if (livePosition && intent != PendingPlacement::move && !(markedJoin && intent == PendingPlacement::drop))
+            desired = std::max(desired, (std::floor((map.beatsAt(*livePosition) + phase) / quantum) + 1) * quantum - phase);
         if (sections && previous != project.clips.size())
         {
             const double actual = endBeat(project.clips[previous]) - desired;
@@ -416,9 +435,33 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
             selectedOverlap = actual;
         }
         const double start = map.timeAtBeat(desired);
-        if (automatic && previous != project.clips.size()) transitions.emplace_back(previous, index);
+        if ((automatic || markedJoin) && previous != project.clips.size())
+            transitions.push_back({previous, index, markedJoin});
         const bool hasMarker = std::any_of(map.points.begin(), map.points.end(), [&](const auto& p) { return p.clipId == clip.id; });
-        if (!hasMarker && (previous != project.clips.size() || map.points.front().clipId != clip.id))
+        if (markedJoin && valid && !hasMarker && !project.hasLockedTransitions())
+        {
+            // Preserve the clock through the authored OUT, including any
+            // existing targets. During playback also preserve active voices.
+            double hold = std::max(joinBeat, map.beatsAt(map.points.back().time));
+            if (livePosition)
+                for (const auto& established : project.clips)
+                    if (established.pendingPlacement == PendingPlacement::none) hold = std::max(hold, endBeat(established));
+            const double holdTime = map.timeAtBeat(hold), heldBpm = map.bpmAt(holdTime);
+            auto candidate = map;
+            if (holdTime > map.points.back().time + 1e-9) candidate.setPoint(holdTime, heldBpm, false);
+            if (std::abs(bpm - heldBpm) > 1e-7 && addSpacedTempoTarget(candidate, clip.id, hold, desired + span * bpm / 60, bpm, true))
+                map = std::move(candidate);
+            else
+            {
+                // Keep a visible, editable marker even if there is too little
+                // audio for a ramp. Inserting on the curve preserves its shape.
+                const double at = map.timeAtBeat(joinBeat);
+                const auto next = std::upper_bound(map.points.begin(), map.points.end(), at,
+                    [](double time, const auto& point) { return time < point.time; });
+                map.setTrackPoint(clip.id, at, map.bpmAt(at), next != map.points.end() && next->ramp);
+            }
+        }
+        else if (!markedJoin && !hasMarker && (previous != project.clips.size() || map.points.front().clipId != clip.id))
         {
             int point = 0;
             if (intent == PendingPlacement::move)
@@ -457,6 +500,7 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
         clip.fadeIn = clip.fadeOut = 0; clip.prepared.reset(); clip.preparedOffset = 0;
         if (intent != PendingPlacement::move)
         { clip.introAnchor.reset(); clip.outroAnchor.reset(); clip.fadeInAnchor.reset(); clip.fadeOutAnchor.reset(); }
+        if (markedJoin) clip.introAnchor = cue;
         clip.tempoMap = valid ? std::make_shared<const TempoMap>(map) : nullptr; clip.tempoSourceBpm = 0;
         clip.pendingPlacement = PendingPlacement::none;
     }
@@ -644,31 +688,44 @@ static MatchResult buildTempoMap(Project p, bool align, double overlapBeats, int
     }
     for (const auto& pair : placedTransitions)
     {
-        auto& previous = project.clips[pair.first]; auto& incoming = project.clips[pair.second];
+        auto& previous = project.clips[pair.outgoing]; auto& incoming = project.clips[pair.incoming];
         if (std::any_of(project.transitionLinks.begin(), project.transitionLinks.end(), [&](const auto& link)
             { return link.outgoing == previous.id && link.incoming == incoming.id; })) continue;
         const double overlap = std::max(0.0, std::min({previous.length, incoming.length, previous.end() - incoming.start}));
         const auto selectedPreset = incoming.pendingTransitionPreset.value_or(preset);
-        const auto window = sectionWindow(previous, incoming, project.gridClock(), incoming.pendingSectionTransition.value_or(sectionTransitions) && selectedPreset != TransitionPreset::alignOnly);
-        const auto bass = initialiseTransition(previous, incoming, overlap, selectedPreset, window);
-        if (selectedPreset == TransitionPreset::alignOnly && std::abs(previous.start + previous.transitionTime(false)
+        const auto window = sectionWindow(previous, incoming, project.gridClock(),
+            !pair.markedJoin && incoming.pendingSectionTransition.value_or(sectionTransitions) && selectedPreset != TransitionPreset::alignOnly);
+        const auto bass = pair.markedJoin ? std::optional<std::array<double, 4>>{}
+            : initialiseTransition(previous, incoming, overlap, selectedPreset, window);
+        if ((pair.markedJoin || selectedPreset == TransitionPreset::alignOnly) && std::abs(previous.start + previous.transitionTime(false)
             - incoming.start - incoming.transitionTime(true)) > 1e-6)
         {
             result.error = "The existing OUT cannot meet this incoming IN. Stop playback or move OUT to an upcoming position, then add the track again.";
             return result;
         }
-        if (overlap > 0 || selectedPreset == TransitionPreset::alignOnly)
+        if (overlap > 0 || pair.markedJoin || selectedPreset == TransitionPreset::alignOnly)
         {
             const auto linked = project.linkClips(previous.id, incoming.id);
             if (linked.failed()) { result.error = linked.getErrorMessage(); return result; }
             for (auto& link : project.transitionLinks) if (link.outgoing == previous.id && link.incoming == incoming.id)
             {
                 link.bassSwap = bass;
+                if (pair.markedJoin)
+                {
+                    const double begin = previous.transitionTime(false);
+                    const auto clock = project.gridClock();
+                    const double at = previous.start + begin;
+                    const double preferredEnd = clock.timeAtBeat(clock.beatsAt(at) + (overlapBeats > 0 ? overlapBeats : 16.));
+                    const double end = std::max(begin, std::min({previous.end(), incoming.end(), preferredEnd}) - previous.start);
+                    link.frame = std::array<double, 2> {*previous.outroAnchor, std::max(*previous.outroAnchor, previous.sourceElapsed(end))};
+                    link.alignmentOnly = true;
+                }
                 if (selectedPreset == TransitionPreset::bassSwap && bass)
                 { project.clearTransitionBass(link); link.bands[1] = TransitionBandSettings {TransitionBandMode::swap, 1, 0, sectionSwapPosition(project, link)}; previous.automaticBass = incoming.automaticBass = false; }
             }
             const auto incomingId = incoming.id; const auto* relationship = project.transitionFor(incomingId);
-            const auto regular = relationship && project.transitionRange(*relationship).getLength() > 1.e-6
+            const auto regular = relationship && !pair.markedJoin
+                && project.transitionRange(*relationship).getLength() > 1.e-6
                 ? project.applyTransitionPreset(incomingId,selectedPreset) : juce::Result::ok();
             if (regular.failed()) { result.error = regular.getErrorMessage(); return result; }
         }

@@ -14,7 +14,7 @@ uniform float colourR,colourG,colourB,pulse,mode,mirror,feedback;
 uniform sampler2D historyImage;
 uniform int historyValid;
 uniform float bassHit,midHit,trebleHit,bassTime,midTime,trebleTime;
-// Project beats give 120â€“160 BPM articulation; measured bands supply its strength.
+// Project beats give 120Ã¢â‚¬â€œ160 BPM articulation; measured bands supply its strength.
 // Independent accumulated band phases carry movement between attacks. No global zoom.
 float lowSwing(){return .85*sin(bassTime*1.1+bassImpulse*4.2+float(VARIANT)*.73);}
 float midSwing(){return .8*sin(midTime*.9+midImpulse*3.8+float(VARIANT)*1.17);}
@@ -86,7 +86,13 @@ vec4 decal=cutoutArt(p.xy*.35+.5);albedo=mix(albedo,decal.rgb,decal.a*imageMix);
 return albedo*(.13+diff*.85)+palette(id*.1+.3)*rim*.45+vec3(spec)*.5;}
 void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colour=vec4(max(c,vec3(0)),1);}
 
-void main(){vec2 p=domain();float t=clockTime();vec3 c=vec3(0);
+void main(){
+    vec2 artworkUV=gl_FragCoord.xy/resolution;
+vec2 p=domain()+.35*structureCurrent(artworkUV);float t=clockTime();
+    p=rot(.50*drive()*sin(midImpulse))*p/(1.+1.8*drive());
+    p+=vec2(.28*sin(t*.75),.32*cos(t*.65))*drive();
+    p.x+=max(0.,resolution.x/resolution.y-1.777778)*1.4*sin(t*.95)*clamp(drive()*2.,0.,1.);
+    vec3 c=vec3(0);
 #if FAMILY == 12
     // Escape-time Julia / Mandelbrot fields with orbit-trap relief.
     p=rot(.4*midSwing())*p+vec2(.16*lowSwing(),.1*highSwing());

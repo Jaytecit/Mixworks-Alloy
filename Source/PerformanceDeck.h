@@ -36,6 +36,8 @@ public:
     std::array<AlloyDial, 8> pots;
     std::array<juce::Slider, 8> faders;
     juce::Slider master;
+    std::array<juce::Slider, 2> wheels;
+    std::array<juce::ComboBox, 2> wheelTargets;
     std::array<juce::TextButton, 16> pads;
     std::array<juce::TextButton, 8> buttons;
     std::array<HotcueButton, 9> channelButtons;
@@ -49,12 +51,15 @@ private:
     bool updating = false;
     bool forgeEffects = false;
     std::array<juce::Label, 17> names;
+    std::array<juce::Label, 2> wheelNames;
+    std::array<bool, 2> wheelDragging {}, wheelMoved {};
     juce::Label title, state, hint, launchState;
     std::array<bool, 17> gestures {};
     std::array<AutomationAddress, 17> gestureAddresses;
     std::array<AutomationAddress, 17> displayedAddresses;
     AutomationAddress timelineAddress(int lane, AutomationTarget) const;
     void configure(juce::Slider&, int slot, MidiAction, AutomationAddress, const juce::String&);
+    void configureWheel(int slot);
     void trigger(MidiAction);
 };
 }

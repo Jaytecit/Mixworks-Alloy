@@ -76,6 +76,8 @@ vec4 cellField(vec2 p) {
     return vec4(max(0.,second-first),first,winner);
 }
 float heightAt(vec2 p) {
+    p+=.12*structureCurrent(p*.28+.5);
+
     float gap=cellField(p).x;
     float crystal=.035+.185*min(gap,1.);
     float frame=.145+.025*smoothstep(0.,.045,gap);

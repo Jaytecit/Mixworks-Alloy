@@ -1,11 +1,84 @@
 #include "Workstation.h"
+#include "StudioWorkspace.h"
 #include "AppWindow.h"
 #include "UiMessages.h"
+#include "TutorialMusic.h"
 
 namespace mixworks
 {
 namespace
 {
+class GettingStartedPanel final : public juce::Component, private juce::Timer
+{
+public:
+    std::function<void(int,bool)> persist;
+    std::function<void(int)> act;
+    std::function<bool(int)> ready;
+    std::function<juce::String(int)> waiting;
+    std::function<void(bool)> setHints;
+    std::function<void()> useDemo;
+    std::function<bool()> canDemo,preparingDemo;
+    int step=0; bool heardPlayback=false;
+    juce::Label heading,body,progress;
+    juce::TextButton back{"Back"},next{"Next"},action,skip{"Skip for now"},demo{"Use original demo music"};
+    juce::ToggleButton tips{"Show popup helpers"};
+    GettingStartedPanel(int initial,bool helpers) : step(initial)
+    {
+        setName("Getting started"); setSize(520,390);
+        for(auto* c:std::initializer_list<juce::Component*>{&heading,&body,&progress,&back,&next,&action,&skip,&tips,&demo}) addAndMakeVisible(c);
+        heading.setFont(juce::FontOptions(19)); heading.setColour(juce::Label::textColourId,colour::text);
+        body.setFont(juce::FontOptions(14)); body.setColour(juce::Label::textColourId,colour::text); body.setJustificationType(juce::Justification::topLeft);
+        progress.setColour(juce::Label::textColourId,colour::muted); tips.setToggleState(helpers,juce::dontSendNotification);
+        next.setComponentID("tutorial-next"); skip.setComponentID("tutorial-skip"); action.setComponentID("tutorial-action"); heading.setComponentID("tutorial-step"); tips.setComponentID("tutorial-tips");
+        demo.setComponentID("tutorial-demo");demo.setTooltip("Optionally create three original 120 BPM demonstration tracks in the app's tutorial folder and add them to the library. Your existing music and mix stay untouched.");
+        demo.onClick=[this] {if(useDemo)useDemo();};
+        back.onClick=[this] { step=std::max(0,step-1); if(persist)persist(step,false); update(); };
+        next.onClick=[this] { if(!next.isEnabled())return; if(step==4) { if(persist)persist(4,true); close(); }
+            else { ++step; if(persist)persist(step,false); update(); } };
+        skip.onClick=[this] { if(persist)persist(step,false); close(); };
+        action.onClick=[this] { if(act)act(step); };
+        tips.onClick=[this] { if(setHints)setHints(tips.getToggleState()); };
+        update(); startTimerHz(4);
+    }
+    void close() { if(auto* window=findParentComponentOfClass<juce::DocumentWindow>())window->setVisible(false); }
+    void update()
+    {
+        static const char* titles[]{"1. Bring in your music","2. Put a song on the timeline","3. Highlight and edit some audio","4. Listen to the mix","5. Save your mix"};
+        static const char* text[]{
+            "Choose Import music for your own songs, or use the optional original demo music below. The demos are three short 120 BPM tracks. Click a library title's waveform strip to preview a passage. Your existing files stay untouched. Skip and resume from Help at any time.",
+            "Double-click a library song, or drag it onto a mixer lane. Add another song when you are ready. Overlap songs and use Transitions to shape their handover.",
+            "Drag across the waveform to highlight audio, then right-click the highlight for Copy, Cut, Delete or Crop. Drag the title to move a track; drag an outer edge to trim it. Undo restores an edit. Right-click the segment and choose Segment settings for exact values.",
+            "Press Play and listen. Zoom or scroll to inspect the mix. Timeline hotcues jump the whole mix; all lanes follow. Read plays saved curves; Touch and Latch record moved controls on armed lanes.",
+            "Choose Save and name your mix. The default folder is Desktop / Mixworks; File can change it. Your mix keeps its editing choices while the original music stays untouched. Export WAV makes a playable audio file."};
+        static const char* actions[]{"Import music...","Show library","Show timeline","Play / pause","Save mix..."};
+        heading.setText(titles[step],juce::dontSendNotification); body.setText(text[step],juce::dontSendNotification); action.setButtonText(actions[step]);
+        const bool creating=preparingDemo && preparingDemo();demo.setVisible(step==0);demo.setButtonText(creating ? "Cancel demo preparation" : "Use original demo music");demo.setEnabled(creating || (canDemo && canDemo()));
+        bool complete=ready && ready(step); if(step==3) { heardPlayback|=complete; complete=heardPlayback; }
+        next.setButtonText(step==4 ? "Finish" : "Next"); next.setEnabled(complete); back.setEnabled(step>0);
+        const auto reason=waiting ? waiting(step):juce::String();
+        progress.setText(complete ? "Ready to continue." : reason.isNotEmpty() ? reason : "Try this step in the main window, or Skip for now.",juce::dontSendNotification);
+        next.setTooltip(complete ? "Continue the tutorial." : "Complete this step in the main window first. Skip for now keeps your place.");
+    }
+    void paint(juce::Graphics& g) override { g.fillAll(colour::panel); }
+    void resized() override
+    {
+        auto r=getLocalBounds().reduced(18); heading.setBounds(r.removeFromTop(34)); r.removeFromTop(8); body.setBounds(r.removeFromTop(146));
+        demo.setBounds(r.removeFromTop(30));r.removeFromTop(6);
+        progress.setBounds(r.removeFromTop(28)); tips.setBounds(r.removeFromTop(28)); r.removeFromTop(8);
+        auto buttons=r.removeFromTop(32); back.setBounds(buttons.removeFromLeft(60)); buttons.removeFromLeft(8); action.setBounds(buttons.removeFromLeft(136));
+        next.setBounds(buttons.removeFromRight(65)); buttons.removeFromRight(8); skip.setBounds(buttons);
+    }
+private: void timerCallback() override { update(); }
+};
+class GettingStartedWindow final : public AlloyPopupWindow<juce::DocumentWindow>
+{
+public:
+    GettingStartedWindow(GettingStartedPanel* content) : AlloyPopupWindow("Getting started / Mixworks",colour::panel,juce::DocumentWindow::closeButton)
+    { setUsingNativeTitleBar(false); setContentOwned(content,true); setResizable(false,false); centreWithSize(520,390); }
+    void closeButtonPressed() override
+    { if(auto* panel=dynamic_cast<GettingStartedPanel*>(getContentComponent()))if(panel->persist)panel->persist(panel->step,false); setVisible(false); }
+};
+
 // JUCE transports integer IDs; keep each command family explicit and disjoint.
 enum class MenuCommand : int
 {
@@ -50,6 +123,8 @@ enum class MenuCommand : int
     autoScan = 38,
     stopScan = 39,
     scanReports = 139,
+    chooseMusicScanFolder = 140,
+    resetMusicScanFolder = 141,
     quit = 45,
     analyseSelected = 60,
     analyseReview = 61,
@@ -80,6 +155,9 @@ enum class MenuCommand : int
     rippleDelete = 90, closeGap = 91,
     workspaceLayouts = 92, consoleOrder = 93,
     insertBefore = 94, insertAfter = 95,
+    saveFolder = 96, resetSaveFolder = 97, tutorial = 98,
+    segmentSettings = 99, exactRange = 100, selectionTools = 101, chooseSegment = 102,
+    transitionDefaults = 103, masterCurve = 104, automationDetails = 105,
     length4 = 3000, length8, length16, length32, length64, lengthSections,
     snapBeat = 3010, snapHalf, snapQuarter
 };
@@ -87,14 +165,14 @@ constexpr int commandId(MenuCommand command) { return static_cast<int>(command);
 constexpr std::array<MenuCommand, 6> transitionCommands {{MenuCommand::length4, MenuCommand::length8, MenuCommand::length16, MenuCommand::length32, MenuCommand::length64, MenuCommand::lengthSections}};
 }
 
-juce::StringArray Workstation::getMenuBarNames() { return {"File", "Edit", "Mix", "Beat grids", "View", "Tools"}; }
+juce::StringArray Workstation::getMenuBarNames() { return {"File", "Edit", "Mix", "Beat grids", "View", "Tools", "Help"}; }
 juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
 {
     juce::PopupMenu menu;
     switch (index)
     {
         case 0: menu.addSectionHeader("Current: " + (sessionFile == juce::File() ? "Untitled mix" : sessionFile.getFileName()) + (dirty ? " *" : "")); menu.addItem(commandId(MenuCommand::newMix), "New mix"); menu.addItem(commandId(MenuCommand::openMix), "Open mix..."); menu.addItem(commandId(MenuCommand::saveMix), "Save mix (Ctrl+S)"); menu.addItem(commandId(MenuCommand::saveMixAs), "Save mix as... (Ctrl+Shift+S)"); menu.addItem(commandId(MenuCommand::recover), "Recover unsaved mix..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addFiles), "Add files to library..."); menu.addItem(commandId(MenuCommand::importPlaylist), "Import playlist..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::exportWav), "Export mix as WAV..."); menu.addItem(commandId(MenuCommand::exportPlaylist), "Export source playlist..."); menu.addItem(commandId(MenuCommand::exportTrackList), "Export track list..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::quit), "Exit Mixworks (Alt+F4)"); break;
-        case 1: menu.addItem(commandId(MenuCommand::undo), "Undo", !undoHistory.empty()); menu.addItem(commandId(MenuCommand::redo), "Redo", !redoHistory.empty()); menu.addSeparator(); menu.addItem(commandId(MenuCommand::split), "Split at playhead", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::duplicate), "Duplicate selection", currentClip() != nullptr || (sceneLane && sceneLane->hasSelectedScene())); menu.addItem(commandId(MenuCommand::remove), "Remove selection", currentClip() != nullptr || (sceneLane && sceneLane->hasSelectedScene())); menu.addItem(commandId(MenuCommand::reverse), "Reverse", currentClip() != nullptr, currentClip() && currentClip()->reversed); menu.addItem(commandId(MenuCommand::loop), "Loop section...", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::resetClipCutoff), "Reset selected segment cutoff", currentClip() && !engine.project.clipTransitionLocked(currentClip()->id)); break;
+        case 1: menu.addItem(commandId(MenuCommand::undo), "Undo", !undoHistory.empty() && (!engine.capturingPerformance() || undoHistory.size()>(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0)))); menu.addItem(commandId(MenuCommand::redo), "Redo", !redoHistory.empty()); menu.addSeparator(); menu.addItem(commandId(MenuCommand::split), "Split at playhead", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::duplicate), "Duplicate selection", currentClip() != nullptr || (sceneLane && sceneLane->hasSelectedScene())); menu.addItem(commandId(MenuCommand::remove), "Remove selection", currentClip() != nullptr || (sceneLane && sceneLane->hasSelectedScene())); menu.addItem(commandId(MenuCommand::reverse), "Reverse", currentClip() != nullptr, currentClip() && currentClip()->reversed); menu.addItem(commandId(MenuCommand::loop), "Loop section...", currentClip() != nullptr); menu.addItem(commandId(MenuCommand::resetClipCutoff), "Reset selected segment cutoff", currentClip() && !engine.project.clipTransitionLocked(currentClip()->id)); break;
         case 2: menu.addSubMenu("Automation", automationMenu(engine.selectedTrack.load())); menu.addSeparator(); menu.addItem(commandId(MenuCommand::effectEnding), "Effect ending...", !busy); menu.addSeparator(); menu.addItem(commandId(MenuCommand::tempo), "Tempo marker at playhead... (P)"); menu.addItem(commandId(MenuCommand::snap), "Snap to grid", true, engine.project.snap); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addLabel), "Label marker at playhead... (L)"); menu.addItem(commandId(MenuCommand::editLabel), "Edit selected label...", timeline.selectedLabel.isNotEmpty()); menu.addItem(commandId(MenuCommand::removeLabel), "Remove selected label", timeline.selectedLabel.isNotEmpty()); menu.addItem(commandId(MenuCommand::previousLabel), "Previous label ([)", !engine.project.labels.empty()); menu.addItem(commandId(MenuCommand::nextLabel), "Next label (])", !engine.project.labels.empty()); menu.addSeparator(); menu.addItem(commandId(MenuCommand::play), "Play / pause"); menu.addItem(commandId(MenuCommand::stop), "Stop"); menu.addItem(commandId(MenuCommand::home), "Return to start"); break;
         case 3:
         {
@@ -106,10 +184,25 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
             snapping.addItem(commandId(MenuCommand::snapQuarter), "Quarter beat", true, engine.project.snapDivision == 4);
             menu.addSubMenu("Snap grid", snapping); menu.addSeparator();
             juce::PopupMenu analysis; const bool available = !busy && !engine.playing && timelineLoads.empty() && pendingTempo <= 0 && !tempoPreparationPending && !engine.exporting;
-            const auto selected = analysisTargets(0);
-            analysis.addItem(commandId(MenuCommand::analyseFocused), "Retry weak BPM / key", available && std::any_of(selected.begin(), selected.end(), [](const auto& m) { return canRetryAnalysis(*m); }));
-            analysis.addItem(commandId(MenuCommand::analyseSelected), "Selected tracks", available && !analysisTargets(0).empty());
-            analysis.addItem(commandId(MenuCommand::analyseReview), "Tracks needing analysis", available && !analysisTargets(1).empty());
+            // Menu enablement needs existence, not a deduplicated work list.
+            // Building all review targets here made opening this menu quadratic
+            // in a large library, even with no selected tracks.
+            bool selected = false, retry = false;
+            if (available)
+            {
+                const auto& table = browserPage == 1 ? playlistTable : libraryTable;
+                const auto rows = table.table.getSelectedRows();
+                for (int i = 0; i < rows.size() && !retry; ++i)
+                {
+                    const int row = rows[i]; const Media* media = nullptr;
+                    if (browserPage == 1) { if (const auto* clip = table.clipAtRow(row)) media = clip->media.get(); }
+                    else if (row >= 0 && row < (int)visibleMedia.size()) media = engine.library[(size_t)visibleMedia[(size_t)row]].get();
+                    if (media) { selected = true; retry = canRetryAnalysis(*media); }
+                }
+            }
+            analysis.addItem(commandId(MenuCommand::analyseFocused), "Retry weak BPM / key", available && retry);
+            analysis.addItem(commandId(MenuCommand::analyseSelected), "Selected tracks", available && selected);
+            analysis.addItem(commandId(MenuCommand::analyseReview), "Tracks needing analysis", available && std::any_of(engine.library.begin(), engine.library.end(), [](const auto& m) { return m && m->needsAnalysis(); }));
             analysis.addItem(commandId(MenuCommand::analyseAll), "All library songs", available && !engine.library.empty());
             analysis.addSeparator(); analysis.addItem(commandId(MenuCommand::selectReview), "Select tracks needing analysis", !engine.library.empty());
             menu.addSubMenu("Re-analyse", analysis); menu.addSeparator(); menu.addSectionHeader("Transition length");
@@ -131,7 +224,9 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
             }
             menu.addItem(commandId(MenuCommand::popupHints), "Popup hints", true, layout.popupHints);
             menu.addItem(commandId(MenuCommand::energySections), "Suggested energy sections", true, showEnergySections);
-            menu.addItem(2781, "Visual scene library / preview...", !busy);
+            menu.addItem(2781, "Open Visual Studio...", !busy);
+            menu.addItem(2782, "Share master audio with Visual Studio", sceneLane != nullptr,
+                         sceneLane && sceneLane->studioAudioShared());
             menu.addItem(commandId(MenuCommand::masterOutput), "Master output / Spectrum...", !busy); menu.addSeparator();
             menu.addItem(commandId(MenuCommand::forge), "Forge sparks", true, layout.forgeEffects);
             {
@@ -154,27 +249,67 @@ juce::PopupMenu Workstation::getMenuForIndex(int index, const juce::String&)
                 menu.addSubMenu("Attract motion", motion);
             }
             menu.addSeparator();
-            menu.addItem(commandId(MenuCommand::editing), "Editing console", true, toolPage == 2); menu.addItem(commandId(MenuCommand::detachEditing), editingWindow ? "Attach Editing" : "Detach Editing", true, editingWindow != nullptr); menu.addItem(commandId(MenuCommand::effects), "Effects / VST3", true, inspectorPage == 1); menu.addItem(commandId(MenuCommand::keyboard), "MIDI keyboard", true, inspectorPage == 2);
+            menu.addItem(commandId(MenuCommand::editing), "Details inspector", true, !consoleCollapsed && toolPage == 2); menu.addItem(commandId(MenuCommand::detachEditing), editingWindow ? "Attach Editing" : "Detach Editing", true, editingWindow != nullptr); menu.addItem(commandId(MenuCommand::effects), "Effects / VST3", true, inspectorPage == 1); menu.addItem(commandId(MenuCommand::keyboard), "MIDI keyboard", true, inspectorPage == 2);
             menu.addSeparator(); menu.addItem(commandId(MenuCommand::fit), "Fit whole mix"); menu.addItem(commandId(MenuCommand::zoomIn), "Zoom in"); menu.addItem(commandId(MenuCommand::zoomOut), "Zoom out");
             if (const auto* window = findParentComponentOfClass<AppWindow>()) { menu.addSeparator(); menu.addSubMenu("Display", window->displayMenu()); }
             break;
-        case 5: menu.addItem(commandId(MenuCommand::settings), "Audio / MIDI settings..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::addPlugin), "Add VST3 effect / instrument..."); menu.addItem(commandId(MenuCommand::assignPlugin), "Assign MIDI plugin controls..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::scanMusic), "Scan Music folder now", !engine.playing); menu.addItem(commandId(MenuCommand::autoScan), "Automatically scan Music folder", true, musicScanEnabled); menu.addItem(commandId(MenuCommand::stopScan), "Stop current Music scan", musicScan != nullptr || musicScanJobPending || musicScanManual); menu.addItem(commandId(MenuCommand::scanReports), "Music scan reports..."); menu.addSeparator(); menu.addItem(commandId(MenuCommand::lastMessage), "Last message details...", getProperties()["lastMessageDetails"].toString().isNotEmpty()); break;
+        case 5:
+            menu.addItem(commandId(MenuCommand::settings), "Audio / MIDI settings..."); menu.addSeparator();
+            menu.addItem(commandId(MenuCommand::addPlugin), "Add VST3 effect / instrument...");
+            menu.addItem(commandId(MenuCommand::assignPlugin), "Assign MIDI plugin controls..."); menu.addSeparator();
+            menu.addItem(commandId(MenuCommand::scanMusic), "Scan Music folder now", !engine.playing);
+            menu.addItem(commandId(MenuCommand::autoScan), "Automatically scan Music folder", true, musicScanEnabled);
+            menu.addItem(commandId(MenuCommand::chooseMusicScanFolder), "Choose Music scan folder...");
+            menu.addItem(commandId(MenuCommand::resetMusicScanFolder), "Use Windows Music folder", musicFolderPreference != juce::File());
+            menu.addItem(commandId(MenuCommand::stopScan), "Stop current Music scan", musicScan != nullptr || musicScanJobPending || musicScanManual);
+            menu.addItem(commandId(MenuCommand::scanReports), "Music scan reports..."); menu.addSeparator();
+            menu.addItem(commandId(MenuCommand::lastMessage), "Last message details...", getProperties()["lastMessageDetails"].toString().isNotEmpty()); break;
+        case 6: menu.addItem(commandId(MenuCommand::tutorial),"Getting started / resume tutorial..."); menu.addItem(commandId(MenuCommand::popupHints),"Popup helpers",true,layout.popupHints); break;
         default: break;
+    }
+    if (index == 0)
+    {
+        juce::PopupMenu folders;
+        folders.addSectionHeader(defaultSaveFolder().getFullPathName());
+        folders.addItem(commandId(MenuCommand::saveFolder), "Choose default save folder...");
+        folders.addItem(commandId(MenuCommand::resetSaveFolder), "Use Desktop / Mixworks", true, layout.saveFolder.isEmpty());
+        menu.addSubMenu("Default save folder", folders);
     }
     if (index == 1)
     {
         menu.addSeparator();
+        menu.addItem(commandId(MenuCommand::selectionTools), "Edit selection... (Shift+F10)", editSelection.multiple() && !busy);
+        menu.addItem(commandId(MenuCommand::exactRange), "Exact range...", currentClip() && !busy);
+        menu.addItem(commandId(MenuCommand::segmentSettings), "Segment settings... (Ctrl+T)", currentClip() && !editSelection.multiple() && !busy);
+        menu.addItem(commandId(MenuCommand::chooseSegment), "Choose segment...", !engine.project.clips.empty() && !busy);
         menu.addItem(commandId(MenuCommand::rippleDelete), "Ripple delete segment / all lanes (Ctrl+Shift+Delete)", currentClip() != nullptr && !busy && !engine.exporting);
         menu.addItem(commandId(MenuCommand::closeGap), "Close gap before segment / all lanes (Ctrl+Shift+G)", currentClip() != nullptr && !busy && !engine.exporting);
         menu.addItem(commandId(MenuCommand::insertBefore), "Insert song before selected segment...", currentClip() && canInsertArrangement() && !engine.library.empty());
         menu.addItem(commandId(MenuCommand::insertAfter), "Insert song after selected segment...", currentClip() && canInsertArrangement() && !engine.library.empty());
+    }
+    if (index == 2)
+    {
+        menu.addItem(commandId(MenuCommand::transitionDefaults), "Defaults for new transitions...", !busy);
+        menu.addItem(commandId(MenuCommand::automationDetails), "Automation details...", !busy);
+        menu.addItem(commandId(MenuCommand::masterCurve), "Master volume automation...", !busy);
     }
     if (index == 1 || index == 2) addBarMenus(menu, index == 1);
     return menu;
 }
 void Workstation::menuItemSelected(int id, int menuIndex)
 {
-    if (id == 2781) { if (sceneLane) sceneLane->showBrowser(); return; }
+    if(id==commandId(MenuCommand::tutorial)) { showTutorial(); return; }
+    if (id == commandId(MenuCommand::saveFolder)) { chooseDefaultSaveFolder(); return; }
+    if (id == commandId(MenuCommand::resetSaveFolder)) { setDefaultSaveFolder({}); return; }
+    if (id == 2781) { if (studioWorkspace) studioWorkspace->openStudio(); return; }
+    if (id == 2782 && sceneLane)
+    {
+        const bool enable = !sceneLane->studioAudioShared();
+        if (!sceneLane->shareStudioAudio(enable)) setStatus("Could not start the local Visual Studio audio link.");
+        else setStatus(enable ? "Sharing master audio. Select Alloy live in Visual Studio."
+                              : "Visual Studio audio sharing stopped.");
+        return;
+    }
     if (id == commandId(MenuCommand::insertBefore) || id == commandId(MenuCommand::insertAfter))
     {
         if (menuIndex == 1 && currentClip()) chooseArrangementInsertion(selectedClip, id == commandId(MenuCommand::insertAfter));
@@ -192,6 +327,18 @@ void Workstation::menuItemSelected(int id, int menuIndex)
     { performTimelineAction((TimelineAction) id, engine.position.load(), engine.selectedTrack.load()); return; }
     if (id == commandId(MenuCommand::quit)) { if (auto* app = juce::JUCEApplication::getInstance()) app->systemRequestedQuit(); return; }
     if (auto* window = findParentComponentOfClass<AppWindow>()) if (window->performDisplayAction(id)) return;
+    if (id == commandId(MenuCommand::selectionTools)) { timelineRuler.selectionTools.onClick(); return; }
+    if (id == commandId(MenuCommand::exactRange)) { editRangeTime(); return; }
+    if (id == commandId(MenuCommand::segmentSettings))
+    { performTimelineAction(TimelineAction::settings, engine.position.load(), engine.selectedTrack.load()); return; }
+    if (id == commandId(MenuCommand::chooseSegment)) { chooseTimelineSegment(menuBar.getScreenBounds().withWidth(180)); return; }
+    if (id == commandId(MenuCommand::transitionDefaults)) { showNewTransitionDefaults(menuBar.getScreenBounds().withWidth(180)); return; }
+    if (id == commandId(MenuCommand::automationDetails)) { showAutomationDetails(); return; }
+    if (id == commandId(MenuCommand::masterCurve))
+    {
+        if (!busy && !engine.exporting) { timeline.selectAutomationCurve({-1, AutomationTarget::master}); showAutomationDetails(); }
+        return;
+    }
     if (id == commandId(MenuCommand::detachEditing)) { detachToolPanel(2, !editingWindow); return; }
     if (id == commandId(MenuCommand::transitions)) { showToolPage(1); return; }
     if (id == commandId(MenuCommand::detachTransitions)) { detachToolPanel(1, !transitionWindow); return; }
@@ -263,6 +410,17 @@ void Workstation::menuItemSelected(int id, int menuIndex)
         case MenuCommand::removeLabel: removeLabelMarker(); break; case MenuCommand::previousLabel: navigateLabel(false); break; case MenuCommand::nextLabel: navigateLabel(true); break;
         case MenuCommand::scanMusic: stopMusicScan(); musicAttempts.clear(); musicScanManual = true; nextMusicScan = 0; setStatus("Music scan requested: " + musicFolder.getFullPathName()); break;
         case MenuCommand::autoScan: toggleMusicScan(); break; case MenuCommand::stopScan: stopMusicScan(); setStatus("Music scan stopped; it can resume on the next automatic check."); break;
+        case MenuCommand::chooseMusicScanFolder:
+        {
+            chooser = std::make_unique<juce::FileChooser>("Choose the folder Alloy should scan, including subfolders", musicFolder);
+            chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                [safe = juce::Component::SafePointer<Workstation>(this)](const auto& picker)
+                {
+                    if (safe && picker.getResult() != juce::File()) safe->selectMusicScanFolder(picker.getResult());
+                });
+            break;
+        }
+        case MenuCommand::resetMusicScanFolder: selectMusicScanFolder({}); break;
         case MenuCommand::scanReports:
             if (musicReport.existsAsFile()) musicReport.startAsProcess();
             else if (musicScanReportsFolder(musicPreference).isDirectory()) musicScanReportsFolder(musicPreference).revealToUser();
@@ -285,6 +443,77 @@ void Workstation::toggleWindowMode()
 {
     if (auto* window = findParentComponentOfClass<AppWindow>()) window->toggleFullscreen();
 }
+void Workstation::showTutorial()
+{
+    if(tutorialWindow && tutorialWindow->isVisible()) { tutorialWindow->toFront(true); return; }
+    if(workspacePreference==juce::File()) { setStatus("Tutorial progress needs an isolated or normal workspace preference folder."); return; }
+    const auto file=workspacePreference.getSiblingFile("getting-started.json"); const auto saved=juce::JSON::parse(file);
+    const int step=saved["format"].toString()=="mixworks-getting-started" && saved["step"].isInt() && !(bool)saved["complete"]
+        ? juce::jlimit(0,4,(int)saved["step"]) : 0;
+    auto* panel=new GettingStartedPanel(step,layout.popupHints);
+    const auto safe=juce::Component::SafePointer<Workstation>(this);
+    panel->persist=[safe,file](int current,bool complete)
+    {
+        if(!safe)return; juce::var value(new juce::DynamicObject()); value.getDynamicObject()->setProperty("format","mixworks-getting-started");
+        value.getDynamicObject()->setProperty("step",current); value.getDynamicObject()->setProperty("complete",complete);
+        const auto directory=file.getParentDirectory().createDirectory();
+        juce::String error;
+        if(directory.failed())error=directory.getErrorMessage();
+        else if(file.isSymbolicLink() || file.getParentDirectory().isSymbolicLink())error="The tutorial path is a link; it was kept.";
+        else { juce::TemporaryFile temporary(file);
+            if(!temporary.getFile().replaceWithText(juce::JSON::toString(value)) || !temporary.overwriteTargetFileWithTemporary())
+                error="The previous tutorial progress was kept. Check folder access and try again."; }
+        if(error.isNotEmpty())safe->setStatus("Tutorial progress could not be saved. "+error);
+    };
+    panel->ready=[safe](int current)
+    {
+        if(!safe)return false;
+        switch(current) { case 0:return !safe->engine.library.empty(); case 1:return !safe->engine.project.clips.empty()
+                && !safe->busy && safe->timelineLoads.empty() && !safe->tempoPreparationPending && safe->pendingTempo<=0 && safe->engine.playbackReady();
+            case 2:return safe->editSelection.range.has_value(); case 3:return safe->engine.playing.load();
+            case 4:return safe->sessionFile.existsAsFile() && !safe->dirty; default:return false; }
+    };
+    panel->waiting=[safe](int current)
+    {return safe && current==1 && !safe->engine.project.clips.empty()
+        && (safe->busy || !safe->timelineLoads.empty() || safe->tempoPreparationPending || safe->pendingTempo>0 || !safe->engine.playbackReady())
+        ? juce::String("Track audio is preparing. Continue when it is ready.") : juce::String();};
+    panel->act=[safe](int current)
+    {
+        if(!safe)return;
+        switch(current) { case 0:safe->chooseImport();break; case 1:safe->showBrowserPage(0);safe->setStatus("Double-click a library song or drag it onto a lane.");break;
+            case 2:safe->timeline.grabKeyboardFocus();safe->setStatus("Drag across a waveform to highlight audio, then right-click the highlight.");break;
+            case 3:safe->playButton.triggerClick();break;case 4:safe->saveButton.triggerClick();break;default:break; }
+    };
+    panel->setHints=[safe](bool enabled)
+    { if(!safe)return;safe->layout.popupHints=enabled;safe->hints.setHintsEnabled(enabled);safe->workspaceDirty=true;safe->saveWorkspacePreferences(); };
+    panel->preparingDemo=[safe] {return safe && (bool)safe->getProperties().getWithDefault("tutorialGenerating",false);};
+    panel->canDemo=[safe] {return safe && !safe->busy && !safe->engine.exporting && !safe->engine.playing && !safe->engine.capturingPerformance() && safe->pendingTempo<=0 && !safe->tempoPreparationPending;};
+    panel->useDemo=[safe]
+    {
+        if(!safe)return;
+        if((bool)safe->getProperties().getWithDefault("tutorialGenerating",false))
+        {if(safe->importCancellation)safe->importCancellation->store(true);safe->setStatus("Cancelling optional demo preparation...");return;}
+        if(safe->busy || safe->engine.exporting || safe->engine.playing || safe->engine.capturingPerformance() || safe->pendingTempo>0 || safe->tempoPreparationPending)
+        {safe->setStatus("Stop playback and finish preparation before adding the optional demo music.");return;}
+        auto cancelled=std::make_shared<std::atomic<bool>>(false);safe->importCancellation=cancelled;
+        safe->getProperties().set("tutorialGenerating",true);safe->setBusy(true);safe->setStatus("Creating three original demo tracks locally...");
+        const auto folder=safe->workspacePreference.getSiblingFile("TutorialAudio-v1");
+        safe->workers.addJob([safe,cancelled,folder]
+        {
+            auto result=createTutorialMusic(folder,cancelled);
+            juce::MessageManager::callAsync([safe,cancelled,result=std::move(result)]
+            {
+                if(!safe || safe->importCancellation!=cancelled)return;
+                safe->getProperties().remove("tutorialGenerating");safe->importCancellation.reset();safe->setBusy(false);
+                if(cancelled->load()) {safe->setStatus("Demo preparation cancelled. Your music and mix were kept.");return;}
+                if(result.error.isNotEmpty()) {safe->setStatus(result.error);return;}
+                safe->showBrowserPage(0);safe->importFiles(result.files);
+            });
+        });
+    };
+    panel->update(); tutorialWindow=std::make_unique<GettingStartedWindow>(panel); tutorialWindow->setLookAndFeel(&look); tutorialWindow->setVisible(true);
+}
+
 void Workstation::initialiseShortcuts()
 {
     for (auto* c : std::initializer_list<juce::Component*> {&effectsTab, &shortcutsTab, &shortcutSearch, &shortcutHeading, &allShortcuts, &shortcutResults}) addAndMakeVisible(c);
@@ -335,7 +564,7 @@ void Workstation::refreshShortcuts()
         {"Ctrl + D", "Duplicate selected segment", "Editing", true},
         {"Delete", "Remove selection", "Segment, range/group, label or selected node", true},
         {"Alt + Left / Right", "Previous / next transition", "Transitions", true},
-        {"Ctrl + T", "Open Editing console", "Selected segment", true},
+        {"Ctrl + T", "Open segment settings", "Selected segment", true},
         {"Ctrl + O", "Open mix", "File"},
         {"Ctrl + Shift + S", "Save mix as", "File"},
         {"Ctrl + A", "Select all segments", "Timeline"},
@@ -391,6 +620,7 @@ void Workstation::refreshShortcuts()
         {"Home", "Reset focused dial", "Dial focused"},
         {"Space", "Play / pause source preview", "BPM / key review; outside numeric text fields"},
         {"Enter", "Select focused timeline object", "Keyboard accessibility"},
+        {"Shift+F10", "Open focused timeline object's menu", "Keyboard accessibility"},
         {"Tab / Shift + Tab", "Next / previous control", "Keyboard focus"},
         {"Enter / Escape", "Apply / cancel dialog", "Where the dialog provides these actions"},
         {"F11", "Toggle fullscreen", "Window"},
@@ -445,7 +675,6 @@ void Workstation::resizeLane(int lane, int height)
 void Workstation::layoutTrackHeaders()
 {
     for (int i = 0; i < trackCount; ++i) strips[(size_t) i]->setBounds(0, timeline.laneTop(i) - viewport.getViewPositionY(), trackHeaders.getWidth(), timeline.laneSize(i));
-    if (sceneLane) { sceneLane->setBounds(layout.visuals.withWidth(viewport.getViewWidth())); sceneLane->browserButton.setBounds(layout.visualHeader.reduced(5, 20)); sceneLane->repaint(); }
     tempoStrip.setBounds(layout.tempo.withWidth(viewport.getViewWidth())); tempoStrip.repaint();
     timelineRuler.setBounds(layout.ruler.withWidth(viewport.getViewWidth()));
 }
@@ -496,7 +725,8 @@ juce::Result Workstation::restoreNamedWorkspace(const juce::File& file)
     NamedWorkspace preset; const auto result = readNamedWorkspace(file, preset); if (result.failed()) return result;
     const bool monitor = layout.monitorMuted;
     for (int page = 0; page < 3; ++page) detachToolPanel(page, false);
-    layout = preset.layout; layout.monitorMuted = monitor; toolPage = preset.layout.toolPage;
+    const auto saveFolder = layout.saveFolder;
+    layout = preset.layout; layout.monitorMuted = monitor; layout.saveFolder = saveFolder; toolPage = preset.layout.toolPage;
     timeline.pixelsPerSecond = preset.zoom;
     hints.setHintsEnabled(layout.popupHints); if (performance) performance->setForgeEffects(forgeMotionAllowed());
     showBrowserPage(preset.browserPage); showInspectorPage(preset.inspectorPage);
@@ -512,7 +742,7 @@ juce::Result Workstation::restoreNamedWorkspace(const juce::File& file)
         if (window) window->setBounds(requested.withSize(std::min(requested.getWidth(), area.getWidth()), std::min(requested.getHeight(), area.getHeight())).constrainedWithin(area));
     }
     toolPage = preset.layout.toolPage;
-    if (preset.detached[(size_t) toolPage]) for (int page : layout.consoleOrder) if (!preset.detached[(size_t) page]) { toolPage = page; break; }
+    if (toolPage < 3 && preset.detached[(size_t) toolPage]) for (int page : layout.consoleOrder) if (!preset.detached[(size_t) page]) { toolPage = page; break; }
     trackEditingWorkspace(); workspaceDirty = true; workspaceChangedAt = juce::Time::getMillisecondCounterHiRes();
     resized(); refresh();
     { const juce::ScopedValueSetter<bool> viewGuard(programmaticTimelineView, true); viewport.setViewPosition(preset.view); }
@@ -616,7 +846,7 @@ void Workstation::resized()
     const auto laneShares = layout.laneScale;
     const int savedHeight = layout.preferredTimelineHeight;
     if (consoleCollapsed) { layout.preferredTimelineHeight = 0; layout.timeline = {}; }
-    layout.update(getWidth(), getHeight(), !consoleCollapsed && (!performanceWindow || !transitionWindow || !editingWindow), !consoleCollapsed && toolPage == 2 && !editingWindow); menuBar.setBounds(layout.menu);
+    layout.update(getWidth(), getHeight(), !consoleCollapsed && (!performanceWindow || !transitionWindow || !editingWindow || !studioWindow), !consoleCollapsed && (toolPage == 2 || toolPage == 3)); menuBar.setBounds(layout.menu);
     if (consoleCollapsed) layout.preferredTimelineHeight = savedHeight;
     statusAccess.setBounds(layout.status);
     if (laneShares != layout.laneScale) { workspaceDirty = true; workspaceChangedAt = juce::Time::getMillisecondCounterHiRes(); }
@@ -630,7 +860,7 @@ void Workstation::resized()
     importProgress.setBounds((getWidth() - 620) / 2, std::max(100, (getHeight() - 245) / 2), 620, 245);
     auto toolbar = layout.toolbar;
     auto button = [](juce::Component& c, juce::Rectangle<int>& row, int width) { c.setBounds(row.removeFromLeft(width)); row.removeFromLeft(4); };
-    // Transition defaults live with their panel; overflow file/edit actions remain in the menus.
+    // Overflow file and edit actions remain available in the menus.
     const bool narrowToolbar = getWidth() < 1500;
     const int waveformWidth = narrowToolbar ? 112 : 174;
     const int settingsWidth = narrowToolbar ? 184 : 232;

@@ -67,7 +67,7 @@ void main(){
     // Two broad pigment banks slip across one open jagged fault.
     float distance=abs(uv.y-faultBoundary(uv));
     float mask=smoothstep(faultGap(),faultGap()+.009,distance);
-    vec2 q=faultSource(uv);vec4 direct=pigmentArt(q),past=texture(input0,clamp(q,0.,1.));
+    vec2 q=faultSource(uv);q.y=.5+(q.y-.5)/(1.+2.4*bassHit*pulse);q.y+=.17*sin(travelTime*1.2)*pulse;vec4 direct=pigmentArt(q),past=texture(input0,clamp(q,0.,1.));
     c=mix(direct.rgb,past.rgb,.28)*mask;
     float lip=exp(-pow((distance-faultGap()-.008)*150.,2.));
     c+=lip*(.08+.65*trebleHit*pulse)*vec3(.3,.65,1.)*max(direct.a,past.a);

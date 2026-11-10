@@ -21,16 +21,23 @@ juce::Result readMasterSettings(const juce::var&, MasterSettings&);
 class SpectrumFeed
 {
 public:
+    struct Clock
+    {
+        double position = -1.;
+        juce::uint64 revision = 0;
+    };
     static constexpr int capacity = 8192;
-    SpectrumFeed();
+    explicit SpectrumFeed(bool timestamped = false);
     std::atomic<bool> enabled {false};
     std::atomic<juce::uint64> dropped {0};
-    int push(const juce::AudioBuffer<float>&, int frames, double sampleRate);
-    int read(float* left, float* right, double* rates, int wanted);
+    int push(const juce::AudioBuffer<float>&, int frames, double sampleRate,
+             const Clock* programme = nullptr, int programmeFrames = 0);
+    int read(float* left, float* right, double* rates, int wanted, Clock* timing = nullptr);
     void discardAvailable(); // Consumer only; producer may continue writing.
 private:
     juce::AudioBuffer<float> data;
     std::vector<double> sampleRates;
+    std::vector<Clock> clocks;
     juce::AbstractFifo fifo;
 };
 }

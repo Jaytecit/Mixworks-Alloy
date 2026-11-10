@@ -30,6 +30,8 @@ vec3 lot(vec3 p,out vec2 id){
 #endif
 }
 float city(vec3 p){
+    p.y-=.70*structureHeight(fract(vec2(p.x*.13,p.z*.078)+.5));
+
     vec2 id;vec3 q=lot(p,id);float seed=hash(id);
 #if CITY_KIND == 0
     float height=1.1+seed*5.4+step(.87,seed)*2.3;

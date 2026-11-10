@@ -9,9 +9,21 @@ namespace
 const std::array<MidiAction, 6> deckActions {{{MidiActionKind::undo}, {MidiActionKind::redo},
     {MidiActionKind::play}, {MidiActionKind::stop}, {MidiActionKind::snap}, {MidiActionKind::record}}};
 const char* potNames[] {"BASS", "MID", "TREBLE", "CUTOFF"};
+constexpr std::array wheelEffects {AutomationTarget::cutoff, AutomationTarget::pan,
+    AutomationTarget::bass, AutomationTarget::mid, AutomationTarget::treble};
+AutomationAddress wheelAddress(int choice)
+{
+    const auto index = (size_t) juce::jlimit(0, trackCount * (int) wheelEffects.size() - 1, choice - 1);
+    return {(int) (index / wheelEffects.size()), wheelEffects[index % wheelEffects.size()]};
+}
 MidiAction padAction(int i)
 {
     return i < 8 ? MidiAction {MidiActionKind::cyclePot, i} : MidiAction {i < 12 ? MidiActionKind::mute : MidiActionKind::solo, i % 4};
+}
+const Clip* cueTarget(const Engine& engine)
+{
+    const auto* selected=engine.project.clipFor(engine.selectedClip);
+    return selected && selected->track==engine.selectedTrack ? selected : engine.controlClip(engine.selectedTrack);
 }
 bool editingControl(const juce::Slider& slider)
 {
@@ -48,16 +60,17 @@ PerformanceDeck::PerformanceDeck(Engine& e) : engine(e)
             {i % 4, i < 4 ? AutomationTarget::volume : AutomationTarget::pan}, juce::String(i % 4 + 1) + (i < 4 ? " / LEVEL" : " / PAN"));
     }
     configure(master, 16, {MidiActionKind::master}, {-1, AutomationTarget::master}, "MASTER");
+    for (int slot = 0; slot < 2; ++slot) configureWheel(slot);
     for (int i = 0; i < 9; ++i)
     {
         auto& b = channelButtons[(size_t) i]; addAndMakeVisible(b);
-        b.setButtonText("HC" + juce::String(i + 1)); b.onClick = [this, i] { if (cue) cue(i); };
-        b.onEdit = [this, i] { if (const auto* clip = engine.controlClip(engine.selectedTrack)) if (editCue) editCue(clip->id, i); };
+        b.setButtonText("HC" + juce::String(i + 1)); b.onClick = [this, i] { if (engine.isMidiLearnEnabled()) trigger({MidiActionKind::timelineCue,i}); else if (cue) cue(i); };
+        b.onEdit = [this, i] { if (const auto* clip = cueTarget(engine)) if (editCue) editCue(clip->id, i); };
     }
     controls.setTooltip("Edit any HC1-HC9 slot, including trimmed-out cues, or reset EQ/cutoff/pans. MIDI Learn can map reset actions; existing assignments remain active.");
     controls.onClick = [this]
     {
-        const auto* clip = engine.controlClip(engine.selectedTrack); const auto id = clip ? clip->id : juce::String();
+        const auto* clip = cueTarget(engine); const auto id = clip ? clip->id : juce::String();
         controlsMenu().showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&controls), [safe = juce::Component::SafePointer<PerformanceDeck>(this), id](int command)
         { if (safe) safe->performControlsMenu(command, id); });
     };
@@ -85,7 +98,7 @@ PerformanceDeck::PerformanceDeck(Engine& e) : engine(e)
     buttons[7].onClick = [this]
     {
         const auto expected = engine.project.launch;
-        const auto* clip = engine.controlClip(engine.selectedTrack); const auto owner = clip ? clip->id : juce::String();
+        const auto* clip = cueTarget(engine); const auto owner = clip ? clip->id : juce::String();
         launchMenu().showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&buttons[7]), [safe = juce::Component::SafePointer<PerformanceDeck>(this), expected, owner](int command)
         { if (safe) safe->performLaunchMenu(command, expected,owner); });
     };
@@ -94,6 +107,57 @@ PerformanceDeck::PerformanceDeck(Engine& e) : engine(e)
     buttons[5].setTooltip("Record a performance: enables Touch recording for all lanes and master. Play, perform, then Stop. Ordinary live control needs no arming or MIDI setup.");
     refresh(true);
 }
+void PerformanceDeck::configureWheel(int slot)
+{
+    const auto i = (size_t) slot;
+    auto& slider = wheels[i];
+    auto& target = wheelTargets[i];
+    auto& label = wheelNames[i];
+    const bool pitch = slot == 0;
+    const juce::String name = pitch ? "Pitch wheel" : "Mod wheel";
+    addAndMakeVisible(slider); addAndMakeVisible(target); addAndMakeVisible(label);
+    label.setText(name, juce::dontSendNotification);
+    label.setJustificationType(juce::Justification::centred);
+    label.setFont(juce::FontOptions(11).withStyle("Bold"));
+    label.setColour(juce::Label::textColourId, colour::orange);
+    target.setName(name + " effect");
+    target.setTooltip("Choose a mixer lane and live effect for this on-screen wheel.");
+    for (int lane = 0; lane < trackCount; ++lane)
+        for (size_t effect = 0; effect < wheelEffects.size(); ++effect)
+            target.addItem(juce::String(lane + 1) + " / " + automationName(wheelEffects[effect]),
+                           1 + lane * (int) wheelEffects.size() + (int) effect);
+    target.setSelectedId(pitch ? 1 : 6, juce::dontSendNotification);
+    target.onChange = [this] { refresh(isEnabled()); };
+    slider.setSliderStyle(juce::Slider::LinearVertical);
+    slider.getProperties().set("alloyWheel", true);
+    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, true, 66, 18);
+    slider.setDoubleClickReturnValue(true, 0);
+    slider.setTooltip(pitch ? "Drag to shape the effect. Release returns it to neutral."
+                            : "Drag to shape the effect. The setting holds when released.");
+    slider.onDragStart = [this, i]
+    {
+        wheelDragging[i] = true;
+        wheelMoved[i] = false;
+        wheelTargets[i].setEnabled(false);
+    };
+    slider.onValueChange = [this, i]
+    {
+        if (updating || !wheels[i].isEnabled() || !engine.controlInputEnabled || engine.isMidiLearnEnabled()) return;
+        const auto address = wheelAddress(wheelTargets[i].getSelectedId());
+        if ((!wheelDragging[i] || !wheelMoved[i]) && !engine.canWriteAutomation(address.track) && remember) remember();
+        if (engine.setControlValue(address, (float) wheels[i].getValue()))
+        {
+            wheelMoved[i] = true;
+            if (changed) changed();
+        }
+    };
+    slider.onDragEnd = [this, i, pitch]
+    {
+        if (pitch && wheelMoved[i]) wheels[i].setValue(0, juce::sendNotificationSync);
+        wheelDragging[i] = false;
+        refresh(isEnabled());
+    };
+}
 void PerformanceDeck::triggerReset(int slot)
 {
     if (slot < 0 || slot >= 9) return;
@@ -101,7 +165,7 @@ void PerformanceDeck::triggerReset(int slot)
 }
 juce::PopupMenu PerformanceDeck::controlsMenu() const
 {
-    juce::PopupMenu menu; const auto* clip = engine.controlClip(engine.selectedTrack);
+    juce::PopupMenu menu; const auto* clip = cueTarget(engine);
     menu.addSectionHeader(clip ? "Hotcues / " + clip->media->libraryTitle() : "Select a segment for hotcues");
     for (int slot = 0; slot < 9; ++slot) menu.addItem(100 + slot, "Edit HC" + juce::String(slot + 1) + "...", clip && isEnabled());
     menu.addSeparator(); menu.addSectionHeader("Reset controls / MIDI Learn");
@@ -121,14 +185,12 @@ void PerformanceDeck::performControlsMenu(int command, const juce::String& id)
 juce::PopupMenu PerformanceDeck::launchMenu() const
 {
     const juce::ScopedLock guard(engine.lock); juce::PopupMenu menu;
-    menu.addSectionHeader("Programme clock / hotcue and pause timing");
+    menu.addSectionHeader("Programme pause timing / timeline cues jump immediately");
     for (int i = 0; i < 4; ++i)
         menu.addItem(200 + i, launchTimingName((LaunchTiming) i), buttons[7].isEnabled(), engine.project.launch.timing == (LaunchTiming) i);
     menu.addSeparator(); menu.addSectionHeader("Project phrase grid / anchored at bar 1");
     for (int bars : {8, 16, 32}) menu.addItem(300 + bars, juce::String(bars) + " bars", buttons[7].isEnabled(), engine.project.launch.phraseBars == bars);
     menu.addSeparator(); menu.addItem(400, "Cancel queued pause", engine.scheduledPauseStatus().state == ScheduledPauseState::pending);
-    const auto* owner = engine.controlClip(engine.selectedTrack);
-    if (owner) menu.addItem(401,"Cancel queued hotcue / " + owner->media->libraryTitle(),engine.liveHotcueStatus(owner->id).state == LiveHotcueState::pending);
     return menu;
 }
 void PerformanceDeck::performLaunchMenu(int command, const LaunchSettings& expected, const juce::String& owner)
@@ -225,6 +287,7 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
     struct View
     {
         std::array<SliderView, 17> sliders;
+        std::array<SliderView, 2> wheels;
         std::array<CueView, 9> cues;
         std::array<int, 8> lanes {};
         std::array<bool, 8> muteSolo {};
@@ -267,6 +330,15 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
             view.muteSolo[(size_t) i] = i < 4 ? engine.project.tracks[(size_t) i].mute : engine.project.tracks[(size_t) (i % 4)].solo;
         }
         sample(16, -1, AutomationTarget::master);
+        for (size_t i = 0; i < view.wheels.size(); ++i)
+        {
+            auto& wheel = view.wheels[i];
+            wheel.address = wheelAddress(wheelTargets[i].getSelectedId());
+            wheel.target = wheel.address.target;
+            wheel.value = engine.automationValue(wheel.address, engine.position.load());
+            wheel.enabled = available && !view.mapping && engine.controlInputEnabled
+                && !engine.exporting && !engine.project.automationLocked(wheel.address);
+        }
         const auto pause = engine.scheduledPauseStatus(); const auto pauseText = engine.scheduledPauseText();
         view.pausePending = pause.state == ScheduledPauseState::pending;
         view.pauseEnabled = available && !view.mapping && engine.controlInputEnabled && view.playing && !engine.rehearsalActive() && !engine.gridAudition.active() && engine.playbackReady();
@@ -275,35 +347,27 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
         view.pauseName = "Programme pause / " + view.timingName;
         view.pauseTooltip = view.pauseName + ". " + pauseText + ". Press again to cancel a queued pause. The existing Play/Pause and Stop remain immediate.";
         view.timingTitle = "Launch timing / " + timingText;
-        const auto* owner = engine.controlClip(engine.selectedTrack);
-        const auto cueState = owner ? engine.liveHotcueStatus(owner->id) : LiveHotcueStatus{};
-        const auto cueText = owner ? engine.liveHotcueText(owner->id) : juce::String();
-        const double ownerTime = owner ? engine.liveClipTime(owner->id, engine.position) : 0.;
-        const bool targetPlaying = owner && ownerTime >= owner->start && ownerTime < owner->end()
-            && engine.controlInputEnabled && engine.playbackReady() && !engine.rehearsalActive() && !engine.gridAudition.active();
+        const auto* owner = cueTarget(engine);
         for (int slot = 0; slot < 9; ++slot)
         {
-            auto& c = view.cues[(size_t) slot]; const auto* saved = owner ? hotcueFor(*owner, slot) : nullptr;
-            const auto position = owner ? hotcueTimelineTime(*owner, slot, engine.position) : std::optional<double>{};
-            const auto name = "HC" + juce::String(slot + 1) + " / " + (owner ? owner->media->libraryTitle() : juce::String("Select a segment"));
-            c.saved = saved != nullptr; c.queued = cueState.state == LiveHotcueState::pending && cueState.slot == slot;
-            c.title = name + (saved ? " / source " + juce::String(saved->sourceSeconds, 6) + " s" + (saved->manual ? " / manual" : " / initial default") + (position ? "" : " / outside segment") : " / empty");
-            c.tooltip = name + (saved ? position ? ". Stopped: locate this cue. Playing: launch only this segment at the selected programme boundary. Right-click edits precisely."
-                : ". Saved outside this segment. Use Cues / resets to edit it." : ". Empty slot: click to add a source cue, or use section defaults in the editor.")
-                + " " + cueText + " EQ/cutoff/pan resets are in Cues / resets. Record/Perform captures audible hotcue commits in the editable take.";
-            c.enabled = available && owner && !view.mapping && (!view.playing ? (!saved || position.has_value())
-                : targetPlaying && saved && position.has_value() && (!view.armed || engine.capturingPerformance()) && !engine.project.clipTransitionLocked(owner->id));
+            auto& c=view.cues[(size_t)slot]; const auto* saved=owner ? hotcueFor(*owner,slot) : nullptr;
+            const auto position=owner ? hotcueTimelineTime(*owner,slot,engine.position) : std::optional<double>{};
+            const auto name="HC"+juce::String(slot+1)+" / "+(owner ? owner->media->libraryTitle() : juce::String("Select a track"));
+            c.saved=saved!=nullptr; c.queued=false;
+            c.title=name+(position ? " / timeline "+timeText(*position) : saved ? " / outside trimmed audio" : " / empty");
+            c.tooltip=name+". Jump the whole mix immediately, stopped or playing; all lanes follow the timeline. Alt+"+juce::String(slot+1)
+                +" does the same. Launch quantisation does not delay timeline cues. MIDI Learn maps this pad. Right-click edits its source position."
+                +(saved && !position ? " Extend the trim edge or edit this cue first." : "");
+            c.enabled=available && owner && (view.mapping || (saved ? position.has_value() : !view.playing));
         }
         view.state = juce::String(view.armed ? view.playing ? "REC / TOUCH" : "TAKE ARMED" : "LIVE") + "  /  LANE "
             + juce::String(engine.selectedTrack.load() + 1) + (owner ? " / SEGMENT" : "");
         view.mappingText = "Mapping: " + engine.activeMappingTitle();
-        view.launchText = timingText + (cueState.state == LiveHotcueState::pending
-            ? "\nHC" + juce::String(cueState.slot + 1) + " queued / bar " + juce::String(cueState.beat / 4 + 1, 2)
-            : view.pausePending ? "\nQueued: bar " + juce::String(pause.beat / 4 + 1, 2) + " / " + juce::String(pause.boundary - engine.project.tempo.origin, 3) + " s" : "\nProgramme pause");
-        view.launchTitle = "Programme launch timing / " + timingText + " / " + cueText + " / " + pauseText;
-        view.help = view.mapping ? engine.mappingSummary().upToFirstOccurrenceOf("\n", false, false)
-            : "PROGRAMME TIMING: " + timingText + " | " + (cueText.isNotEmpty() ? cueText : pauseText.isNotEmpty() ? pauseText
-                : juce::String("HC pads launch only the selected playing segment. Press the queued cue again to cancel. Play/Pause and Stop stay immediate."));
+        view.launchText=timingText+(view.pausePending ? "\nQueued pause / bar "+juce::String(pause.beat/4+1,2) : "\nProgramme pause");
+        view.launchTitle="Programme pause timing / "+timingText+". Timeline cues jump immediately.";
+        view.help=view.mapping ? engine.mappingSummary().upToFirstOccurrenceOf("\n",false,false)
+            : "HC pads and Alt+1-9 jump the whole mix immediately. Pause timing: "+timingText+". "+pauseText;
+
     }
     const juce::ScopedValueSetter<bool> updateGuard(updating, true);
     learn.setToggleState(view.mapping, juce::dontSendNotification);
@@ -349,12 +413,35 @@ void PerformanceDeck::refresh(bool available, bool visibleOnly)
         names[(size_t) i + 8].setTooltip(fader.owner);
     }
     sync(master, view.sliders[16], 16);
+    for (size_t i = 0; i < wheels.size(); ++i)
+    {
+        const auto& wheel = view.wheels[i];
+        auto& slider = wheels[i];
+        const auto name = wheelNames[i].getText() + " / " + wheelTargets[i].getText();
+        slider.setName(name); slider.setTitle(name);
+        if (!wheelDragging[i])
+        {
+            const auto range = automationRange(wheel.target);
+            slider.setRange(range.getStart(), range.getEnd(), .01);
+            slider.setTextValueSuffix(wheel.target == AutomationTarget::cutoff || wheel.target == AutomationTarget::pan ? "" : " dB");
+            slider.textFromValueFunction = wheel.target == AutomationTarget::cutoff
+                ? std::function<juce::String(double)>([](double value) { return cutoffText((float) value, true); })
+                : std::function<juce::String(double)>();
+            slider.setValue(wheel.value, juce::dontSendNotification);
+            slider.updateText();
+        }
+        slider.setEnabled(wheel.enabled);
+        wheelTargets[i].setEnabled(available && !view.mapping && !wheelDragging[i]);
+    }
     for (int i = 0; i < 16; ++i)
     {
         pads[(size_t) i].setEnabled(available && (i >= 8 || (!gestures[(size_t) i] && !gestures[(size_t) (i ^ 1)])));
         pads[(size_t) i].setToggleState(i >= 8 && view.muteSolo[(size_t) (i % 8)], juce::dontSendNotification);
     }
     for (int i = 0; i < 8; ++i) buttons[(size_t) i].setEnabled(available && (i < 6 || !view.mapping));
+    buttons[0].setEnabled(available && (view.mapping || (bool)getProperties().getWithDefault("historyUndoReady",true)));
+    buttons[1].setEnabled(available && (view.mapping || (bool)getProperties().getWithDefault("historyRedoReady",true)));
+
     buttons[5].setEnabled(available && (!view.voices || engine.workMode==WorkMode::recordPerform));
     buttons[5].setTooltip(engine.workMode==WorkMode::recordPerform ? "Start / finalise an independent editable performance take." : "Record arrangement automation (advanced). Record/Perform records an independent take.");
     buttons[6].setEnabled(view.pauseEnabled); buttons[6].setButtonText(view.pausePending ? "Cancel @" : "Pause @");
@@ -395,6 +482,14 @@ void PerformanceDeck::resized()
     constexpr std::array<size_t, 8> transportOrder {6, 7, 0, 1, 2, 3, 5, 4};
     for (size_t slot = 0; slot < transportOrder.size(); ++slot)
         buttons[transportOrder[slot]].setBounds(cluster.getX() + (int) (slot % 4) * 56, cluster.getY() + (int) (slot / 4) * bh, 53, bh - 3);
+    auto wheelArea = area.removeFromLeft(174); area.removeFromLeft(12);
+    for (size_t i = 0; i < wheels.size(); ++i)
+    {
+        auto cell = wheelArea.removeFromLeft(87).reduced(3, 0);
+        wheelNames[i].setBounds(cell.removeFromTop(18));
+        wheelTargets[i].setBounds(cell.removeFromBottom(25));
+        wheels[i].setBounds(cell.reduced(9, 5));
+    }
     auto left = area.removeFromLeft((int) (area.getWidth() * .56)); area.removeFromLeft(16);
     auto potRow = left.removeFromTop(std::max(91, left.getHeight() / 2)); const int pw = potRow.getWidth() / 8;
     for (int i = 0; i < 8; ++i) { auto cell = potRow.removeFromLeft(pw); names[(size_t) i].setBounds(cell.removeFromTop(followTimeline.getToggleState() ? 31 : 17)); pots[(size_t) i].setBounds(cell); }

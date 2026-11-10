@@ -12,5 +12,5 @@ void main(){
     vec2 uv=gl_FragCoord.xy/resolution;
     vec3 c=(art(uv)*2.+art(uv+vec2(.012,0))+art(uv-vec2(.012,0))
         +art(uv+vec2(0,.012))+art(uv-vec2(0,.012)))/6.;
-    colour=vec4(dot(c,vec3(.2126,.7152,.0722)),0,0,1);
+    colour=vec4(max(dot(c,vec3(.2126,.7152,.0722)),structureHeight(uv)),0,0,1);
 }

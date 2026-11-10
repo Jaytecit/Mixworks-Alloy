@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Synesthesia / Alloy resource investigation — 1 November 2026
 
 Alloy has identifiable resource costs worth fixing. Synesthesia's useful model is GPU shader rendering with controlled output resolution and frame delivery. Alloy already uses GPU shaders, but its final frame still travels through CPU memory and the UI. The mixer separately retains substantial decoded/prepared PCM mappings and disk caches. This investigation establishes mechanisms and priorities, not a measured causal attribution of every slowdown or a completed optimisation.

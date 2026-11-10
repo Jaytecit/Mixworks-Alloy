@@ -86,7 +86,9 @@ vec4 decal=cutoutArt(p.xy*.35+.5);albedo=mix(albedo,decal.rgb,decal.a*imageMix);
 return albedo*(.13+diff*.85)+palette(id*.1+.3)*rim*.45+vec3(spec)*.5;}
 void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colour=vec4(max(c,vec3(0)),1);}
 
-void main(){vec2 p=domain();float t=clockTime();vec3 c=vec3(0);
+void main(){
+    vec2 artworkUV=gl_FragCoord.xy/resolution;
+vec2 p=domain()+.35*structureCurrent(artworkUV);float t=clockTime();vec3 c=vec3(0);
 #if FAMILY == 12
     // Escape-time Julia / Mandelbrot fields with orbit-trap relief.
     p=rot(.4*midSwing())*p+vec2(.16*lowSwing(),.1*highSwing());

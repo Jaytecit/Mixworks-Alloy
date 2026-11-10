@@ -221,6 +221,24 @@ double sectionSwapPosition(const Project& project, const Project::TransitionLink
     const double first = clock.beatsAt(range.getStart()), last = clock.beatsAt(range.getEnd());
     return (clock.beatsAt(*at) - first) / (last - first);
 }
+double alignedSectionCut(const Project& project, const Project::TransitionLink& link)
+{
+    const auto range = project.transitionRange(link);
+    if (range.getLength() < 1.e-7) return range.getStart();
+    const auto grid = project.gridClock();
+    const auto* out = project.clipFor(link.outgoing);
+    const auto* in = project.clipFor(link.incoming);
+    if (out && in)
+        if (const auto at = sharedChange(*out, *in, grid, range)) return *at;
+    const auto first = grid.beatsAt(range.getStart()), last = grid.beatsAt(range.getEnd());
+    const auto middle = (first + last) * .5;
+    for (const auto step : {4., 1.})
+    {
+        const auto beat = std::round(middle / step) * step;
+        if (beat > first + .01 && beat < last - .01) return grid.timeAtBeat(beat);
+    }
+    return grid.timeAtBeat(middle);
+}
 void paintEnergySections(juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds, double scale)
 {
     // Loops/reverse require occurrence-specific section identities; leave them unknown.

@@ -1,5 +1,35 @@
 # Proportionate testing
 
+10 November .88 focused checkpoint: menu11, seek90, live72, Studio26, composite94,
+shaped105 and bridge39 passed, plus actual GL24 and live bridge45. Normal UI WAV
+export/reopen/PCM and actual large-library menu response were demonstrated. The
+separate native save/export fixture exhausts its stack identically on .88 and .86;
+its failed reports are retained and no native export42 result is claimed. See
+[Handover](../HANDOVER.md) for exact scope and remaining acceptance. Earlier
+source-only and candidate-specific notes below are historical.
+
+10 November seek/menu checkpoint: `--seek-continuity-only` is a bounded 90-check
+entry returning before broader streaming checks. .87 passed it, live72, Studio26
+and 24 actual-GL checks, plus owned live seek/scene/ruler observations. Source now
+includes `--beat-menu-only` (11 metadata-only checks at the observed catalogue
+count) and repaired native bridge hierarchy tests; those await the next linked
+build at Jay's request. MSVC syntax-only checks are separate evidence, not an
+executed native suite or new app build. See
+[checkpoint](PHASE1-SEEK-CONTINUITY-20261110.md) and [HANDOVER](../HANDOVER.md).
+
+10 November phase-1 direct fades: `--shaped-fades-only` is a bounded 105-check
+branch returning before the broader preset suite. It uses one owned 24-second,
+8 kHz source for direct gain/power/EQ/filter formulas, two-node counts, tempo
+mapping, insertion/slicing, hard cuts, preset placement, source-backed reopen,
+Undo and export-rendered PCM. 0.55.84 also passes `--live-transition-only`72/0.
+Both used `verification.run_checks` serially, stress off, clean retention. One
+temporary source copy was used for the subsequent isolated actual UI measurement,
+then removed after save/close. Actual mouse endpoint movement retained two saved
+nodes, and UI Undo restored the exact original curves. These results do not close
+intermittent device playback or composite fades and are not a complete gate.
+Evidence and failed-fixture provenance: `.local/phase1-fades-1110`; current scope
+and launcher identity: [HANDOVER](../HANDOVER.md).
+
 Current visuals: [glass/maintenance checkpoint](MAINTENANCE-20261103.md) and
 [verification entry points](../VERIFICATION.md). The dated records below apply to
 their named candidates; current status is in [HANDOVER](../HANDOVER.md).

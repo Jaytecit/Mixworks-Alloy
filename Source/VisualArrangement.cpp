@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <limits>
 
 namespace mixworks
 {
@@ -166,28 +167,37 @@ juce::Result arrangeVisualScenes(Project& project, const std::vector<VisualScene
     const bool hasOriginals=std::any_of(pool.begin(),pool.end(),[](const auto& e){return !isMilkDropKey(e.key);});
     if(source==VisualSceneSource::both && !hasOriginals)
         return juce::Result::fail("Both needs original scenes as well as imported MilkDrop presets. The current mix was kept.");
-    std::map<juce::String,int> sceneUses, transitionUses;
+    std::map<juce::String,int> sceneUses;
     std::vector<juce::String> recentFamilies, recentMotifs;
     const bool hasSolidScenes=std::any_of(pool.begin(),pool.end(),[](const auto& e){return !isMilkDropKey(e.key) && e.family!="sprite-particles";});
     std::vector<VisualSceneClip> result;
     for (size_t i = 0; i < songs.size(); ++i)
     {
+        const auto eligible = [&](const VisualSceneEntry& entry)
+        {
+            return !(source==VisualSceneSource::both && isMilkDropKey(entry.key)!=(i%2==1))
+                && !(hasSolidScenes && entry.family=="sprite-particles" && i%5!=4);
+        };
+        // Deal from the least-used eligible scenes before allowing another
+        // repeat. Energy and style guide a shuffled choice, rather than fixing
+        // essentially the same short list for every mix at a similar tempo.
+        int leastUse=std::numeric_limits<int>::max();
+        for (const auto& entry : pool) if (eligible(entry)) leastUse=std::min(leastUse,sceneUses[entry.key]);
         size_t selected=0; double best=1.e9;
         for (size_t n=0;n<pool.size();++n)
         {
             // Balance engines before choosing a look within each engine. A large
             // owned library must not crowd a few imports out of a short show.
-            if(source==VisualSceneSource::both && isMilkDropKey(pool[n].key)!=(i%2==1)) continue;
             // Particle scenes are occasional accents, at most one in five when
             // solid/image choices exist. Manual access to every scene remains.
-            if (hasSolidScenes && pool[n].family=="sprite-particles" && i%5!=4) continue;
+            if (!eligible(pool[n]) || sceneUses[pool[n].key]!=leastUse) continue;
             double repetition=0.;
             for(size_t age=0;age<recentFamilies.size() && age<8;++age) {
                 const auto previous=recentFamilies.size()-1-age;
                 if(pool[n].family.isNotEmpty() && pool[n].family==recentFamilies[previous]) repetition+=age==0?8.:2.2/(1.+age*.3);
                 if(pool[n].motif.isNotEmpty() && pool[n].motif==recentMotifs[previous]) repetition+=2.4/(1.+age*.25);
             }
-            const double score=sceneUses[pool[n].key]*2+repetition+std::abs(pool[n].energy-songs[i]->energy)+random.nextDouble()*.18
+            const double score=repetition+std::abs(pool[n].energy-songs[i]->energy)+random.nextDouble()*1.5
                 +(pool[n].style==family ? 0 : .15)
                 +(!result.empty() && pool[n].key==result.back().scene && pool.size()>1 ? 2 : 0);
             if (score<best) { best=score; selected=n; }
@@ -219,29 +229,8 @@ juce::Result arrangeVisualScenes(Project& project, const std::vector<VisualScene
         {
             const auto* link=songs[i]->transition;
             const auto window=windows[i-1];
-            const double beats=project.gridClock().beatsAt(window.getEnd())-project.gridClock().beatsAt(window.getStart());
             const auto swap=link ? project.transitionSwapTimes(*link,1) : std::nullopt;
-            if (window.isEmpty()) scene.transition="cut";
-            else if (link && link->filter.active()) scene.transition=link->filter.mode==TransitionFilterMode::highToLow ? "sweep" : "sweep-reverse";
-            else if (swap) scene.transition=beats<=2 || i%2==0 ? "zoom" : "radial";
-            else if (songs[i]->energyRise || beats<=4 || songs[i]->energy-songs[i-1]->energy>.18) scene.transition="zoom";
-            else scene.transition=i%2==0 ? "radial" : "dissolve";
-            if (!window.isEmpty() && !(link && link->filter.active()))
-            {
-                const auto preferred=scene.transition;
-                double bestTransition=1.e9;
-                for (const auto* kind : {"dissolve","zoom","radial","sweep","sweep-reverse"})
-                {
-                    const double score=transitionUses[kind]+(preferred==kind ? 0 : .35)+random.nextDouble()*.1;
-                    if (score<bestTransition) { bestTransition=score; scene.transition=kind; }
-                }
-            }
-            // Extended track handovers need a direct blend, including filtered
-            // music transitions. Keep spatial reveals for short section changes.
-            if (window.getLength()>4. || beats>8.) scene.transition="dissolve";
-            if((isMilkDropKey(scene.scene) || isMilkDropKey(result.back().scene))
-                && scene.transition!="dissolve" && scene.transition!="zoom" && scene.transition!="cut") scene.transition="dissolve";
-            ++transitionUses[scene.transition];
+            scene.transition="feedback";
             if (swap && window.getLength()>0)
                 scene.pivot=juce::jlimit(.05,.95,(((*swap)[0]+(*swap)[1])*.5-window.getStart())/window.getLength());
         }

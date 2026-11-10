@@ -1,0 +1,18 @@
+{
+  "TITLE": "Tidal Culture",
+  "MEDIA": [{"WRAP": "clamp"}],
+  "PASSES": [
+    {"TARGET": "tideClock", "WIDTH": 1, "HEIGHT": 1},
+    {"TARGET": "transported", "WIDTH": 480, "HEIGHT": 270},
+    {"TARGET": "reaction", "WIDTH": 480, "HEIGHT": 270},
+    {"TARGET": "culture", "WIDTH": 480, "HEIGHT": 270}
+  ],
+  "CONTROLS": [
+    {"NAME": "imprint", "TYPE": "slider", "LABEL": "Sprite imprint", "DEFAULT": 0.82, "MIN": 0, "MAX": 1, "UI_GROUP": "Culture", "DESCRIPTION": "How strongly Nested artwork redirects chemical growth."},
+    {"NAME": "branching", "TYPE": "slider", "LABEL": "Branching", "DEFAULT": 0.56, "MIN": 0, "MAX": 1, "UI_GROUP": "Culture", "DESCRIPTION": "Adjusts the balance of feed and removal to favour islands or connected ridges."},
+    {"NAME": "current", "TYPE": "slider", "LABEL": "Current", "DEFAULT": 0.66, "MIN": 0, "MAX": 1, "UI_GROUP": "Motion"},
+    {"NAME": "beat_pressure", "TYPE": "slider", "LABEL": "Beat pressure", "DEFAULT": 0.76, "MIN": 0, "MAX": 1, "UI_GROUP": "Motion"},
+    {"NAME": "relief", "TYPE": "slider", "LABEL": "Relief", "DEFAULT": 0.67, "MIN": 0, "MAX": 1, "UI_GROUP": "Light"},
+    {"NAME": "palette", "TYPE": "dropdown", "LABEL": "Palette", "DEFAULT": 0, "LABELS": ["Copper & Tide", "Citrine Lagoon", "Violet Reef"], "UI_GROUP": "Light"}
+  ]
+}

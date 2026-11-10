@@ -13,6 +13,22 @@ TimelineHeader::TimelineHeader(Workstation& w, bool isOverview) : owner(w), over
     if (!overview)
     {
         addAndMakeVisible(guideButton); guideButton.setClickingTogglesState(true);
+        addChildComponent(selectionTools); addChildComponent(pairTools); addAndMakeVisible(rangePolicy);
+        selectionTools.onClick = [this]
+        {
+            if (const auto* clip = owner.currentClip())
+                owner.showTimelineMenu(owner.engine.position.load(), clip->track, selectionTools.getScreenBounds());
+        };
+        pairTools.onClick = [this] { owner.openTransitionEditor(owner.selectedTransition); };
+        rangePolicy.setTooltip("Range drag mode and fixed musical lengths. Alt bypasses snapping.");
+        rangePolicy.onClick = [this]
+        {
+            owner.rangePolicyMenu().showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&rangePolicy),
+                [safe = juce::Component::SafePointer<TimelineHeader>(this)](int id)
+                {
+                    if (safe && id) safe->owner.setRangePolicy(id - (int) TimelineAction::rangeDragFree + 1);
+                });
+        };
         guideButton.setTitle("Show alignment guide");
         guideButton.setTooltip("Show/hide an independent alignment guide. Shift-click the ruler to place it; drag the cyan handle. Uses Snap; hold Alt for free placement. Never seeks or moves audio.");
         guideButton.onClick=[this]
@@ -24,7 +40,27 @@ TimelineHeader::TimelineHeader(Workstation& w, bool isOverview) : owner(w), over
         };
     }
 }
-void TimelineHeader::resized() { if (!overview) guideButton.setBounds(std::max(0,getWidth()-66),1,64,20); }
+void TimelineHeader::resized()
+{
+    if (overview) return;
+    auto row = getLocalBounds().withY(1).withHeight(20).withTrimmedRight(2);
+    guideButton.setBounds(row.removeFromRight(64)); row.removeFromRight(4);
+    if (pairTools.isVisible()) { pairTools.setBounds(row.removeFromRight(108)); row.removeFromRight(4); }
+    if (selectionTools.isVisible()) { selectionTools.setBounds(row.removeFromRight(102)); row.removeFromRight(4); }
+    rangePolicy.setBounds(row.removeFromRight(112));
+}
+void TimelineHeader::refreshEditTools()
+{
+    if (overview) return;
+    selectionTools.setVisible(owner.editSelection.multiple());
+    selectionTools.setTooltip(owner.editingSelectionInfo.getText());
+    pairTools.setVisible(owner.engine.project.transitionFor(owner.selectedTransition) != nullptr);
+    const int mode = owner.editingRangeSize.getSelectedId();
+    const juce::StringArray labels {"", "Range: Free", "Range: 1 beat", "Range: 1 bar", "Range: 8 bars",
+        "Range: 16 bars", "Range: 32 bars", "Range: Beats", "Range: Snap"};
+    rangePolicy.setButtonText(labels[mode]);
+    resized();
+}
 void TimelineHeader::placeGuide(const juce::MouseEvent& e)
 {
     const double at=std::max(0.,(e.position.x+owner.viewport.getViewPositionX())/owner.timeline.pixelsPerSecond);

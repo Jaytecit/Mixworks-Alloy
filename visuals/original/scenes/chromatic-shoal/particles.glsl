@@ -1,4 +1,5 @@
 #version 330
+uniform sampler2D userImage;
 // Owned source-neighbour flock. RG position, BA velocity; pigment is separate.
 uniform vec2 resolution;
 uniform sampler2D input0,input1;
@@ -26,6 +27,8 @@ void main(){
     vec2 hub=vec2(.5+.18*cos(t*.46+chroma*3.),.5+.17*sin(t*.37+ink.g*4.));
     vec2 q=p-hub,tangent=vec2(-q.y,q.x);
     vec2 force=(centre-p)*(1.8+mid*3.)+(align-v)*(1.+feedback*2.)+separate*(.5+bass*2.);
+    force+=structureCurrent(home)*2.;
+
     force+=tangent*(1.4+mid*2.)+(home-p)*(.9+.5*(1.-warp));
     force+=vec2(cos(t*.7+home.y*8.+midImpulse),sin(t*.6-home.x*9.+trebleImpulse))*.11;
     force+=normalize(q+vec2(.001))*bassHit*pulse*.8+vec2(ink.r-ink.b,ink.g-.5)*trebleHit*.5;

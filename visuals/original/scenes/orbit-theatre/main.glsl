@@ -2,6 +2,7 @@
 #define STAGE 1
 // Owned image instruments. STAGE: 0 lightbox, 1 orbiting plane, 2 mechanical iris.
 uniform vec2 resolution;
+uniform float projectBeat,bass;
 uniform sampler2D userImage;
 uniform int hasImage;
 uniform float bassHit,midHit,trebleHit,bassImpulse,midImpulse,trebleImpulse;
@@ -11,7 +12,8 @@ mat2 turn(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 vec3 palette(float t){return .06+.84*pow(.5+.5*cos(vec3(0.,2.1,4.2)+t+hue*6.283185),vec3(1.25));}
 vec3 picture(vec2 uv){
     vec3 base=palette(uv.x*2.+uv.y)*.07;
-    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=sampleCutout(materialDomain(uv));
+    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=structurePigment(materialDomain(uv));
+    b.rgb/=max(b.a,.001);
     return mix(base,mix(a.rgb,b.rgb,b.a),max(a.a,b.a)*imageMix);
 }
 float rectangle(vec2 p,vec2 size){vec2 q=abs(p)-size;return length(max(q,0.))+min(max(q.x,q.y),0.);}
@@ -53,11 +55,13 @@ void main(){
     c+=palette(.4)*plinth*exp(-pow(abs(p.x)*.65,4.))*.055;
 #elif STAGE == 1
     // The complete image is a moving perspective plane, not a fixed centre decal.
-    float phase=t*.86+midImpulse*.45;
+    float punch=clamp(max(bassHit,pow(1.-fract(projectBeat),3.)*bass*1.35),0.,1.);
+    float snap=floor(projectBeat*.5)*.55;
+    float phase=t*.86+midImpulse*.45+snap;
     float ring=abs(length(p/vec2(1.43,.64))-1.);
     c+=palette(.3)*exp(-ring*85.)*(.10+.14*midHit);
-    vec3 centre=vec3(.65*sin(phase),.19*cos(phase*.8),.32*cos(phase));
-    c=plane(p,centre,.56*sin(phase+.4),.13*sin(phase*.7),vec2(1.43,.86)*(.86+scale*.32),c);
+    vec3 centre=vec3(.65*sin(phase)+.35*punch*sin(snap),.19*cos(phase*.8),.32*cos(phase)+1.65*punch);
+    c=plane(p,centre,.56*sin(phase+.4),(.13*sin(phase*.7)+.28*punch*sin(floor(projectBeat)*1.570796)),vec2(1.43,.86)*(.86+scale*.32)*(1.+.38*punch),c);
     for(int i=0;i<3;i++){
         float a=phase+float(i)*2.094395+trebleImpulse*.17;
         vec2 position=vec2(1.43*cos(a),.64*sin(a));

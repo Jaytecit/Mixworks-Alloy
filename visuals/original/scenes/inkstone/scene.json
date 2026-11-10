@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "key": "original/inkstone",
+  "title": "Inkstone",
+  "author": "Mixworks / Jay with AI assistance",
+  "source": "Original artwork-stencilled marbling study",
+  "family": "hand-authored",
+  "spriteGeometry": "surface",
+  "controls": {
+    "motion": {"min": 0, "max": 1, "default": 0.65, "type": "speed", "label": "Current speed"},
+    "warp": {"min": 0, "max": 1, "default": 0.73, "type": "continuous", "label": "Pigment displacement"},
+    "pulse": {"min": 0, "max": 1, "default": 0.9, "type": "pulse", "label": "Music response"},
+    "feedback": {"min": 0, "max": 1, "default": 0, "type": "continuous", "label": "Retained pigment"},
+    "imageMix": {"min": 0, "max": 1, "default": 0.32, "type": "continuous", "label": "Artwork colour"},
+    "imageZoom": {"min": 0, "max": 1, "default": 0.5, "type": "continuous", "label": "Source framing"},
+    "finishGlow": {"min": 0, "max": 1, "default": 0, "type": "continuous", "label": "Soft highlight glow"},
+    "paletteStyle": {"min": 0, "max": 1, "default": 0, "type": "choice", "steps": 8, "label": "Colour palette"},
+    "paletteAmount": {"min": 0, "max": 1, "default": 0, "type": "continuous", "label": "Palette amount"}
+  },
+  "passSchema": 2,
+  "passes": [
+    {"id": "bath", "shader": "bath.glsl", "scale": 0.5, "format": "rgba16f"},
+    {"id": "stencil", "shader": "stencil.glsl", "scale": 1, "format": "rgba16f",
+      "inputs": [{"pass": "bath", "frame": "current"}]},
+    {"id": "wake", "shader": "wake.glsl", "scale": 0.5, "format": "rgba16f", "history": true,
+      "inputs": [{"pass": "stencil", "frame": "current"}, {"pass": "bath", "frame": "current"}, {"pass": "wake", "frame": "previous"}]},
+    {"id": "finish", "shader": "main.glsl", "scale": 1, "format": "rgba8",
+      "inputs": [{"pass": "bath", "frame": "current"}, {"pass": "stencil", "frame": "current"}, {"pass": "wake", "frame": "current"}]}
+  ],
+  "motionProfile": "Continuous pigment current with bass-driven shear and persistent wake",
+  "mediaRole": "Alpha stencils and bends the pigment, RGB shades the print",
+  "presets": [
+    {"id": "signature", "title": "Live warp", "controls": {"feedback": 0}},
+    {"id": "flow", "title": "Retained flow", "controls": {"feedback": 0.85}},
+    {"id": "drift", "title": "Drift without music response", "controls": {"feedback": 0.85, "pulse": 0}}
+  ]
+}

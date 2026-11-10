@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import math
 import re
-from visual_catalogue import catalogue, CONTROL_DEFAULTS
+from visual_catalogue import catalogue, CONTROL_DEFAULTS, field_identity
 import glfw
 from OpenGL import GL as gl
 from OpenGL.GL.shaders import compileProgram, compileShader
@@ -17,14 +17,26 @@ uniform sampler2D nextImage;
 uniform float imageBlend, imageZoom, imageRotation;
 uniform float travelTime;
 uniform float materialMotion, materialMode;
+uniform float reliefDepth, meltWarp, displacementColour;
 uniform vec2 mediaAspect, nextMediaAspect;
 uniform sampler2D cutoutImage, nextCutoutImage;
 uniform int hasCutout;
 uniform float cutoutBlend;
+uniform float spriteStructurePush;
 uniform vec2 cutoutAspect, nextCutoutAspect;
 uniform sampler2D handoffMaterial;
 uniform float handoffStrength;
 vec2 materialDomain(vec2 uv);
+vec2 spriteDomain(vec2 uv) {
+    float t=travelTime;
+    float column=.045+.075*(.5+.5*sin(uv.x*17.+sin(uv.x*39.)*1.7+t*.38));
+    return uv+meltWarp*vec2(.018*sin(uv.y*13.+t*.6),column*(.5+.5*sin(t*.47+uv.x*9.)));
+}
+vec4 compositeCutout(vec4 background,vec4 sprite) {
+    float alpha=sprite.a+background.a*(1.-sprite.a);
+    vec3 premultiplied=sprite.rgb*sprite.a+background.rgb*background.a*(1.-sprite.a);
+    return vec4(premultiplied/max(alpha,.0001),alpha);
+}
 vec4 inheritedMaterial(vec2 uv,vec4 nativeColour) {
     if(handoffStrength<=0.)return nativeColour;
     vec4 c=texture(handoffMaterial,clamp(uv,0.,1.));
@@ -34,16 +46,103 @@ vec4 inheritedMaterial(vec2 uv,vec4 nativeColour) {
 vec4 inheritedTextureLod(sampler2D tex,vec2 uv,float lod) {
     return inheritedMaterial(uv,textureLod(tex,materialDomain(uv),lod));
 }
-vec4 cutoutSample(sampler2D tex,vec2 uv,vec2 aspect) {
+vec4 cutoutSampleLod(sampler2D tex,vec2 uv,vec2 aspect,float lod) {
+    uv=spriteDomain(uv);
     uv=(uv-.5)*aspect+.5;
     if(any(lessThan(uv,vec2(0)))||any(greaterThan(uv,vec2(1))))return vec4(0);
-    return texture(tex,uv);
+    return textureLod(tex,uv,lod);
 }
+vec4 cutoutArtLod(vec2 uv,float lod) {
+    vec4 a=cutoutSampleLod(cutoutImage,uv,cutoutAspect,lod);
+    if(cutoutBlend<=0.)return a;
+    vec4 b=cutoutSampleLod(nextCutoutImage,uv,nextCutoutAspect,lod);
+    return mix(a,b,cutoutBlend);
+}
+// Generator inputs use premultiplied mipmaps. Coverage and luminance have
+// separate weights so a dark mark can still produce a wall or feed a field.
+float structureCoverage(vec2 uv) {
+    if(hasCutout==0)return 0.;
+    return cutoutArtLod(uv,3.).a;
+}
+float structureHeight(vec2 uv) {
+    if(hasCutout==0)return 0.;
+    vec4 ink=cutoutArtLod(uv,4.);
+    return (.60*ink.a+.40*dot(ink.rgb,vec3(.2126,.7152,.0722)))*(.68+.62*spriteStructurePush);
+}
+vec2 structureCurrent(vec2 uv) {
+    if(hasCutout==0)return vec2(0);
+    vec2 dx=vec2(.014,0),dy=dx.yx;
+    vec2 slope=vec2(structureCoverage(uv+dx)-structureCoverage(uv-dx),
+                   structureCoverage(uv+dy)-structureCoverage(uv-dy));
+    vec2 drift=sin(vec2(uv.y*17.,uv.x*13.)+vec2(-.56,.38)*travelTime);
+    return (vec2(-slope.y,slope.x)+.24*structureCoverage(uv)*drift)*(.46+.9*spriteStructurePush);
+}
+vec4 structurePigment(vec2 uv) {
+    if(hasCutout==0)return vec4(0);
+    vec2 q=uv+.064*structureCurrent(uv);
+    vec4 ink=cutoutArtLod(q,1.5);
+    float fold=sin(q.y*38.+2.4*sin(q.x*16.-travelTime*.37)+1.4*sin(q.y*18.+q.x*12.));
+    float vein=smoothstep(.46,.94,fold);
+    vec3 mineral=mix(vec3(.075,.21,.23),vec3(.83,.49,.24),vein);
+    vec3 colour=mix(mineral,ink.rgb/max(ink.a,.001),.46);
+    return vec4(colour*ink.a,ink.a);
+}
+float reliefCoverage(float alpha) {
+    return smoothstep(.12,.34,alpha);
+}
+vec4 reliefCutout(vec2 uv) {
+    if(hasCutout==0)return vec4(0);
+    vec4 cut=cutoutArtLod(uv,3.5);
+    return cut*reliefCoverage(cut.a);
+}
+// Relief normals need a broader footprint than colour detail. Filtering the
+// premultiplied texture first prevents hidden RGB and hard logo edges becoming
+// high-frequency slopes in an implicit surface.
+vec3 heightArt(vec2 uv,float lod,bool softenCoverage) {
+    uv=materialDomain(uv);
+    vec4 a=vec4(0),b=vec4(0);
+    {
+        vec2 p=(uv-.5)/(.90+.08*imageZoom);
+        vec2 au=p*(mediaAspect/min(mediaAspect.x,mediaAspect.y))+.5;
+        vec2 bu=p*(nextMediaAspect/min(nextMediaAspect.x,nextMediaAspect.y))+.5;
+        a=textureLod(userImage,clamp(au,0.,1.),lod);
+        b=textureLod(nextImage,clamp(bu,0.,1.),lod);
+    }
+    vec3 base=mix(a.rgb,b.rgb,imageBlend);
+    if(hasCutout==0)return base;
+    vec4 cut=cutoutArtLod(uv,lod);
+    if(softenCoverage)cut*=reliefCoverage(cut.a);
+    return base*(1.-cut.a)+cut.rgb;
+}
+vec3 heightArt(vec2 uv) { return heightArt(uv,3.5,false); }
 vec4 sampleCutout(vec2 uv) {
     if(hasCutout==0)return vec4(0);
-    vec4 a=cutoutSample(cutoutImage,uv,cutoutAspect),b=cutoutSample(nextCutoutImage,uv,nextCutoutAspect);
-    vec4 c=mix(vec4(a.rgb*a.a,a.a),vec4(b.rgb*b.a,b.a),cutoutBlend);
-    return vec4(c.rgb/max(c.a,.0001),c.a*(1.-handoffStrength));
+    vec4 c=cutoutArtLod(uv,1.25);
+    return vec4(c.rgb/max(c.a,.0001),c.a);
+}
+float spriteHeight(vec2 uv) {
+    if(hasCutout==0)return 0.;
+    return dot(cutoutArtLod(materialDomain(uv),3.5).rgb,vec3(.2126,.7152,.0722));
+}
+float spriteRelief(vec2 uv) {
+    if(reliefDepth<=0. || hasCutout==0)return 0.;
+    return reliefDepth*spriteHeight(uv);
+}
+// Colour is applied at the surface shading boundary. Simulation and relief
+// sampling stay uncoloured, so enabling neon alone cannot change the geometry.
+vec4 spriteMaterial(vec2 uv) {
+    vec4 c=sampleCutout(materialDomain(uv));
+    if(displacementColour<=0. || c.a<=0.)return c;
+    float field=spriteHeight(uv)*.7+.12*sin(uv.x*17.+travelTime*.2);
+    vec3 neon=.5+.5*cos(6.283185*(field+travelTime*.035+vec3(0.,.32,.64)));
+    c.rgb=mix(c.rgb,neon*max(.14,max(c.r,max(c.g,c.b))),displacementColour*reliefCoverage(c.a));
+    return c;
+}
+vec4 surfaceSpriteMaterial(vec2 uv) {
+    vec4 c=spriteMaterial(uv);
+    // Leave a softer, lower knee for pigment than for the height field.
+    c.a*=smoothstep(.05,.18,c.a);
+    return c;
 }
 vec2 materialDomain(vec2 uv) {
     float t=travelTime*(.12+.55*materialMotion);
@@ -84,7 +183,23 @@ vec4 sampleFittedMedia(vec2 uv) {
 }
 '''
 
+def sprite_compositing_source(text):
+    """Keep straight RGB straight when a scene applies the returned alpha.
+
+    Applying foreground alpha inside RGB and again at the outer blend squares
+    soft sprite coverage. RGB-only blends already apply it once and stay intact.
+    """
+    pair=r'mix\((?P<bg>\w+)\.rgb,(?P<fg>\w+)\.rgb,(?P=fg)\.a\),max\((?P=bg)\.a,(?P=fg)\.a\)'
+    text=re.sub(r'vec4\('+pair+r'\)',lambda m:'compositeCutout('+m['bg']+','+m['fg']+')',text)
+    nested=r'mix\((?P<base>[^,()\n]+),'+pair
+    return re.sub(nested,lambda m:'mix('+m['base']+',compositeCutout('+m['bg']+','+m['fg']+').rgb,compositeCutout('+m['bg']+','+m['fg']+').a',text)
+
+
 def scene_source(text):
+    text=sprite_compositing_source(text)
+    # Nested geometry receives source-premultiplied textures directly. Particle
+    # atlas samplers already interpolate premultiplied texels; do not square alpha.
+    text=text.replace('a.rgb*=a.a;b.rgb*=b.a;c.rgb*=c.a;d.rgb*=d.a;','')
     # Inject only into the main shader, after its own sampler declaration.
     text=text.replace('texture(userImage,','sampleMedia(')
     text=text.replace('textureLod(userImage,','inheritedTextureLod(userImage,')
@@ -93,9 +208,6 @@ def scene_source(text):
                       'vec4 pmSample(sampler2D tex,vec2 uv) {\n    uv=materialDomain(uv);')
     text=text.replace('vec4 alphaArt(sampler2D tex,vec2 uv,vec2 aspect){',
                       'vec4 alphaArt(sampler2D tex,vec2 uv,vec2 aspect){uv=materialDomain(uv);')
-    if 'vec4 cutoutArt(' in text:
-        text=text.replace('return vec4(c.rgb/max(c.a,.00001),c.a);',
-                          'return vec4(c.rgb/max(c.a,.00001),c.a*(1.-handoffStrength));')
     text=text.replace('sceneTime*(.19+.26*motion)','travelTime*.48')
     text=text.replace('sceneTime*(.65+motion*.9)','travelTime*1.7')
     text=text.replace('sceneTime*(.45+motion*.8)','travelTime*1.3')
@@ -153,15 +265,23 @@ vec3 reflectedScene(vec2 uv){
 }
 vec3 authoredPalette(vec3 source,int style){
     float value=max(source.r,max(source.g,source.b));
+    if(style==1||style==3){
+        // Grade by brightness so artwork colour survives and hues cannot wrap into hard bands.
+        bool warm=style==3;
+        vec3 shadows=warm?vec3(.28,.38,.45):vec3(.24,.42,.50);
+        vec3 midtones=warm?vec3(.74,.50,.36):vec3(.30,.62,.66);
+        vec3 highlights=warm?vec3(.98,.87,.69):vec3(.82,.92,.89);
+        vec3 grade=mix(shadows,midtones,smoothstep(.10,.60,value));
+        grade=mix(grade,highlights,smoothstep(.55,1.,value));
+        return grade*value;
+    }
     float low=min(source.r,min(source.g,source.b));
     float chroma=value-low;
     float phase=chroma<.001?0.:(source.r==value?(source.g-source.b)/chroma:
         source.g==value?2.+(source.b-source.r)/chroma:4.+(source.r-source.g)/chroma)/6.;
     float x=fract(phase+hue*.32+value*.48+midImpulse*.012);
     vec3 a,b,c;
-    if(style==1){a=vec3(.01,.95,1.);b=vec3(1.,.005,.42);c=vec3(.38,.005,1.);}
-    else if(style==2){a=vec3(.52,1.,.005);b=vec3(.3,.005,1.);c=vec3(.005,.36,1.);}
-    else if(style==3){a=vec3(1.,.015,.005);b=vec3(1.,.24,.005);c=vec3(1.,.93,.01);}
+    if(style==2){a=vec3(.52,1.,.005);b=vec3(.3,.005,1.);c=vec3(.005,.36,1.);}
     else if(style==4){a=vec3(.005,.76,.24);b=vec3(.8,.005,.08);c=vec3(.015,.08,1.);}
     else if(style==5){a=vec3(1.,0.,.01);b=vec3(0.,1.,.015);c=vec3(.005,.015,1.);}
     else if(style==6){
@@ -183,18 +303,24 @@ void main(){
         halo+=max(s-.55,0.);
     }
     c+=halo*(finishGlow*.12)*(1.-c);
-    // Recolour the actual scene and its imagery, preserving spatial detail.
-    // Integrated band phases cycle continuously; attacks add immediate changes.
-    float angle=travelTime*.24+bassImpulse*.23+midImpulse*.41+trebleImpulse*.19
-        +bassHit*.85+midHit*.55+trebleHit*.35;
-    vec3 axis=normalize(vec3(1.));
-    vec3 rotated=c*cos(angle)+cross(axis,c)*sin(angle)+axis*dot(axis,c)*(1.-cos(angle));
-    float light=dot(c,vec3(.2126,.7152,.0722));
-    vec3 tint=.5+.5*cos(angle+vec3(0.,2.094,4.189));
-    rotated=mix(rotated,light*(.45+1.5*tint),.18+.22*bassHit);
-    int style=int(floor(paletteStyle*7.+.5));
-    if(style==0)c=mix(c,rotated,clamp(.5+.45*intensity,0.,1.));
-    else c=mix(c,authoredPalette(c,style),paletteAmount);
+    if(paletteAmount>0.){
+        int style=int(floor(paletteStyle*7.+.5));
+        if(style==0){
+            // Integrated band phases cycle continuously. Attacks add changes.
+            float angle=travelTime*.24+bassImpulse*.23+midImpulse*.41+trebleImpulse*.19
+                +bassHit*.85+midHit*.55+trebleHit*.35;
+            vec3 axis=normalize(vec3(1.));
+            vec3 rotated=c*cos(angle)+cross(axis,c)*sin(angle)+axis*dot(axis,c)*(1.-cos(angle));
+            float light=dot(c,vec3(.2126,.7152,.0722));
+            vec3 tint=.5+.5*cos(angle+vec3(0.,2.094,4.189));
+            rotated=mix(rotated,light*(.45+1.5*tint),.18+.22*bassHit);
+            c=mix(c,rotated,paletteAmount*clamp(.5+.45*intensity,0.,1.));
+        }else{
+            // Keep the scene's own pigment dominant under the strong colour ramps.
+            float strength=style<=5?paletteAmount*.38:paletteAmount;
+            c=mix(c,authoredPalette(c,style),strength);
+        }
+    }
     colour=vec4(clamp(c,0.,1.),1.);
 }
 '''
@@ -259,6 +385,7 @@ class Renderer:
 
     def __init__(self):
         self.window, self.vao = None, 0
+        self.field_programs={}
         if not glfw.init(): raise RuntimeError('OpenGL window library could not start')
         try:
             glfw.window_hint(glfw.VISIBLE, False)
@@ -279,6 +406,8 @@ class Renderer:
     def close(self):
         if self.window:
             glfw.make_context_current(self.window)
+            for shader in self.field_programs.values():gl.glDeleteProgram(shader)
+            self.field_programs.clear()
             if self.vao: gl.glDeleteVertexArrays(1, [self.vao])
             glfw.destroy_window(self.window)
         self.window, self.vao = None, 0
@@ -411,7 +540,7 @@ class AudioController:
 
 
 class Scene:
-    def __init__(self, root, width, height, key='original/prism-bloom'):
+    def __init__(self, root, width, height, key='original/prism-bloom', *, field_programs=None):
         if key not in SCENE_KEYS: raise ValueError('Unknown original scene')
         self.key = key
         self.width, self.height = width, height
@@ -421,9 +550,11 @@ class Scene:
         self.audio = AudioController()
         self.handoff = None
         descriptor=json.loads((Path(root)/'scenes'/key.split('/')[1]/'scene.json').read_text())
+        morph_family,self.composition=field_identity(descriptor)
         self.particle_family=descriptor.get('variant',-1) if descriptor.get('family')=='sprite-particles' else -1
         self.hierarchy_mode=descriptor.get('hierarchyMode',-1)
         self.last_controls={}
+        self.last_media_identity=None
         scene_root = Path(root)/'scenes'/key.split('/')[1]
         descriptors = pass_descriptors(scene_root)
         descriptors=[*descriptors,dict(id='sharedlook',shader='shared-look.glsl',scale=1,format='rgba8',inputs=[descriptors[-1]['id']])]
@@ -438,18 +569,31 @@ class Scene:
                 self.passes.append(entry)
                 entry['target'] = Target(*dimensions(entry), buffers=2 if entry.get('history') else 1,
                                          format=entry['format'], filter=entry.get('filter','linear'))
-                source=LOOK_GLSL if entry['id']=='sharedlook' else (scene_root/entry['shader']).read_text(encoding='utf-8')
+                shader_path=scene_root/entry['shader']
+                if morph_family=='layered-relief' and entry['shader']=='main.glsl':
+                    shader_path=scene_root.parent/'crosswoven-silk'/'field.glsl'
+                source=LOOK_GLSL if entry['id']=='sharedlook' else shader_path.read_text(encoding='utf-8')
                 # Re-capture material atlases on an explicit image-method edit.
                 # Image-fed physical/population fields keep their accumulated state.
                 entry['materialSource']=bool(entry.get('state') and entry.get('semantic')=='premultiplied-source-atlas-v1')
                 vertex=(scene_root/entry['vertex']).read_text(encoding='utf-8') if 'vertex' in entry else VERTEX
-                entry['program'] = program(scene_source(source) if 'uniform sampler2D userImage;' in source else source,vertex)
-                names = ('resolution','sceneTime','projectBeat','beatPulse','energy','bass','mid','treble','onset','bassHit','bassTime','midHit','trebleHit','midTime','trebleTime','bassImpulse','midImpulse','trebleImpulse',
+                if 'uniform sampler2D userImage;' in source:
+                    source=scene_source(source)
+                if field_programs is not None and self.composition>=0 and entry['shader']=='main.glsl':
+                    cache_key=(source,vertex)
+                    if cache_key not in field_programs:
+                        field_programs[cache_key]=program(source,vertex)
+                    entry['program']=field_programs[cache_key]
+                    entry['sharedProgram']=True
+                else:
+                    entry['program']=program(source,vertex)
+                names = ('resolution','sceneTime','projectBeat','beatPulse','kickImpact','energy','bass','mid','treble','onset','bassHit','bassTime','midHit','trebleHit','midTime','trebleTime','bassImpulse','midImpulse','trebleImpulse',
                          'simulationTime','simulationReset','stepDelta','audioMotion','intensity','motion','imageMix','userImage','imageSize','hasImage',
                          'input0','input1','input2','input3','historyImage','historyValid',
                          'nextImage','imageBlend','mediaAspect','nextMediaAspect','travelTime','deltaTime',
-                         'cutoutImage','nextCutoutImage','hasCutout','cutoutBlend','cutoutAspect','nextCutoutAspect',
-                         'handoffMaterial','handoffAppearance','handoffStrength','generationBlend','handoffFamily','handoffMode','handoffScale','handoffHierarchy') + tuple(CONTROL_DEFAULTS)
+                         'cutoutImage','nextCutoutImage','hasCutout','cutoutBlend','cutoutAspect','nextCutoutAspect','spriteStructurePush',
+                         'handoffMaterial','handoffAppearance','handoffStrength','generationBlend','handoffFamily','handoffMode','handoffScale','handoffHierarchy',
+                         'sourceComposition','targetComposition','sceneMorph') + tuple(CONTROL_DEFAULTS)
                 entry['locations'] = {name:gl.glGetUniformLocation(entry['program'],name) for name in names}
             self.final = self.passes[-1]['target']
         except Exception:
@@ -460,10 +604,11 @@ class Scene:
     def byte_size(self):
         return sum(p['target'].byte_size for p in self.passes)+(self.handoff.byte_size if self.handoff else 0)
 
-    def render(self, actor, beat, levels, texture, image_size, generation=0, next_texture=0, next_size=(1,1), image_blend=0.,cutout=(0,(1,1),0,(1,1),0.)):
+    def render(self, actor, beat, levels, texture, image_size, generation=0, next_texture=0, next_size=(1,1), image_blend=0.,cutout=(0,(1,1),0,(1,1),0.), *, morph=(-1,1.), media_identity=0, kick_impact=0.):
         dt = 0. if self.clock is None else actor['time']-self.clock
         identity = (actor['revision'],generation)
-        reset = self.clock is None or identity != self.identity or dt < 0 or dt > .3
+        reset = self.clock is None or identity != self.identity or dt < 0
+        dt=min(dt,.3)
         if reset:
             for entry in self.passes:
                 if entry.get('history'): entry['target'].clear()
@@ -475,11 +620,13 @@ class Scene:
         driven['energy']=min(1.,levels['energy']*(sum(controls.get(b+'Drive',.5) for b in ('bass','mid','treble'))/1.5))
         controlled = self.audio.update(driven,dt,reset,controls.get('momentum',.5))
         values = dict(sceneTime=actor['time'],projectBeat=beat,
+                      kickImpact=kick_impact,
                       deltaTime=0. if reset else max(0.,min(.1,dt)),
                       travelTime=actor.get('motionTime',actor['time']*(.25+.75*actor['controls'].get('motion',.5))),
                       audioMotion=self.audio.motion_phase,
                       imageBlend=image_blend,
                       cutoutBlend=cutout[4],
+                      spriteStructurePush=max(kick_impact,controlled['bassHit']*.72)*controls.get('pulse',.65),
                       beatPulse=math.exp(-6*(beat%1))*controlled['bass'], **controlled, **actor['controls'])
         values.setdefault('imageZoom',.35); values.setdefault('imageRotation',.5)
         for name in ('materialMotion','materialMode','viewPattern','finishGlow','paletteStyle','paletteAmount'):
@@ -503,6 +650,9 @@ class Scene:
             gl.glViewport(0,0,target.width,target.height)
             gl.glUseProgram(entry['program'])
             gl.glUniform2f(locations['resolution'],target.width,target.height)
+            gl.glUniform1i(locations['sourceComposition'],morph[0])
+            gl.glUniform1i(locations['targetComposition'],self.composition)
+            gl.glUniform1f(locations['sceneMorph'],morph[1])
             for name,value in values.items():
                 if name in locations: gl.glUniform1f(locations[name],value)
             bindings = [('userImage',texture),('nextImage',next_texture or texture),('cutoutImage',cutout[0]),('nextCutoutImage',cutout[2] or cutout[0])]
@@ -544,7 +694,7 @@ class Scene:
             rendered[entry['id']] = target.textures[output]
         state=[e for e in self.passes if e.get('state')]
         material_changed=bool(self.last_controls) and controls.get('materialMode',0.)!=self.last_controls.get('materialMode',0.)
-        if material_changed and not reset:
+        if (material_changed or media_identity!=self.last_media_identity) and not reset:
             # An explicit material-method edit must update paused captured imagery
             # without advancing/restarting particle positions or pressure fields.
             values.update(stepDelta=0.,simulationTime=self.simulation_time,simulationReset=1.)
@@ -569,11 +719,12 @@ class Scene:
             if not entry.get('state'): draw(entry,previous,reset)
         self.clock, self.identity = actor['time'], identity
         self.last_controls=dict(actor['controls'])
+        self.last_media_identity=media_identity
         self.frames += 1
 
     def close(self):
         if self.handoff:self.handoff.close();self.handoff=None
         for entry in self.passes:
             if entry['target']: entry['target'].close()
-            if entry['program']: gl.glDeleteProgram(entry['program'])
+            if entry['program'] and not entry.get('sharedProgram'): gl.glDeleteProgram(entry['program'])
         self.passes, self.final = [], None

@@ -34,20 +34,20 @@ int prepareSavedLibrary(const juce::StringArray& args)
     const auto index = args.indexOf("--prepare-library");
     if (index < 0 || index + 1 >= args.size() || !juce::File::isAbsolutePath(args[index + 1].unquoted())) return 1;
     const juce::File file(args[index + 1].unquoted()); const auto started = juce::Time::getMillisecondCounterHiRes();
-    auto saved = mixworks::readLibraryCatalogue(file); if (saved.error.isNotEmpty()) return 1;
+    auto saved = mixworks::openLibraryStore(file); if (saved.error.isNotEmpty()) return 1;
     const auto snapshotReadMs = juce::Time::getMillisecondCounterHiRes() - started;
-    juce::AudioFormatManager formats; formats.registerBasicFormats(); auto snapshots = saved.media; int unavailable = 0;
+    juce::AudioFormatManager formats; formats.registerBasicFormats(); std::vector<std::shared_ptr<mixworks::Media>> snapshots; int unavailable = 0;
     for (const auto& source : saved.files)
     {
-        if (std::any_of(snapshots.begin(), snapshots.end(), [&](const auto& m) { return m->file == source; })) continue;
+        if (std::any_of(saved.media.begin(), saved.media.end(), [&](const auto& m) { return m->file == source; })) continue;
         auto loaded = mixworks::readMedia(formats, source, {}, mixworks::AnalysisCacheMode::readOnly, mixworks::MediaReadPurpose::catalogue);
         if (loaded.media) snapshots.push_back(std::move(loaded.media)); else ++unavailable;
     }
-    const auto error = mixworks::rememberLibraryCatalogue(file, saved.files, snapshots);
+    const auto error = mixworks::saveLibraryStore(file, snapshots);
     const auto reportIndex = args.indexOf("--report");
     if (reportIndex >= 0 && reportIndex + 1 < args.size() && juce::File::isAbsolutePath(args[reportIndex + 1].unquoted()))
     {
-        juce::var report(new juce::DynamicObject()); auto* object = report.getDynamicObject(); object->setProperty("tracks", (int) snapshots.size());
+        juce::var report(new juce::DynamicObject()); auto* object = report.getDynamicObject(); object->setProperty("tracks", (int) (saved.media.size() + snapshots.size()));
         object->setProperty("unavailable", unavailable); object->setProperty("error", error); object->setProperty("elapsedMs", juce::Time::getMillisecondCounterHiRes() - started);
         object->setProperty("snapshotReadMs", snapshotReadMs);
         juce::File(args[reportIndex + 1].unquoted()).replaceWithText(juce::JSON::toString(report));

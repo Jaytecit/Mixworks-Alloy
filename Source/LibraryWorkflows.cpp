@@ -110,7 +110,7 @@ void Workstation::reanalyseTracks(int scope, bool focused, std::vector<std::shar
                     if (safe->tempoEditBaseline) project(*safe->tempoEditBaseline);
                     const auto catalogue = std::find_if(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& media) { return media->file == previous->file; });
                     if (catalogue != safe->engine.library.end()) safe->adoptLibraryRefresh(*catalogue, fresh);
-                    safe->dirty = true; safe->markCatalogueChanged(); safe->refresh();
+                    safe->dirty = true; safe->refresh();
                 }
                 safe->importProgress.finishFile();
                 if (review.isObject())
@@ -146,113 +146,198 @@ bool Workstation::adoptLibraryRefresh(const std::shared_ptr<Media>& previous, co
     if (found == engine.library.end() || timelineLoads.count(previous->id)) return false;
     if (previous->sessionMetadataPending || previous->analysisSource == verified->analysisSource)
     {
-        verified->id = previous->id; verified->manualBpm = previous->manualBpm;
-        verified->manualBeatOrigin = previous->manualBeatOrigin; verified->manualKey = previous->manualKey;
+        verified->id = previous->id;
+        if (previous->sessionMetadataPending || (previous->analysisFileModified == verified->analysisFileModified
+                                               && previous->analysisFileBytes == verified->analysisFileBytes))
+        {
+            verified->manualBpm = previous->manualBpm;
+            verified->manualBeatOrigin = previous->manualBeatOrigin; verified->manualKey = previous->manualKey;
+        }
         verified->name = previous->name;
     }
     if (selectedLibraryId == previous->id) selectedLibraryId = verified->id;
     // Only replace the catalogue entry. Arranged/Undo audio keeps its verified source object.
-    *found = verified; markCatalogueChanged(); return true;
+    *found = verified; markCatalogueChanged(verified); return true;
 }
-void Workstation::markCatalogueChanged()
+void Workstation::markCatalogueChanged(const std::shared_ptr<Media>& media, uint64_t scan)
 {
-    if (catalogueFile == juce::File()) return;
-    catalogueDirty = true; catalogueChangedAt = juce::Time::getMillisecondCounterHiRes();
+    if (catalogueFile == juce::File() || !media || media->file == juce::File()) return;
+    auto& change = catalogueChanges[media->file.getFullPathName().toLowerCase()];
+    change.media = media;
+    if (scan != 0) change.scan = scan;
+    if (!catalogueDirty) catalogueChangedAt = juce::Time::getMillisecondCounterHiRes();
+    catalogueDirty = true;
 }
 void Workstation::writeLibraryCatalogue()
 {
-    if (catalogueFile == juce::File() || catalogueWritePending) return;
-    juce::Array<juce::File> sources; for (const auto& media : engine.library) sources.add(media->file);
-    std::vector<std::shared_ptr<Media>> snapshots; for (const auto& media : engine.library) snapshots.push_back(media->catalogueCopy());
+    if (catalogueFile == juce::File() || catalogueWritePending || catalogueChanges.empty()) return;
+    catalogueWriting = std::move(catalogueChanges);
+    catalogueChanges.clear();
+    std::vector<std::shared_ptr<Media>> snapshots;
+    for (const auto& entry : catalogueWriting) snapshots.push_back(entry.second.media->catalogueCopy());
     catalogueWritePending = true; catalogueDirty = false;
     const auto file = catalogueFile; auto safe = juce::Component::SafePointer<Workstation>(this);
-    workers.addJob([safe, file, sources, snapshots]
+    workers.addJob([safe, file, snapshots = std::move(snapshots)]
     {
-        const auto error = rememberLibraryCatalogue(file, sources, snapshots);
+        const auto error = saveLibraryStore(file, snapshots);
         juce::MessageManager::callAsync([safe, error]
         {
             if (!safe) return; safe->catalogueWritePending = false;
-            if (error.isNotEmpty()) safe->setStatus("Library catalogue warning: " + error);
+            if (error.isNotEmpty())
+            {
+                for (const auto& entry : safe->catalogueWriting)
+                {
+                    auto& pending = safe->catalogueChanges[entry.first];
+                    if (!pending.media) pending = entry.second;
+                    else if (!pending.scan) pending.scan = entry.second.scan;
+                }
+                safe->catalogueDirty = true;
+                safe->catalogueChangedAt = juce::Time::getMillisecondCounterHiRes();
+                if (safe->catalogueSaveError != error) safe->setStatus("Library save warning: " + error);
+            }
+            else
+                for (const auto& entry : safe->catalogueWriting)
+                    if (entry.second.scan != 0 && entry.second.scan == safe->musicScanSerial) ++safe->musicSaved;
+            safe->catalogueSaveError = error;
+            safe->catalogueWriting.clear();
         });
     });
+}
+void Workstation::flushLibraryCatalogue()
+{
+    for (const auto& entry : catalogueChanges) catalogueWriting[entry.first] = entry.second;
+    std::vector<std::shared_ptr<Media>> snapshots;
+    for (const auto& entry : catalogueWriting) snapshots.push_back(entry.second.media);
+    if (const auto error = saveLibraryStore(catalogueFile, snapshots); error.isNotEmpty()) juce::Logger::writeToLog(error);
 }
 void Workstation::tickLibraryCatalogue()
 {
     if (gridWindow && gridWindow->isVisible()) return;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (catalogueTablePending && now >= nextCatalogueTableUpdate)
+    {
+        catalogueTablePending = false; nextCatalogueTableUpdate = now + 200;
+        filterLibrary(); libraryTable.table.updateContent(); libraryTable.table.repaint();
+    }
     if (catalogueRestorePending)
     {
-        catalogueRestorePending = false; catalogueRefreshPending = true; setStatus("Opening the saved music library...");
+        catalogueRestorePending = false; catalogueOpening = catalogueRefreshPending = true; setStatus("Opening the saved music library...");
         const auto file = catalogueFile; auto safe = juce::Component::SafePointer<Workstation>(this);
         workers.addJob([safe, file]
         {
-            auto saved = readLibraryCatalogue(file);
+            auto saved = openLibraryStore(file);
             juce::MessageManager::callAsync([safe, saved = std::move(saved)]() mutable
             {
-                if (!safe) return; safe->catalogueRefreshPending = false;
-                if (saved.error.isNotEmpty()) { safe->setStatus(saved.error); return; }
+                if (!safe) return; safe->catalogueOpening = safe->catalogueRefreshPending = false;
+                std::set<juce::String> known;
+                std::map<juce::String, std::shared_ptr<Media>> snapshots;
+                for (auto& media : saved.media) snapshots.emplace(media->file.getFullPathName().toLowerCase(), std::move(media));
+                for (const auto& media : safe->engine.library) known.insert(media->file.getFullPathName().toLowerCase());
                 for (const auto& source : saved.files)
                 {
-                    if (std::any_of(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& m) { return m->file == source; })) continue;
-                    const auto found = std::find_if(saved.media.begin(), saved.media.end(), [&](const auto& m) { return m->file == source; });
-                    if (found != saved.media.end()) { safe->engine.library.push_back(*found); safe->catalogueRefreshQueue.push_back(*found); }
+                    const auto path = source.getFullPathName().toLowerCase();
+                    if (!known.insert(path).second) continue;
+                    const auto found = snapshots.find(path);
+                    if (found != snapshots.end()) { safe->engine.library.push_back(found->second); safe->catalogueRefreshQueue.push_back(found->second); }
                     else
                     {
                         auto pending = std::make_shared<Media>(); pending->file = source; pending->name = source.getFileNameWithoutExtension(); pending->sourceDetailsPending = true;
                         safe->engine.library.push_back(pending); safe->catalogueRefreshQueue.push_back(std::move(pending));
                     }
                 }
-                safe->refresh(); safe->setStatus("Music library ready. Source checks run in the background.");
+                safe->refresh(); safe->setStatus(saved.error.isNotEmpty() ? saved.error : "Music library ready. Source checks run in the background.");
             });
         });
         return;
     }
+    if (catalogueDirty && !catalogueWritePending
+        && now - catalogueChangedAt >= (catalogueSaveError.isEmpty() ? 350 : 5000))
+        writeLibraryCatalogue();
     if (busy || engine.playing || engine.exporting || musicScanJobPending || pendingTempo > 0 || tempoPreparationPending) return;
-    if (catalogueDirty && !catalogueWritePending && !catalogueRefreshPending && catalogueRefreshQueue.empty()
-        && juce::Time::getMillisecondCounterHiRes() - catalogueChangedAt >= 1500) writeLibraryCatalogue();
     if (!catalogueRefreshPending && !catalogueRefreshQueue.empty() && timelineLoads.empty())
     {
-        auto previous = catalogueRefreshQueue.front(); catalogueRefreshQueue.erase(catalogueRefreshQueue.begin()); catalogueRefreshPending = true;
-        auto safe = juce::Component::SafePointer<Workstation>(this);
-        workers.addJob([safe, previous, cancelled = sourceReadsCancelled]
+        struct Candidate
         {
+            std::shared_ptr<Media> media;
+            ScanKnown known;
+            bool readGenre;
+            double sessionOrigin;
+            std::optional<TrackAnalysisRecord> oldRecord;
+        };
+        std::vector<Candidate> candidates;
+        const auto count = std::min<size_t>(128, catalogueRefreshQueue.size());
+        for (size_t i = 0; i < count; ++i)
+        {
+            const auto& media = catalogueRefreshQueue[i];
+            std::optional<TrackAnalysisRecord> oldRecord;
+            if (media->analysisVersion != analysisRevision && media->analysisSource.sha256.isNotEmpty()) oldRecord = media->analysisRecord();
+            candidates.push_back({media, ScanKnown(*media), !media->assets.genreRead,
+                                  media->sessionMetadataPending ? media->manualBeatOrigin : -1, std::move(oldRecord)});
+        }
+        catalogueRefreshPending = true;
+        auto safe = juce::Component::SafePointer<Workstation>(this);
+        workers.addJob([safe, candidates = std::move(candidates), cancelled = sourceReadsCancelled]
+        {
+            size_t checked = 0;
+            std::vector<std::shared_ptr<Media>> missing;
+            std::shared_ptr<Media> previous;
             MediaResult result;
             std::optional<juce::String> genre;
-            const auto sidecar = analysisRecordInputFile(previous->file);
-            const bool sameSidecar = sidecar.getSize() == previous->analysisFileBytes && sidecar.getLastModificationTime().toMilliseconds() == previous->analysisFileModified;
-            const bool unchanged = !previous->sessionMetadataPending && previous->analysisVersion == analysisRevision && !previous->analysisSource.sha256.isEmpty() && previous->file.existsAsFile()
-                && previous->file.getSize() == previous->analysisSource.bytes && previous->file.getLastModificationTime().toMilliseconds() == previous->sourceModified
-                && sameSidecar;
-            if (unchanged && !previous->assets.genreRead) genre = readLibraryGenre(previous->file);
-            if (!unchanged)
+            for (const auto& item : candidates)
             {
-                juce::AudioFormatManager formats; formats.registerBasicFormats(); const auto record = previous->analysisRecord();
-                result = readMedia(formats, previous->file, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::catalogue,
-                    previous->analysisVersion != analysisRevision && !record.source.sha256.isEmpty() && (sameSidecar || !sidecar.exists()) ? &record : nullptr, cancelled);
-                if (result.media && previous->sessionMetadataPending && previous->manualBeatOrigin > result.media->duration())
-                { result.media.reset(); result.error = "Saved beat marker exceeds source audio: " + previous->file.getFullPathName(); }
+                if (*cancelled) break;
+                ++checked;
+                const auto stamp = musicFileStamp(item.media->file);
+                if (stamp.bytes == 0 && stamp.modified == 0) { missing.push_back(item.media); continue; }
+                const bool unchanged = stamp.matches(item.known);
+                if (unchanged && !item.readGenre) continue;
+                previous = item.media;
+                if (unchanged) genre = readLibraryGenre(previous->file);
+                else
+                {
+                    const bool sameSidecar = stamp.analysisBytes == item.known.analysisBytes && stamp.analysisModified == item.known.analysisModified;
+                    juce::AudioFormatManager formats; formats.registerBasicFormats();
+                    result = readMedia(formats, previous->file, {}, AnalysisCacheMode::readWrite, MediaReadPurpose::catalogue,
+                        item.oldRecord && (sameSidecar || stamp.analysisBytes == 0) ? &*item.oldRecord : nullptr, cancelled);
+                    if (result.media && item.sessionOrigin > result.media->duration())
+                    { result.media.reset(); result.error = "Saved beat marker exceeds source audio: " + previous->file.getFullPathName(); }
+                }
+                break;
             }
-            juce::MessageManager::callAsync([safe, previous, result = std::move(result), unchanged, genre]() mutable
+            auto first = candidates.front().media;
+            juce::MessageManager::callAsync([safe, first, checked, missing = std::move(missing), previous, result = std::move(result), genre]() mutable
             {
                 if (!safe) return; safe->catalogueRefreshPending = false;
-                if (unchanged)
+                auto& queue = safe->catalogueRefreshQueue;
+                if (queue.empty() || queue.front() != first || queue.size() < checked) return;
+                queue.erase(queue.begin(), queue.begin() + (ptrdiff_t) checked);
+                bool changed = false;
+                const auto present = [&](const auto& media)
+                {
+                    return std::find(safe->engine.library.begin(), safe->engine.library.end(), media) != safe->engine.library.end();
+                };
+                const auto unavailable = [&](const auto& media, const auto& reason)
+                {
+                    if (!media->hasPlayback())
+                    {
+                        const juce::ScopedLock guard(safe->engine.lock);
+                        media->sourceDetailsPending = false; media->playbackError = reason; changed = true;
+                    }
+                };
+                for (const auto& media : missing)
+                    if (present(media)) unavailable(media, "Missing audio file: " + media->file.getFullPathName());
+                if (previous && present(previous))
                 {
                     if (genre)
                     {
                         const juce::ScopedLock guard(safe->engine.lock);
                         previous->assets.genre = *genre; previous->assets.genreRead = true;
-                        safe->markCatalogueChanged(); safe->refresh();
+                        safe->markCatalogueChanged(previous); changed = true;
                     }
-                    return;
+                    else if (result.media) changed |= safe->adoptLibraryRefresh(previous, result.media);
+                    else unavailable(previous, result.error);
                 }
-                auto found = std::find(safe->engine.library.begin(), safe->engine.library.end(), previous);
-                if (found == safe->engine.library.end()) return; // An older session's worker cannot publish into a newer entry.
-                if (result.media)
-                {
-                    safe->adoptLibraryRefresh(previous, result.media);
-                    safe->markCatalogueChanged(); safe->refresh();
-                }
-                else if (found != safe->engine.library.end() && *found == previous && !previous->hasPlayback())
-                { const juce::ScopedLock guard(safe->engine.lock); previous->sourceDetailsPending = false; previous->playbackError = result.error; safe->refresh(); }
+                if (changed) safe->catalogueTablePending = true;
             });
         });
     }

@@ -87,7 +87,10 @@ return albedo*(.13+diff*.85)+palette(id*.1+.3)*rim*.45+vec3(spec)*.5;}
 void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colour=vec4(max(c,vec3(0)),1);}
 
 vec3 opticalInk(vec2 uv){vec2 p=uv-.5;float ribs=sin(length(p)*18.-bassTime*5.+sin(atan(p.y,p.x)*3.+midTime*2.));return palette(ribs*.2+p.x*.2)*(.3+.7*smoothstep(-.65,.3,ribs));}
-void main(){vec2 p=domain();float t=clockTime();float cells=2.+float(VARIANT%4)+floor(detail*2.);
+void main(){
+    vec2 stamp=gl_FragCoord.xy/resolution;
+    vec2 lensCurrent=structureCurrent(stamp);
+vec2 p=domain()+.34*lensCurrent;float t=clockTime();float cells=2.+float(VARIANT%4)+floor(detail*2.)+.85*structureHeight(stamp);
     vec2 q=rot(float(VARIANT%3)*.4)*p*cells;
     q.x+=.55*lowSwing()*sin(floor(q.y)*1.7);q.y+=.4*midSwing()*cos(floor(q.x)*1.3);
     vec2 id=floor(q),f=fract(q)-.5;float seed=hash(id);

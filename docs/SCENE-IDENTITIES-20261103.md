@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Scene identity refinements — 3 November 2026
 
 Jay authorised the first changes from the [full scene audit](SCENE-SIMILARITY-AUDIT-20261103.md): plain defaults for the 28 sixfold scenes, distinct city scenes and distinct ribbon-feedback scenes. The five approved image instruments remain byte-for-byte unchanged.

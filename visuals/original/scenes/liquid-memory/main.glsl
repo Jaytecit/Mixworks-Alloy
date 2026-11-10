@@ -1,29 +1,29 @@
-#version 330
-uniform vec2 resolution;
-uniform sampler2D input0;
-uniform sampler2D userImage;
-uniform int hasImage;
-uniform float warp,detail,imageMix,intensity,bassHit,trebleHit;
-out vec4 colour;
-float height(vec2 p){return texture(input0,clamp(p,0.,1.)).r;}
-vec3 sourceArt(vec2 uv){
-    vec4 background=hasImage!=0?sampleFittedMedia(uv):vec4(0);
-    vec4 cut=sampleCutout(materialDomain(uv));
-    return mix(background.rgb,cut.rgb,cut.a);
-}
-void main(){
-    vec2 uv=gl_FragCoord.xy/resolution,px=1./vec2(textureSize(input0,0));
-    float h=height(uv);
-    vec2 g=vec2(height(uv+vec2(px.x*2.,0))-height(uv-vec2(px.x*2.,0)),height(uv+vec2(0,px.y*2.))-height(uv-vec2(0,px.y*2.)))*.5;
-    // Broad and fine derivatives produce a polished surface, not contour lines.
-    g+=vec2(height(uv+vec2(px.x*4.,0))-height(uv-vec2(px.x*4.,0)),height(uv+vec2(0,px.y*4.))-height(uv-vec2(0,px.y*4.)))*.22;
-    vec3 n=normalize(vec3(-g*(7.+detail*8.),1.));
-    vec3 art=(hasImage!=0||hasCutout!=0)?sourceArt(clamp(uv+g*(.6+warp),0.,1.)):vec3(.05,.3,.7);
-    vec3 reflection=(hasImage!=0||hasCutout!=0)?sourceArt(clamp(.5+n.xy*.35,0.,1.)):vec3(.4,.1,.8);
-    float diffuse=.18+.82*max(0.,dot(n,normalize(vec3(-.6,.8,1.))));
-    float spec=pow(max(0.,dot(n,normalize(vec3(-.5,.6,1.)))),54.);
-    float fresnel=pow(1.-n.z,2.);
-    vec3 body=mix(art*.68,reflection*.8,fresnel*.7)*diffuse;
-    body+=vec3(.05,.8,1.)*spec*(.25+.4*intensity)+vec3(.36,.01,.8)*max(0.,-h)*.45;
-    colour=vec4(clamp(body,0.,1.),1.);
-}
+#version 330
+uniform vec2 resolution;
+uniform sampler2D input0;
+uniform sampler2D userImage;
+uniform int hasImage;
+uniform float warp,detail,imageMix,intensity,bassHit,trebleHit;
+out vec4 colour;
+float height(vec2 p){return texture(input0,clamp(p,0.,1.)).r+.45*spriteRelief(p);}
+vec3 sourceArt(vec2 uv){
+    vec4 background=hasImage!=0?sampleFittedMedia(uv):vec4(0);
+    vec4 cut=spriteMaterial(uv);
+    return mix(background.rgb,cut.rgb,cut.a);
+}
+void main(){
+    vec2 uv=gl_FragCoord.xy/resolution,px=1./vec2(textureSize(input0,0));
+    float h=height(uv);
+    vec2 g=vec2(height(uv+vec2(px.x*2.,0))-height(uv-vec2(px.x*2.,0)),height(uv+vec2(0,px.y*2.))-height(uv-vec2(0,px.y*2.)))*.5;
+    // Broad and fine derivatives produce a polished surface, not contour lines.
+    g+=vec2(height(uv+vec2(px.x*4.,0))-height(uv-vec2(px.x*4.,0)),height(uv+vec2(0,px.y*4.))-height(uv-vec2(0,px.y*4.)))*.22;
+    vec3 n=normalize(vec3(-g*(7.+detail*8.),1.));
+    vec3 art=(hasImage!=0||hasCutout!=0)?sourceArt(clamp(uv+g*(.6+warp),0.,1.)):vec3(.05,.3,.7);
+    vec3 reflection=(hasImage!=0||hasCutout!=0)?sourceArt(clamp(.5+n.xy*.35,0.,1.)):vec3(.4,.1,.8);
+    float diffuse=.18+.82*max(0.,dot(n,normalize(vec3(-.6,.8,1.))));
+    float spec=pow(max(0.,dot(n,normalize(vec3(-.5,.6,1.)))),54.);
+    float fresnel=pow(1.-n.z,2.);
+    vec3 body=mix(art*.68,reflection*.8,fresnel*.7)*diffuse;
+    body+=vec3(.05,.8,1.)*spec*(.25+.4*intensity)+vec3(.36,.01,.8)*max(0.,-h)*.45;
+    colour=vec4(clamp(body,0.,1.),1.);
+}

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from milkdrop_catalogue import catalogue
+from milkdrop_catalogue import catalogue, validate_source
 from original_scene_player import actor
 
 
@@ -59,8 +59,50 @@ class MilkDropCatalogueTests(unittest.TestCase):
         self.assertEqual(catalogue(self.root/'missing'), {})
         from visual_catalogue import catalogue as owned
         entries = owned(Path(__file__).resolve().parents[1]/'visuals/original')
-        self.assertEqual(len(entries), 203)
+        self.assertEqual(len(entries), 205)
         self.assertTrue(all(key.startswith('original/') for key in entries))
+
+    def linked(self, entries):
+        folder = self.root/'linked'
+        folder.mkdir(exist_ok=True)
+        self.source = self.root/'external collection'
+        self.source.mkdir(exist_ok=True)
+        manifest = dict(schema=2, root=str(self.source), texturePaths=[str(self.source)], entries=entries)
+        (folder/'collection.json').write_text(json.dumps(manifest))
+        return catalogue(self.root)
+
+    def test_linked_collection_has_no_128_limit_and_opens_sources_lazily(self):
+        source = self.root/'external collection'
+        entries = [dict(sha256=f'{i:064x}', title=f'Preset {i}', source=str(source/f'{i}.milk')) for i in range(140)]
+        result = self.linked(entries)
+        self.assertEqual(len(result), 140)
+        self.assertTrue(all(Path(e['preset']).parent == source for e in result.values()))
+        self.assertEqual(list(source.iterdir()), [])
+        with self.assertRaisesRegex(ValueError, 'unavailable'):
+            validate_source(next(iter(result.values())))
+
+    def test_linked_duplicate_hash_and_changed_source(self):
+        source = self.root/'external collection'/'preset.milk'
+        entry = dict(sha256=self.hash, title='Linked', source=str(source))
+        result = self.linked([entry, entry])
+        self.assertEqual(len(result), 1)
+        source.write_bytes((self.folder/'preset.milk').read_bytes())
+        validate_source(result['milkdrop/'+self.hash])
+        source.write_text('[preset00]\nfDecay=.5\n')
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            validate_source(result['milkdrop/'+self.hash])
+
+    def test_linked_malformed_paths_are_not_catalogued(self):
+        source = self.root/'external collection'
+        base = dict(sha256=self.hash, title='Linked', source=str(source/'preset.milk'))
+        entries = [None, dict(base, source='relative.milk'), dict(base, source=str(self.root/'outside.milk')),
+                   dict(base, sha256='../bad'), dict(base, title='')]
+        self.assertEqual(self.linked(entries), {})
+
+    def test_linked_and_copied_imports_deduplicate(self):
+        self.save()
+        result = self.linked([dict(sha256=self.hash, title='Linked', source=str(self.root/'external collection'/'same.milk'))])
+        self.assertEqual(len(result), 1)
 
 
 if __name__ == '__main__':

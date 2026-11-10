@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "StudioWorkspace.h"
 #include "PromoControl.h"
 #include "RhythmDecoder.h"
 #include "Recovery.h"
@@ -15,6 +16,7 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
 void runPerformanceTakeParserTests(const std::function<void(bool,const juce::String&)>&);
 void runTargetedAnalysisTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
 void runImportScanTests(const std::function<void(bool,const juce::String&)>&, const juce::File&, const juce::StringArray&);
+void runLibraryStartupTests(const std::function<void(bool,const juce::String&)>&, const juce::File&);
 void runSectionFlagTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runHotcueTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runSourceSectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
@@ -29,7 +31,10 @@ void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>
 void runGridAlignmentTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runEarToolTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runVisualArrangementTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runStudioAudioLinkTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::StringArray&);
 void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runVisualKickTests(const std::function<void(bool, const juce::String&)>&);
+void runAudioSlipTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runUiClarityTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runFocusedRealProbe(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
@@ -121,9 +126,10 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures==0 ? 0 : 1;
     }
-    if (args.contains("--import-scan-only"))
+    if (args.contains("--import-scan-only") || args.contains("--library-startup-only"))
     {
-        runImportScanTests(check,output,args);
+        if (args.contains("--library-startup-only")) runLibraryStartupTests(check, output);
+        else runImportScanTests(check,output,args);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
@@ -157,9 +163,15 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--edit-selection-only"))
+    if (args.contains("--edit-selection-only") || args.contains("--direct-range-only"))
     {
         runEditSelectionTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--edge-trim-only") || args.contains("--pair-movement-only"))
+    {
+        runAudioSlipTests(check,output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
@@ -169,9 +181,9 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--library-preview-only") || args.contains("--zoom-handles-only") || args.contains("--transition-swaps-only"))
+    if (args.contains("--library-preview-only") || args.contains("--library-row-preview-only") || args.contains("--tutorial-demo-only") || args.contains("--zoom-handles-only") || args.contains("--transition-swaps-only"))
     {
-        if (args.contains("--library-preview-only")) runLibraryPreviewTests(check,output);
+        if (args.contains("--library-preview-only") || args.contains("--library-row-preview-only") || args.contains("--tutorial-demo-only")) runLibraryPreviewTests(check,output);
         else if (args.contains("--zoom-handles-only")) runZoomHandleTests(check,output);
         else runTransitionSwapTests(check,output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
@@ -195,7 +207,7 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--live-hotcues-only"))
+    if (args.contains("--live-hotcues-only") || args.contains("--timeline-cues-only"))
     {
         runLiveHotcueTests(check,output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
@@ -252,7 +264,7 @@ int runSelfTests(const juce::String& commandLine)
         if (args.contains("--long-open-only")) runLongOpenTests(check, output, args); else runLongSessionTests(check, output, args);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--original-playback-only") || args.contains("--transition-boundary-only"))
+    if (args.contains("--original-playback-only") || args.contains("--transition-boundary-only") || args.contains("--seek-continuity-only"))
     {
         runOriginalPlaybackTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
@@ -288,6 +300,18 @@ int runSelfTests(const juce::String& commandLine)
         runRhythmDecoderTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
+    if (args.contains("--studio-workspace-only"))
+    {
+        StudioWorkspace::runChecks(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--studio-audio-only"))
+    {
+        runStudioAudioLinkTests(check, output, args);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
     if (args.contains("--visual-arrangement-only"))
     {
         runVisualArrangementTests(check, output);
@@ -300,12 +324,18 @@ int runSelfTests(const juce::String& commandLine)
         runMilkDropTests(check,output,preset);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--original-visual-only"))
+    if (args.contains("--visual-kick-only"))
+    {
+        runVisualKickTests(check);
+        runOriginalVisualTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
+    if (args.contains("--original-visual-only") || args.contains("--scene-replacement-only"))
     {
         runOriginalVisualTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--ui-clarity-only"))
+    if (args.contains("--ui-clarity-only") || args.contains("--tutorial-only") || args.contains("--controller-wheels-only") || args.contains("--beat-menu-only"))
     {
         runUiClarityTests(check, output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
@@ -383,7 +413,7 @@ int runSelfTests(const juce::String& commandLine)
         runTrackOwnershipTests(check, output, i >= 0 && i + 1 < args.size() ? juce::File(args[i + 1].unquoted()) : juce::File());
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n"; output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--preset-nodes-only"))
+    if (args.contains("--preset-nodes-only") || args.contains("--shaped-fades-only") || args.contains("--composite-fades-only"))
     {
         runPresetNodeTests(check,output);
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";

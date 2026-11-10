@@ -4,6 +4,12 @@ Read `HANDOVER.md` before implementation and keep it current. The project reposi
 
 Original application material uses the root Personal Beta Licence. Third-party material retains its own licences. Read `docs/LICENSING.md` before any public binary/package release: JUCE entitlement, ASIO proprietary terms and SoundTouch relinking obligations are unresolved release prerequisites. Do not publish the existing local executable under restrictive terms or accept/purchase agreements on the owner's behalf. Local technical verification does not establish distribution clearance.
 
+## App version and local launcher — user instruction, 5 November 2026
+
+For every new app build produced from changed code or bundled assets, increment the patch version in the root `CMakeLists.txt` before building. Verify that the visible title-area version and Windows executable metadata match. Bundle successive source edits into one build where the low-disruption policy calls for it, and never hand off different app builds under the same displayed version.
+
+After the appropriate verification passes, stage the exact complete local bundle in a new versioned release directory and update `out/Launch.cmd` to target it. Verify the launcher target, executable hash and displayed version before handoff, and preserve the previous launcher for rollback. Jay authorises this for every verified local app update. Leave any open instance and its session running. If the candidate fails verification, keep the working launcher and report the blocker. This standing instruction covers local activation.
+
 ## Current development scope - user instruction, 24 October 2026
 
 Legacy features and backward compatibility with old mixes/arrangements are not required during development. Do not add compatibility layers or spend verification effort preserving legacy behaviour unless explicitly requested. Prioritise the current workflow; this does not authorise deleting original music, protected reference evidence, or restarting/modifying the user's running session.

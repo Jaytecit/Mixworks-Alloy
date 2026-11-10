@@ -35,7 +35,13 @@ class BridgeTests(unittest.TestCase):
             while time.monotonic()<until:
                 requests = list((self.root/'control/requests').glob('*.json'))
                 if requests:
-                    q = json.loads(requests[0].read_text())
+                    try:
+                        q = json.loads(requests[0].read_text())
+                    except (OSError, json.JSONDecodeError):
+                        # Windows can briefly deny a file immediately after its
+                        # atomic publication. Poll the same read; never resend it.
+                        time.sleep(.005)
+                        continue
                     result = mutate(dict(id=q['id'], ok=True, state=dict(protocolVersion=1,
                                       root=str(self.root), busy=False)))
                     (self.root/f"control/responses/{q['id']}.json").write_text(json.dumps(result))
@@ -90,6 +96,34 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(TimeoutError, 'uncertain'):
             self.client.call('stop', timeout=.05)
         self.assertEqual(len(list((self.root/'control/requests').glob('*.json'))), 1)
+
+    def test_preview_command_roundtrips_without_protocol_override(self):
+        self.server()
+        self.assertTrue(self.client.call('preview', index=0, fraction=.5)['ok'])
+        trace = (self.root/'evidence/commands.jsonl').read_text()
+        self.assertEqual(json.loads(trace)['command'], 'preview')
+        self.assertNotIn(self.client.token, trace)
+
+    def test_work_mode_roundtrip(self):
+        self.server()
+        self.assertTrue(self.client.call('work_mode', name='record-perform')['ok'])
+        trace = (self.root/'evidence/commands.jsonl').read_text()
+        self.assertIn('work_mode', trace)
+        self.assertNotIn(self.client.token, trace)
+
+    def test_timeline_cue_roundtrip(self):
+        self.server()
+        self.assertTrue(self.client.call('timeline_cue', slot=0)['ok'])
+        trace = (self.root/'evidence/commands.jsonl').read_text()
+        self.assertIn('timeline_cue', trace)
+        self.assertNotIn(self.client.token, trace)
+
+    def test_transition_answer_roundtrip(self):
+        self.server()
+        self.assertTrue(self.client.call('transition_confirm', incoming='fixture-pair', replace=False)['ok'])
+        trace = (self.root/'evidence/commands.jsonl').read_text()
+        self.assertIn('transition_confirm', trace)
+        self.assertNotIn(self.client.token, trace)
 
     def test_invalid_commands_timeouts_and_protocol_overrides_never_send(self):
         for command, kwargs in [('shell', {}), ('status', {'id':'x'}), ('status', {'timeout':-1}),

@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # DJ arrangement foundation implementation plan
 
 **Goal:** replace recording-level intensity ranking with explainable musical-activity features, add a nonblocking genre preference and conservative technique variety. Follow the [research targets](research/DJ-ARRANGEMENT-TARGETS-20261023.md). Execute inline; the user requested no subagents or separate repetitive review cycles. Preserve independent source/evidence checkpoints; no commit/public release is requested.

@@ -187,6 +187,14 @@ bool OriginalAudio::request(int first, int last) const
     }
     return ready;
 }
+bool OriginalAudio::prepare(int first, int last) const
+{
+    if (realtime || failed()) return false;
+    first = juce::jlimit(0, frames, first); last = juce::jlimit(first, frames, last);
+    for (int index = first / blockFrames; last > first && index <= (last - 1) / blockFrames; ++index)
+        if (!pool().get(*this, index, true)) return false;
+    return !failed();
+}
 bool OriginalAudio::waveformRange(int first, int last, float& peak, float& rms) const
 {
     peak = rms = 0;

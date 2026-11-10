@@ -24,6 +24,8 @@ void main(){
     if(simulationReset>.5){colour=vec4(fresh,1);return;}
     vec2 p=uv-.5;
     vec2 flow=vec2(sin(p.y*9.+midTime*.8),cos(p.x*8.-midTime*.7));
+    flow+=structureCurrent(uv)*4.;
+
     vec2 carried=uv-stepDelta*(flow*(.006+.012*mid)+vec2(-p.y,p.x)*.022);
     vec3 previous=texture(input0,reflected(carried)).rgb;
     // Secondary scale inside the atlas creates nested contour echoes, never tiles.

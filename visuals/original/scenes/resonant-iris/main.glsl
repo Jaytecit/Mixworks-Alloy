@@ -11,7 +11,8 @@ mat2 turn(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 vec3 palette(float t){return .06+.84*pow(.5+.5*cos(vec3(0.,2.1,4.2)+t+hue*6.283185),vec3(1.25));}
 vec3 picture(vec2 uv){
     vec3 base=palette(uv.x*2.+uv.y)*.07;
-    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=sampleCutout(materialDomain(uv));
+    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=structurePigment(materialDomain(uv));
+    b.rgb/=max(b.a,.001);
     return mix(base,mix(a.rgb,b.rgb,b.a),max(a.a,b.a)*imageMix);
 }
 float rectangle(vec2 p,vec2 size){vec2 q=abs(p)-size;return length(max(q,0.))+min(max(q.x,q.y),0.);}
@@ -68,9 +69,12 @@ void main(){
     }
 #else
     // Hard shutter leaves reveal and occlude a source plane behind them.
-    float r=length(p),angle=atan(p.y,p.x)+midImpulse*.20+t*.07;
+    // Mechanical iris approaches on bass, with a small lateral mounting swing.
+    p-=vec2((.35+max(0.,aspect.x-1.777778)*1.35)*sin(t*.72),.13*cos(t*.91))*low;
+    p/=1.+1.50*low;
+    float r=length(p),angle=atan(p.y,p.x)+midImpulse*.55+t*.12+floor(bassTime*2.)*.18*pulse;
     float wedge=6.283185/8.;
-    float radius=.35+.055*sin(t*.6)+low*.34+.08*bassTime/(1.+bassTime);
+    float radius=.35+.055*sin(t*.6)+low*.72+.08*bassTime/(1.+bassTime);
     float local=mod(angle+wedge*.5,wedge)-wedge*.5;
     float aperture=radius/max(.8,cos(local));
     float hole=1.-smoothstep(aperture-.008,aperture+.008,r);

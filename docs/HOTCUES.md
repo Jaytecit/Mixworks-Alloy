@@ -1,23 +1,30 @@
-# HC1–HC9 and live target cues
-
-The Controller's nine buttons below its sliders are HC1–HC9. Each number has a fixed colour matching its timeline flag. Slots belong to the selected placed segment, including repeated instances of the same song. While stopped they locate a source position; while that segment is playing they queue a jump for that segment alone. The programme cursor and other segments continue. Hotcue MIDI learning remains subsequent work.
-
-Live cues share the Controller's programme timing button with **Pause @**: Immediate, Next beat, Next bar (default), or Next phrase. Phrase length is 8/16/32 bars, anchored at project bar 1. A pad marked **@** is pending; the timing area shows its bar and the tooltip identifies the song, source cue and execution time. Press the same pending pad again to cancel, a different pad to replace only that segment's queue, or use **Cancel queued hotcue / song** in the timing menu. Other segments' queues are independent. Immediate means the next audio sample; quantised actions use the first sample on/after the next strictly future boundary, without moving the programme clock.
-
-Live source playback retains the segment's prepared source/tempo mapping, trim/slip/reverse/arranged-loop mapping and source automation. Lane/master automation and processing stay on programme time. Effects keep their history. The runtime source cursor is reported in the Controller's status/tooltip. The target stops sounding at its mapped segment end; it does not extend the arrangement or start a different segment. A target that is not playing, an out-of-range cue or a boundary after its remaining content rejects explicitly. Private track launching and performance loops remain separate workflows.
-
-Pause cancels pending cues and retains executed source cursors for resume. Stop, seek, source/placement/prepared-identity changes, device changes and exclusive audition clear affected runtime cursors. Grid/timing/cue changes cancel pending requests instead of moving them to a later boundary; an already executed cursor continues when only its replacement queue changes. Queue/cursor state does not dirty the document, enter Undo or save/reopen. Offline export renders the arrangement, not an unrecorded hotcue performance. Discrete event recording/replay remains unfinished: choose Read to launch cues, and Stop before arming a subsequent arrangement automation take. Recording cannot silently replace an active live cursor.
-
-Click a populated pad while stopped to locate that source position on the programme timeline, keeping playback stopped. An empty pad opens its editor. Right-click a usable pad or choose **Cues / resets… → Edit HCn…** for precise source seconds. That menu also reaches cues outside the current segment. **Apply** edits only that slot; **Clear slot** leaves it empty. **Use section defaults** explicitly replaces all nine slots for this segment. Each change has one Undo; Cancel, unchanged text and invalid/stale edits preserve data.
-
-Timeline flags are separately selectable and draggable while stopped. Alt bypasses Snap; ordinary dragging snaps displacement while retaining an existing manual phase. Enter opens exact entry, Delete clears only the cue slot, Left/Right selects adjacent populated slots, and Up/Down adjusts a mapped cue by one project beat (four with Shift). Native source-value objects are read-only; focus selects/reveals without seeking. Explicit Controller pad activation is the navigation action.
-
-Newly added instances initialise from file start and up to eight retained section-change hints. Existing sessions do not acquire cues merely by opening or viewing them; use an empty pad or explicit section defaults. Manual edits and cleared slots survive new analysis. Section boundaries and hotcues remain separately editable: moving one does not move the other. Automatic positions are initial suggestions, not semantic verse/chorus claims.
-
-Source seconds survive trimming, audio slip, tempo mapping, reverse, movement and copied/split instances. A trimmed-out cue remains saved and its locate pad is disabled; the editor can still change it. For loops, the label/locator selects the next valid occurrence at or after the programme cursor, or the first if none remains. Copies inherit independent value data. Original audio and global analysis records are not rewritten.
-
-EQ, cutoff and pan resets remain under **Cues / resets…**, with their previous command and MIDI profile identities. MIDI Learn can still map those reset actions. Cue edits respect transition locks, preparation, export, rehearsal and active automation recording. Choose Read before changing slots.
-
-Current session format41 retains cue data; analysis revision11/caches remain. Live target cues/queues, private preparation and performance-event replay are implemented through 0.55.64. Full hotcue MIDI/controller acceptance remains open; see [the current mode contract](ARRANGE-RECORD-PERFORM-PLAN.md). Human screen-reader, controller and listening acceptance remain separate.
-
-See [section flags](SECTION-FLAGS.md), [timeline editing](TIMELINE-EDITING.md), [testing](TESTING.md) and [handover](../HANDOVER.md).
+# Timeline hotcues
+
+Candidate workflow under verification, 4 November 2026. The selected production
+launcher remains the earlier bundle; see [HANDOVER](../HANDOVER.md) for exact
+candidate identities and evidence. [Previous source-only workflow](history/finishing-core-20261104/HOTCUES.md)
+is historical.
+
+HC1–HC9 belong to the selected placed segment. A pad jumps the **whole mix** to
+that cue's timeline position. While playing, playback continues there on every
+lane. While stopped, it stays stopped. The visible playhead and viewport reveal
+the destination. Alt+1–9 uses the same action.
+
+Timeline cues jump immediately. The Controller's pause timing still supports
+Immediate, Next beat, Next bar and Next phrase; it does not delay a timeline cue.
+There is no pending source-only cue hidden behind a timeline pad.
+
+To map a pad, enable MIDI Learn, click HC1–HC9, then use the desired physical
+control. The typed assignments are timeline-cue-1 through timeline-cue-9. Virtual
+MIDI plumbing is separate from physical FLkey/reconnect acceptance (W12).
+
+A future placement can be a cue destination. A cue excluded by that placement's
+trim is unavailable: extend the edge to restore its source interval, or right-click
+the cue to edit it. The action never silently restores excluded audio. Empty slots
+open the source-position editor while stopped. **Cues / resets** also offers exact
+cue edits and the existing EQ/filter/pan reset controls.
+
+In Record/Perform, a cue records a programme seek in the editable take. Replay
+follows the same all-lane timeline jump. It keeps earlier heard events rather than
+rewriting the original recording. Real hardware and musical listening remain
+separate acceptance, not implied by native PCM checks.

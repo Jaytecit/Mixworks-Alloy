@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # DJ.Studio editing and stems — 22 October 2026
 
 This is a reference investigation for Alloy's node/preset audit. It does not implement stem separation in Alloy. No DJ.Studio project was opened, edited, separated or exported during this investigation; the installed application and its data were read only.

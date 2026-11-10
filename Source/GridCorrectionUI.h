@@ -32,6 +32,7 @@ private:
     std::function<juce::Result(const SourceCorrection&, bool)> apply;
     TapTempo taps;
     SourceCorrection draft;
+    double exactBpm = 0;
     juce::TextEditor info, bpm, phase;
     juce::ComboBox key, zoom, precision;
     juce::Label heading, instructions, effectiveTempo, bpmLabel, phaseLabel, keyLabel, status, anchorInfo, barsLabel, applyNotice;
@@ -71,13 +72,14 @@ private:
     struct GridEdit
     {
         juce::String bpm, phase;
+        double exactBpm = 0;
         int bars = 16;
         bool calculated = false;
         std::array<double, 3> points {{-1, -1, -1}};
         int barsAB = 16, barsBC = 16;
         bool confirmed = false;
         bool operator==(const GridEdit& other) const
-        { return bpm == other.bpm && phase == other.phase && bars == other.bars && calculated == other.calculated
+        { return bpm == other.bpm && phase == other.phase && exactBpm == other.exactBpm && bars == other.bars && calculated == other.calculated
             && points == other.points && barsAB == other.barsAB && barsBC == other.barsBC && confirmed == other.confirmed; }
     };
     GridEdit initialGrid, lastGrid, dragBefore;
@@ -86,6 +88,7 @@ private:
     int dragging = 0, selectedHandle = 0; // 1: A; 2: B; 3: pending click; 4: waveform alignment; 5: simple source navigation.
     double dragStartX = 0, dragLastX = 0, dragDelta = 0, dragViewStart = 0, dragAnchor = 0, dragB = 0, dragSecondsPerPixel = 0;
     juce::Result readDraft();
+    void setDraftBpm(double);
     void changed();
     void setCursor(double, bool restart = true);
     void togglePlay();

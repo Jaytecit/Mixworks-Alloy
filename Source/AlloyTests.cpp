@@ -677,16 +677,12 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         const auto before = juce::JSON::toString(projectToJson(evidence.engine.project));
         evidence.refresh(); evidence.libraryTable.table.selectRow(2);
         const auto selected = evidence.selectedLibraryId;
-        evidence.libraryTable.sortOrderChanged(7, false);
-        check(evidence.visibleMedia == std::vector<int>({3, 2, 1, 0, 4}) && evidence.selectedLibraryId == selected
-            && evidence.libraryTable.table.getSelectedRow() == 1, "descending confidence sorting preserves row identity and keeps manual keys unranked last");
-        evidence.libraryTable.sortOrderChanged(7, true);
-        check(evidence.visibleMedia == std::vector<int>({1, 2, 3, 0, 4}) && evidence.libraryTable.table.getSelectedRow() == 1,
-            "ascending confidence order matches numbered levels without ranking manual correction as excellent");
         auto& header = evidence.libraryTable.table.getHeader();
-        check(header.getIndexOfColumnId(7, true) == header.getIndexOfColumnId(2, true) + 1, "confidence follows Time in the requested library order");
-        check(evidence.libraryTable.getCellTooltip(0, 7).contains("Suggested key") && evidence.libraryTable.getCellTooltip(1, 7).contains("Key found")
-            && evidence.libraryTable.getCellTooltip(4, 3).contains("Your chosen key"), "key cells give short review guidance and manual origin");
+        check(header.getIndexOfColumnId(7, true)<0 && header.getIndexOfColumnId(9, true)<0,
+            "review uses row styling rather than separate confidence columns");
+        check(evidence.selectedLibraryId==selected && evidence.libraryTable.table.isEnabled()
+            && evidence.libraryTable.getCellTooltip(2,1).contains("still available"),
+            "review explanation preserves selection and ordinary availability");
         for (int mode : {0, 1, 2})
         {
             evidence.engine.project.keyDisplay = mode;
@@ -877,9 +873,9 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
 
     auto ownedStackFixture_ui = std::make_unique<Workstation>(false); auto& ui = *ownedStackFixture_ui; ui.stopTimer(); ui.workspacePreference = preference;
     {
-        const int columns[] {5, 1, 3, 4, 2, 7, 8}; bool order = true;
-        for (int i = 0; i < 7; ++i) order &= ui.libraryTable.table.getHeader().getColumnIdOfIndex(i, true) == columns[i];
-        check(order, "default library order matches Art / Title / Key / BPM / Time / Conf / Genre");
+        const int columns[] {5, 1, 3, 4, 2, 8}; bool order = true;
+        for (int i = 0; i < (int)std::size(columns); ++i) order &= ui.libraryTable.table.getHeader().getColumnIdOfIndex(i, true) == columns[i];
+        check(order, "default library order matches Art / Title / Key / BPM / Time / Genre");
         const auto before = juce::JSON::toString(projectToJson(ui.engine.project));
         const auto undo = ui.undoHistory.size(); const auto position = ui.engine.position.load(); const bool dirty = ui.dirty;
         ui.shortcutsTab.onClick();
@@ -1061,7 +1057,7 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         auto* tableHandler = ui.libraryTable.table.getAccessibilityHandler();
         auto* tableInterface = tableHandler ? tableHandler->getTableInterface() : nullptr;
         auto* row = tableInterface ? tableInterface->getRowHandler(0) : nullptr;
-        check(row && row->getTitle().contains("Deep Current") && row->getTitle().contains("BPM 120.00")
+        check(row && row->getTitle().contains("Deep Current") && row->getTitle().contains("BPM 120")
             && row->getTitle().contains("key ") && row->getTitle().contains("artist Alloy interface test fixture")
             && row->getTitle().contains("key check Manual"), "native Library row announces actual song, artist, BPM, key and review status");
         ui.showBrowserPage(1); ui.refresh();
@@ -1184,12 +1180,13 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         check(access.timeline.getAccessibilityHandler() && access.timeline.getAccessibilityHandler()->getRole() == juce::AccessibilityRole::list
             && handler && handler->getRole() == juce::AccessibilityRole::listItem && handler->getTitle().contains("Segment 1")
             && handler->getTitle().contains("Deep Current") && handler->getTitle().contains("mixer lane 1")
-            && handler->getTitle().contains("BPM 120.00"), "native timeline exposes named segment objects and their actual musical owners");
+            && handler->getTitle().contains("BPM 120"), "native timeline exposes named segment objects and their actual musical owners");
         const auto document = juce::JSON::toString(projectToJson(access.engine.project)); const auto history = access.undoHistory.size(); const bool dirty = access.dirty;
         const auto mode = access.engine.automationRecordMode; const auto position = access.engine.position.load();
+        const auto page = access.toolPage; const auto collapsed = access.consoleCollapsed;
         check(handler && handler->getActions().invoke(juce::AccessibilityActionType::focus)
-            && access.selectedClip == first && access.toolPage == 2 && handler->getCurrentState().isSelected(),
-            "native segment focus selects its actual owner and existing Editing console");
+            && access.selectedClip == first && access.toolPage == page && access.consoleCollapsed == collapsed && handler->getCurrentState().isSelected(),
+            "native segment focus selects its actual owner without opening the details inspector");
         access.refresh();
         check(find("segment:" + first) == segment && juce::Component::getCurrentlyFocusedComponent() == segment,
             "musical-object identity and keyboard focus survive ordinary refresh");
@@ -1198,9 +1195,9 @@ void runAlloyTests(const std::function<void(bool, const juce::String&)>& check, 
         auto* pairHandler = pair ? pair->getAccessibilityHandler() : nullptr;
         check(pairHandler && pairHandler->getTitle().contains("Deep Current to Submerge")
             && pairHandler->getActions().invoke(juce::AccessibilityActionType::press) && access.selectedTransition == second
-            && access.selectedClip == second && access.toolPage == 1 && access.engine.position == position
-            && juce::Component::getCurrentlyFocusedComponent() == pair,
-            "native transition action selects the pair and Transitions console without seeking");
+            && access.selectedClip == second && access.toolPage == page && access.consoleCollapsed == collapsed
+            && access.engine.position == position && juce::Component::getCurrentlyFocusedComponent() == pair,
+            "native transition action selects its pair without opening the editor or seeking");
         access.engine.exporting = true; if (segment) segment->activate(); access.engine.exporting = false;
         check(access.selectedClip == second, "stale enabled accessibility action revalidates export guard at execution");
         access.busy = true; if (segment) segment->activate(); access.busy = false;

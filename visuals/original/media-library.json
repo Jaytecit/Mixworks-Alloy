@@ -3,6 +3,7 @@
   "backgroundFolders": ["Backgrounds"],
   "spriteFolders": ["Sprites"],
   "phraseBeats": 32,
+  "spritePhraseBeats": 256,
   "blendBeats": 4,
   "videoEnabled": false
 }

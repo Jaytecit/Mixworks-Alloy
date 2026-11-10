@@ -1,0 +1,284 @@
+[
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 21,
+    "action": "desk-pot-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 22,
+    "action": "desk-pot-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 23,
+    "action": "desk-pot-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 24,
+    "action": "desk-pot-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 25,
+    "action": "desk-pot-5"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 26,
+    "action": "desk-pot-6"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 27,
+    "action": "desk-pot-7"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 28,
+    "action": "desk-pot-8"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 71,
+    "action": "volume-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 72,
+    "action": "volume-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 73,
+    "action": "volume-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 74,
+    "action": "volume-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 75,
+    "action": "pan-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 76,
+    "action": "pan-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 77,
+    "action": "pan-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 78,
+    "action": "pan-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 79,
+    "action": "master"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 11,
+    "action": "reset-eq-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 12,
+    "action": "reset-eq-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 13,
+    "action": "reset-eq-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 14,
+    "action": "reset-eq-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 15,
+    "action": "reset-filter-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 16,
+    "action": "reset-filter-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 17,
+    "action": "reset-filter-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 18,
+    "action": "reset-filter-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 19,
+    "action": "reset-pans"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 101,
+    "action": "desk-lane-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 102,
+    "action": "desk-lane-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 103,
+    "action": "desk-lane-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 104,
+    "action": "desk-lane-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 105,
+    "action": "desk-lane-5"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 106,
+    "action": "desk-lane-6"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 107,
+    "action": "desk-lane-7"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 108,
+    "action": "desk-lane-8"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 109,
+    "action": "mute-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 110,
+    "action": "mute-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 111,
+    "action": "mute-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 112,
+    "action": "mute-4"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 113,
+    "action": "solo-1"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 114,
+    "action": "solo-2"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 115,
+    "action": "solo-3"
+  },
+  {
+    "status": 176,
+    "channel": 8,
+    "number": 116,
+    "action": "solo-4"
+  },
+  {
+    "status": 176,
+    "channel": 16,
+    "number": 52,
+    "action": "home"
+  },
+  {
+    "status": 176,
+    "channel": 16,
+    "number": 76,
+    "action": "undo"
+  },
+  {
+    "status": 176,
+    "channel": 16,
+    "number": 77,
+    "action": "redo"
+  },
+  {
+    "status": 176,
+    "channel": 16,
+    "number": 117,
+    "action": "record-take"
+  },
+  {
+    "status": 176,
+    "channel": 16,
+    "number": 118,
+    "action": "snap"
+  }
+]

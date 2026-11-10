@@ -1,4 +1,5 @@
 #version 330
+uniform sampler2D userImage;
 uniform float bassImpulse,midImpulse,trebleImpulse;
 #define FAMILY 6
 // One texel per persistent fragment: position.xy, velocity.xy in screen UV.
@@ -95,6 +96,7 @@ void main(){
  // Source-derived edge/colour forces and persistent damping; no frame history blur.
  force+=safe(grad+vec2(.001))*hi*edge*d*.6;
  float dt=stepDelta*(.35+1.3*motion);
+ force+=structureCurrent(home)*1.4;
  v=(v+(spring*(target-p)+force)*dt*(.15+.85*generationBlend))*exp(-drag*dt);
  float speed=length(v);v*=min(1.,.8/max(.001,speed));p+=v*dt;
  // Reflect instead of silently losing fragments at the boundary.

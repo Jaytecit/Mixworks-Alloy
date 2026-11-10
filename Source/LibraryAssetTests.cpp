@@ -147,7 +147,7 @@ void runLibraryAssetTests(const std::function<void(bool, const juce::String&)>& 
         childArgs.set(childArgs.indexOf("--report") + 1, root.getChildFile("genre-backfill.txt").getFullPathName());
         juce::ChildProcess genreChild; const bool genreStarted = genreChild.start(childArgs), genreFinished = genreStarted && genreChild.waitForProcessToFinish(15000);
         if (genreStarted && !genreFinished) genreChild.kill();
-        const auto backfilled = readLibraryCatalogue(legacyGenreFile);
+        const auto backfilled = openLibraryStore(legacyGenreFile);
         check(genreFinished && genreChild.getExitCode() == 0 && backfilled.media.size() == snapshots.size()
             && std::all_of(backfilled.media.begin(), backfilled.media.end(), [](const auto& m) { return m->assets.genreRead && m->analysisFromCache && !m->hasPlayback(); }),
             "native background restoration backfills old genre metadata while retaining analysed data and lightweight media");
@@ -156,7 +156,7 @@ void runLibraryAssetTests(const std::function<void(bool, const juce::String&)>& 
         childArgs.set(childArgs.indexOf("--report") + 1, root.getChildFile("legacy-library.txt").getFullPathName());
         juce::ChildProcess legacyChild; const bool legacyStarted = legacyChild.start(childArgs), legacyFinished = legacyStarted && legacyChild.waitForProcessToFinish(15000);
         if (legacyStarted && !legacyFinished) legacyChild.kill();
-        check(legacyFinished && legacyChild.getExitCode() == 0 && readLibraryCatalogue(legacyIndex).media.size() == snapshots.size(), "an old path-only library upgrades through native background restoration and persists its snapshot");
+        check(legacyFinished && legacyChild.getExitCode() == 0 && openLibraryStore(legacyIndex).media.size() == snapshots.size(), "an old path-only library upgrades through native background restoration and persists its snapshot");
     }
     else
     {
@@ -224,7 +224,7 @@ void runLibraryAssetTests(const std::function<void(bool, const juce::String&)>& 
         if (phase == 3)
         {
             if (!ui.catalogueRefreshQueue.empty()) return;
-            check(readLibraryCatalogue(index).files.size() == sources.size() + 1, "native persistence keeps all remembered sources plus the unavailable track");
+            check(openLibraryStore(index).files.size() == sources.size() + 1, "native persistence keeps all remembered sources plus the unavailable track");
             Project project; Clip clip; clip.media = ui.engine.library[0]; clip.length = 0.25; project.clips.push_back(clip); admissionSourceId = clip.media->id; admissionSourceFile = clip.media->file;
             auto document = projectToJson(project, ui.engine.library);
             const int firstExtra = document["media"].getArray()->size();

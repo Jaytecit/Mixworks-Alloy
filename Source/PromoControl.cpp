@@ -63,6 +63,7 @@ PromoControl::PromoControl(Workstation& w, juce::File directory, bool poll)
     owner.musicPreference = root.getChildFile("data/library-scan.json");
     owner.workspacePreference = root.getChildFile("data/workspace.json");
     owner.catalogueFile = root.getChildFile("data/library.json");
+    owner.layout.saveFolder = root.getChildFile("sessions").getFullPathName();
     owner.hints.setHintsEnabled(false);
     owner.setStatus("LOCAL BRIDGE / isolated session / MIDI input disabled");
     if (poll) startTimer(40);
@@ -82,19 +83,34 @@ juce::var PromoControl::state() const
     auto o = object(); put(o, "version", JUCE_APPLICATION_VERSION_STRING); put(o, "promo", true);
     put(o,"protocolVersion",1); put(o,"root",root.getFullPathName()); put(o,"pid",processId()); put(o,"dirty",owner.dirty);
     juce::Array<juce::var> capabilities;
-    for (const auto* name : {"status","import","add","correct_source","transition_preset","play","stop","seek","view","panel","select_clip","select_transition","control","save","open","screenshot","undo","close","timing","audio_probe","jump_bars","move_clip","transition_edit","insertion_preset"}) capabilities.add(name);
+    for (const auto* name : {"status","import","add","correct_source","transition_preset","play","stop","seek","view","panel","select_clip","select_transition","control","save","open","screenshot","undo","close","timing","audio_probe","jump_bars","move_clip","transition_edit","insertion_preset","preview","work_mode","timeline_cue","transition_confirm"}) capabilities.add(name);
     put(o,"capabilities",capabilities);
     put(o,"insertionPreset",owner.transitionPreset.getSelectedId()); put(o,"sectionInsertion",owner.transitionIndex==5);
     put(o, "playing", owner.engine.playing.load()); put(o, "position", owner.engine.position.load());
-    put(o, "ready", owner.engine.playbackReady()); put(o, "busy", owner.busy || !owner.timelineLoads.empty() || owner.tempoPreparationPending || owner.engine.exporting || juce::Component::getCurrentlyModalComponent()!=nullptr);
+    put(o,"workMode",owner.engine.workMode==WorkMode::arrange ? "arrange" : "record-perform");
+    put(o,"capturingTake",owner.engine.capturingPerformance());put(o,"takeCount",(int)owner.engine.project.performanceTakes.size());
+    if(auto* question=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());question && question->getName()=="Replace transition curves?")
+    {auto q=object();put(q,"incoming",owner.selectedTransition);juce::StringArray text;for(auto* child:question->getChildren())if(auto* label=dynamic_cast<juce::Label*>(child))text.add(label->getText());put(q,"message",text.joinIntoString("\n"));put(o,"transitionQuestion",q);}
+    put(o,"seekPending",owner.engine.seekPending.load()); put(o,"seekError",owner.engine.seekError);
+    put(o, "ready", owner.engine.playbackReady()); put(o, "busy", owner.busy || owner.engine.seekPending || !owner.timelineLoads.empty() || owner.tempoPreparationPending || owner.engine.exporting || juce::Component::getCurrentlyModalComponent()!=nullptr);
     put(o, "status", owner.status); put(o, "selectedClip", owner.selectedClip); put(o, "selectedTransition", owner.selectedTransition);
+    put(o,"saveFolder",owner.defaultSaveFolder().getFullPathName());
     put(o, "width", owner.getWidth()); put(o, "height", owner.getHeight()); put(o, "peak", owner.engine.masterPeak.load());
     put(o, "timestamp", (double) juce::Time::currentTimeMillis());
     put(o,"monitorMuted",owner.engine.monitorMuted.load()); put(o,"audibleEnd",owner.engine.project.audibleEnd());
+    auto preview=object();put(preview,"sourceId",owner.libraryPreview.sourceId());put(preview,"loading",owner.libraryPreview.isLoading());
+    put(preview,"fraction",owner.libraryPreview.positionFraction());put(preview,"duration",owner.libraryPreview.lengthSeconds());put(preview,"privateOutput",owner.libraryPreview.usesPrivateOutput());put(o,"preview",preview);
     const auto streaming=OriginalAudio::statistics(); auto stream=object();
     put(stream,"poolBytes",(juce::int64)streaming.bytes); put(stream,"blockReads",(juce::int64)streaming.reads);
     put(stream,"callbackSampleMisses",(juce::int64)streaming.misses); put(stream,"buffering",owner.engine.streamBuffering.load());
     put(stream,"waitCallbacks",(juce::int64)owner.engine.streamWaitCallbacks.load()); put(o,"originalAudio",stream);
+    const auto callbacks=owner.engine.callbackDiagnostics.snapshot(); auto audio=object();
+    put(audio,"callbacks",(juce::int64)callbacks.callbacks); put(audio,"overBudget",(juce::int64)callbacks.overBudget);
+    put(audio,"lockMisses",(juce::int64)callbacks.lockMisses); put(audio,"oversized",(juce::int64)callbacks.oversized);
+    put(audio,"exportSilence",(juce::int64)callbacks.exportSilence);
+    const auto ticksPerMs=juce::Time::getHighResolutionTicksPerSecond()/1000.;
+    put(audio,"totalMs",callbacks.totalTicks/ticksPerMs); put(audio,"peakMs",callbacks.peakTicks/ticksPerMs);
+    put(o,"audioCallbacks",audio);
     if(owner.sceneLane)
     {
         const auto& lane=*owner.sceneLane; const auto& timing=lane.getProperties();
@@ -125,6 +141,15 @@ juce::var PromoControl::execute(const juce::var& request)
     if (!request.isObject() || !plainName(id) || token.length() < 32 || request["token"].toString() != token) return fail("Unauthorised or invalid request.");
     if (!number(request["timestamp"], juce::Time::currentTimeMillis() - 60000.0, juce::Time::currentTimeMillis() + 5000.0)) return fail("Expired request.");
     if (command == "status") { put(result,"ok",true); put(result,"state",state()); return result; }
+    if(command=="transition_confirm")
+    {
+        auto* question=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
+        if(!request["replace"].isBool() || !question || question->getName()!="Replace transition curves?"
+            || owner.selectedTransition.isEmpty() || request["incoming"].toString()!=owner.selectedTransition)
+            return fail("Inspect the matching transition replacement question before answering it.");
+        question->exitModalState((bool)request["replace"] ? 1:0);
+        put(result,"ok",true);put(result,"state",state());return result;
+    }
     if (owner.busy || !owner.timelineLoads.empty() || owner.tempoPreparationPending || owner.engine.exporting || juce::Component::getCurrentlyModalComponent()) return fail("App is busy; inspect status and retry with a new request ID.");
     const auto path = request["path"].toString();
     if (command == "import")
@@ -157,6 +182,22 @@ juce::var PromoControl::execute(const juce::var& request)
         if (!request["index"].isInt() || !number(request["index"],1,3)) return fail("Invalid insertion preset.");
         owner.transitionPreset.setSelectedId((int)request["index"],juce::sendNotificationSync);
     }
+    else if (command == "work_mode")
+    {
+        const auto name=request["name"].toString();
+        if(name!="arrange" && name!="record-perform")return fail("Choose arrange or record-perform.");
+        if(owner.engine.playing || owner.engine.capturingPerformance())return fail("Stop and finalise the owned take before changing work mode.");
+        // Select the real mode menu, including its route, take and workspace side effects.
+        owner.workModeButton.onClick();
+        auto* menu=juce::Component::getCurrentlyModalComponent();
+        if(!menu)return fail("Work-mode menu did not open; inspect the actual state.");
+        menu->exitModalState(name=="arrange" ? 1:2);
+    }
+    else if(command=="timeline_cue")
+    {
+        if(!request["slot"].isInt() || !number(request["slot"],0,8))return fail("Choose timeline cue slot 0-8.");
+        owner.locateHotcue((int)request["slot"]);
+    }
     else if (command == "play")
     {
         if (!request["enabled"].isBool() || ((bool) request["enabled"] && (!owner.engine.playbackReady() || owner.engine.project.clips.empty()))) return fail("Playback is not ready or enabled is missing.");
@@ -166,11 +207,14 @@ juce::var PromoControl::execute(const juce::var& request)
     else if (command == "seek")
     {
         if (!number(request["seconds"],0,owner.engine.project.audibleEnd())) return fail("Seek is outside the mix.");
-        owner.engine.seek((double) request["seconds"]);
+        const auto seek = owner.engine.seek((double) request["seconds"]); if (seek.failed()) return fail(seek.getErrorMessage());
     }
     else if (command == "view")
     {
         if (!number(request["start"],0,10800) || !number(request["seconds"],2,10800)) return fail("Invalid timeline view.");
+        if(request.hasProperty("monitorMuted") && !request["monitorMuted"].isBool())return fail("Monitor mute must be an explicit boolean.");
+        if(request["monitorMuted"].isBool())
+        {owner.monitorMute.setToggleState((bool)request["monitorMuted"],juce::dontSendNotification);owner.monitorMute.onClick();}
         owner.setFollowPlayhead(false);
         const juce::ScopedValueSetter<bool> guard(owner.programmaticTimelineView,true);
         owner.timeline.zoomAt((owner.viewport.getViewWidth() / (double) request["seconds"]) / owner.timeline.pixelsPerSecond,0);
@@ -261,6 +305,17 @@ juce::var PromoControl::execute(const juce::var& request)
         if (juce::JSON::toString(projectToJson(candidate))!=juce::JSON::toString(projectToJson(owner.engine.project)))
         { owner.engine.finishAutomation(); owner.remember(); const juce::ScopedLock guard(owner.engine.lock); owner.engine.project=std::move(candidate); }
     }
+    else if(command=="preview")
+    {
+        if(request["stop"].isBool() && (bool)request["stop"])owner.libraryPreview.stop();
+        else
+        {
+            if(!request["index"].isInt() || !number(request["index"],0,(double)owner.engine.library.size()-1) || !number(request["fraction"],0,1))return fail("Preview needs a library index and fraction from 0 to 1, or stop:true.");
+            const auto& media=owner.engine.library[(size_t)(int)request["index"]];
+            if(!media || !contained(media->file) || !media->file.isAChildOf(root.getChildFile("audio")))return fail("Preview requires an owned audio fixture.");
+            owner.previewLibraryTrack(media->id,(double)request["fraction"]);
+        }
+    }
     else if (command == "control")
     {
         if (!request["lane"].isInt() || !number(request["lane"],0,trackCount-1)) return fail("Invalid lane.");
@@ -334,9 +389,15 @@ void runPromoControlTests(const std::function<void(bool,const juce::String&)>& c
     auto w=std::make_unique<Workstation>(false); PromoControl bridge(*w,root,false);
     int id=0; auto call=[&](const char* command,const char* key=nullptr,juce::var value={}) { auto q=object(); put(q,"id","test-"+juce::String(++id)); put(q,"token",juce::String::repeatedString("a",64)); put(q,"timestamp",(double)juce::Time::currentTimeMillis()); put(q,"command",command); if(key)put(q,key,value); return bridge.execute(q); };
     check((bool)call("status")["ok"],"promo status returns actual state");
+    check(juce::File(call("status")["state"]["saveFolder"].toString()).isAChildOf(root),"normal save/export choosers default inside the isolated bridge root");
     {
-        SceneLane* diagnosticLane=nullptr;
-        for(auto* child:w->getChildren()) if(auto* lane=dynamic_cast<SceneLane*>(child)) diagnosticLane=lane;
+        std::function<SceneLane*(juce::Component&)> findLane = [&](juce::Component& component)->SceneLane*
+        {
+            if (auto* lane = dynamic_cast<SceneLane*>(&component)) return lane;
+            for (auto* child : component.getChildren()) if (auto* lane = findLane(*child)) return lane;
+            return nullptr;
+        };
+        auto* diagnosticLane = findLane(*w);
         check(diagnosticLane!=nullptr,"visual diagnostics use the actual scene component");
         auto gaps=object(); put(gaps,"17",2);
         if(diagnosticLane) diagnosticLane->getProperties().set("visualGapHistogramCeilMs",gaps);
@@ -346,6 +407,8 @@ void runPromoControlTests(const std::function<void(bool,const juce::String&)>& c
             "read-only visual diagnostics copy cumulative timing facts instead of sharing mutable state");
     }
     check((int)call("status")["state"]["protocolVersion"]==1,"bridge advertises protocol version");
+    check(call("status")["state"]["seekPending"].isBool(),"bridge exposes actual pending seek state");
+    check(call("status")["state"]["seekError"].isString(),"bridge exposes the last seek preparation result");
     check(call("status")["state"]["capabilities"].getArray()->contains("close"),"bridge advertises graceful close");
     check(!(bool)bridge.execute(object())["ok"],"promo rejects unauthenticated request");
     check(!(bool)call("shell")["ok"],"promo does not execute arbitrary commands");
@@ -373,6 +436,12 @@ void runPromoControlTests(const std::function<void(bool,const juce::String&)>& c
     Clip clip; clip.media=source; clip.length=12; w->engine.project.clips={clip}; w->refresh();
     auto query=[&](const char* command,std::initializer_list<std::pair<const char*,juce::var>> fields)
     { auto q=object();put(q,"id","test-"+juce::String(++id));put(q,"token",juce::String::repeatedString("a",64));put(q,"timestamp",(double)juce::Time::currentTimeMillis());put(q,"command",command);for(const auto& x:fields)put(q,x.first,x.second);return bridge.execute(q); };
+    const auto muted=query("view",{{"start",0},{"seconds",40},{"monitorMuted",true}});
+    check((bool)muted["ok"] && (bool)muted["state"]["monitorMuted"],"bridge uses the actual monitor-mute control in its isolated app");
+    check(!(bool)query("view",{{"start",0},{"seconds",40},{"monitorMuted",1}})["ok"],"bridge monitor mute rejects ambiguous numeric values");
+    check(!(bool)query("preview",{{"index",-1},{"fraction",.5}})["ok"],"bridge preview rejects missing or invalid source ownership");
+    const auto stopped=query("preview",{{"stop",true}});
+    check((bool)stopped["ok"] && stopped["state"]["preview"]["sourceId"].toString().isEmpty(),"bridge preview Stop is explicit and exposes actual idle state");
     const auto timed=query("timing",{{"index",0},{"source_seconds",.5}});
     check((bool)timed["ok"] && std::abs((double)timed["timing"]["projectSeconds"]-.5)<1e-9,"bridge projects an actual source event without editing it");
     const auto probed=query("audio_probe",{{"seconds",.49},{"frames",1024}});
@@ -382,5 +451,13 @@ void runPromoControlTests(const std::function<void(bool,const juce::String&)>& c
           "bridge PCM probe uses a separate actual export renderer and retains live position");
     const auto jumped=query("jump_bars",{{"bars",4},{"direction",1}});
     check((bool)jumped["ok"] && w->engine.position==8,"bridge bar jump invokes the native navigation owner");
+    check(!(bool)query("timeline_cue",{{"slot",9}})["ok"] && w->engine.position==8,"bridge cue rejects invalid slots without seeking");
+    w->engine.project.putHotcue(clip.id,0,.5);w->selectedClip=clip.id;w->selectTrack(0);
+    const auto cue=query("timeline_cue",{{"slot",0}});
+    check((bool)cue["ok"] && w->engine.position==.5 && !w->engine.playing,"bridge timeline cue invokes the actual whole-mix navigation owner");
+    check(!(bool)query("work_mode",{{"name","invalid"}})["ok"],"bridge work mode rejects unknown choices");
+    check(!(bool)query("transition_confirm",{{"replace",true},{"incoming",clip.id}})["ok"],"bridge cannot confirm an absent or unrelated dialog");
+    w->engine.playing=true;
+    check(!(bool)query("work_mode",{{"name","record-perform"}})["ok"] && w->engine.workMode==WorkMode::arrange,"bridge cannot switch mode beneath running programme audio");w->engine.playing=false;
 }
 }

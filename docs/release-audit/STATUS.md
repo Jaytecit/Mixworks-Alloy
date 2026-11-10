@@ -1,3 +1,5 @@
+> Continuation and priorities moved to [the outstanding roadmap](../../FINISHING-PLAN.md), especially W28/W30. The chronological runs below retain their original next-step labels and candidate-bound evidence; those labels are historical. No rule has been promoted by documentation cleanup.
+
 # Audit execution status and continuation
 
 This is the dated release-audit ledger. For the latest source/local activation and

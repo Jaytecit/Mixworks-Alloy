@@ -10,7 +10,7 @@ public:
     std::function<void()> dock;
     ToolPanelWindow(ToolPanel& panel, const juce::String& name) : AlloyPopupWindow("Alloy / " + name, colour::background, allButtons)
     {
-        setUsingNativeTitleBar(true); setResizable(true, false); setResizeLimits(640, 360, 7680, 2160);
+        setUsingNativeTitleBar(false); setResizable(true, false); setResizeLimits(640, 360, 7680, 2160);
         setContentNonOwned(&panel, false);
     }
     void closeButtonPressed() override { if (dock) dock(); }
@@ -48,7 +48,9 @@ void Workstation::initialisePerformance()
             + " / phrase " + juce::String(settings.phraseBars) + " bars. Pending hotcues and pause cancelled; trigger again."); refresh();
     };
     addAndMakeVisible(controllerTab); controllerTab.getProperties().set("alloyTab", true);
-    addAndMakeVisible(editingTab); editingTab.getProperties().set("alloyTab", true);
+    addChildComponent(editingTab); editingTab.getProperties().set("alloyTab", true);
+    addAndMakeVisible(recordingTools);
+    recordingTools.onClick = [this] { showAutomationRecordingMenu(); };
     editingTab.onClick = [this] { toggleConsole(2); };
     editingPanel.dock.onClick = [this] { detachToolPanel(2, !editingWindow); };
     controllerTab.onClick = [this] { toggleConsole(0); };
@@ -70,15 +72,25 @@ void Workstation::initialisePerformance()
         return keyPressed(key);
     };
     transitionPanel.dock.onClick = [this] { detachToolPanel(1, !transitionWindow); };
-    engine.onPerformanceAction = [this](MidiAction a)
+    engine.onPerformanceAction = [this](MidiAction action)
     {
-        if (busy) return;
-        if (a.kind == MidiActionKind::previousTransition || a.kind == MidiActionKind::nextTransition) navigateTransition(a.kind == MidiActionKind::nextTransition ? 1 : -1);
-        else if (a.kind == MidiActionKind::undo || a.kind == MidiActionKind::redo) undo(a.kind == MidiActionKind::redo);
+        const auto id=selectedClip;
+        juce::MessageManager::callAsync([safe=juce::Component::SafePointer<Workstation>(this),action,id]
+        {
+            if(!safe || safe->busy || safe->engine.exporting)return;
+            if(action.kind==MidiActionKind::timelineCue)
+            { if(safe->selectedClip!=id) {safe->setStatus("The cue target changed. Select its track and trigger the cue again.");return;} safe->locateHotcue(action.index); }
+            else if(action.kind==MidiActionKind::previousTransition || action.kind==MidiActionKind::nextTransition)safe->navigateTransition(action.kind==MidiActionKind::nextTransition ? 1 : -1);
+            else if(action.kind==MidiActionKind::undo || action.kind==MidiActionKind::redo)safe->undo(action.kind==MidiActionKind::redo);
+        });
     };
 }
 void Workstation::performAction(MidiAction a)
 {
+    if(a.kind==MidiActionKind::timelineCue) { locateHotcue(a.index); return; }
+    if(a.kind==MidiActionKind::undo || a.kind==MidiActionKind::redo) {undo(a.kind==MidiActionKind::redo);return;}
+    if(a.kind==MidiActionKind::previousTransition || a.kind==MidiActionKind::nextTransition) {navigateTransition(a.kind==MidiActionKind::nextTransition ? 1 : -1);return;}
+
     if (busy || engine.exporting) return;
     if (a.kind == MidiActionKind::record && engine.hasLiveHotcueVoices())
     { setStatus("Stop before recording an arrangement take. Live hotcue event recording is not available yet; the live source cursor was kept."); return; }
@@ -115,21 +127,7 @@ void Workstation::initialiseEditing()
     editingPaste.setTooltip("Paste at the playhead on this lane. Existing segments stay in place, and the new copy has separate effects.");
     editingRipple.setTooltip("Delete this segment and close its time across all lanes. Later audio, automation and markers move left; Undo restores the edit.");
     editingCloseGap.setTooltip("Remove the empty gap before this segment across all lanes. Later audio, automation and markers move left; Undo restores the edit.");
-    editingSelect.onClick = [this]
-    {
-        if (busy || engine.exporting) return;
-        juce::PopupMenu menu; std::vector<juce::String> ids;
-        for (const auto& clip : engine.project.clips)
-        { ids.push_back(clip.id); menu.addItem((int) ids.size(), "Segment " + juce::String((int) ids.size()) + " / " + clip.media->libraryTitle() + " / lane " + juce::String(clip.track + 1) + " / " + timeText(clip.start - engine.project.tempo.origin), true, clip.id == selectedClip); }
-        if (ids.empty()) { setStatus("Add a song to create a segment first."); return; }
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&editingSelect), [safe = juce::Component::SafePointer<Workstation>(this), ids](int result)
-        {
-            if (!safe || safe->busy || safe->engine.exporting || result <= 0 || result > (int) ids.size()) return;
-            const auto* clip = safe->engine.project.clipFor(ids[(size_t) result - 1]); if (!clip) return;
-            safe->selectedClip = clip->id; safe->selectedAutomationTarget = -1; safe->timeline.selectAutomationPoint({}, -1);
-            safe->selectTrack(clip->track); safe->refresh(); safe->setStatus("Selected segment / " + clip->media->libraryTitle() + " / lane " + juce::String(clip->track + 1));
-        });
-    };
+    editingSelect.onClick = [this] { chooseTimelineSegment(editingSelect.getScreenBounds()); };
     editingCut.onClick = [this] { performTimelineAction(TimelineAction::cut, engine.position, engine.selectedTrack); };
     editingCopy.onClick = [this] { performTimelineAction(TimelineAction::copy, engine.position, engine.selectedTrack); refresh(); };
     editingPaste.onClick = [this] { performTimelineAction(TimelineAction::paste, engine.position, engine.selectedTrack); };
@@ -140,10 +138,10 @@ void Workstation::initialiseEditing()
     editingRange.setButtonText("Select audio"); editingRangeTime.setButtonText("Exact range...");
     editingAll.setButtonText("All"); editingClear.setButtonText("Clear");
     initialiseAutomationEditor();
-    for (auto* control : std::initializer_list<juce::Component*> {&editingRange, &editingRangeTime, &editingAll, &editingClear, &editingRangeSize, &editingSelectionInfo}) editingBody.addAndMakeVisible(control);
+    for (auto* control : std::initializer_list<juce::Component*> {&editingRangeTime, &editingAll, &editingClear, &editingRangeSize, &editingSelectionInfo}) editingBody.addAndMakeVisible(control);
     editingRange.setTooltip("Drag across a waveform to highlight audio. Free drag ignores global Snap. Drag a track header to move it. Shift-drag also selects audio.");
     editingRange.onClick = [this] { timeline.rangeDragAnchor.reset(); refreshEditSelection(); };
-    for (auto* control : std::initializer_list<juce::Component*> {&editingAudioPage, &editingSettingsPage, &editingAutomationPage, &editingMove, &editingSplit, &editingDelete, &editingMore, &editingHint}) editingBody.addAndMakeVisible(control);
+    for (auto* control : std::initializer_list<juce::Component*> {&editingAudioPage, &editingSettingsPage, &editingAutomationPage, &editingSplit, &editingDelete, &editingMore, &editingHint}) editingBody.addAndMakeVisible(control);
     editingAudioPage.onClick = [this] { showEditingPage(0); };
     editingSettingsPage.onClick = [this] { showEditingPage(1); refresh(); };
     editingAutomationPage.onClick = [this] { showEditingPage(2); };
@@ -173,23 +171,45 @@ void Workstation::initialiseEditing()
     editingBody.addAndMakeVisible(editingUnlink);
     editingUnlink.setTooltip("Let selected segments move independently when dragged. Undo restores their links.");
     editingUnlink.onClick = [this] { performTimelineAction(TimelineAction::unlinkSelection, engine.position, engine.selectedTrack); };
+    editingRangeSize.addItem("Follow project Snap",8);
     editingRangeSize.addItem("Free drag", 1);
     editingRangeSize.addItem("Snap drag to beats", 7);
     editingRangeSize.addSeparator();
     editingRangeSize.addItemList({"Select 1 beat", "Select 1 bar", "Select 8 bars", "Select 16 bars", "Select 32 bars"}, 2);
-    editingRangeSize.setSelectedId(1, juce::dontSendNotification);
-    editingRangeSize.setTooltip("Free drag selects any length without snapping. Beat snap affects only selection. Musical presets select a fixed length with one click.");
-    editingRangeSize.onChange = [this] { timeline.rangeDragAnchor.reset(); refreshEditSelection(); };
+    editingRangeSize.setSelectedId(8, juce::dontSendNotification);
+    editingRangeSize.setTooltip("Follow project Snap is the default for direct waveform selection. Choose Free drag or a fixed musical length when useful. Alt bypasses snapping. Drag titles to move tracks; edge bars trim audio.");
+    editingRangeSize.onChange = [this] { setRangePolicy(editingRangeSize.getSelectedId()); refreshEditSelection(); };
     editingSelectionInfo.setFont(juce::FontOptions(11));
     editingSelectionInfo.setAccessible(true);
 }
+void Workstation::chooseTimelineSegment(juce::Rectangle<int> anchor)
+{
+    if (busy || engine.exporting) return;
+    juce::PopupMenu menu; std::vector<juce::String> ids;
+    for (const auto& clip : engine.project.clips)
+    {
+        ids.push_back(clip.id);
+        menu.addItem((int) ids.size(), clip.media->libraryTitle() + " / lane " + juce::String(clip.track + 1)
+            + " / " + timeText(clip.start - engine.project.tempo.origin), true, clip.id == selectedClip);
+    }
+    if (ids.empty()) { setStatus("Add a song to create a segment first."); return; }
+    menu.showMenuAsync(timelineMenuOptions(anchor), [safe = juce::Component::SafePointer<Workstation>(this), ids](int result)
+    {
+        if (!safe || safe->busy || safe->engine.exporting || result <= 0 || result > (int) ids.size()) return;
+        const auto* clip = safe->engine.project.clipFor(ids[(size_t) result - 1]);
+        if (!clip) return;
+        safe->selectedClip = clip->id; safe->selectedAutomationTarget = -1;
+        safe->timeline.selectAutomationPoint({}, -1);
+        safe->selectTrack(clip->track);
+        safe->setStatus("Selected segment / " + clip->media->libraryTitle() + " / lane " + juce::String(clip->track + 1));
+    });
+}
+
 void Workstation::showEditingPage(int page)
 {
     editingPage = juce::jlimit(0, 2, page);
     timeline.rangeDragAnchor.reset();
     editingRange.setToggleState(editingPage == 0, juce::dontSendNotification);
-    if (editingPage == 0) { selectedAutomationTarget = -1; timeline.selectAutomationPoint({}, -1); }
-    if (editingPage == 1) clearEditSelection(); // Settings explicitly address the active track piece.
     editingViewport.setViewPosition(0, 0);
     layoutEditing(); refreshEditSelection(); timeline.repaint();
 }
@@ -250,9 +270,7 @@ void Workstation::layoutEditing()
         put(editingMore, row.removeFromRight(104).reduced(1));
         put(editingSelectionInfo, area.removeFromTop(22));
         row = area.removeFromTop(30);
-        put(editingMove, row.removeFromLeft(100).reduced(2, 1));
-        put(editingRange, row.removeFromLeft(115).reduced(2, 1));
-        put(editingRangeSize, row.removeFromLeft(std::min(170, row.getWidth() - 156)).reduced(2, 1));
+        put(editingRangeSize, row.removeFromLeft(std::min(210, row.getWidth() - 156)).reduced(2, 1));
         put(editingClear, row.removeFromRight(56).reduced(2, 1));
         put(editingRangeTime, row.reduced(2, 1));
         row = area.removeFromTop(32);
@@ -306,7 +324,18 @@ void Workstation::layoutToolPanels()
     auto area = layout.performance;
     auto tabs = area.removeFromTop(32);
     const std::array<juce::TextButton*, 3> buttons {&controllerTab, &transitionTab, &editingTab};
-    for (const int page : layout.consoleOrder) buttons[(size_t) page]->setBounds(tabs.removeFromLeft(108).withTrimmedRight(4));
+    recordingTools.setBounds(tabs.removeFromRight(204).reduced(2, 2));
+    editingTab.setVisible(editingWindow || (!consoleCollapsed && toolPage == 2));
+    for (const int page : layout.consoleOrder)
+        if (buttons[(size_t) page]->isVisible()) buttons[(size_t) page]->setBounds(tabs.removeFromLeft(108).withTrimmedRight(4));
+    studioTab.setBounds(tabs.removeFromLeft(126).withTrimmedRight(4));
+    studioTab.setToggleState(!consoleCollapsed && toolPage == 3, juce::dontSendNotification);
+    if (studioPanel)
+    {
+        studioPanel->setVisible(studioWindow || (!consoleCollapsed && toolPage == 3));
+        if (!studioWindow) studioPanel->setBounds(area);
+        studioPanel->dock.setDetached(studioWindow != nullptr);
+    }
     editingTab.setToggleState(!consoleCollapsed && toolPage == 2, juce::dontSendNotification);
     controllerTab.setToggleState(!consoleCollapsed && toolPage == 0, juce::dontSendNotification);
     transitionTab.setToggleState(!consoleCollapsed && toolPage == 1, juce::dontSendNotification);
@@ -328,23 +357,23 @@ void Workstation::toggleConsole(int page)
 }
 void Workstation::showToolPage(int page)
 {
-    page = juce::jlimit(0, 2, page);
-    auto* window = page == 0 ? performanceWindow.get() : page == 1 ? transitionWindow.get() : editingWindow.get();
+    page = juce::jlimit(0, 3, page);
+    auto* window = page == 0 ? performanceWindow.get() : page == 1 ? transitionWindow.get() : page == 2 ? editingWindow.get() : studioWindow.get();
     if (window) { window->setMinimised(false); window->toFront(true); return; }
     if (consoleCollapsed) layout.timeline = {};
-    consoleCollapsed = false; toolPage = page; if (page == 2) showEditingPage(editingPage); trackEditingWorkspace(); resized(); repaint();
+    consoleCollapsed = false; toolPage = page; trackEditingWorkspace(); resized(); repaint();
 }
 void Workstation::detachToolPanel(int page, bool detached)
 {
-    if (page < 0 || page > 2) return;
-    auto& ownedWindow = page == 0 ? performanceWindow : page == 1 ? transitionWindow : editingWindow;
-    auto& panel = page == 0 ? performancePanel : page == 1 ? transitionPanel : editingPanel;
+    if (page < 0 || page > 3) return;
+    auto& ownedWindow = page == 0 ? performanceWindow : page == 1 ? transitionWindow : page == 2 ? editingWindow : studioWindow;
+    auto& panel = page == 0 ? performancePanel : page == 1 ? transitionPanel : page == 2 ? editingPanel : *studioPanel;
     if (page == 2) panel.setEnabled(!busy);
     if (detached == (ownedWindow != nullptr)) return;
     consoleCollapsed = false;
     if (detached)
     {
-        auto window = std::make_unique<ToolPanelWindow>(panel, page == 0 ? "Controller" : page == 1 ? "Transitions" : "Editing");
+        auto window = std::make_unique<ToolPanelWindow>(panel, page == 0 ? "Controller" : page == 1 ? "Transitions" : page == 2 ? "Editing" : "Visual Studio");
         window->setLookAndFeel(&look);
         // Native close callbacks return before their window is destroyed.
         window->dock = [safe = juce::Component::SafePointer<Workstation>(this), page]
@@ -355,7 +384,7 @@ void Workstation::detachToolPanel(int page, bool detached)
         const auto target = std::find_if(displays.displays.begin(), displays.displays.end(), [&](const auto& display) { return &display != current; });
         if (target != displays.displays.end()) work = target->userBounds.getLargestIntegerWithin();
         else if (current) work = current->userBounds.getLargestIntegerWithin();
-        auto bounds = work.withSizeKeepingCentre(std::min(1440, work.getWidth()), std::min(520, work.getHeight()));
+        auto bounds = work.withSizeKeepingCentre(std::min(1440, work.getWidth()), std::min(page == 3 ? 760 : 520, work.getHeight()));
         if (page == 2 && !layout.editingWindowBounds.isEmpty())
         {
             const auto* display = displays.getDisplayForRect(layout.editingWindowBounds);

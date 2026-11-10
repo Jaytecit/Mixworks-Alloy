@@ -42,6 +42,8 @@ void main(){
  vec4 slow=texture(input1,uv);
  // Expanding image contours and nonlinear colour currents, with delayed memory.
  vec2 velocity=p*(14.+38.*bass+26.*bassHit*pulse);
+ velocity+=structureCurrent(mediaUV)*55.;
+
  velocity+=vec2(slow.g-slow.b,slow.b-slow.r)*(10.+40.*warp);
  velocity+=vec2(-p.y,p.x)*(3.+12.*mid+22.*midHit);
  vec2 radial=p/max(.08,length(p));

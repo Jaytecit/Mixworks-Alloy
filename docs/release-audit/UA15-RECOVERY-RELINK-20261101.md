@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Recovery and source relinking — ua15, 1 November 2026
 
 Final candidate `c23eed125222979242d2cdb1441bfd77f4f031bc263772d32c0d25218696e9e6` builds and passes **67/0** bounded `--recovery-only` checks through `verification.run_checks`, below-normal priority, stress disabled. No infrastructure or retention errors. Three final native captures inspected. This is scoped evidence, not whole-rule or full-readiness acceptance.

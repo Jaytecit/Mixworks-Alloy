@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Guided pulse, downbeat and grid correction — ua11
 
 **Update:** [ua13](UA13-FOCUSED-VERIFICATION-20261101.md) successfully builds this

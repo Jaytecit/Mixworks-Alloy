@@ -4,7 +4,7 @@
 
 namespace mixworks
 {
-bool requestOriginalClip(const Clip& placement, double at, double before, double after)
+bool requestOriginalClip(const Clip& placement, double at, double before, double after, bool prepare)
 {
     if (placement.start >= at + after || placement.end() <= at - before) return true;
     const auto& clip = placement.elasticSource ? placement.elasticSource->clip : placement;
@@ -19,8 +19,9 @@ bool requestOriginalClip(const Clip& placement, double at, double before, double
         if (clip.reversed) { const double old = lo; lo = clip.sourceSpan() - hi; hi = clip.sourceSpan() - old; }
         const double first = (clip.offset + lo) * media.sampleRate - 2;
         const double last = (clip.offset + hi) * media.sampleRate + 2;
-        ready = media.original->request((int)juce::jlimit(0., double(media.frames()), std::floor(first)),
-                                        (int)juce::jlimit(0., double(media.frames()), std::ceil(last))) && ready;
+        const int begin = (int)juce::jlimit(0., double(media.frames()), std::floor(first));
+        const int end = (int)juce::jlimit(0., double(media.frames()), std::ceil(last));
+        ready = (prepare ? media.original->prepare(begin, end) : media.original->request(begin, end)) && ready;
     };
     const auto source = [&](const Media& media)
     {
@@ -139,13 +140,22 @@ void ElasticRenderer::reset()
 }
 void ElasticRenderer::prepare(const Clip& clip, double at, double outputRate, int frames)
 {
+    prepare(std::vector<Clip>{clip}, at, outputRate, frames);
+}
+void ElasticRenderer::prepare(const std::vector<Clip>& clips, double at, double outputRate, int frames)
+{
     juce::AudioBuffer<float> scratch(2,std::max(1,frames)); scratch.clear();
-    beginBlock(); add(scratch,std::max(1,frames),at,outputRate,clip);
+    beginBlock();
+    for (const auto& clip : clips) if (clip.elasticPlayback && clip.start < at + frames / outputRate && clip.end() > at)
+    {
+        if (clip.stems && clip.stemsEnabled)
+            for (int stem = 0; stem < stemCount; ++stem) add(scratch,std::max(1,frames),at,outputRate,clip,stem);
+        else add(scratch,std::max(1,frames),at,outputRate,clip);
+    }
     // Warm the processor and allocate every ring slot before callback admission.
     // Subsequent window rotation keeps these dimensions and storage.
-    const int wanted=(int)std::llround(clip.media->sampleRate*windowSeconds)+1;
     for(auto& stream:streams) for(auto& cached:stream->windows)
-        cached.pcm.setSize(clip.media->channels(),wanted,false,false,true);
+        cached.pcm.setSize(stream->source->clip.media->channels(),(int)std::llround(stream->source->clip.media->sampleRate*windowSeconds)+1,false,false,true);
 }
 void ElasticRenderer::add(juce::AudioBuffer<float>& buffer, int frames, double at, double outputRate, const Clip& clip, int stem)
 {

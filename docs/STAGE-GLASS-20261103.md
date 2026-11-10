@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Stage and glass identities — 3 November 2026
 
 Jay accepted the Afterhours travel correction and asked to continue with the next audit group: Pulse Gallery, Orbit Theatre, Resonant Iris, Rhombus Foundry and Enamel Scales. All other scene directories and shared renderer/controller modules remain byte-for-byte unchanged, including the five original approved image instruments, the city/feedback refinements and the 28 plain-default changes.

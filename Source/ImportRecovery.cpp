@@ -12,16 +12,16 @@ int runImportRecovery(const juce::StringArray& args)
     if (manifest.getSize()>1024*1024 || report.exists() || report.isSymbolicLink() || catalogue.isSymbolicLink()) return 2;
     const auto doc=juce::JSON::parse(manifest);
     if (!doc["missingPaths"].isArray() || doc["missingPaths"].size()>600) return 2;
-    auto saved=readLibraryCatalogue(catalogue); if (saved.error.isNotEmpty()) return 2;
+    auto saved=openLibraryStore(catalogue); if (saved.error.isNotEmpty()) return 2;
     juce::AudioFormatManager formats; formats.registerBasicFormats(); juce::Array<juce::var> outcomes;
-    juce::Array<juce::File> additions; std::vector<std::shared_ptr<Media>> snapshots; std::set<juce::String> seen;
+    std::vector<std::shared_ptr<Media>> snapshots; std::set<juce::String> seen;
     int failures=0,added=0,reused=0,skipped=0; bool stopped=false;
     juce::String saveIssue;
     auto flush=[&]
     {
-        if (additions.isEmpty()) return;
-        const auto error=rememberLibraryCatalogue(catalogue,additions,snapshots);
-        if (error.isNotEmpty()) saveIssue=error; else { additions.clear(); snapshots.clear(); }
+        if (snapshots.empty()) return;
+        const auto error=saveLibraryStore(catalogue,snapshots);
+        if (error.isNotEmpty()) saveIssue=error; else snapshots.clear();
     };
     auto publish=[&]
     {
@@ -51,13 +51,13 @@ int runImportRecovery(const juce::StringArray& args)
             if (!loaded.media) { ++failures; record->setProperty("status","failed"); record->setProperty("reason",loaded.error); }
             else
             {
-                ++added; reused+=loaded.media->analysisFromCache; additions.add(source); snapshots.push_back(loaded.media);
+                ++added; reused+=loaded.media->analysisFromCache; snapshots.push_back(loaded.media);
                 record->setProperty("status","imported"); record->setProperty("analysisFromCache",loaded.media->analysisFromCache); record->setProperty("decodedFromCache",loaded.media->decodedFromCache);
                 record->setProperty("warning",loaded.media->analysisCacheWarning+" "+loaded.media->playbackCacheWarning);
                 record->setProperty("frames",loaded.media->frames());
             }
         }
-        outcomes.add(row); if (additions.size()>=100) flush(); if (!publish()) return 2;
+        outcomes.add(row); if (snapshots.size()>=100) flush(); if (!publish()) return 2;
         if (saveIssue.isNotEmpty()) break;
     }
     flush(); if (!publish()) return 2;

@@ -11,6 +11,7 @@ juce::Result editablePresetNodes(const Project&, const AutomationAddress&, Autom
 juce::Result materialiseEditablePresetNodes(Project&, const AutomationAddress&);
 juce::Result capturePresetNodes(const Project&, const juce::String& incoming, TransitionStyle::Nodes&);
 juce::Result applyPresetNodes(Project&, const juce::String& incoming, const TransitionStyle::Nodes&, unsigned targets = 0x3f);
+juce::Result applyOwnedPresetNodes(Project&, const juce::String& incoming, const TransitionStyle::Nodes&, const juce::String& name);
 juce::Result placeTransitionBandNodes(Project&, const juce::String& incoming, int band, const TransitionBandSettings&);
 juce::Result placeTransitionFilterNodes(Project&, const juce::String& incoming, const TransitionFilterSettings&);
 juce::var presetNodesToJson(const TransitionStyle::Nodes&);

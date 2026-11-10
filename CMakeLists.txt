@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Mixworks VERSION 0.55.68 LANGUAGES C CXX)
+project(Mixworks VERSION 0.55.88 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.local/deps/JUCE" CACHE PATH "JUCE 8 source directory")
@@ -21,7 +21,7 @@ if(WIN32)
 endif()
 target_sources(Mixworks PRIVATE Source/Main.cpp Source/Model.cpp Source/Analysis.cpp Source/Beatmatch.cpp Source/Engine.cpp Source/Automation.cpp Source/AutomationUI.cpp Source/TimelineAutomation.cpp Source/SectionUI.cpp Source/Workstation.cpp Source/SelfTest.cpp Source/MusicTests.cpp Source/TempoTests.cpp Source/TempoUiTests.cpp Source/EditingTests.cpp Source/AutomationTests.cpp Source/LiveAutomationTests.cpp)
 target_compile_definitions(Mixworks PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_VST=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Mixworks,JUCE_PRODUCT_NAME>" JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}")
-target_sources(Mixworks PRIVATE Source/AnalysisCache.cpp Source/WorkspaceUI.cpp Source/AnalysisCacheTests.cpp Source/Playlist.cpp Source/FusionWorkflows.cpp Source/FusionWorkflowTests.cpp)
+target_sources(Mixworks PRIVATE Source/AnalysisCache.cpp Source/WorkspaceUI.cpp Source/TutorialMusic.cpp Source/AnalysisCacheTests.cpp Source/Playlist.cpp Source/FusionWorkflows.cpp Source/FusionWorkflowTests.cpp)
 target_sources(Mixworks PRIVATE Source/MusicalEnergy.cpp Source/MusicalEnergyTests.cpp)
 target_sources(Mixworks PRIVATE Source/StemJobs.cpp Source/StemMixing.cpp Source/StemUI.cpp Source/StemTests.cpp)
 target_sources(Mixworks PRIVATE Source/GridCorrection.cpp Source/GridCorrectionUI.cpp Source/GridCorrectionTests.cpp)
@@ -70,7 +70,7 @@ add_custom_command(TARGET Mixworks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BEAT_THIS_DIR}/onnx/beat_this.onnx" "$<TARGET_FILE_DIR:Mixworks>/beat-this-final0.onnx")
 if(WIN32)
   target_compile_definitions(Mixworks PRIVATE JUCE_ASIO=1)
-  target_link_libraries(Mixworks PRIVATE propsys windowscodecs dwmapi psapi bcrypt)
+  target_link_libraries(Mixworks PRIVATE propsys windowscodecs dwmapi psapi bcrypt winsqlite3)
 endif()
 target_link_libraries(Mixworks PRIVATE SoundTouch juce::juce_audio_utils juce::juce_dsp juce::juce_cryptography juce::juce_recommended_config_flags)
 if(MSVC)
@@ -103,31 +103,55 @@ target_sources(Mixworks PRIVATE Source/AutoArrangement.cpp Source/AutoArrangemen
 target_sources(Mixworks PRIVATE Source/LibraryPreview.cpp Source/LibraryPreviewTests.cpp)
 
 # Visual runtime is packaged beside the executable; no reference installation is used.
-target_sources(Mixworks PRIVATE Source/VisualScenes.cpp Source/VisualArrangement.cpp Source/VisualArrangementTests.cpp Source/SceneLane.cpp Source/SceneLaneTests.cpp)
+target_sources(Mixworks PRIVATE Source/VisualScenes.cpp Source/VisualArrangement.cpp Source/VisualArrangementTests.cpp Source/SceneLane.cpp Source/SceneLaneTests.cpp Source/StudioWorkspace.cpp)
+target_sources(Mixworks PRIVATE Source/StudioAudioLink.cpp Source/StudioAudioLinkTests.cpp)
 target_sources(Mixworks PRIVATE Source/MilkDrop.cpp)
 
 
   set(alloy_original_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_scene_worker.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/studio_scene_player.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_compositor.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_handoff.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_feedback.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_presenter.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_scene_player.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/milkdrop_scene.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/milkdrop_catalogue.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/milkdrop_preview.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_catalogue.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_media.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_visual_gl.py")
   file(GLOB_RECURSE alloy_original_assets CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/*")
+  file(GLOB_RECURSE alloy_studio_scenes CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/scenes/*")
+  set(alloy_studio_sources)
+  foreach(module engine scene media audio audio_sources studio timeline deck midi)
+    list(APPEND alloy_studio_sources "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/${module}.py")
+  endforeach()
+  set(alloy_studio_assets
+    "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/alloy-flkey49.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/scene-library.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/authoring/Prism Current.milk")
+  set(alloy_studio_background "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Backgrounds/Molten Alloy Waveform Core-1.png")
+  set(alloy_studio_sprite "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Sprites/Copper Martini - Circuit Martini.png")
+  set(alloy_studio_flare "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Sprites/Copper Cyan VFX - Horizontal Flare.png")
   list(FILTER alloy_original_assets EXCLUDE REGEX "/(Sprites|Backgrounds|Video)/")
-  set_property(TARGET Mixworks APPEND PROPERTY LINK_DEPENDS ${alloy_original_sources} ${alloy_original_assets})
+  set_property(TARGET Mixworks APPEND PROPERTY LINK_DEPENDS ${alloy_original_sources} ${alloy_original_assets} ${alloy_studio_sources} ${alloy_studio_assets} ${alloy_studio_scenes} ${alloy_studio_background} ${alloy_studio_sprite} ${alloy_studio_flare})
   add_custom_command(TARGET Mixworks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${alloy_original_sources} "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio_engine" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${alloy_studio_sources} "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio_engine"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${alloy_studio_assets} "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${alloy_studio_background}" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio/Copper Background.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${alloy_studio_sprite}" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio/Circuit Sprite.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${alloy_studio_flare}" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio/Flare Sprite.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/scenes" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/studio/scenes"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/scenes" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/scenes"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/previews" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/previews"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/original-scenes.json" "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/media-library.json" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Sprites" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Backgrounds")
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Sprites" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Backgrounds"
+    VERBATIM)
 
 # Optional shared renderer; no NestDrop binaries or third-party presets are bundled.
 # Prepare with scripts/fetch-projectm.ps1. Ordinary owned scenes do not load this DLL.
@@ -138,3 +162,11 @@ if(EXISTS "${alloy_projectm}/bin/projectM-4.dll")
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${alloy_projectm}/bin/projectM-4.dll" "${alloy_projectm}/bin/glew32.dll" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/milkdrop"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${alloy_projectm}/licenses" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/milkdrop/licenses")
 endif()
+
+# The connected standalone Studio uses the same private Python, with a matching
+# Tk runtime copied from the developer's installed interpreter.
+find_program(ALLOY_TK_PYTHON NAMES python REQUIRED)
+add_custom_command(TARGET Mixworks POST_BUILD
+  COMMAND "${ALLOY_TK_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/stage_studio_tk.py"
+          --destination "$<TARGET_FILE_DIR:Mixworks>/visual-python"
+  VERBATIM)

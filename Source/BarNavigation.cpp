@@ -42,9 +42,10 @@ void Workstation::jumpBars(int bars, int direction)
     const auto clock = engine.project.gridClock();
     const double target = clock.timeAtBeat(clock.beatsAt(engine.position) + direction * bars * 4.);
     if (!std::isfinite(target)) { setStatus("This bar position is unavailable."); return; }
-    engine.seek(juce::jlimit(0., engine.project.audibleEnd(), target));
-    viewport.setViewPosition(std::max(0, (int) (engine.position * timeline.pixelsPerSecond) - viewport.getViewWidth() / 2), viewport.getViewPositionY());
-    setStatus("Jumped " + juce::String(bars) + " mix bars " + (direction < 0 ? "backward." : "forward.")); refresh();
+    const double destination = juce::jlimit(0., engine.project.audibleEnd(), target);
+    if (engine.seek(destination).failed()) return;
+    viewport.setViewPosition(std::max(0, (int) (destination * timeline.pixelsPerSecond) - viewport.getViewWidth() / 2), viewport.getViewPositionY());
+    setStatus(juce::String(engine.seekPending ? "Preparing " : "Jumped ") + juce::String(bars) + " mix bars " + (direction < 0 ? "backward." : "forward.")); refresh();
 }
 void Workstation::moveTrackBars(int bars, int direction)
 {

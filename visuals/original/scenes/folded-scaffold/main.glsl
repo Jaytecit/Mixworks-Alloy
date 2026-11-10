@@ -14,7 +14,7 @@ uniform float colourR,colourG,colourB,pulse,mode,mirror,feedback;
 uniform sampler2D historyImage;
 uniform int historyValid;
 uniform float bassHit,midHit,trebleHit,bassTime,midTime,trebleTime;
-// Project beats give 120â€“160 BPM articulation; measured bands supply its strength.
+// Project beats give 120Ã¢â‚¬â€œ160 BPM articulation; measured bands supply its strength.
 // Independent accumulated band phases carry movement between attacks. No global zoom.
 float lowSwing(){return .85*sin(bassTime*1.1+bassImpulse*4.2+float(VARIANT)*.73);}
 float midSwing(){return .8*sin(midTime*.9+midImpulse*3.8+float(VARIANT)*1.17);}
@@ -89,6 +89,8 @@ void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colo
 // Signed-distance sculptural families: occlusion, normals, ambient shadow and fog.
 float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
 float sdf(vec3 p){
+    p.y-=.33*structureHeight(fract(p.xz*.17+.5));
+
     float t=clockTime();
 #if FAMILY == 0
     p.xy-=vec2(.30*midSwing()*sin(p.z*.65),(.24*highSwing()+.12*trebleHit)*cos(p.z));
@@ -174,7 +176,10 @@ float sdf(vec3 p){
     return max(abs(g)*.20-.035,length(p)-1.6);
 #endif
 }
-void main(){vec2 p=domain();float t=clockTime();vec3 ro=vec3(0,0,3.4);vec3 rd=normalize(vec3(p*.65,-1.8));
+void main(){vec2 p=domain();float t=clockTime();float impact=clamp(bassHit*1.5,0.,1.)*pulse;
+    p=rot(.40*impact*sin(floor(projectBeat)*1.5708))*p;
+    vec3 ro=vec3(.42*sin(t*.65)*impact,.30*cos(t*.7)*impact,3.4-1.3*impact);
+    vec3 rd=normalize(vec3(p*.57,-1.8));
 #if FAMILY <= 2 || FAMILY == 3 || FAMILY == 18
     // Two-beat surge/recoil, lateral syncopation and a longer curved route.
     float route=t*.35+bassTime*2.4+bassImpulse*4.5;

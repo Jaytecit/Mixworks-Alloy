@@ -18,6 +18,9 @@ void main(){
     q=fract(uv*vec2(3,2));
 #elif COMPOSITION == 2
     vec2 p=(uv-.5)*vec2(1.78,1.);q=vec2(atan(p.y,p.x)/6.283+.5,length(p));
+#elif COMPOSITION == 3
+    // Two image-fed spore beds replenish the lower field as the first bed drifts up.
+    q=fract(uv*vec2(1,2)+vec2(.10*sin(t*.35),.06*sin(t*.23)));
 #elif COMPOSITION == 4
     q=.5+(uv-.5)*(.8+.35*cos(length(uv-.5)*9.));
 #elif COMPOSITION == 6
@@ -25,7 +28,7 @@ void main(){
 #elif COMPOSITION == 7
     q=fract(uv*2.);
 #endif
-    vec4 image=art(q);float food=dot(image.rgb,vec3(.2126,.7152,.0722))*image.a;
+    vec4 image=art(q);float food=max(dot(image.rgb,vec3(.2126,.7152,.0722))*image.a,.82*structureCoverage(uv));
 #if COMPOSITION == 4
     float radius=length((uv-.5)*vec2(1.78,1.));
     food*=smoothstep(.2,.3,radius)*(1.-smoothstep(.55,.72,radius));
@@ -62,6 +65,13 @@ void main(){
     float pop=alive(chart),rate=stepDelta*(1.1+motion*2.7);
     float next=mix(pop,growth,clamp(rate,0.,1.));
     next+=food*imageMix*stepDelta*(.02+.25*trebleHit*pulse);
-    next-=bassHit*pulse*stepDelta*.16*(.2+.8*seed);
+    // Empty population is otherwise an absorbing state: food feeding alone stays
+    // below the birth interval. Recruit separated viable colonies, not RGB fog.
+    vec2 bed=uv*vec2(8,5),local=fract(bed)-.5;
+    float nursery=exp(-dot(local*vec2(1.,1.4),local*vec2(1.,1.4))*24.)
+        *step(.24,hash(floor(bed)));
+    float nutrient=.30+.70*smoothstep(.025,.5,food)*imageMix;
+    next+=max(0.,.85-next)*nursery*nutrient*stepDelta*(8.0+6.0*trebleHit*pulse);
+    next-=bassHit*pulse*stepDelta*.065*(.2+.8*seed);
     colour=vec4(clamp(next,0.,1.),growth-pop,food,1.);
 }

@@ -17,7 +17,7 @@ WORKSPACE = Path(__file__).resolve().parents[1]
 PROTOCOL = 1
 COMMANDS = ('status', 'import', 'add', 'correct_source', 'transition_preset', 'play', 'stop',
             'seek', 'view', 'panel', 'select_clip', 'select_transition', 'control', 'save',
-            'open', 'screenshot', 'undo', 'close', 'timing', 'audio_probe', 'jump_bars', 'move_clip', 'transition_edit', 'insertion_preset')
+            'open', 'screenshot', 'undo', 'close', 'timing', 'audio_probe', 'jump_bars', 'move_clip', 'transition_edit', 'insertion_preset', 'preview', 'work_mode', 'timeline_cue', 'transition_confirm')
 
 
 class BridgeError(RuntimeError):

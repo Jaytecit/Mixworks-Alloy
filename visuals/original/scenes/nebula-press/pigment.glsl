@@ -19,13 +19,13 @@ vec4 pigmentArt(vec2 uv){
 }
 vec2 jetOrigin(){return vec2(.12,.5+.12*sin(travelTime*.68+midImpulse*.14*pulse));}
 float pressCentre(vec2 uv,float side){
-    float squeeze=.04*sin(travelTime*.72)+bassHit*pulse*.035;
+    float squeeze=.12*sin(travelTime*1.1)+bassHit*pulse*.11;
     return .5+side*(.25-squeeze)+.024*sin(uv.y*(6.+detail*6.)+midImpulse*.25*pulse);
 }
-float pressWidth(){return .075+.020*warp+.018*bassHit*pulse;}
+float pressWidth(){return .105+.035*warp+.085*bassHit*pulse;}
 float pressMask(vec2 uv,float side){
     float dx=(uv.x-pressCentre(uv,side))/pressWidth();
-    float vertical=smoothstep(.04,.16,uv.y)*smoothstep(.04,.16,1.-uv.y);
+    float vertical=smoothstep(0.,.065,uv.y)*smoothstep(0.,.065,1.-uv.y);
     float square=dx*dx;
     return exp(-square*square)*vertical;
 }

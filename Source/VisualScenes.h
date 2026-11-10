@@ -9,8 +9,11 @@ enum class VisualSceneSource { originals=1, milkdrop=2, both=3 };
 VisualSceneSource visualSceneSourceFromId(int);
 juce::String visualSceneSourceName(VisualSceneSource);
 struct VisualControlPoint { double at=0, value=0; };
-struct VisualControlCurve { bool stepped=false; std::vector<VisualControlPoint> points; };
-struct VisualControlSpec { double initial=.5; int steps=0; };
+struct VisualControlCurve { bool stepped=false; std::vector<VisualControlPoint> points; bool cycle=false; };
+struct VisualControlSpec { double initial=.5; int steps=0; juce::String label; };
+enum class VisualLayer { background, milk, shader, sprite };
+VisualLayer visualLayer(const juce::String& key);
+double visualCycleAt(double elapsedBeats);
 struct VisualScenePreset
 {
     juce::String id, title;
@@ -20,7 +23,7 @@ struct VisualSceneClip
 {
     juce::String id = juce::Uuid().toString(), scene, title;
     double start = 0, length = 16, offset = 0;
-    juce::String transition = "dissolve", style;
+    juce::String transition = "feedback", style;
     double pivot = .5;
     std::map<juce::String, double> controls;
     std::map<juce::String, VisualControlCurve> automation;
@@ -35,8 +38,9 @@ struct VisualSceneEntry
     std::map<juce::String, VisualControlSpec> controlSpecs;
     std::vector<VisualScenePreset> presets;
     juce::String family, motif;
+    juce::String referenceImage;
 };
-std::map<juce::String,double> visualControlsAt(const VisualSceneClip&, double localTime);
+std::map<juce::String,double> visualControlsAt(const VisualSceneClip&, double localTime, double elapsedBeats = 0);
 double visualMotionTime(const VisualSceneClip&, double localTime);
 void automateVisualScene(VisualSceneClip&, const VisualSceneEntry&, double energy, juce::Random&);
 void describeVisualScene(VisualSceneEntry&);

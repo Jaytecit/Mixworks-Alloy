@@ -1,6 +1,12 @@
 # Music scan failures and reports
 
-The Music scanner includes subfolders and accepts WAV, AIFF, FLAC, Ogg and MP3. Checked counts include unchanged supported files; added/refreshed counts refer to library changes.
+The Music scanner includes subfolders and accepts WAV, AIFF, FLAC, Ogg and MP3. **Tools / Choose Music scan folder...** selects one folder tree. **Use Windows Music folder** restores the default. Previously saved tracks remain in the Library when the scan folder changes.
+
+Alloy opens the saved Library, checks remembered tracks in the background, and looks for new files in the chosen tree. Automatic scanning runs when the workstation is idle. After the initial pass, Windows folder notifications trigger further checks. A periodic pass also reconciles the tree. Unchanged tracks reuse their saved data from file stamps. Changed files or analysis records are checked before reuse.
+
+**Checked** counts supported files seen during the pass, including unchanged tracks and tracks already queued for the startup source check. **Added** and **refreshed** count live Library updates. **Saved** counts Library rows committed to disk. Hover over the notice for analysis reuse, audio processing, failures, and pending source checks. The scanner saves in small batches, including completed tracks from a stopped pass. Library additions do not require saving the mix.
+
+The first launch with the new store imports `library.json` into `library.sqlite3` in the same local app-data folder. The original catalogue stays on disk. The new database writes changed tracks independently and keeps the path index separate from each track's snapshot. The 128 MiB guard still applies to reading the original JSON file. The active Library has no 128 MiB total limit.
 
 From 0.55.63, the notice separates **failed imports** from **cache warnings**. A failure means no library entry was added/refreshed. A cache warning means audio loaded but an analysis or decoded-audio cache operation reported a problem. Failed refreshes keep the existing entry. Source music is never deleted.
 

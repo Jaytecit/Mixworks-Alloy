@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "key": "original/jumping-techno-tunnel",
+  "title": "Jumping Techno Tunnel",
+  "author": "User-supplied shader; Alloy adapter",
+  "source": "First user-supplied cyan/pink rings-and-spokes mainImage; original jumping depth retained.",
+  "family": "hand-authored",
+  "passSchema": 1,
+  "passes": [
+    {
+      "id": "finish",
+      "shader": "main.glsl",
+      "scale": 1,
+      "format": "rgba8",
+      "inputs": []
+    }
+  ],
+  "controls": {
+    "intensity": {
+      "min": 0,
+      "max": 1,
+      "default": 0.7
+    },
+    "motion": {
+      "min": 0,
+      "max": 1,
+      "default": 0.5
+    },
+    "paletteStyle": {
+      "min": 0,
+      "max": 1,
+      "default": 0.14285714285714285
+    },
+    "paletteAmount": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0
+    },
+    "finishGlow": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0
+    },
+    "viewPattern": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0
+    }
+  },
+  "presets": [
+    {
+      "id": "signature",
+      "title": "Original jumping motion",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "paletteStyle": 0.14285714285714285,
+        "paletteAmount": 0.0,
+        "finishGlow": 0.0,
+        "viewPattern": 0.0
+      }
+    }
+  ]
+}

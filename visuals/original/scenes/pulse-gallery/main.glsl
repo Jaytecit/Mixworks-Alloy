@@ -11,7 +11,8 @@ mat2 turn(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 vec3 palette(float t){return .06+.84*pow(.5+.5*cos(vec3(0.,2.1,4.2)+t+hue*6.283185),vec3(1.25));}
 vec3 picture(vec2 uv){
     vec3 base=palette(uv.x*2.+uv.y)*.07;
-    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=sampleCutout(materialDomain(uv));
+    vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=structurePigment(materialDomain(uv));
+    b.rgb/=max(b.a,.001);
     return mix(base,mix(a.rgb,b.rgb,b.a),max(a.a,b.a)*imageMix);
 }
 float rectangle(vec2 p,vec2 size){vec2 q=abs(p)-size;return length(max(q,0.))+min(max(q.x,q.y),0.);}

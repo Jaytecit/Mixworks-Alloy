@@ -7,6 +7,7 @@ uniform int hasImage;
 uniform float sceneTime,bassHit,midHit,trebleHit,warp,detail,imageMix,pulse;
 out vec4 colour;
 vec3 imageAt(vec2 uv){
+    uv=.5+(uv-.5)/vec2(1.+.7*bassHit*pulse,1.+2.5*bassHit*pulse);uv.y+=sin(floor(sceneTime*2.)*2.4)*.22*bassHit*pulse;
     if(hasImage!=0||hasCutout!=0){
         vec4 background=hasImage!=0?sampleFittedMedia(uv):vec4(0);
         vec4 cut=sampleCutout(materialDomain(uv));return mix(background.rgb,cut.rgb,cut.a);

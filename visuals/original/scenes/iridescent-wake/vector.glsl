@@ -17,7 +17,7 @@ vec4 pigmentArt(vec2 uv){
     if(hasImage==0&&hasCutout==0)c=vec4(.3+.3*sin(uv.x*12.),.35+.25*cos(uv.y*9.),.7,1.);
     return vec4(c.rgb*c.a,c.a);
 }
-vec2 jetOrigin(){return vec2(.12,.5+.12*sin(travelTime*.68+midImpulse*.14*pulse));}
+vec2 jetOrigin(){return vec2(.10,.5+.36*sin(travelTime*1.15+midImpulse*.30*pulse));}
 float pressCentre(vec2 uv,float side){
     float squeeze=.04*sin(travelTime*.72)+bassHit*pulse*.035;
     return .5+side*(.25-squeeze)+.024*sin(uv.y*(6.+detail*6.)+midImpulse*.25*pulse);
@@ -60,6 +60,8 @@ void main(){
     target=vec2(side*(.075+.13*midHit*pulse),side*bassHit*pulse*.018);
 #endif
     target*=.8+.4*warp;
+    target+=structureCurrent(uv)*.22;
+
     if(simulationReset>.5){colour=vec4(target,0.,pigmentArt(uv).a);return;}
     vec2 old=texture(input0,uv).rg;
     vec2 previous=texture(input0,clamp(uv-old*stepDelta,0.,1.)).rg;

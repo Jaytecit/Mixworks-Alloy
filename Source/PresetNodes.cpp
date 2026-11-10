@@ -47,6 +47,64 @@ Links linksFor(const Project& p, const juce::String& id)
 {
     Links result; for (const auto& link : p.transitionLinks) if (link.incoming == id || link.outgoing == id) result.insert(link.incoming); return result;
 }
+void shapeClock(AutomationShape& shape, const Project& project, const AutomationAddress& address, double begin, double end)
+{
+    shape.clock.points.clear();
+    const auto* clip = project.clipFor(address.clipId);
+    if (!clip || !clip->tempoMap || end <= begin) return;
+    shape.clock.points = clip->tempoMap->localPoints(begin,end);
+    for (auto& point : shape.clock.points) point.time /= end-begin;
+    const double bpm = shape.clock.points.front().bpm;
+    if (std::all_of(shape.clock.points.begin(),shape.clock.points.end(),[&](const auto& point) { return point.bpm == bpm; })) shape.clock.points.clear();
+}
+// Fresh generated treatments are exact, editable two-endpoint spans. Independent
+// entrance/exit fades retain their own endpoints and the intentional hold between.
+bool directNodes(const Project& project, const NodeSource& source, AutomationCurve& result)
+{
+    const int band = (int)source.address.target;
+    struct Fade { double begin, end; AutomationShape shape; bool step = false; };
+    std::vector<Fade> fades;
+    if (band >= 0 && band < 4) for (const auto& pair : source.playback.pairs)
+    {
+        const auto& envelope = pair[(size_t)band];
+        if (envelope.strength <= 0) continue;
+        AutomationShape shape; shape.kind = envelope.constantPower ? 1 : 0; shape.strength = envelope.strength;
+        shape.bend = envelope.bend >= 1 ? 0 : envelope.bend; shape.rising = envelope.rising;
+        fades.push_back({envelope.begin,envelope.end,shape,envelope.instant || envelope.bend >= 1});
+    }
+    if (band == 0)
+    {
+        if (source.fades.fadeIn > 0) fades.push_back({source.clip.start+source.fades.intro,source.clip.start+source.fades.intro+source.fades.fadeIn,{}});
+        if (source.fades.fadeOut > 0)
+        { AutomationShape shape; shape.rising = false; fades.push_back({source.clip.start+source.fades.outro,source.clip.start+source.fades.outro+source.fades.fadeOut,shape}); }
+    }
+    if (source.address.target == AutomationTarget::cutoff) for (const auto& envelope : source.playback.filters)
+    {
+        if (!envelope.setting.active()) continue;
+        AutomationShape shape; shape.kind = envelope.highPass() ? 2 : 3; shape.strength = envelope.setting.strength;
+        shape.rising = !envelope.incoming; shape.upper = std::min(20000.,source.clip.media->sampleRate*.45);
+        fades.push_back({envelope.begin,envelope.end,shape});
+    }
+    std::sort(fades.begin(),fades.end(),[](const auto& a,const auto& b) { return a.begin < b.begin; });
+    if (fades.empty()) return false;
+    for (size_t i = 1; i < fades.size(); ++i) if (fades[i].begin <= fades[i-1].end) return false;
+    const double manual = project.manualValue(source.address);
+    result = {}; result.enabled = true;
+    for (auto& fade : fades)
+    {
+        const bool gain = fade.shape.kind < 2;
+        const auto value = [&](double u) { const double v = fade.shape.value(u); return (float)(gain ? std::max(-160.,juce::Decibels::gainToDecibels(v,-160.)+manual) : v); };
+        double begin = project.automationTime(source.address,fade.begin), end = project.automationTime(source.address,fade.end);
+        if (fade.step) begin = std::max(0.,end-1.e-9);
+        if (end <= begin) return false;
+        shapeClock(fade.shape,project,source.address,fade.begin,fade.end);
+        if (!fade.shape.valid()) return false;
+        const auto first = value(0), last = value(1);
+        result.points.push_back({begin,first,fade.step ? 1. : 0.,false,gain,{},fade.step ? std::nullopt : std::optional<AutomationShape>(fade.shape)});
+        result.points.push_back({end,last,0,false,gain});
+    }
+    return true;
+}
 juce::Result composeNodes(const Project& p, const NodeSource& source, AutomationCurve& result)
 {
     const auto* saved = p.curve(source.address); result = saved ? *saved : AutomationCurve{};
@@ -55,214 +113,94 @@ juce::Result composeNodes(const Project& p, const NodeSource& source, Automation
         return juce::Result::fail("Enable or clear the existing disabled curve before converting its preset to nodes. Its saved points were kept.");
     const int band = (int) source.address.target; const bool filter = source.address.target == AutomationTarget::cutoff;
     if (filter && saved && saved->active())
-        return juce::Result::fail("This legacy filter also has manual cutoff automation. Keep it or clear that curve before converting the filter preset.");
+        return juce::Result::fail("This track already has manual cutoff automation. Keep it or clear that curve before applying a generated filter sweep. The curve was kept.");
     const auto range = automationRange(source.address.target); const float manual = p.manualValue(source.address);
-    const auto session = [&](double x) { return p.automationSessionTime(source.address,x); };
     const auto curveTime = [&](double t) { return p.automationTime(source.address,t); };
-    // Fresh ordinary volume fades are linear in audible gain, not in dB.
-    // Keep that native interpolation instead of baking its logarithm into
-    // dozens of short dB segments (which also looked like hard-cut handles).
-    if (source.address.target == AutomationTarget::volume && (!saved || saved->points.empty())
-        && (source.fades.fadeIn > 0 || source.fades.fadeOut > 0)
-        && source.playback.pairs[0][0].strength == 0 && source.playback.pairs[1][0].strength == 0)
+    const auto session = [&](double x)
     {
-        std::set<double> times {0.,curveTime(source.clip.end())};
-        for (double local : {source.fades.intro,source.fades.intro+source.fades.fadeIn,source.fades.outro,source.fades.outro+source.fades.fadeOut})
-            if (local > 0 && local < source.clip.length) times.insert(curveTime(source.clip.start+local));
-        if (source.fades.fadeIn > 0 && source.fades.fadeOut > 0)
-        {
-            const double crossing = (source.fades.fadeIn*(source.fades.outro+source.fades.fadeOut)
-                + source.fades.fadeOut*source.fades.intro)/(source.fades.fadeIn+source.fades.fadeOut);
-            if (crossing > 0 && crossing < source.clip.length) times.insert(curveTime(source.clip.start+crossing));
-        }
-        if (source.clip.tempoMap) for (const auto& point : source.clip.tempoMap->points)
-            if (point.time > source.clip.start && point.time < source.clip.end()) times.insert(curveTime(point.time));
-        const auto gain = [&](double x)
-        {
-            // Evaluate in clip-local time. The source/session round trip at a
-            // late clip's exact start can land just before it, inventing a
-            // silence-to-unity discontinuity that subdivision cannot fit.
-            double local = source.clip.localTimeForSource(x);
-            if (x == 0 || std::abs(local) < 1.e-9) local = 0;
-            if (std::abs(local-source.clip.length) < 1.e-9) local = std::nextafter(source.clip.length,0.);
-            return (double) source.fades.gainAt(local) * juce::Decibels::decibelsToGain((double) manual);
-        };
-        const auto db = [](double g) { return (float) juce::Decibels::gainToDecibels(g,-160.); };
-        result = {}; result.enabled = true;
-        result.points.push_back({*times.begin(),db(gain(*times.begin())),0,false,true});
-        bool valid = true;
-        std::function<void(double,double,double,double,int)> span = [&](double a,double av,double b,double bv,int depth)
-        {
-            const auto deviation = [&](double bend, bool exponential)
-            {
-                double error = 0;
-                for (int i = 1; i < 16; ++i) error = std::max(error,std::abs(gain(a+(b-a)*i/16.)
-                    -(av+(bv-av)*automationProgress(i/16.,bend,exponential))));
-                return error;
-            };
-            double bend = 0; bool exponential = false; double error = deviation(0,false);
-            // A tempo-shaped fade usually fits one native bent gain span.
-            // Fit it before subdividing into many short straight segments.
-            if (error > 2.e-6 && av != bv)
-            {
-                const double fraction = (gain((a+b)*.5)-av)/(bv-av);
-                if (fraction > 0 && fraction < 1) for (bool exp : {false,true})
-                {
-                    const double fitted = juce::jlimit(-.999999,.999999,std::log((1-fraction)/fraction)/(exp ? 4 : 8));
-                    const double candidateError = deviation(fitted,exp);
-                    if (candidateError < error) { error = candidateError; bend = fitted; exponential = exp; }
-                }
-            }
-            if (error > 2.e-6 && depth < 24 && result.points.size() < 4095)
-            { const double mid = (a+b)*.5, mv = gain(mid); span(a,av,mid,mv,depth+1); span(mid,mv,b,bv,depth+1); return; }
-            if (error > 2.e-6 || result.points.size() >= 4096) { valid = false; return; }
-            result.points.back().bend = bend; result.points.back().exponential = exponential;
-            result.points.push_back({b,db(bv),0,false,true});
-        };
-        for (auto at = times.begin(); at != times.end(); ++at)
-            if (const auto next = std::next(at); next != times.end()) span(*at,gain(*at),*next,gain(*next),0);
-        if (!valid) return juce::Result::fail("Cannot represent this volume fade accurately. The arrangement was kept.");
-        // Endpoint holding already provides the flat portions outside a fade.
-        while (result.points.size() > 1 && result.points[0].value == result.points[1].value) result.points.erase(result.points.begin());
-        while (result.points.size() > 1 && result.points.back().value == result.points[result.points.size()-2].value) result.points.pop_back();
-        return juce::Result::ok();
-    }
-    auto value = [&](double x)
-    {
-        const double mapped = session(x);
-        double t = std::abs(mapped-source.clip.end()) < 1.e-9 ? std::nextafter(source.clip.end(),source.clip.start)
-            : std::abs(mapped-source.clip.start) < 1.e-9 ? source.clip.start : mapped;
-        if (band >= 0 && band < 4) for (const auto& pair : source.playback.pairs)
-        {
-            const auto& envelope = pair[(size_t) band];
-            const double edge = envelope.instant ? envelope.begin : envelope.end;
-            if (envelope.strength > 0 && (envelope.instant || envelope.bend >= 1) && std::abs(t-edge) < 1.e-9) t = edge;
-        }
-        const float base = saved ? saved->valueAt(x,manual) : manual;
-        if (t < source.clip.start || t > source.clip.end()) return base;
-        if (filter)
-        {
-            const TransitionFilterEnvelope* active = nullptr;
-            for (const auto& envelope : source.playback.filters) if (envelope.setting.active() && envelope.amountAt(t) > 0)
-            { if (active) return std::numeric_limits<float>::quiet_NaN(); active = &envelope; }
-            if (!active) return base;
-            const double amount = active->amountAt(t), upper = std::min(20000.,source.clip.media->sampleRate * .45), ratio = upper / 20.;
-            const double hz = active->highPass() ? 20 * std::pow(ratio,.8 * amount) : upper * std::pow(ratio,-.8 * amount);
-            const float cutoff = active->highPass() ? (float) ((hz - 20) / 19980) : lowPassToCutoff((float) hz);
-            // Match the legacy wet entrance continuously from Off, including
-            // source rates whose Nyquist limit is below the cutoff range.
-            return range.clipValue(cutoff * (float) std::min(1.,amount / .02));
-        }
-        double gain = source.playback.gainAt(band,t);
-        if (source.address.target == AutomationTarget::volume) gain *= source.fades.gainAt(t - source.clip.start);
-        return range.clipValue(base + juce::Decibels::gainToDecibels((float) gain,-60.f));
+        // Exact structural endpoints must survive the source/session round trip,
+        // including cuts and clip bounds on a ramped tempo map.
+        for (double t : {source.clip.start,source.clip.end()}) if (x==curveTime(t)) return t;
+        for (const auto& pair : source.playback.pairs) for (const auto& e : pair)
+            if (e.strength>0) for (double t : {e.begin,e.end}) if (x==curveTime(t)) return t;
+        return p.automationSessionTime(source.address,x);
     };
-    std::set<double> knots{0.,curveTime(source.clip.end())}; std::set<double> steps,guards;
-    if (saved) for (size_t i = 0; i < saved->points.size(); ++i)
-    { knots.insert(saved->points[i].time); if (i > 0 && saved->points[i-1].bend >= 1) steps.insert(saved->points[i].time); }
-    for (const auto& pair : source.playback.pairs) if (band >= 0 && band < 4)
+    if ((!saved || saved->points.empty()) && directNodes(p,source,result)) return juce::Result::ok();
+    if (filter)
+        return juce::Result::fail("These filter sweeps overlap. Shorten or move their frames so only one sweep controls this track at a time. The curves were kept.");
+    if (band < 0 || band >= 4) return juce::Result::fail("This parameter has no generated fade.");
+    std::set<double> knots {curveTime(source.clip.start),curveTime(source.clip.end())};
+    if (saved) for (const auto& point : saved->points) knots.insert(point.time);
+    for (const auto& pair : source.playback.pairs)
+    { const auto& e=pair[(size_t)band]; if (e.strength>0) { knots.insert(curveTime(e.begin)); knots.insert(curveTime(e.end)); } }
+    if (band==0)
     {
-        const auto& envelope = pair[(size_t) band]; if (envelope.strength <= 0) continue;
-        knots.insert(curveTime(envelope.begin)); knots.insert(curveTime(envelope.end));
-        if (envelope.instant) steps.insert(curveTime(envelope.begin));
-        else if (envelope.bend >= 1) steps.insert(curveTime(envelope.end));
+        if (source.fades.fadeIn>0) { knots.insert(curveTime(source.clip.start+source.fades.intro)); knots.insert(curveTime(source.clip.start+source.fades.intro+source.fades.fadeIn)); }
+        if (source.fades.fadeOut>0) { knots.insert(curveTime(source.clip.start+source.fades.outro)); knots.insert(curveTime(source.clip.start+source.fades.outro+source.fades.fadeOut)); }
     }
-    if (source.address.target == AutomationTarget::volume)
-        for (double local : {source.fades.intro,source.fades.intro + source.fades.fadeIn,source.fades.outro,source.fades.outro + source.fades.fadeOut})
-            if (local >= 0 && local <= source.clip.length) knots.insert(curveTime(source.clip.start + local));
-    if (filter) for (const auto& envelope : source.playback.filters) if (envelope.setting.active())
+    if (knots.size()>4096) return juce::Result::fail("This track already has too many authored nodes to add these fade endpoints. Remove unused nodes first. The curves were kept.");
+    const auto baseAt = [&](double x) { return saved ? saved->interpolatedValue(x,manual) : manual; };
+    const auto gain = [](double db) { return db<=-160 ? 0. : juce::Decibels::decibelsToGain(db); };
+    const double clipFirst=curveTime(source.clip.start),clipLast=curveTime(source.clip.end());
+    const auto value = [&](double x)
     {
-        knots.insert(curveTime(envelope.begin)); knots.insert(curveTime(envelope.end));
-        // The legacy wet entrance changes formula at amount .02. Keep that
-        // boundary explicit so a single exponential span covers the real sweep.
-        if (envelope.setting.strength > .02)
+        const double t=session(x); double v=gain(baseAt(x));
+        if (x>=clipFirst && x<clipLast)
+        { v*=source.playback.gainAt(band,t); if (band==0) v*=source.fades.gainAt(t-source.clip.start); }
+        return (float)juce::Decibels::gainToDecibels(v,-160.);
+    };
+    result={}; result.enabled=true;
+    for (const double x : knots) result.points.push_back({x,value(x),0,false,true});
+    for (size_t i=0;i+1<result.points.size();++i)
+    {
+        const double a=result.points[i].time,b=result.points[i+1].time,begin=session(a),end=session(b),duration=end-begin;
+        if (duration<=0) return juce::Result::fail("The source clock cannot represent these fade endpoints. The curves were kept.");
+        AutomationShape composite; composite.kind=4; shapeClock(composite,p,source.address,begin,end);
+        AutomationShape base; base.kind=5; base.first=baseAt(a); base.last=baseAt(b);
+        if (saved && !saved->points.empty())
         {
-            const double wet = .02 / envelope.setting.strength;
-            knots.insert(curveTime(envelope.begin + (envelope.end - envelope.begin) * (envelope.incoming ? 1 - wet : wet)));
+            const auto slice=saved->sliced(a,b,manual); const auto& point=slice.points.front();
+            base.bend=point.bend; base.exponential=point.exponential; base.gainInterpolation=point.gainSpace;
+            if (point.shape) base.terms.push_back(*point.shape);
+            composite.endpointStep=point.bend>=1 || (point.shape && point.shape->endpointStep);
         }
-    }
-    for (double edge : steps) if (edge > 0)
-    { const double guard = std::max(0.,edge - 1 / source.clip.media->sampleRate); knots.insert(guard); guards.insert(guard); }
-    result = {}; result.enabled = true; bool valid = true; juce::String diagnostic;
-    const float tolerance = filter ? .00001f : .002f;
-    std::function<void(double,float,double,float,int)> subdivide = [&](double a,float av,double b,float bv,int depth)
-    {
-        if (!valid) return;
-        if (!std::isfinite(av) || !std::isfinite(bv) || result.points.size() >= 4096) { valid = false; return; }
-        std::array<float,15> samples;
-        for (size_t n = 0; n < samples.size(); ++n)
-        { samples[n] = value(a + (b-a) * (n+1) / 16.); if (!std::isfinite(samples[n])) { valid = false; return; } }
-        const auto deviation = [&](double bend, bool exponential)
+        shapeClock(base,p,source.address,begin,end); base.forwardClock=true;
+        composite.terms.push_back(std::move(base));
+        const auto fade = [&](double firstTime,double lastTime,AutomationShape shape,bool step)
         {
-            float error = 0;
-            for (size_t n = 0; n < samples.size(); ++n)
-                error = std::max(error,std::abs(samples[n] - (float) (av + (bv-av) * automationProgress((n+1)/16.,bend,exponential))));
-            return error;
+            shape.inputEnd=(lastTime-begin)/duration;
+            shape.inputBegin=step ? shape.inputEnd-1 : (firstTime-begin)/duration;
+            if (step) shape.kind=7;
+            return shape;
         };
-        double bend = 0; bool exponential = false; float error = deviation(0,false);
-        // Fit the existing bend before subdividing. Frequency-domain exponentials
-        // also have a native span, rather than being baked into dozens of points.
-        if (error > tolerance * .9f && bv != av)
+        // Every term is evaluated analytically in the interval's project clock.
+        // Only actual authored nodes and the two endpoints of each fade are knots.
+        if (a>=clipFirst && b<=clipLast)
         {
-            const double fraction = (samples[7] - (double) av) / (bv-av);
-            if (fraction > 0 && fraction < 1)
+            for (const auto& pair : source.playback.pairs)
             {
-                const double odds = std::log((1-fraction)/fraction);
-                for (bool exp : {false,true})
-                {
-                    if (exp && !filter) continue;
-                    const double trial = juce::jlimit(-1.,std::nextafter(1.,0.),odds / (exp ? 4 : 8));
-                    const float nextError = deviation(trial,exp);
-                    if (nextError < error) { error = nextError; bend = trial; exponential = exp; }
-                }
+                const auto& e=pair[(size_t)band]; if (e.strength<=0) continue;
+                AutomationShape shape; shape.kind=e.constantPower ? 1 : 0; shape.strength=e.strength;
+                shape.rising=e.rising; shape.bend=e.bend>=1 ? 0 : e.bend;
+                composite.terms.push_back(fade(e.begin,e.end,shape,e.instant || e.bend>=1));
+                if ((e.instant || e.bend>=1) && std::abs(end-e.end)<1.e-9) composite.endpointStep=true;
+            }
+            if (band==0 && (source.fades.fadeIn>0 || source.fades.fadeOut>0))
+            {
+                AutomationShape clip; clip.kind=6;
+                if (source.fades.fadeIn>0) clip.terms.push_back(fade(source.clip.start+source.fades.intro,source.clip.start+source.fades.intro+source.fades.fadeIn,{},false));
+                if (source.fades.fadeOut>0)
+                { AutomationShape shape; shape.rising=false; clip.terms.push_back(fade(source.clip.start+source.fades.outro,source.clip.start+source.fades.outro+source.fades.fadeOut,shape,false)); }
+                composite.terms.push_back(std::move(clip));
             }
         }
-        if (error > tolerance * .9f && depth < 28 && b-a > 1.e-10)
-        { const double mid = (a+b)*.5; const float mv = value(mid); subdivide(a,av,mid,mv,depth+1); subdivide(mid,mv,b,bv,depth+1); return; }
-        if (error > tolerance)
-        {
-            diagnostic = "source " + juce::String(a,12) + ".." + juce::String(b,12) + ", values " + juce::String(av,8) + "/" + juce::String(bv,8) + ", error " + juce::String(error,8);
-            valid = false; return;
-        }
-        result.points.back().bend = bend; result.points.back().exponential = exponential;
-        result.points.push_back({b,bv,0});
-    };
-    if (!knots.empty()) result.points.push_back({*knots.begin(),value(*knots.begin()),0});
-    for (auto i = knots.begin(); i != knots.end(); ++i)
-    {
-        const auto next = std::next(i); if (next == knots.end()) break;
-        if (steps.count(*next)) { result.points.back().bend = 1; result.points.push_back({*next,value(*next),0}); }
-        else subdivide(*i,value(*i),*next,value(*next),0);
+        // Clip boundaries and authored cuts can jump without a guard sample.
+        if (std::abs(composite.value(composite.position(1))-gain(result.points[i+1].value))>1.e-7) composite.endpointStep=true;
+        composite.first=composite.value(composite.position(0)); composite.last=composite.value(composite.position(1));
+        if (!composite.valid()) return juce::Result::fail("This compound curve exceeds the supported formula depth. Undo or simplify an earlier compound treatment first. The curves were kept.");
+        result.points[i].shape=std::move(composite);
     }
-    if (!valid)
-    {
-        juce::Logger::writeToLog("Preset composition refused: " + source.clip.media->name + " / " + automationName(source.address.target)
-            + " / " + juce::String((int) result.points.size()) + " nodes / " + diagnostic);
-        return juce::Result::fail("Cannot create " + juce::String(automationName(source.address.target)) + " preset nodes for " + source.clip.media->name
-            + ". The arrangement was kept. " + diagnostic);
-    }
-    // A flat approach needs no extra point one sample before its step. Keeping
-    // that redundant guard would prevent dragging the cut earlier normally.
-    for (size_t i = 1; i+1 < result.points.size();)
-    {
-        const auto& point = result.points[i];
-        const bool authored = saved && std::any_of(saved->points.begin(),saved->points.end(),[&](const auto& p) { return p.time == point.time; });
-        if (guards.count(point.time) && !authored && point.bend == 1 && result.points[i-1].value == point.value)
-        { result.points[i-1].bend = 1; result.points.erase(result.points.begin()+(int) i); }
-        else ++i;
-    }
-    // Generated flat padding adds no shape: the ordinary curve already holds
-    // its endpoints. Preserve authored points, including deliberately flat ones.
-    const auto authored = [&](const AutomationPoint& point)
-    { return saved && std::any_of(saved->points.begin(),saved->points.end(),[&](const auto& original) { return original.time == point.time; }); };
-    for (size_t i = 1; i+1 < result.points.size();)
-        if (!authored(result.points[i]) && result.points[i-1].value == result.points[i].value && result.points[i].value == result.points[i+1].value)
-            result.points.erase(result.points.begin()+(int) i);
-        else ++i;
-    while (result.points.size() > 1 && !authored(result.points.front()) && result.points[0].value == result.points[1].value)
-        result.points.erase(result.points.begin());
-    while (result.points.size() > 1 && !authored(result.points.back()) && result.points.back().value == result.points[result.points.size()-2].value)
-        result.points.pop_back();
+
     return juce::Result::ok();
 }
 juce::Result materialise(Project& project, const Links& links, unsigned targets, const juce::String& standalone = {})
@@ -325,7 +263,10 @@ juce::Result capturePresetNodes(const Project& project, const juce::String& inco
             const double begin = project.automationTime(address,frame.getStart()), end = project.automationTime(address,frame.getEnd());
             auto curve = view.sliced(begin,end,project.manualValue(address));
             for (auto& point : curve.points)
+            {
+                if (point.shape) point.shape->clock.points.clear(); // Portable templates use project-time fractions.
                 point.time = juce::jlimit(0.,1.,(project.automationSessionTime(address,begin + point.time) - frame.getStart()) / frame.getLength());
+            }
             // Source guard points one ULP apart can map to the same project
             // instant. Keep the later point's right-hand value/interpolation,
             // matching AutomationCurve::interpolatedValue at that instant.
@@ -340,6 +281,78 @@ juce::Result capturePresetNodes(const Project& project, const juce::String& inco
         }
     }
     const auto valid = captured.validate(); if (valid.failed()) return valid; result = std::move(captured); return juce::Result::ok();
+}
+juce::Result applyOwnedPresetNodes(Project& project, const juce::String& incoming, const TransitionStyle::Nodes& nodes, const juce::String& name)
+{
+    const auto valid = nodes.validate(); if (valid.failed()) return valid;
+    const auto* link = project.transitionFor(incoming);
+    if (!link) return juce::Result::fail("Select an aligned pair first.");
+    const auto frame = project.transitionRange(*link);
+    auto* out = project.clipFor(link->outgoing);
+    auto* in = project.clipFor(incoming);
+    if (out->effects && out->effects == in->effects)
+        return juce::Result::fail("This pair shares one automation curve. Select two independent tracks.");
+    const auto owner = juce::Uuid().toString();
+    bool inserted = false;
+    for (size_t side = 0; side < 2; ++side)
+    {
+        auto& clip = side == 0 ? *out : *in;
+        for (int target = 0; target < trackAutomationCount; ++target)
+        {
+            const auto& shape = nodes.curves[side][(size_t)target];
+            if (!shape.active()) continue;
+            const AutomationAddress address{clip.track,(AutomationTarget)target,{},{},clip.id};
+            auto& curve = project.effectSettings(clip).automation[(size_t)target];
+            if (!curve.enabled && !curve.points.empty())
+                return juce::Result::fail("Enable the existing " + juce::String(automationName(address.target)) + " curve before applying this preset.");
+            const auto sourceTime = [&](double time) { return project.automationTime(address,time); };
+            const double begin = sourceTime(frame.getStart()), end = sourceTime(frame.getEnd());
+            const float manual = project.manualValue(address);
+            std::vector<AutomationPoint> placed;
+            for (auto point : shape.points)
+            {
+                point.time = sourceTime(frame.getStart() + point.time * frame.getLength());
+                point.presetOwner = owner;
+
+                placed.push_back(std::move(point));
+            }
+            for (size_t i = 0; i+1 < placed.size(); ++i) if (placed[i].shape)
+                shapeClock(*placed[i].shape,project,address,project.automationSessionTime(address,placed[i].time),project.automationSessionTime(address,placed[i+1].time));
+            constexpr double guard = 1.e-6;
+            {
+                const float value = curve.valueAt(begin - guard,manual);
+                if (curve.active() || value != placed.front().value)
+                    placed.insert(placed.begin(),{begin-guard,value,1,false,value < -60.f,owner});
+            }
+            {
+                const float value = curve.valueAt(end + guard,manual);
+                if (curve.active() || value != placed.back().value)
+                {
+                    placed.back().bend = 1;
+                    placed.push_back({end+guard,value,0,false,value < -60.f,owner});
+                }
+            }
+            for (const auto& point : placed)
+                if (std::any_of(curve.points.begin(),curve.points.end(),[&](const auto& existing)
+                    { return std::abs(existing.time-point.time) < 1.e-9; }))
+                    return juce::Result::fail("A preset node meets an existing " + juce::String(automationName(address.target))
+                        + " node. Move the existing node or adjust the join or length first.");
+            if (curve.points.size() + placed.size() > 4096)
+                return juce::Result::fail("This preset would exceed the automation node limit.");
+            curve.points.insert(curve.points.end(),placed.begin(),placed.end());
+            std::sort(curve.points.begin(),curve.points.end(),[](const auto& a,const auto& b) { return a.time < b.time; });
+            if (std::adjacent_find(curve.points.begin(),curve.points.end(),[](const auto& a,const auto& b) { return a.time >= b.time; }) != curve.points.end())
+                return juce::Result::fail("Preset nodes are too close at this source clock.");
+            curve.enabled = true;
+            inserted = true;
+        }
+    }
+    if (!inserted) return juce::Result::ok();
+    auto& edited = project.transitionLinks[(size_t)(link-project.transitionLinks.data())];
+    edited.presetOwner = owner;
+    edited.presetName = name;
+    edited.alignmentOnly = false;
+    return juce::Result::ok();
 }
 juce::Result applyPresetNodes(Project& project, const juce::String& incoming, const TransitionStyle::Nodes& nodes, unsigned targets)
 {
@@ -420,9 +433,12 @@ juce::Result applyPresetNodes(Project& project, const juce::String& incoming, co
                     // Bulk insertion must retain the template's bends. The
                     // single-node editor splits a preceding bend when adding
                     // a point; using it here would turn a step into a ramp.
-                    curve.points.push_back({time,point.value,point.bend,point.exponential,point.gainSpace});
+                    auto placed = point; placed.time = time;
+                    curve.points.push_back(std::move(placed));
                 }
             else if (!before.points.empty()) { curve.points.push_back({begin,manual,0}); curve.points.push_back({end,manual,0}); }
+            for (size_t i = 0; i+1 < curve.points.size(); ++i) if (curve.points[i].time >= begin && curve.points[i+1].time <= end && curve.points[i].shape)
+                shapeClock(*curve.points[i].shape,candidate,address,candidate.automationSessionTime(address,curve.points[i].time),candidate.automationSessionTime(address,curve.points[i+1].time));
             if ((clip->sourceElapsed(clip->length) > end || (!before.points.empty() && before.points.back().time > end))
                 && (!before.points.empty() || source.points.empty() || source.points.back().value != manual))
             {
@@ -455,7 +471,7 @@ juce::Result placeTargetNodes(Project& project,const juce::String& incoming,int 
     auto shape = project;
     shape.transitionLinks = {*link}; shape.transitionLinks.front().locked = false;
     shape.transitionLinks.front().bands = {}; shape.transitionLinks.front().filter = {}; shape.transitionLinks.front().bassSwap.reset();
-    for (auto& clip : shape.clips) { clip.controls.automation = {}; clip.fadeIn = clip.fadeOut = 0; }
+    for (auto& clip : shape.clips) { shape.effectSettings(clip).automation = {}; clip.controls.automation = {}; clip.fadeIn = clip.fadeOut = 0; }
     const auto checked = band ? shape.setTransitionBand(incoming,target,*band) : shape.setTransitionFilter(incoming,*filter);
     if (checked.failed()) return checked;
     const auto compiled = materialisePresetNodes(shape,incoming,1u << target); if (compiled.failed()) return compiled;
@@ -481,7 +497,8 @@ juce::Result TransitionStyle::Nodes::validate() const
         {
             if (!std::isfinite(point.time) || point.time < 0 || point.time > 1 || point.time <= previous
                 || !std::isfinite(point.value) || (point.value < (point.gainSpace && target < 4 ? -160 : range.getStart()) || point.value > range.getEnd()) || (point.gainSpace && target >= 4)
-                || !std::isfinite(point.bend) || std::abs(point.bend) > 1)
+                || !std::isfinite(point.bend) || std::abs(point.bend) > 1
+                || (point.shape && (!point.shape->valid() || (point.shape->kind>4 || ((point.shape->kind < 2 || point.shape->kind==4) ? !point.gainSpace : target != (int)AutomationTarget::cutoff)))))
                 return juce::Result::fail("Invalid ordinary preset node time, value or bend.");
             previous = point.time;
         }
@@ -495,7 +512,7 @@ bool TransitionStyle::Nodes::operator==(const Nodes& b) const
         const auto& a = curves[side][target]; const auto& other = b.curves[side][target];
         if (a.enabled != other.enabled || a.points.size() != other.points.size()) return false;
         for (size_t i = 0; i < a.points.size(); ++i)
-            if (std::abs(a.points[i].time - other.points[i].time) > 1.e-12 || a.points[i].value != other.points[i].value || std::abs(a.points[i].bend - other.points[i].bend) > 1.e-12 || a.points[i].exponential != other.points[i].exponential || a.points[i].gainSpace != other.points[i].gainSpace) return false;
+            if (std::abs(a.points[i].time - other.points[i].time) > 1.e-12 || a.points[i].value != other.points[i].value || std::abs(a.points[i].bend - other.points[i].bend) > 1.e-12 || a.points[i].exponential != other.points[i].exponential || a.points[i].gainSpace != other.points[i].gainSpace || a.points[i].shape != other.points[i].shape) return false;
     }
     return true;
 }
@@ -510,7 +527,7 @@ juce::var presetNodesToJson(const TransitionStyle::Nodes& nodes)
             auto* object = new juce::DynamicObject(); object->setProperty("enabled",curve.enabled); juce::Array<juce::var> points;
             for (const auto& point : curve.points)
             {
-                auto* node = new juce::DynamicObject(); node->setProperty("time",point.time); node->setProperty("value",point.value); node->setProperty("bend",point.bend); if (point.exponential) node->setProperty("exponential",true); if (point.gainSpace) node->setProperty("gainSpace",true); points.add(juce::var(node));
+                auto* node = new juce::DynamicObject(); node->setProperty("time",point.time); node->setProperty("value",point.value); node->setProperty("bend",point.bend); if (point.exponential) node->setProperty("exponential",true); if (point.gainSpace) node->setProperty("gainSpace",true); if (point.shape) node->setProperty("shape",automationShapeToJson(*point.shape)); points.add(juce::var(node));
             }
             object->setProperty("points",points); curves.add(juce::var(object));
         }
@@ -536,6 +553,7 @@ juce::Result readPresetNodes(const juce::var& document, TransitionStyle::Nodes& 
             {
                 if (!point.isObject() || !numeric(point["time"]) || !numeric(point["value"]) || !numeric(point["bend"]) || (point.hasProperty("exponential") && !point["exponential"].isBool()) || (point.hasProperty("gainSpace") && !point["gainSpace"].isBool())) return fail();
                 curve.points.push_back({(double) point["time"],(float) point["value"],(double) point["bend"],(bool) point["exponential"],(bool) point["gainSpace"]});
+                if (point.hasProperty("shape") && !readAutomationShape(point["shape"],curve.points.back().shape)) return fail();
             }
         }
     }

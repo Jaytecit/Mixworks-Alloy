@@ -12,7 +12,7 @@ mat2 rot(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 vec4 art(vec2 uv){vec4 a=hasImage!=0?sampleFittedMedia(uv):vec4(0),b=sampleCutout(materialDomain(uv));vec4 c=vec4(mix(a.rgb,b.rgb,b.a),max(a.a,b.a));return vec4(c.rgb*c.a,c.a);}
 void main(){
     vec2 uv=gl_FragCoord.xy/resolution,p=uv-.5,q=p;float t=simulationTime;
-    vec4 fresh=art(uv);
+    vec4 fresh=hasCutout!=0 ? structurePigment(uv) : art(uv);
     if(hasImage==0&&hasCutout==0)fresh=vec4(.5+.3*sin(uv.x*13.),.2,.5+.4*cos(uv.y*11.),1);
     if(simulationReset>.5){colour=fresh;return;}
 #if COMPOSITION == 0
@@ -34,6 +34,8 @@ void main(){
     q=p+vec2(b-a,a-b)*stepDelta*.18;
 #endif
     q+=vec2(midHit,trebleHit)*pulse*stepDelta*vec2(.025,-.018);
+    q+=structureCurrent(uv)*stepDelta*.22;
+
     vec4 old=texture(input0,clamp(q+.5,0.,1.));
     vec3 shifted=old.gbr;float cycle=stepDelta*(.04+.12*midHit);
     old.rgb=mix(old.rgb,shifted,cycle)*exp(-stepDelta*.04);

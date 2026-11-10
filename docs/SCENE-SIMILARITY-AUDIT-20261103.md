@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Scene similarity audit — 3 November 2026
 
 All **203 active scenes** were screened against the installed 0.55.68 images80 runtime. There are worthwhile overlaps to fix, including Jay's Afterhours Skyline / Dreamline Metropolis example. The largest common cause is **28 scenes defaulting to the same sixfold reflection finish**, which conceals otherwise different structures. Treat this as a prioritised comparison list, not a proposal to delete scenes or rewrite every participant.

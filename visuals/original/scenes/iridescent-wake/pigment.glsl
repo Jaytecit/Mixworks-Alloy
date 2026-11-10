@@ -17,7 +17,7 @@ vec4 pigmentArt(vec2 uv){
     if(hasImage==0&&hasCutout==0)c=vec4(.3+.3*sin(uv.x*12.),.35+.25*cos(uv.y*9.),.7,1.);
     return vec4(c.rgb*c.a,c.a);
 }
-vec2 jetOrigin(){return vec2(.12,.5+.12*sin(travelTime*.68+midImpulse*.14*pulse));}
+vec2 jetOrigin(){return vec2(.10,.5+.36*sin(travelTime*1.15+midImpulse*.30*pulse));}
 float pressCentre(vec2 uv,float side){
     float squeeze=.04*sin(travelTime*.72)+bassHit*pulse*.035;
     return .5+side*(.25-squeeze)+.024*sin(uv.y*(6.+detail*6.)+midImpulse*.25*pulse);
@@ -50,11 +50,11 @@ void main(){
     float mask=1.,release=.25,feed=1.;
 #if PIGMENT_KIND == 0
     vec2 origin=jetOrigin(),d=uv-origin;
-    vec2 size=vec2(.035,.032+.020*bassHit*pulse);
+    vec2 size=vec2(.045,.055+.085*bassHit*pulse);
     mask=exp(-dot(d/size,d/size));
     vec2 source=.5+d/vec2(.070,.110)+vec2(.18*sin(travelTime*.5),0);
     fresh=pigmentArt(source)*mask*(.5+.5*bassHit*pulse);
-    release=.32+(1.-feedback)*.7;
+    release=.23+(1.-feedback)*.45;
     feed=32.;
 #elif PIGMENT_KIND == 1
     float left=pressMask(uv,-1.),right=pressMask(uv,1.);

@@ -10,10 +10,39 @@ import numpy as np
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from original_visual_gl import AudioController, pass_descriptors, SCENE_KEYS
-from original_scene_player import audio_levels, actor
+from original_scene_player import audio_levels, actor, kick_impact, transport_reset_required
 
 
 class OriginalVisualTests(unittest.TestCase):
+    def test_kick_impacts_follow_audio_timestamps_across_cadences(self):
+        kicks=[[.5,1.],[.877,.94],[1.5,1.]]
+        self.assertEqual(kick_impact(1.05,[]),0.)
+        self.assertEqual(kick_impact(.49,kicks),0.)
+        self.assertLess(kick_impact(.55,kicks),.15)
+        self.assertAlmostEqual(kick_impact(.587,kicks),1.)
+        self.assertAlmostEqual(kick_impact(.964,kicks),.94)
+        self.assertEqual(kick_impact(1.21,kicks),0.)
+        for fps in (30,60):
+            times=np.arange(2*fps)/fps
+            impacts=[kick_impact(at,kicks) for at in times]
+            starts=sum(value>0 and (i==0 or impacts[i-1]==0) for i,value in enumerate(impacts))
+            self.assertEqual(starts,3)
+        self.assertLess(kick_impact(.72,kicks),kick_impact(.65,kicks))
+        self.assertEqual(kick_impact(.82,kicks),0.)
+
+    def test_kick_input_is_bounded(self):
+        for bad in (None,[[0,1]]*4,[[0]],[[float('nan'),1]],[[0,1.1]],[[-1,1]]):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                kick_impact(1.,bad)
+
+    def test_slow_forward_cadence_keeps_state_while_real_seeks_reset(self):
+        self.assertFalse(transport_reset_required(None,4,100.))
+        for at in (100.,100.5,102.,130.):
+            self.assertFalse(transport_reset_required((4,100.),4,at))
+        self.assertTrue(transport_reset_required((4,100.),5,130.))
+        self.assertTrue(transport_reset_required((4,100.),5,100.))
+        self.assertTrue(transport_reset_required((4,100.),4,99.))
+
     def test_preset_validation_rejects_invalid_controls_and_duplicate_names(self):
         from visual_catalogue import catalogue
         with tempfile.TemporaryDirectory() as folder:

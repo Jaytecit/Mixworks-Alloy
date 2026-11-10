@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Destination safety and error/retry — ua09
 
 **Update:** [ua13](UA13-FOCUSED-VERIFICATION-20261101.md) successfully builds this

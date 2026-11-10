@@ -1,0 +1,11 @@
+{
+  "TITLE": "Fault Ledger / Shelf Rejoin",
+  "MEDIA": [{"WRAP": "clamp"}],
+  "PASSES": [{"TARGET": "fossils", "WIDTH": 400, "HEIGHT": 225, "WRAP": "clamp"}],
+  "CONTROLS": [
+    {"NAME": "motion", "TYPE": "slider speed", "LABEL": "Motion rate", "DEFAULT": 0.6, "MIN": 0, "MAX": 1.8, "UI_GROUP": "Scene"},
+    {"NAME": "response", "TYPE": "slider", "LABEL": "Music response", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Scene"},
+    {"NAME": "imprint", "TYPE": "slider", "LABEL": "Fossil transfer", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Nested", "DESCRIPTION": "Presses artwork into a moving seam. Old impressions travel and fade after a swap."},
+    {"NAME": "clear_fossils", "TYPE": "bang", "LABEL": "Clear fossils", "MIN": 0, "MAX": 1, "UI_GROUP": "Nested"}
+  ]
+}

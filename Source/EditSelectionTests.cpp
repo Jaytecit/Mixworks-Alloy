@@ -366,6 +366,205 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         writer.reset();
         Clip c; c.media = media; c.track = n; c.length = 20; base.clips.push_back(c);
     }
+    if(juce::JUCEApplicationBase::getCommandLineParameters().contains("--direct-range-only"))
+    {
+        base.updateLaneHandles();
+        w.stopTimer(); w.engine.project=base; w.engine.project.snap=false; w.timeline.pixelsPerSecond=32; w.layout.followPlayhead=false;
+        w.selectedClip=base.clips[0].id; w.refresh(); w.viewport.setViewPosition(0,0); w.engine.position=11;
+        const auto original=juce::JSON::toString(projectToJson(w.engine.project),true,17);
+        const auto mouse=juce::Desktop::getInstance().getMainMouseSource();
+        auto event=[&](juce::Point<float> at,juce::Point<float> down,bool drag,int mods)
+        {return juce::MouseEvent(mouse,at,juce::ModifierKeys(mods),1,0,0,0,0,&w.timeline,&w.timeline,juce::Time::getCurrentTime(),down,juce::Time::getCurrentTime(),1,drag);};
+        auto select=[&](double begin,double end,int modifiers)
+        { const float y=w.timeline.clipBounds(w.engine.project.clips[0]).getCentreY();
+          const juce::Point<float> down{(float)(begin*32),y},to{(float)(end*32),y};
+          w.timeline.mouseDown(event(down,down,false,juce::ModifierKeys::leftButtonModifier|modifiers));
+          w.timeline.mouseDrag(event(to,down,true,juce::ModifierKeys::leftButtonModifier|modifiers));
+          w.timeline.mouseUp(event(to,down,true,juce::ModifierKeys::leftButtonModifier|modifiers)); };
+        select(2,6,0);
+        check(w.editSelection.range && *w.editSelection.range==juce::Range<double>(2,6) && w.engine.position==11
+            && juce::JSON::toString(projectToJson(w.engine.project),true,17)==original,"plain waveform drag highlights audio without moving the source or playhead");
+        const auto at=juce::Point<float>{128,w.timeline.clipBounds(w.engine.project.clips[0]).getCentreY()};
+        w.timeline.mouseDown(event(at,at,false,juce::ModifierKeys::rightButtonModifier));
+        check(w.editSelection.range && w.editSelection.range->getLength()==4 && juce::PopupMenu::dismissAllActiveMenus(),"actual right-click opens tools while preserving the highlighted range");
+        const auto context = w.timelineMenu(4, 0);
+        bool copy = false, exact = false, unrelated = false;
+        for (juce::PopupMenu::MenuItemIterator item(context, true); item.next();)
+        {
+            const auto action = (TimelineAction) item.getItem().itemID;
+            copy |= action == TimelineAction::copy && item.getItem().isEnabled;
+            exact |= action == TimelineAction::exactRange && item.getItem().isEnabled;
+            unrelated |= action == TimelineAction::removePiece || action == TimelineAction::rippleDelete
+                || action == TimelineAction::settings || action == TimelineAction::split;
+        }
+        check(copy && exact && !unrelated, "range menu includes precision selection and excludes whole-segment commands");
+        w.performTimelineAction(TimelineAction::copy,4,0);
+        check(w.editClipboard && w.editClipboard->clips.size()==1 && w.editClipboard->clips[0].length==4 && w.editClipboard->clips[0].offset==2,
+            "context Copy uses only the highlighted source interval");
+        w.performTimelineAction(TimelineAction::cut,4,0);
+        bool gap=true; for(const auto& c:w.engine.project.clips)if(c.track==0 && c.start<6 && c.end()>2)gap=false;
+        check(gap && w.engine.project.clips.size()==3,"context Cut removes only highlighted audio and keeps the other lane");
+        w.undo(false); check(juce::JSON::toString(projectToJson(w.engine.project),true,17)==original,"Undo restores a direct highlighted-range cut");
+        w.engine.project.snap=true; w.clearEditSelection(); select(2.14,6.2,0);
+        check(w.editSelection.range && std::abs(w.editSelection.range->getStart()-2)<1.e-6 && std::abs(w.editSelection.range->getEnd()-6)<1.e-6,"direct selection follows the project beat grid");
+        w.clearEditSelection(); select(2.14,6.2,juce::ModifierKeys::altModifier);
+        check(w.editSelection.range && std::abs(w.editSelection.range->getStart()-2.14)<1.e-5 && std::abs(w.editSelection.range->getEnd()-6.2)<1.e-5,"Alt selection preserves an unsnapped audio interval");
+        auto capture=report.getSiblingFile("direct-audio-range.png").createOutputStream();
+        check(capture && juce::PNGImageFormat().writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()),*capture),"capture actual direct waveform range selection");
+        w.engine.project=base; w.selectedClip=base.clips[0].id; w.clearEditSelection(); w.engine.position=4; w.undoHistory.clear(); w.redoHistory.clear();
+        const auto json=[&] {return juce::JSON::toString(projectToJson(w.engine.project),true,17);};
+        const auto unchanged=json();
+        for(int condition=0;condition<5;++condition)
+        {
+            if(condition==0)w.busy=true;
+            if(condition==1)w.engine.exporting=true;
+            if(condition==2)w.pendingTempo=121;
+            if(condition==3)w.engine.project.transitionLinks.push_back({base.clips[0].id,base.clips[1].id});
+            if(condition==3)w.engine.project.transitionLinks.back().locked=true;
+            if(condition==4)w.engine.position=0;
+            const auto before=json(); const auto position=w.engine.position.load(); w.refresh();
+            const auto reason=w.timelineActionUnavailable(TimelineAction::split,position,0);
+            w.splitClip();
+            check(reason.isNotEmpty() && w.status==reason && json()==before && w.engine.position==position && w.undoHistory.empty(),
+                "split button/shortcut refuses without moving playback or partially editing / "+juce::String(condition));
+            check(!w.splitButton.isEnabled() && AlloyHints::textFor(w.splitButton)==reason && w.splitButton.getDescription()==reason,
+                "disabled split exposes its exact next step in hover and accessible description / "+juce::String(condition));
+            const auto menu=w.timelineMenu(position,0); bool found=false;
+            for(juce::PopupMenu::MenuItemIterator row(menu);row.next();)if(row.getItem().itemID==(int)TimelineAction::split)
+                found=!row.getItem().isEnabled && row.getItem().text.contains(reason);
+            check(found,"disabled context row exposes the same specific reason / "+juce::String(condition));
+            w.busy=false; w.engine.exporting=false; w.pendingTempo=0; w.engine.project=base; w.engine.position=4;
+        }
+        w.setEditRange(2,6); w.engine.playing=true; w.refresh();
+        w.performTimelineAction(TimelineAction::cut,4,0);
+        check(w.status.contains("Stop playback") && json()==unchanged && w.engine.position==4 && w.engine.playing && w.undoHistory.empty(),
+            "range Cut explains playback refusal without changing audio, clock or history");
+        w.engine.playing=false; w.clearEditSelection(); w.editClipboard.reset(); w.clipClipboard.reset(); w.refresh();
+        w.performTimelineAction(TimelineAction::paste,4,0);
+        check(w.status.contains("Copy audio first") && json()==unchanged && w.undoHistory.empty(),"empty clipboard Paste gives a useful next step without mutation");
+        juce::Label disabledChild; w.editingPaste.addChildComponent(disabledChild);
+        check(AlloyHints::textFor(disabledChild).contains("Copy audio first"),"text children inherit their disabled editing control's reason");
+        const AutomationAddress address{0,AutomationTarget::volume,{},{},base.clips[0].id};
+        for(int condition=0;condition<5;++condition)
+        {
+            w.engine.project=base; w.selectedClip=base.clips[0].id; auto target=address;
+            if(condition==0)w.busy=true;
+            if(condition==1)w.engine.exporting=true;
+            if(condition==2)w.pendingTempo=121;
+            if(condition==3) { w.engine.project.transitionLinks.push_back({base.clips[0].id,base.clips[1].id}); w.engine.project.transitionLinks.back().locked=true; }
+            if(condition==4) { target.target=AutomationTarget::plugin; target.slotId="missing-effect"; target.parameterId="missing-control"; }
+            w.timeline.selectAutomationCurve(target); w.refresh(); const auto before=json();
+            check(!w.insertAutomationNode(target,4,false) && json()==before && w.undoHistory.empty(),"unavailable automation insertion preserves project and history / "+juce::String(condition));
+            const auto reason=w.status;
+            check(!w.deleteAutomationNode(target,0) && w.status==reason && json()==before,
+                "automation deletion shares the precise refusal instead of failing silently / "+juce::String(condition));
+            check(condition==4 ? reason.contains("Load the effect") : !w.automationAdd.isEnabled() && AlloyHints::textFor(w.automationAdd)==reason && w.automationAdd.getDescription()==reason,
+                "automation refusal names preparation/export/lock or the missing effect, with discoverable recovery / "+juce::String(condition));
+            w.busy=false; w.engine.exporting=false; w.pendingTempo=0;
+        }
+        w.engine.project=base; w.selectedClip=base.clips[0].id; w.timeline.selectAutomationCurve(address); w.refresh();
+        const auto beforeDialog=json(); w.editAutomationPoint(0,-1,4);
+        auto* editor=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
+        check(editor && editor->getName()=="Automation node","open actual exact-entry automation dialog before its availability changes");
+        w.engine.exporting=true;
+        if(editor) { editor->exitModalState(1);
+            #if JUCE_WINDOWS
+            MSG message; while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+            #endif
+        }
+        check(w.status.contains("Finish or cancel export") && json()==beforeDialog && w.undoHistory.empty(),
+            "exact-entry confirmation explains newly unavailable export without partial publication");
+        w.showToolPage(2); w.showEditingPage(2); w.refresh(); auto refusal=report.getSiblingFile("editing-export-unavailable.png").createOutputStream();
+        check(refusal && juce::PNGImageFormat().writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()),*refusal),"capture real editing controls and concise export refusal");
+        w.engine.exporting=false;
+        Project linked=base; linked.transitionLinks={{base.clips[0].id,base.clips[1].id}};
+        linked.transitionLinks[0].frame=std::array<double,2>{4,16}; linked.transitionLinks[0].muteOutside=true;
+        check(linked.applyTransitionPreset(base.clips[1].id,TransitionPreset::crossfade).wasOk(),"prepare an audible linked pair with deliberate exterior cuts for partial editing");
+        const auto originalLinked=juce::JSON::toString(projectToJson(linked),true,17);
+        const auto pcm=[](const Project& project,int lane,double at)
+        {
+            Engine renderer; renderer.sampleRate=8000; renderer.project=project;
+            if(lane>=0)for(int i=0;i<trackCount;++i)renderer.project.tracks[(size_t)i].mute=i!=lane;
+            juce::AudioBuffer<float> audio(2,128); juce::MidiBuffer midi; renderer.render(audio,128,at,midi); return audio;
+        };
+        const auto beginLinked=[&]
+        {
+            w.engine.project=linked; w.selectedClip=base.clips[0].id; w.engine.position=3.25;
+            w.clearEditSelection(); w.editClipboard.reset(); w.clipClipboard.reset(); w.undoHistory.clear(); w.redoHistory.clear();
+            w.setEditRange(10,12); w.showToolPage(2); w.showEditingPage(0); w.refresh();
+        };
+        for(const auto action:{TimelineAction::cut,TimelineAction::cropSelection})
+        {
+            beginLinked(); const auto menu=w.timelineMenu(11,0); bool disclosed=false;
+            for(juce::PopupMenu::MenuItemIterator row(menu);row.next();)if(row.getItem().itemID==(int)action)disclosed=row.getItem().text.contains("unlink affected transitions");
+            check(disclosed,"partial linked edit explains unlinking before the context action");
+            w.performTimelineAction(action,11,0); const auto edited=w.engine.project;
+            check(edited.transitionLinks.empty() && w.undoHistory.size()==1 && w.engine.position==3.25 && w.status.contains("treatments kept as nodes"),
+                "partial linked Cut/Crop commits one undoable edit with explicit surviving treatment ownership");
+            float retainedError=0,partnerError=0,excludedPeak=0;
+            for(const double time:{2.,6.,9.99,10.5,11.99,14.,18.})
+            {
+                const auto before=pcm(linked,0,time),after=pcm(edited,0,time),partnerBefore=pcm(linked,1,time),partnerAfter=pcm(edited,1,time);
+                for(int ch=0;ch<2;++ch)for(int frame=0;frame<128;++frame)
+                {
+                    const double at=time+frame/8000.; const bool inside=at>=10 && at<12;
+                    const bool keep=action==TimelineAction::cut ? !inside : inside;
+                    if(keep)retainedError=std::max(retainedError,std::abs(before.getSample(ch,frame)-after.getSample(ch,frame)));
+                    else excludedPeak=std::max(excludedPeak,std::abs(after.getSample(ch,frame)));
+                    partnerError=std::max(partnerError,std::abs(partnerBefore.getSample(ch,frame)-partnerAfter.getSample(ch,frame)));
+                }
+            }
+            check(retainedError<2.e-6f && partnerError<2.e-6f && excludedPeak==0,
+                "partial linked edit keeps exact retained/unedited-partner PCM and silences excluded samples across cut edges / "+juce::String(retainedError,8)+" / "+juce::String(partnerError,8));
+            const auto committed=json(); w.undo(false); check(json()==originalLinked,"Undo restores complete linked geometry, treatments and outside cuts");
+            w.undo(true); check(json()==committed,"Redo restores the same partial linked edit");
+            if(action==TimelineAction::cut)
+            {
+                for(const auto& clip:base.clips)
+                {
+                    clip.media->analysisSource={audioDigest(clip.media->file),clip.media->file.getSize(),8000,clip.media->frames(),1};
+                    check(writeAnalysisRecord(clip.media->file,clip.media->analysisRecord()).isEmpty(),"seed owned source analysis for actual partial-edit reopen without detection");
+                }
+                const auto file=report.getSiblingFile("partial-linked-cut.mixworks"); const auto saved=w.engine.saveProject(file);
+                Engine reopened; reopened.sampleRate=8000; const auto opened=saved.isEmpty() ? reopened.restoreProject(file.loadFileAsString()) : saved;
+                check(saved.isEmpty() && opened.isEmpty() && reopened.project.transitionLinks.empty(),"actual source-backed save/reopen retains partial linked surgery / "+opened);
+                if(opened.isEmpty())
+                {
+                    const auto expected=pcm(edited,-1,10.5),actual=pcm(reopened.project,-1,10.5); float difference=0;
+                    for(int ch=0;ch<2;++ch)for(int frame=0;frame<128;++frame)difference=std::max(difference,std::abs(expected.getSample(ch,frame)-actual.getSample(ch,frame)));
+                    check(difference<2.e-6f,"reopened edit renders the original unselected partner through the selected source's gap");
+                    juce::String error; auto exporter=reopened.createExportRenderer(error);
+                    check(exporter && error.isEmpty(),"normal export renderer admits the reopened partial edit / "+error);
+                    if(exporter) { exporter->sampleRate=8000; juce::AudioBuffer<float> exported(2,128); juce::MidiBuffer midi; exporter->render(exported,128,10.5,midi); float difference=0;
+                        for(int ch=0;ch<2;++ch)for(int frame=0;frame<128;++frame)difference=std::max(difference,std::abs(expected.getSample(ch,frame)-exported.getSample(ch,frame)));
+                        check(difference<2.e-6f,"offline export path agrees with the partial-edit PCM oracle"); }
+                }
+                w.selectedClip=w.engine.project.clips.front().id; w.showToolPage(2); w.showEditingPage(0); w.refresh();
+                auto image=report.getSiblingFile("partial-linked-cut.png").createOutputStream();
+                check(image && juce::PNGImageFormat().writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()),*image),"capture actual partial linked cut with retained source pieces and editing controls");
+            }
+        }
+        beginLinked(); EditFragment replacement; replacement.clips.push_back(base.clips[1].slice(0,2)); replacement.origin=0; replacement.lane=1;
+        w.editClipboard=replacement; const auto beforeReplace=json(); w.replaceSelectedAudio();
+        editor=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
+        check(editor && editor->getDescription().contains("Unlink 1 affected transitions") && json()==beforeReplace,"partial linked Replace previews affected transition ownership before publication");
+        if(editor) { auto image=report.getSiblingFile("partial-linked-replace-question.png").createOutputStream();
+            check(image && juce::PNGImageFormat().writeImageToStream(editor->createComponentSnapshot(editor->getLocalBounds()),*image),"capture the real linked replacement consequence preview");
+            editor->exitModalState(0);
+            #if JUCE_WINDOWS
+            MSG message; while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+            #endif
+        }
+        check(json()==beforeReplace && w.undoHistory.empty() && w.editClipboard.has_value(),"Cancel preserves linked destination and copied replacement");
+        w.replaceSelectedAudio(true);
+        check(w.engine.project.transitionLinks.empty() && w.undoHistory.size()==1 && w.engine.position==3.25,"confirmed linked range replacement keeps programme position and one Undo");
+        const auto inserted=pcm(w.engine.project,0,10.5),originalCopy=pcm(base,1,.5),partner=pcm(w.engine.project,1,10.5),originalPartner=pcm(linked,1,10.5);
+        float replacementError=0; for(int ch=0;ch<2;++ch)for(int frame=0;frame<128;++frame)
+            replacementError=std::max({replacementError,std::abs(inserted.getSample(ch,frame)-originalCopy.getSample(ch,frame)),std::abs(partner.getSample(ch,frame)-originalPartner.getSample(ch,frame))});
+        check(replacementError<2.e-6f,"linked replacement plays the independent copied source while the unselected partner keeps its original treatment");
+        w.undo(false); check(json()==originalLinked,"Undo restores linked pair after partial replacement");
+        return;
+    }
     auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p)); };
     auto pump = []
     {
@@ -478,9 +677,13 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
     reset(); w.engine.project.clips[1].start = 12;
     w.engine.project.ensureTransitionLinks();
     check(w.engine.project.linkClips(base.clips[0].id, base.clips[1].id).wasOk(), "range transition fixture owns a valid linked pair");
+    w.refresh();
     const auto linked = json(w.engine.project);
     w.setEditRange(2, 6); w.performTimelineAction(TimelineAction::remove, 0, 0);
-    check(json(w.engine.project) == linked && w.undoHistory.empty(), "partial range deletion through linked transition ownership refuses atomically");
+    check(w.engine.project.transitionLinks.empty() && w.undoHistory.size()==1 && w.engine.project.clips.size()==3,
+        "partial range deletion materialises and unlinks the affected transition before slicing");
+    w.undo(false); w.undoHistory.clear(); w.redoHistory.clear(); w.selectedClip=base.clips[0].id; w.setEditRange(2,6);
+    check(json(w.engine.project)==linked,"Undo restores the partial linked deletion before independent Copy checks");
     w.performTimelineAction(TimelineAction::copy, 0, 0);
     check(w.editClipboard && w.editClipboard->clips.size() == 1 && json(w.engine.project) == linked,
         "range copy within a linked source captures ordinary curves without touching source relationship");

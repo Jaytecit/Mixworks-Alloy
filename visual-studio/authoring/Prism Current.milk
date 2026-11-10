@@ -1,0 +1,35 @@
+[preset00]
+MILKDROP_PRESET_VERSION=201
+PSVERSION_WARP=2
+PSVERSION_COMP=2
+fDecay=.91
+zoom=1.014
+rot=.013
+warp=.1
+wave_a=0
+ob_a=0
+ib_a=0
+bTexWrap=1
+bDarkenCenter=0
+per_frame_1=zoom=1.012+.010*bass; rot=.010+.009*mid;
+warp_1=`shader_body
+warp_2=`{
+warp_3=`  float2 p = (uv_orig - 0.5) * float2(1.7778, 1.0);
+warp_4=`  float t = frame / 24.0;
+warp_5=`  float low = saturate((bass - 0.72) * 0.53);
+warp_6=`  float radius = length(p);
+warp_7=`  float angle = atan2(p.y, p.x);
+warp_8=`  float ribbon = sin(angle * 4.0 + radius * 25.0 - t * 3.0 + 1.5 * sin(p.y * 11.0 + t));
+warp_9=`  float lattice = sin(p.x * 26.0 + sin(p.y * 17.0 - t * 2.1) * 2.8 + t * 2.0);
+warp_10=`  float filament = pow(1.0 - abs(ribbon), 6.0) * (0.36 + 0.64 * lattice * lattice);
+warp_11=`  float beads = pow(0.5 + 0.5 * lattice, 9.0) * pow(0.5 + 0.5 * sin(31.0 * p.y - 2.6 * t + 5.0 * p.x), 8.0);
+warp_12=`  float3 hue = 0.57 + 0.43 * cos(float3(0.0, 2.1, 4.2) + angle * 2.0 + radius * 7.0 + t * 0.64);
+warp_13=`  float3 trails = tex2D(sampler_main, uv + 0.004 * float2(sin(p.y * 8.0 + t), cos(p.x * 6.0 - t))).rgb;
+warp_14=`  ret = trails * (0.82 + 0.08 * low) + hue * filament * (0.18 + 0.35 * low) + hue.bgr * beads * 0.29;
+warp_15=`  ret += hue * 0.026 * (0.55 + 0.45 * ribbon);
+warp_16=`}
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float3 ink = tex2D(sampler_main, uv).rgb;
+comp_4=`  ret = ink * (1.55 + 0.35 * saturate(bass - 0.65));
+comp_5=`}

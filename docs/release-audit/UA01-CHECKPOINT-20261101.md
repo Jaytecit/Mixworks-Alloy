@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # User-readiness audit: first execution checkpoint
 
 1 November 2026. This begins milestone 1 of [the current plan](USER-READINESS-20261101.md).

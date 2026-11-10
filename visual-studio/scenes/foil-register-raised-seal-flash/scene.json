@@ -1,0 +1,55 @@
+{
+  "TITLE": "Foil Register / Raised Seal Flash",
+  "MEDIA": [
+    {
+      "WRAP": "clamp"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Delay from light",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Nested",
+      "DESCRIPTION": "Bright image regions flash after adjacent foil has already caught the beat."
+    },
+    {
+      "NAME": "clear_nested",
+      "TYPE": "bang",
+      "LABEL": "Clear Nested history",
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ],
+  "PASSES": [
+    {
+      "TARGET": "nestedHistory",
+      "WIDTH": 20,
+      "HEIGHT": 12,
+      "FILTER": "nearest",
+      "WRAP": "clamp"
+    }
+  ]
+}

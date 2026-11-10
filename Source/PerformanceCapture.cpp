@@ -146,21 +146,24 @@ void Engine::returnToAutomation(const AutomationAddress& input)
     const juce::ScopedLock guard(lock); auto address=input;
     if (address.clipId.isEmpty() && address.target==AutomationTarget::plugin && controlClip(address.track)) address.clipId=selectedClip;
     if (exporting || project.automationLocked(address)) return;
-    auto* curve=project.curve(address); if (!curve) return;
+    auto* curve=project.curve(address);
+    if (!curve && (address.clipId.isNotEmpty() || address.target==AutomationTarget::plugin || !project.settings(address))) return;
     const auto writing=std::find_if(activeWrites.begin(),activeWrites.end(),[&](const auto& item) { return item.address==address; });
+    if (!curve && writing==activeWrites.end()) return;
     const float returnValue=writing!=activeWrites.end() ? writing->manualBefore : project.manualValue(address);
-    const bool returnEnabled=writing!=activeWrites.end() ? writing->original.enabled : !curve->points.empty();
+    const bool returnEnabled=curve && (writing!=activeWrites.end() ? writing->original.enabled : !curve->points.empty());
     if (capturingPerformance())
     {
         TakeEvent event; event.kind=TakeEventKind::returnAutomation; event.lane=address.track; event.control=(int)address.target;
         event.slot=address.slotId; event.parameter=address.parameterId; event.stem=address.stem;
         if (const auto* c=project.clipFor(address.clipId)) event.owner=effectsIdentity(c->effects);
         event.sourcePosition=position.load(); event.value=returnValue; event.payload=returnEnabled; appendTakeEvent(std::move(event));
-        if (const auto* original=performanceOriginal->curve(address)) *curve=*original;
+        if (curve) if (const auto* original=performanceOriginal->curve(address)) *curve=*original;
     }
     for (auto it=activeWrites.begin();it!=activeWrites.end();)
-        if (it->address==address) { if (capturingPerformance()) *curve=it->original; else finishWrite(*it,position.load(),true); it=activeWrites.erase(it); } else ++it;
-    curve->enabled=returnEnabled && !curve->points.empty(); project.setManualValue(address,returnValue);
+        if (it->address==address) { if (capturingPerformance() && curve) *curve=it->original; else finishWrite(*it,position.load(),true); it=activeWrites.erase(it); } else ++it;
+    if (curve) curve->enabled=returnEnabled && !curve->points.empty();
+    project.setManualValue(address,returnValue);
     if (auto* parameter=parameterFor(address)) { const juce::ScopedValueSetter<bool> applying(applyingPerformanceEvent,true); parameter->setValueNotifyingHost(returnValue); }
 }
 void Engine::restoreInitialPluginStates(const juce::var& snapshot)
@@ -334,7 +337,7 @@ juce::Result Engine::installTakeAudition(std::unique_ptr<Engine> renderer)
     ++takeAuditionRequest; takeAudition=std::move(renderer); return juce::Result::ok();
 }
 void Engine::endTakeAudition() { const juce::ScopedLock guard(lock); ++takeAuditionRequest; takeAudition.reset(); }
-uint64_t Engine::beginTakeAuditionRequest() { const juce::ScopedLock guard(lock); return ++takeAuditionRequest; }
+uint64_t Engine::beginTakeAuditionRequest() { const juce::ScopedLock guard(lock); ++seekRequest; seekPending = false; return ++takeAuditionRequest; }
 bool Engine::isTakeAuditionRequestCurrent(uint64_t request) const { const juce::ScopedLock guard(lock); return request==takeAuditionRequest; }
 void Engine::prepareRender(double rate,int size)
 {

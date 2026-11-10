@@ -109,7 +109,7 @@ void main() {
      min(
        min(
            sqrt(min(min(dot(p.xz,p.xz),dot(p.yz,p.yz)), dot(p.xy,p.xy)))+(1.-1.)*.2
-         , length(p)-.2-(onset*warp)*.2+(1.-1.)*.2
+         , length(p)-.2-.18*structureHeight(p.xy*.18+.5)-(onset*warp)*.2+(1.-1.)*.2
          )
        , 1.*min(p.w-(bassHit*warp)*.2*length((gl_FragCoord.xy/resolution-.5)),min(p.x,min(p.z,p.y)))+.05)
        )/k;

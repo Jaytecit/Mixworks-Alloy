@@ -63,6 +63,8 @@ vec3 localPoint(vec3 p) {
 // Conservative steps through the periodic implicit field prevent hidden faces
 // from drawing over foreground surfaces. All lighting uses the hit normal.
 vec2 surface(vec3 p) {
+    p.y-=.42*structureHeight(p.xz*.23+.5);
+
     vec3 q=localPoint(p);
     float r=length(q);
     float frequency=4.8+.28*sin(phase*.47);
@@ -146,14 +148,19 @@ vec3 material(vec3 p,vec3 n,vec3 rd,float id) {
 }
 void main() {
     phase=sceneTime*(.19+.26*motion);
+    // Preview-only rhythmic camera surges: retain the original surface/material.
+    float punch=clamp(max(bassHit,pow(1.-fract(projectBeat),3.)*bass*1.35),0.,1.);
+    float snap=floor(projectBeat*.5)*.55;
     vec2 uv=(2.*gl_FragCoord.xy-resolution)/resolution.y;
-    float orbit=.25*sin(phase*.23)+phase*.14;
-    vec3 eye=vec3(4.6*sin(orbit),.45+.5*sin(phase*.19),4.6*cos(orbit));
+    uv=turn(.20*punch*sin(floor(projectBeat)*1.570796))*uv;
+    float orbit=.25*sin(phase*.23)+phase*.14+snap;
+    float radius=4.6-2.20*punch;
+    vec3 eye=vec3(radius*sin(orbit),.45+.5*sin(phase*.19),radius*cos(orbit));
     vec3 aim=vec3(0,.08*sin(phase*.4),0);
     vec3 forward=normalize(aim-eye);
     vec3 right=normalize(cross(forward,vec3(0,1,0)));
     vec3 up=cross(right,forward);
-    vec3 ray=normalize(forward*2.05+uv.x*right+uv.y*up);
+    vec3 ray=normalize(forward*(2.05+.15*punch)+uv.x*right+uv.y*up);
     vec3 c=environment(ray)*.20;
     // A subdued, three-dimensional dust field sits behind the sculpture.
     vec3 starRay=ray; starRay.xz=turn(.04*phase)*starRay.xz;

@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # DJ arrangement research and targets — 23 October 2026
 
 Requested scope: musical energy from rhythm, bass and dynamics; more transition techniques and suitability/avoidance rules; variety over a set; an optional genre preference that yields to better musical choices or missing tags. This document separates published guidance, product decisions and unimplemented targets. Sources accessed 23 October 2026; no source code, models, audio or training material is imported from these sites.

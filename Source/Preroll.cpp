@@ -114,7 +114,7 @@ void Workstation::changePreroll(int bars)
     auto candidate = engine.project; const auto changed = candidate.setTimelineOrigin(target);
     if (changed.failed()) { setStatus(changed.getErrorMessage()); return; }
     const double position = std::max(0., engine.position.load() + target - previous);
-    remember(); engine.project = std::move(candidate); engine.seek(position);
+    remember(); engine.project = std::move(candidate); engine.commitSeek(engine.prepareSeek(position));
     if (target > 0) timeline.pixelsPerSecond = std::max(timeline.pixelsPerSecond, 180. / target);
     refresh(); viewport.setViewPosition(0, viewport.getViewPositionY());
     setStatus(bars == 0 ? "Pre-roll removed. Musical zero and retained audio agree."

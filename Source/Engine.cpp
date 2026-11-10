@@ -1,10 +1,12 @@
 #include "Engine.h"
+#include "StudioAudioLink.h"
 #include "EffectTail.h"
 #include <filesystem>
 #include "Beatmatch.h"
 #include <cmath>
 #include <map>
 #include <limits>
+#include <tuple>
 
 namespace mixworks
 {
@@ -58,6 +60,43 @@ juce::String writeWithBackup(const juce::File& target, const juce::String& text)
 }
 }
 void Engine::useTestMidiProfile(const juce::File& file) { testMidiProfile = file; }
+class Engine::SeekWorker final : public juce::Thread
+{
+public:
+    explicit SeekWorker(Engine& e) : Thread("Alloy seek preparation"), engine(e) { startThread(juce::Thread::Priority::low); }
+    ~SeekWorker() override { signalThreadShouldExit(); notify(); stopThread(20000); }
+    void submit(PreparedSeek value)
+    {
+        latestRequest = value.request;
+        std::optional<PreparedSeek> displaced;
+        { const juce::ScopedLock guard(mutex); displaced.swap(pending); pending.emplace(std::move(value)); }
+        notify();
+    }
+    std::optional<PreparedSeek> take()
+    {
+        std::optional<PreparedSeek> result;
+        { const juce::ScopedLock guard(mutex); result.swap(completed); }
+        return result;
+    }
+private:
+    Engine& engine;
+    juce::CriticalSection mutex;
+    std::optional<PreparedSeek> pending, completed;
+    std::atomic<uint64_t> latestRequest {0};
+    void run() override
+    {
+        while (!threadShouldExit())
+        {
+            std::optional<PreparedSeek> next;
+            { const juce::ScopedLock guard(mutex); next.swap(pending); }
+            if (!next) { wait(50); continue; }
+            warmSeek(*next,[&] { return threadShouldExit() || latestRequest.load() != next->request; });
+            if (threadShouldExit()) break;
+            { const juce::ScopedLock guard(mutex); completed.swap(next); }
+            engine.triggerAsyncUpdate();
+        }
+    }
+};
 Engine::Engine(juce::File midiProfile, bool loadMidiMappings) : mappingsFile(midiProfile == juce::File() ? midiSettingsFile() : std::move(midiProfile))
 {
     formats.registerBasicFormats();
@@ -68,7 +107,8 @@ Engine::Engine(juce::File midiProfile, bool loadMidiMappings) : mappingsFile(mid
 Engine::~Engine()
 {
     onPerformanceBegin={}; onPerformanceFinalised={};
-    onControl = {}; onMidiChanged = {};
+    onControl = {}; onMidiChanged = {}; onSeekStatus = {};
+    seekWorker.reset();
     if (attached) devices.removeAudioCallback(this);
     finalisePerformance(); detachPerformanceParameters();
     devices.removeMidiInputDeviceCallback({}, this);
@@ -275,21 +315,107 @@ void Engine::audioDeviceStopped()
 }
 void Engine::stop()
 {
-    const juce::ScopedLock guard(lock); finalisePerformance(); endTakeAudition(); gridAudition.stop(); endTransitionRehearsal();
+    const juce::ScopedLock guard(lock); ++seekRequest; seekPending = false;
+    finalisePerformance(); endTakeAudition(); gridAudition.stop(); endTransitionRehearsal();
     libraryPreviewSource = nullptr; ++libraryPreviewGeneration;
     serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
     finishAutomation(); automationRecordMode = AutomationRecordMode::read; replayShifts.clear(); cancelPreparedLaunch();
     playing = false; position = project.playbackStart(); ++visualClockRevision; deviceClockValid = false; keyboard.allNotesOff(0); resetPlugins();
 }
-void Engine::seek(double seconds)
+Engine::PreparedSeek Engine::snapshotSeek(double seconds)
 {
-    const juce::ScopedLock guard(lock); endTakeAudition(); endTransitionRehearsal();
-    if (capturingPerformance()) { TakeEvent event; event.kind=TakeEventKind::seek; event.value=std::max(0.,seconds); event.sourcePosition=position.load(); appendTakeEvent(std::move(event)); }
-    cancelPreparedLaunch(); libraryPreviewSource = nullptr; ++libraryPreviewGeneration;
-    serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
-    finishAutomation();
+    PreparedSeek prepared;
+    if (!std::isfinite(seconds)) { prepared.error = "Choose a finite seek position. Playback was kept."; return prepared; }
+    {
+        const juce::ScopedLock guard(lock);
+        prepared.owner = this; prepared.request = ++seekRequest; prepared.revision = visualClockRevision;
+        ++takeAuditionRequest; // Invalidate earlier take preparation at intent time, before disk work.
+        prepared.seconds = std::max(0., seconds); prepared.rate = sampleRate; prepared.frames = blockSize;
+        prepared.running = playing; prepared.clips = project.clips;
+    }
+    if (!std::isfinite(prepared.rate) || prepared.rate <= 0 || prepared.frames <= 0)
+    { prepared.error = "The audio clock is unavailable. Playback was kept."; return prepared; }
+    return prepared;
+}
+void Engine::warmSeek(PreparedSeek& prepared, const std::function<bool()>& cancelled)
+{
+    if (prepared.error.isNotEmpty()) return;
+    try
+    {
+    // Keep rendering the old position while the owned read-ahead pool and
+    // SoundTouch destination windows are prepared. No live DSP is touched here.
+    for (const auto& clip : prepared.clips)
+    {
+        if (cancelled && cancelled()) { prepared.error = "Seek preparation was superseded."; return; }
+        if (!clip.media) { prepared.error = "The seek source is unavailable. Playback was kept."; return; }
+        if (!requestOriginalClip(clip, prepared.seconds, .25, 1. + prepared.frames / prepared.rate, true))
+        { prepared.error = "The seek destination audio could not be prepared. Playback was kept."; return; }
+    }
+    if (cancelled && cancelled()) { prepared.error = "Seek preparation was superseded."; return; }
+    prepared.renderer.prepare(prepared.clips, prepared.seconds, prepared.rate, prepared.frames);
+    }
+    catch (const std::exception&)
+    { prepared.error = "The seek destination could not be prepared. Playback was kept."; }
+}
+Engine::PreparedSeek Engine::prepareSeek(double seconds)
+{
+    auto prepared = snapshotSeek(seconds); warmSeek(prepared);
+    return prepared;
+}
+juce::Result Engine::commitSeek(PreparedSeek prepared)
+{
+    if (prepared.error.isNotEmpty()) return juce::Result::fail(prepared.error);
+    // Declare retirement owners before the guard so their destruction, including
+    // nested engines/plugins and old stretch streams, happens after unlocking.
+    std::unique_ptr<Engine> retiredAudition;
+    std::unique_ptr<Project> retiredProgramme;
+    std::array<RehearsalAudio, 3> retiredRehearsal;
+    const juce::ScopedLock guard(lock);
+    if (prepared.owner != this || prepared.request != seekRequest || prepared.revision != visualClockRevision
+        || prepared.rate != sampleRate || prepared.frames != blockSize || prepared.running != playing
+        || prepared.clips.size() != project.clips.size())
+        return juce::Result::fail("Playback changed during seek preparation. Choose the position again.");
+    const auto identity = [](const Clip& c)
+    {
+        return std::make_tuple(c.id,c.media.get(),c.elasticSource.get(),c.prepared.get(),c.tempoMap.get(),c.stems.get(),c.stemsEnabled,
+            c.start,c.length,c.offset,c.audioSlip,c.rate,c.pitchSemitones,c.reversed,c.loopSpan,c.loopPhase,c.preparedOffset,c.elasticPlayback);
+    };
+    for (size_t i = 0; i < prepared.clips.size(); ++i)
+        if (identity(prepared.clips[i]) != identity(project.clips[i]))
+            return juce::Result::fail("The arrangement changed during seek preparation. Choose the position again.");
+    ++seekRequest; seekPending = false; ++takeAuditionRequest; retiredAudition.swap(takeAudition);
+    retiredProgramme.swap(queuedProgramme); queuedProgrammeCommitted = false;
+    if (rehearsalActive()) { playing = false; position = rehearsalReturn; }
+    rehearsalSlot = -1; rehearsalCursor = 0; retiredRehearsal.swap(rehearsalAudio);
+    if (capturingPerformance()) { TakeEvent event; event.kind=TakeEventKind::seek; event.value=prepared.seconds; event.sourcePosition=position.load(); appendTakeEvent(std::move(event)); }
+    libraryPreviewSource = nullptr; ++libraryPreviewGeneration;
+    cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
+    finishAutomation(); pauseFinishPending = false;
     for (auto& shift:replayShifts) shift.second=0;
-    position = std::max(0.0, seconds); ++visualClockRevision; deviceClockValid = false; resetPlugins();
+    position = prepared.seconds; ++visualClockRevision; deviceClockValid = false;
+    std::swap(elasticRenderer, prepared.renderer);
+    resetPlugins(false);
+    return juce::Result::ok();
+}
+juce::Result Engine::seek(double seconds)
+{
+    if (attached) return queueSeek(seconds);
+    const auto result = commitSeek(prepareSeek(seconds));
+    seekPending = false;
+    seekError = result.getErrorMessage();
+    if (result.failed() && onSeekStatus) onSeekStatus(seekError);
+    return result;
+}
+juce::Result Engine::queueSeek(double seconds)
+{
+    auto prepared = snapshotSeek(seconds);
+    seekError = prepared.error;
+    if (seekError.isNotEmpty())
+    { if (prepared.owner) seekPending = false; if (onSeekStatus) onSeekStatus(seekError); return juce::Result::fail(seekError); }
+    if (!seekWorker) seekWorker = std::make_unique<SeekWorker>(*this);
+    seekPending = true; seekWorker->submit(std::move(prepared));
+    if (onSeekStatus) onSeekStatus("Preparing playback position...");
+    return juce::Result::ok();
 }
 void Engine::prepareClipProcessing()
 {
@@ -298,10 +424,10 @@ void Engine::prepareClipProcessing()
         if (!project.clipFor(it->first) && std::none_of(project.clips.begin(),project.clips.end(),[&](const auto& c) { return effectsIdentity(c.effects)==it->first; })) it=clipProcessors.erase(it); else ++it;
     for (const auto& c : project.clips) { clipProcessors.try_emplace(c.id); clipProcessors.try_emplace(effectsIdentity(c.effects)); }
 }
-void Engine::resetPlugins()
+void Engine::resetPlugins(bool resetElastic)
 {
     const juce::ScopedLock guard(lock);
-    elasticRenderer.reset();
+    if (resetElastic) elasticRenderer.reset();
     masterEqualizer.reset();
     for (auto& eq : equalizers) eq.reset();
     for (auto& filter : cutoffFilters) filter.reset();
@@ -370,10 +496,27 @@ bool Engine::processTrackEffects(const Project& source, const Clip& clip, int fr
     for (int offset = first; offset < last;)
     {
         const int64_t sample=(int64_t)std::llround(at*sr)+offset;
-        const int count=std::min(last-offset,32-(int)((sample%32+32)%32));
-        const double time=audition ? -1 : (sample-(sample%32+32)%32)/sr;
+        int count=std::min(last-offset,32-(int)((sample%32+32)%32));
+        const auto gridSample=sample-(sample%32+32)%32;
+        std::array<int64_t,3> atSample {gridSample,gridSample,gridSample};
+        // Shared source EQ owns ordinary nodes. A sharp cut must split this
+        // processor at its exact sample, including cuts between 32-sample ticks.
+        if(!audition)for(int band=0;band<3;++band)
+        {
+            const auto& curve=source.effectSettings(clip).automation[(size_t)band+1];if(!curve.active())continue;
+            const AutomationAddress address{clip.track,(AutomationTarget)(band+1),{},{},clip.id};
+            const double from=source.automationTime(address,gridSample/sr),until=source.automationTime(address,(sample+count)/sr);
+            auto point=std::upper_bound(curve.points.begin(),curve.points.end(),from,[](double time,const auto& node){return time<node.time;});
+            for(;point!=curve.points.end() && point->time<=until;++point)
+            {
+                if(point==curve.points.begin() || (std::prev(point)->bend<1 && (!std::prev(point)->shape || !std::prev(point)->shape->endpointStep)))continue;
+                const auto edge=(int64_t)std::ceil(source.automationSessionTime(address,point->time)*sr-1.e-9);
+                if(edge>sample && edge<sample+count)count=(int)(edge-sample);
+                if(edge>gridSample && edge<=sample)atSample[(size_t)band]=std::max(atSample[(size_t)band],edge);
+            }
+        }
         std::array<float,3> eq;
-        for (int band=0;band<3;++band) eq[(size_t)band]=automationValueIn(source,{clip.track,(AutomationTarget)(band+1),{},{},clip.id},time);
+        for (int band=0;band<3;++band) eq[(size_t)band]=automationValueIn(source,{clip.track,(AutomationTarget)(band+1),{},{},clip.id},audition ? -1 : atSample[(size_t)band]/sr);
         shared.eq.process(effectBuffer,offset,count,sr,eq);
         for (int i=offset;i<offset+count;++i)
         {
@@ -630,8 +773,8 @@ void Engine::render(juce::AudioBuffer<float>& output, int frames, double at, juc
                 double next = at + frames / sampleRate.load();
                 for (const auto& member : source.clips) if (member.effects == group.effects)
                 {
-                    if (member.start <= time && (route->start > time || member.start > route->start)) route = &member;
-                    else if (member.start > time) next = std::min(next, member.start);
+                    if (member.routeStart() <= time && (route->routeStart() > time || member.routeStart() > route->routeStart())) route = &member;
+                    else if (member.routeStart() > time) next = std::min(next, member.routeStart());
                 }
                 const int count = juce::jlimit(1, frames - sample, (int)std::ceil((next - time) * sampleRate.load() - 1.e-6));
                 auto& buffer = trackBuffers[(size_t)route->track];
@@ -681,38 +824,13 @@ void Engine::render(juce::AudioBuffer<float>& output, int frames, double at, juc
         }
         const auto& settings = source.tracks[(size_t) track];
         const double sr = sampleRate.load();
-        const bool automatedEq = at >= 0 && (settings.automation[1].active() || settings.automation[2].active() || settings.automation[3].active());
-        if (automatedEq)
-        {
-            // A session-sample clock, rather than callback boundaries, owns EQ updates.
-            // 32-sample control intervals keep live and exported curves identical.
-            const int64_t firstSample = (int64_t) std::llround(at * sr);
-            for (int offset = 0; offset < frames;)
-            {
-                const auto sample = firstSample + offset; const auto tick = sample - sample % 32;
-                const int count = std::min(frames - offset, 32 - (int) (sample % 32));
-                std::array<float, 3> values;
-                for (int band = 0; band < 3; ++band) values[(size_t) band] = automationValueIn(source, {track, (AutomationTarget) (band + 1)}, tick / sr);
-                equalizers[(size_t) track].process(buffer, offset, count, sr, values); offset += count;
-            }
-        }
-        else equalizers[(size_t) track].process(buffer, 0, frames, sr, settings.eqDb);
-        for (int i = 0; i < frames; ++i) cutoffFilters[(size_t) track].process(buffer, i, 1, sr, automationValueIn(source, {track, AutomationTarget::cutoff}, at < 0 ? -1 : at + i / sr));
+        equalizers[(size_t) track].process(buffer, 0, frames, sr, settings.eqDb);
+        cutoffFilters[(size_t) track].process(buffer, 0, frames, sr, settings.filterCutoff);
         const bool muted = settings.mute || (anySolo && !settings.solo);
         const float gain = muted ? 0.0f : juce::Decibels::decibelsToGain(settings.gainDb);
         // Centre-unity balance law. Identical in live and offline rendering.
         const float left = gain * std::min(1.0f, 1.0f - settings.pan), right = gain * std::min(1.0f, 1.0f + settings.pan);
-        if (!muted && at >= 0 && (settings.automation[0].active() || settings.automation[4].active()))
-        {
-            auto* l = buffer.getWritePointer(0); auto* r = buffer.getWritePointer(1);
-            for (int i = 0; i < frames; ++i)
-            {
-                const double time = at + i / sr; const float automatedGain = juce::Decibels::decibelsToGain(automationValueIn(source, {track, AutomationTarget::volume}, time));
-                const float pan = automationValueIn(source, {track, AutomationTarget::pan}, time);
-                l[i] *= automatedGain * std::min(1.0f, 1.0f - pan); r[i] *= automatedGain * std::min(1.0f, 1.0f + pan);
-            }
-        }
-        else { buffer.applyGain(0, 0, frames, left); buffer.applyGain(1, 0, frames, right); }
+        buffer.applyGain(0, 0, frames, left); buffer.applyGain(1, 0, frames, right);
         meters[(size_t) track] = buffer.getMagnitude(0, frames);
         output.addFrom(0, 0, buffer, 0, 0, frames); output.addFrom(1, 0, buffer, 1, 0, frames);
     }
@@ -810,11 +928,32 @@ void Engine::audioDeviceIOCallbackWithContext(const float* const*, int, float* c
     serviceLiveHotcues();
     if (running && !gridAudition.active() && !rehearsalActive() && !takeAudition && !requestPlayback(at, frames)) return;
     if (rehearsalActive() || gridAudition.active()) { cancelScheduledPause(ScheduledPauseReason::unavailable); cancelLiveHotcues(ScheduledPauseReason::unavailable,true); }
-    const auto deliverMonitor = [&]
+    const bool studioSharing = studioSpectrum.enabled.load(std::memory_order_relaxed);
+    const bool studioSolo = studioSharing && std::any_of(project.tracks.begin(), project.tracks.end(),
+                                                        [](const auto& track) { return track.solo; });
+    double studioDetectedBpm = 0.;
+    float studioLeadGain = 0.f;
+    const auto deliverMonitor = [&](int programmeFrames = 0)
     {
         outputPeaks.push(mixBuffer, frames);
-        spectrum.push(mixBuffer, frames, sampleRate.load());
-        visualSpectrum.push(mixBuffer, frames, sampleRate.load());
+        const double rate = sampleRate.load();
+        spectrum.push(mixBuffer, frames, rate);
+        const SpectrumFeed::Clock visualClock {at, visualClockRevision.load(std::memory_order_relaxed)};
+        visualSpectrum.push(mixBuffer, frames, rate, &visualClock, programmeFrames);
+        if (studioSharing)
+        {
+            juce::uint64 tempo = 0;
+            if (programmeFrames > 0)
+            {
+                const double latest = at + programmeFrames / rate;
+                const double mixBpm = project.followTrackTempo ? project.tempo.bpmAt(latest) : project.bpm;
+                const double beat = project.followTrackTempo ? project.tempo.beatsAt(latest)
+                    : (latest - project.tempo.origin) * mixBpm / 60.;
+                tempo = StudioAudioLink::encodeTempo(studioDetectedBpm, mixBpm, beat);
+            }
+            studioTempo.store(tempo, std::memory_order_relaxed);
+            studioSpectrum.push(mixBuffer, frames, rate);
+        }
         if (!monitorMuted.load()) for (int ch = 0; ch < std::min(2, outputChannels); ++ch)
             if (outputs[ch]) juce::FloatVectorOperations::copy(outputs[ch], mixBuffer.getReadPointer(ch), frames);
         if (privatePreviewSource && privatePreviewFirstChannel>=2 && privatePreviewFirstChannel+1<outputChannels)
@@ -865,6 +1004,22 @@ void Engine::audioDeviceIOCallbackWithContext(const float* const*, int, float* c
     {
         const auto shifted=replayShifts.find(clip.id); const auto* voice=liveVoiceFor(clip.id);
         const double shift=voice && voice->status.active ? voice->shift : shifted!=replayShifts.end() ? shifted->second : 0;
+        if (studioSharing && running && clip.media && clip.pendingPlacement == PendingPlacement::none)
+        {
+            const double local = at + shift - clip.start;
+            const auto& lane = project.tracks[(size_t) clip.track];
+            if (local >= 0. && local < clip.length && !lane.mute && (!studioSolo || lane.solo))
+            {
+                const float laneDb = lane.valueAt(AutomationTarget::volume, at);
+                const float gain = laneDb > -60.f ? clip.envelope().gainAt(local)
+                    * juce::Decibels::decibelsToGain(laneDb + clip.gainDb) : 0.f;
+                if (gain > studioLeadGain)
+                {
+                    studioLeadGain = gain;
+                    studioDetectedBpm = clip.media->analysis.bpm;
+                }
+            }
+        }
         audibleEnd=std::max(audibleEnd,clip.end()-shift+std::max(project.effectTailSeconds,naturalEffectTail(clip.effects)));
         if (voice && voice->status.state==LiveHotcueState::pending)
             audibleEnd=std::max(audibleEnd,clip.end()-(voice->destination-voice->status.boundary)+std::max(project.effectTailSeconds,naturalEffectTail(clip.effects)));
@@ -905,7 +1060,7 @@ void Engine::audioDeviceIOCallbackWithContext(const float* const*, int, float* c
         if (masterRecorder.active()) masterRecorder.push(mixBuffer,frames);
         performanceFrames.fetch_add(frames);
     }
-    deliverMonitor();
+    deliverMonitor(running && !latencyBlocked ? std::min(activeFrames, transportFrames) : 0);
     if (running && !latencyBlocked)
     {
         const double rate = sampleRate.load();
@@ -1294,6 +1449,13 @@ void Engine::handleAsyncUpdate()
     if (saveMappings) saveMidiMappings();
     bool changed = false;
     for (const auto& event : controls) changed = applyControl(event) || changed;
+    if (seekWorker)
+        if (auto completed = seekWorker->take(); completed && completed->request == seekRequest)
+        {
+            const auto result = commitSeek(std::move(*completed)); seekPending = false; seekError = result.getErrorMessage();
+            if (onSeekStatus) onSeekStatus(result.failed() ? seekError : "Playback position ready.");
+            if (onControl) onControl(false);
+        }
     if (!controls.empty() && onControl) onControl(changed);
     if (onMidiChanged) onMidiChanged();
 }
@@ -1403,7 +1565,6 @@ bool Engine::applyGainControl(const ControlEvent& event, AutomationAddress addre
 {
     if (!std::isfinite(db) || !std::isfinite(event.inputMs)) return false;
     if (gainSnapResetPending.exchange(false)) gainSnapGestures.assign(trackCount * 4 + 1, {});
-    if (project.automationLocked(address)) return false;
     const auto index = address.target == AutomationTarget::master ? 0 : 1 + address.track * 4 + (int) address.target;
     if (index < 0 || index >= (int) gainSnapGestures.size()) return false;
     auto gesture = gainSnapGestures[(size_t) index];
@@ -1421,6 +1582,13 @@ bool Engine::applyGainControl(const ControlEvent& event, AutomationAddress addre
 bool Engine::applyControl(const ControlEvent& event)
 {
     if (exporting || !controlInputEnabled) return false;
+    // These message-thread actions may prepare a global seek. Do not inherit
+    // applyControl's publication lock through their UI/control callbacks.
+    if (event.action.kind == MidiActionKind::home)
+    { if (event.value > 0) seek(project.playbackStart()); return false; }
+    if (event.action.kind == MidiActionKind::timelineCue || event.action.kind == MidiActionKind::previousTransition
+        || event.action.kind == MidiActionKind::nextTransition || event.action.kind == MidiActionKind::undo || event.action.kind == MidiActionKind::redo)
+    { if (event.value > 0 && onPerformanceAction) onPerformanceAction(event.action); return false; }
     const juce::ScopedLock guard(lock);
     const auto action = event.action; const float value = juce::jlimit(0.0f, 1.0f, event.value);
     if (rehearsalActive() && action.kind != MidiActionKind::play && action.kind != MidiActionKind::start && action.kind != MidiActionKind::stop) endTransitionRehearsal();
@@ -1454,7 +1622,7 @@ bool Engine::applyControl(const ControlEvent& event)
         case MidiActionKind::previousTrack: case MidiActionKind::nextTrack:
             if (value > 0) { silenceNotes(); selectedTrack = (selectedTrack + (action.kind == MidiActionKind::nextTrack ? 1 : trackCount - 1)) % trackCount; } return false;
         case MidiActionKind::panic: if (value > 0) silenceNotes(); return false;
-        case MidiActionKind::previousTransition: case MidiActionKind::nextTransition: case MidiActionKind::undo: case MidiActionKind::redo:
+        case MidiActionKind::timelineCue: case MidiActionKind::previousTransition: case MidiActionKind::nextTransition: case MidiActionKind::undo: case MidiActionKind::redo:
             if (value > 0 && onPerformanceAction) onPerformanceAction(action); return false;
         case MidiActionKind::snap:
             if (value > 0) { if (onProjectSwitchBegin) onProjectSwitchBegin(); project.snap = !project.snap; } return value > 0;

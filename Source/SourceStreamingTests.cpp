@@ -14,6 +14,129 @@ void runOriginalPlaybackTests(const std::function<void(bool, const juce::String&
     const auto root = report.getParentDirectory().getChildFile("original-playback"); root.createDirectory();
     juce::AudioFormatManager formats; formats.registerBasicFormats();
     const auto args = juce::JUCEApplicationBase::getCommandLineParameterArray();
+    if (args.contains("--seek-continuity-only"))
+    {
+        constexpr int rate = 8000, frames = 24 * rate, block = 128;
+        auto resident = std::make_shared<Media>(); resident->sampleRate = rate; resident->samples.setSize(1,frames);
+        resident->manualBpm = 120; resident->manualBeatOrigin = 0;
+        for (int i = 0; i < frames; ++i) resident->samples.setSample(0,i,.12f*(float)std::sin(i*.137));
+        const auto file = root.getChildFile("seek-source.wav");
+        { juce::WavAudioFormat format; std::unique_ptr<juce::OutputStream> stream = file.createOutputStream();
+          auto writer = format.createWriterFor(stream,juce::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(1).withBitsPerSample(24));
+          check(writer && writer->writeFromAudioSampleBuffer(resident->samples,0,frames),"write bounded seek fixture"); }
+        // Read the encoded samples independently; this never warms a live identity.
+        { std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+          check(reader && reader->read(&resident->samples,0,frames,0,true,false),"independent seek PCM oracle reads encoded source"); }
+        juce::Array<juce::var> observations;
+        for (int mode = 0; mode < 6; ++mode)
+        {
+            Engine live({},false), oracle({},false); live.prepareRender(rate,512); oracle.prepareRender(rate,512);
+            live.project.masterDb = oracle.project.masterDb = 0;
+            auto streamed = resident->catalogueCopy(); streamed->file = file;
+            streamed->analysisSource.frames = frames; streamed->analysisSource.channels = 1;
+            streamed->original = std::make_shared<OriginalAudio>(file,rate,1,frames);
+            Clip clip; clip.media = streamed; clip.length = 16; clip.rate = mode ? 1.1 : 1.; clip.pitchSemitones = mode ? 2 : 0;
+            clip.reversed = mode == 2; clip.loopSpan = mode == 3 ? 1.3 : 0; clip.loopPhase = .7; clip.audioSlip = mode == 3 ? .12 : 0;
+            if (mode == 4)
+            {
+                auto stems = std::make_shared<StemAssets>();
+                for (auto& source : stems->sources) source = streamed;
+                clip.stems = stems;
+            }
+            clip.elasticPlayback = mode != 0;
+            if (clip.elasticPlayback) clip.elasticSource = std::make_shared<const ElasticSource>(clip);
+            live.project.clips = {clip};
+            if (mode == 5)
+            {
+                auto second = clip; second.id = juce::Uuid().toString(); second.track = 1; second.offset = .4; second.pitchSemitones = -2;
+                second.elasticSource = std::make_shared<const ElasticSource>(second); live.project.clips.push_back(second);
+                auto third = second; third.id = juce::Uuid().toString(); third.track = 2; third.offset = .9;
+                third.elasticSource = std::make_shared<const ElasticSource>(third); live.project.clips.push_back(third);
+            }
+            oracle.project = live.project;
+            for (auto& c : oracle.project.clips)
+            {
+                c.media = resident;
+                if (c.stems) { auto stems = std::make_shared<StemAssets>(); for (auto& source : stems->sources) source = resident; c.stems = stems; }
+                if (c.elasticPlayback) c.elasticSource = std::make_shared<const ElasticSource>(c);
+            }
+            live.prepareClipProcessing(); oracle.prepareClipProcessing();
+            check(live.seek(1.).wasOk(),"prepare initial playback / scenario " + juce::String(mode)); live.playing = true;
+            auto prepared = live.prepareSeek(9.037); const auto windows = prepared.windowsRendered();
+            check(live.playing && live.position == 1. && (mode == 0 || windows > 0),"seek preparation retains current clock and warms destination windows / " + juce::String(mode));
+            juce::AudioBuffer<float> actual(2,block), expected(2,block); juce::MidiBuffer midi;
+            const auto callbacks = live.callbackDiagnostics.snapshot(); const auto waits = live.streamWaitCallbacks.load();
+            std::thread callback([&] { live.audioDeviceIOCallbackWithContext(nullptr,0,actual.getArrayOfWritePointers(),2,block,{}); }); callback.join();
+            oracle.render(expected,block,1.,midi); float oldError = 0;
+            for (int ch=0;ch<2;++ch) for (int i=0;i<block;++i) oldError = std::max(oldError,std::abs(actual.getSample(ch,i)-expected.getSample(ch,i)));
+            check(oldError < 2.e-6f && actual.getMagnitude(0,block) > .001f && std::abs(live.position-(1.+block/double(rate))) < 1.e-9,
+                "old programme still renders exact PCM before seek commit / " + juce::String(mode));
+            check(live.commitSeek(std::move(prepared)).wasOk() && live.playing && live.position == 9.037,"prepared seek publishes destination without stopping / " + juce::String(mode));
+            oracle.resetPlugins(); oracle.render(expected,block,9.037,midi);
+            std::thread destination([&] { live.audioDeviceIOCallbackWithContext(nullptr,0,actual.getArrayOfWritePointers(),2,block,{}); }); destination.join();
+            float error = 0; for (int ch=0;ch<2;++ch) for (int i=0;i<block;++i) error = std::max(error,std::abs(actual.getSample(ch,i)-expected.getSample(ch,i)));
+            check(error < 2.e-6f && actual.getMagnitude(0,block) > .001f && std::abs(live.position-(9.037+block/double(rate))) < 1.e-9,
+                "first destination callback matches independent PCM and advances exact sample clock / " + juce::String(mode));
+            check(live.elasticWindowsRendered() == windows && live.streamWaitCallbacks == waits && live.callbackDiagnostics.snapshot().lockMisses == callbacks.lockMisses,
+                "destination callback needs no new stretch windows, buffering callbacks or lock skips / " + juce::String(mode));
+            auto* fact = new juce::DynamicObject(); fact->setProperty("scenario",mode); fact->setProperty("maxPcmError",error);
+            fact->setProperty("peak",actual.getMagnitude(0,block)); fact->setProperty("preparedWindows",(juce::int64)windows);
+            fact->setProperty("position",live.position.load()); fact->setProperty("bufferingCallbacks",(juce::int64)(live.streamWaitCallbacks.load()-waits));
+            observations.add(juce::var(fact));
+            if (mode <= 1)
+            {
+                const auto auditionRequest = live.beginTakeAuditionRequest();
+                { auto preparedIntent = live.prepareSeek(3.); }
+                check(!live.isTakeAuditionRequestCurrent(auditionRequest),"seek intent invalidates earlier take preparation / " + juce::String(mode));
+                const auto before = live.position.load(); const auto misses = live.callbackDiagnostics.snapshot().lockMisses;
+                check(live.queueSeek(3.2).wasOk() && live.queueSeek(6.2).wasOk() && live.seekPending && live.position == before,
+                    "async requests return before publication and retain only latest destination / " + juce::String(mode));
+                std::thread stillPlaying([&] { live.audioDeviceIOCallbackWithContext(nullptr,0,actual.getArrayOfWritePointers(),2,block,{}); }); stillPlaying.join();
+                oracle.render(expected,block,before,midi); float pendingError = 0;
+                for (int ch=0;ch<2;++ch) for (int i=0;i<block;++i) pendingError = std::max(pendingError,std::abs(actual.getSample(ch,i)-expected.getSample(ch,i)));
+                check(pendingError < 2.e-6f && actual.getMagnitude(0,block)>.001f && live.callbackDiagnostics.snapshot().lockMisses==misses,
+                    "actual old-position callback remains audible while seek worker prepares / " + juce::String(mode));
+                const auto deadline = juce::Time::getMillisecondCounterHiRes() + 5000;
+                while (live.seekPending && juce::Time::getMillisecondCounterHiRes() < deadline)
+                { live.flushMidiControls(); juce::Thread::sleep(2); }
+                check(!live.seekPending && live.seekError.isEmpty() && live.position == 6.2 && live.playing,
+                    "message-thread completion publishes latest asynchronous destination / " + juce::String(mode));
+                live.queueSeek(7.2); live.stop(); const auto stopped = live.position.load();
+                for (int i=0;i<10;++i) { live.flushMidiControls(); juce::Thread::sleep(2); }
+                check(!live.seekPending && !live.playing && live.position == stopped,"Stop cancels pending asynchronous seek / " + juce::String(mode));
+                live.queueSeek(7.2); live.sampleRate = 0;
+                check(live.queueSeek(8.2).failed() && !live.seekPending,"invalid clock clears superseded pending seek / " + juce::String(mode));
+                live.sampleRate = rate;
+            }
+            for (int stale = 0; stale < 6; ++stale)
+            {
+                auto rejected = live.prepareSeek(3.);
+                if (stale == 0) live.stop();
+                if (stale == 1) live.sampleRate = 16000;
+                if (stale == 2) live.project.clips[0].audioSlip += .1;
+                if (stale == 3) { auto newer = live.prepareSeek(4.); }
+                if (stale == 5) live.beginTakeAuditionRequest();
+                const auto position = live.position.load(); const bool playing = live.playing;
+                const auto result = stale == 4 ? oracle.commitSeek(std::move(rejected)) : live.commitSeek(std::move(rejected));
+                check(result.failed() && live.position == position && live.playing == playing,"stale/foreign prepared seek is transactional / " + juce::String(mode) + "/" + juce::String(stale));
+                live.sampleRate = rate;
+            }
+            live.playing = false;
+        }
+        Engine failed({},false); failed.prepareRender(rate,512); Clip good; good.media = resident; good.length = 4;
+        auto missing = resident->catalogueCopy(); missing->analysisSource.frames = frames; missing->analysisSource.channels = 1;
+        missing->original = std::make_shared<OriginalAudio>(root.getChildFile("missing.wav"),rate,1,frames);
+        Clip bad = good; bad.id = juce::Uuid().toString(); bad.media = missing; bad.start = 8;
+        failed.project.clips = {good,bad}; failed.prepareClipProcessing(); failed.seek(1.); failed.playing = true;
+        check(failed.seek(9.).failed() && failed.position == 1. && failed.playing,"unavailable destination keeps current playback and cursor");
+        juce::AudioBuffer<float> retained(2,block); failed.audioDeviceIOCallbackWithContext(nullptr,0,retained.getArrayOfWritePointers(),2,block,{});
+        check(retained.getMagnitude(0,block)>.001f && failed.position>1.,"failed seek leaves actual old programme output available");
+        const auto cursor = failed.position.load();
+        check(failed.seek(std::numeric_limits<double>::quiet_NaN()).failed() && failed.position==cursor,"nonfinite seek is refused without a clock change");
+        failed.playing = false;
+        check(report.getSiblingFile("seek-continuity.json").replaceWithText(juce::JSON::toString(juce::var(observations),true,17)),"retain actual destination PCM/clock/preparation observations");
+        return;
+    }
     if (args.contains("--transition-boundary-only"))
     {
         const int index = args.indexOf("--boundary-fixture");

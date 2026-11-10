@@ -40,7 +40,7 @@ void Workstation::initialiseTransitionRehearsalUI()
             else { setStatus(engine.rehearsalSummary()); refresh(); }
         };
         apply.onClick = [this, i]
-        { const auto* link = engine.project.transitionFor(selectedTransition); if (link && link->alternatives[(size_t) i]) applySelectedStyle(*link->alternatives[(size_t) i]); };
+        { const auto* link = engine.project.transitionFor(selectedTransition); if (link && link->alternatives[(size_t) i]) applySelectedStyle(*link->alternatives[(size_t) i], "Alternative " + juce::String::charToString((juce::juce_wchar) ('A' + i))); };
     }
     prepareRehearsal.setTooltip("Prepare saved A/B/C blends at matched listening volume.");
     endRehearsal.setTooltip("End comparison playback and restore the previous mix cursor, paused.");
@@ -55,7 +55,11 @@ void Workstation::initialiseTransitionRehearsalUI()
     savedTransitionPresets.onChange = [this]
     {
         const int index = savedTransitionPresets.getSelectedId() - 1;
-        if (!refreshing && index >= 0 && index < (int) engine.project.transitionPresets.size()) applySelectedStyle(engine.project.transitionPresets[(size_t) index].style);
+        if (!refreshing && index >= 0 && index < (int) engine.project.transitionPresets.size())
+        {
+            const auto& preset = engine.project.transitionPresets[(size_t)index];
+            applySelectedStyle(preset.style,preset.name);
+        }
     };
     saveTransitionPreset.onClick = [this] { chooseTransitionPresetName(); };
     removeTransitionPreset.onClick = [this]
@@ -74,17 +78,21 @@ void Workstation::layoutTransitionRehearsalUI(juce::Rectangle<int>& body)
     const bool wide = body.getWidth() >= 680;
     auto presets = body;
     if (wide) { rehearsal = body.removeFromLeft((body.getWidth() - 20) / 2); body.removeFromLeft(20); presets = body; }
-    rehearsalContextLabel.setBounds(rehearsal.removeFromTop(20)); auto contextRow = rehearsal.removeFromTop(26);
-    rehearsalLeadIn.setBounds(contextRow.removeFromLeft(contextRow.getWidth() / 2).withTrimmedRight(2)); rehearsalLeadOut.setBounds(contextRow); rehearsal.removeFromTop(6);
-    alternativesLabel.setBounds(rehearsal.removeFromTop(22));
+    auto row = rehearsal.removeFromTop(26);
+    prepareRehearsal.setBounds(row.removeFromLeft(row.getWidth() / 2).withTrimmedRight(2)); endRehearsal.setBounds(row);
+    rehearsal.removeFromTop(4);
+    auto contextRow = rehearsal.removeFromTop(26);
+    rehearsalContextLabel.setBounds(contextRow.removeFromLeft(146));
+    rehearsalLeadIn.setBounds(contextRow.removeFromLeft(contextRow.getWidth() / 2).withTrimmedRight(2)); rehearsalLeadOut.setBounds(contextRow);
+    rehearsal.removeFromTop(4);
+    alternativesLabel.setBounds(rehearsal.removeFromTop(18));
     auto three = [&](auto& buttons)
     {
-        auto row = rehearsal.removeFromTop(26); const int width = row.getWidth() / 3;
+        auto row = rehearsal.removeFromTop(24); const int width = row.getWidth() / 3;
         for (size_t i = 0; i < 3; ++i) buttons[i].setBounds(i == 2 ? row : row.removeFromLeft(width).withTrimmedRight(2));
-        rehearsal.removeFromTop(3);
+        rehearsal.removeFromTop(2);
     };
     three(storeAlternative); three(auditionAlternative); three(applyAlternative);
-    auto row = rehearsal.removeFromTop(27); prepareRehearsal.setBounds(row.removeFromLeft(row.getWidth() / 2).withTrimmedRight(2)); endRehearsal.setBounds(row); rehearsal.removeFromTop(6);
     if (!wide) presets = rehearsal;
     savedPresetsLabel.setBounds(presets.removeFromTop(20)); savedTransitionPresets.setBounds(presets.removeFromTop(26)); presets.removeFromTop(3);
     row = presets.removeFromTop(26); saveTransitionPreset.setBounds(row.removeFromLeft(row.getWidth() / 2).withTrimmedRight(2)); removeTransitionPreset.setBounds(row); presets.removeFromTop(3);
@@ -141,17 +149,18 @@ void Workstation::storeSelectedAlternative(int slot)
     if (juce::JSON::toString(projectToJson(candidate)) != juce::JSON::toString(projectToJson(engine.project))) { remember(); engine.project = std::move(candidate); }
     refresh(); setStatus("Stored " + juce::String::charToString((juce::juce_wchar) ('A' + slot)) + ". Save the session to retain alternatives.");
 }
-void Workstation::applySelectedStyle(const TransitionStyle& style)
+void Workstation::applySelectedStyle(const TransitionStyle& style,const juce::String& name)
 {
-    if (busy || pendingTempo > 0 || tempoPreparationPending) return;
-    // Copy first: style can belong to the Project that remember/commit replaces.
-    const auto treatment = style;
-    engine.flushMidiControls(); engine.finishAutomation(); const juce::ScopedLock guard(engine.lock);
-    auto candidate = engine.project; const auto result = candidate.applyTransitionStyle(selectedTransition, treatment);
-    if (result.failed()) { setStatus(result.getErrorMessage()); refresh(); return; }
-    if (juce::JSON::toString(projectToJson(candidate)) != juce::JSON::toString(projectToJson(engine.project))) { remember(); engine.project = std::move(candidate); }
-    else engine.endTransitionRehearsal();
-    refresh(); setStatus("Transition applied.");
+    if(busy || engine.exporting || pendingTempo>0 || tempoPreparationPending || engine.rehearsalActive()
+        || (engine.workMode!=WorkMode::recordPerform && (engine.automationRecordMode!=AutomationRecordMode::read || engine.recordingAutomation())))
+    { setStatus("Finish preparation, export or rehearsal. In Arrange choose Read before applying a saved transition."); return; }
+    const auto treatment=style; engine.flushMidiControls(); engine.finishAutomation();
+    Project before; { const juce::ScopedLock guard(engine.lock); before=engine.project; }
+    auto candidate=before; const auto result=candidate.applyNamedTransitionStyle(selectedTransition,treatment,name);
+    if(result.failed()) { setStatus(result.getErrorMessage()); refresh(); return; }
+    if(juce::JSON::toString(projectToJson(candidate))==juce::JSON::toString(projectToJson(before))) { refresh(); return; }
+    { const juce::ScopedLock guard(engine.lock); remember(); candidate.performanceTakes.swap(engine.project.performanceTakes); std::swap(engine.project,candidate); }
+    refresh(); setStatus("Transition applied in the selected frame. Mixer-lane curves still combine with its track curves.");
 }
 void Workstation::prepareSelectedRehearsal(int slot)
 {
@@ -208,7 +217,9 @@ void Workstation::chooseTransitionPresetFile(bool writing)
     if (busy) return; const int selected = savedTransitionPresets.getSelectedId() - 1;
     if (writing && (selected < 0 || selected >= (int) engine.project.transitionPresets.size())) return;
     const auto preset = writing ? engine.project.transitionPresets[(size_t) selected] : NamedTransitionStyle {};
-    chooser = std::make_unique<juce::FileChooser>(writing ? "Export transition preset" : "Import transition preset", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.alloypreset", false);
+    const auto initial = writing ? defaultSaveLocation("Transition.alloypreset") : defaultSaveFolder();
+    if (initial == juce::File()) return;
+    chooser = std::make_unique<juce::FileChooser>(writing ? "Export transition preset" : "Import transition preset", initial, "*.alloypreset", false);
     chooser->launchAsync((writing ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting : juce::FileBrowserComponent::openMode) | juce::FileBrowserComponent::canSelectFiles,
         [safe = juce::Component::SafePointer<Workstation>(this), writing, preset](const auto& files)
     {

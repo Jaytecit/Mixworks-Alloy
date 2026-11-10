@@ -1,0 +1,9 @@
+{
+  "TITLE": "Caustic Basin / Shoal Focus",
+  "MEDIA": [{"WRAP": "clamp"}],
+  "CONTROLS": [
+    {"NAME": "motion", "TYPE": "slider speed", "LABEL": "Motion rate", "DEFAULT": 0.83, "MIN": 0, "MAX": 1.8, "UI_GROUP": "Scene"},
+    {"NAME": "response", "TYPE": "slider", "LABEL": "Music response", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Scene"},
+    {"NAME": "imprint", "TYPE": "slider", "LABEL": "Sprite imprint", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Nested", "DESCRIPTION": "Bends the light and moves caustic focus."}
+  ]
+}

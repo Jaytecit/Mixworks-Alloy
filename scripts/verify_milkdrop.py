@@ -75,10 +75,10 @@ def main():
         check(first['sequence']==paused['sequence'] and pixels==held,'player holds imported frame exactly when paused')
         for i,amount in enumerate((0.,.5,1.)):
             facts,pixels=player.render(request((i+1)/30,amount,both=True))
-            check(len(pixels)==width*height*4 and len(facts['scenes'])==2,'owned/imported dissolve renders at blend '+str(amount))
-            decode_frame(pixels,width,height).save(args.out/f'dissolve-{i}.png')
+            check(len(pixels)==width*height*4 and len(facts['scenes'])==2,'owned/imported feedback renders at progress '+str(amount))
+            decode_frame(pixels,width,height).save(args.out/f'feedback-{i}.png')
         facts,pixels=player.render(request(.15,.5,'radial',both=True))
-        check(facts['transition']=='dissolve' and not facts['generativeHandoffs'],'imported handoff uses explicit dissolve fallback')
+        check(facts['transition']=='feedback' and bool(facts['generativeHandoffs']),'imported handoff retains generative feedback')
         reset,pixels=player.render(request(.05,generation=1))
         check(reset['scenes'][0]['frames']==1,'seek generation restarts projectM feedback')
         # A missing optional DLL must never be required by the original path.

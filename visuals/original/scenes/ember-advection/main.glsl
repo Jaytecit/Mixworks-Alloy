@@ -41,17 +41,21 @@ void main(){
 #elif FLOW_KIND == 1
     // Separate ballistic jets, rather than a continuous sinusoidal ribbon.
     float sparks=0.;
-    for(int i=0;i<14;i++){
+    for(int i=0;i<24;i++){
         float seed=hash(vec2(i,5)),phase=fract(t*(.23+seed*.19)+seed+bassImpulse*(.06+seed*.04));
-        float x=(float(i)/13.-.5)*3.0+.10*sin(phase*5.+midImpulse+seed*12.)*(.4+warp);
-        float y=-.83+phase*(1.25+.45*bass);
+        float x=(float(i)/23.-.5)*(2.*aspect.x+.4)+.22*sin(phase*5.+midImpulse+seed*12.)*(.4+warp);
+        float y=-1.12+phase*(2.5+.85*lo);
         float dx=(p.x-x)*(.8+seed*.5),dy=p.y-y;
-        float head=exp(-dx*dx*9000.-dy*dy*2200.);
-        float tail=exp(-dx*dx*3500.)*exp(min(0.,dy)*25.)*step(dy,0.)*smoothstep(-.17,0.,dy);
+        float head=exp(-dx*dx*(2200.-1400.*lo)-dy*dy*900.);
+        float tail=exp(-dx*dx*1500.)*exp(min(0.,dy)*25.)*step(dy,0.)*smoothstep(-.17,0.,dy);
         sparks+=(head+tail*.45)*pow(1.-phase,1.6)*(.12+1.9*lo+.25*bass);
     }
     injection=sourceInk(vec2(uv.x,.45),ink(.02+uv.y*.08))*sparks;
     injection+=ink(.13)*sparks*hi*.35;
+    // Heat billows share the rising flow, with slower parallax than the sparks.
+    float heat=cloud(p*1.55+vec2(.25*sin(t*.17),-t*.22));
+    float plume=pow(heat,3.)*(.010+.022*lo);
+    injection+=sourceInk(uv,ink(.12+heat*.18))*plume;
     flow=vec2(.0008*sin(p.y*5.+midImpulse)*(.3+mi),-.0045-.003*bass);
     decay=.64+feedback*.18;
 #else
@@ -69,6 +73,9 @@ void main(){
     flow=vec2(.0014*sin(p.y*2.-midImpulse*.3)*( .3+warp),-.0013-.0010*mid);
     decay=.938+feedback*.049;
 #endif
+    vec4 deposit=structurePigment(uv);
+    injection+=deposit.rgb*(.012+.022*spriteStructurePush);
+    flow+=structureCurrent(uv)*.007;
     vec2 chart=uv+flow*stepSize;
     vec3 previous=historyValid!=0?texture(historyImage,clamp(chart,0.,1.)).rgb:vec3(0);
 #if FLOW_KIND == 2

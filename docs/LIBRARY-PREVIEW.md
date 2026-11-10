@@ -1,5 +1,9 @@
 # Library preview
 
+Each library title has a small waveform preview strip beneath it. Click or drag along the strip to hear that part of the source; the title stays readable, and seeking does not place the track on the timeline. Clicking another position in the same track seeks without stopping or reopening it. The cursor shows the current audition position. Tracks without analysed waveform peaks still have a seekable line.
+
+With the strip focused, Left/Right seeks five seconds, Shift+Left/Right thirty seconds, and Home/End seeks the source edges. Space or Enter toggles preview; Escape stops it. The artwork play/stop control remains available. Track review warnings do not disable preview.
+
 In **Arrange**, click the library artwork's play overlay to audition through the **master output**; click again to stop. Preview pauses arrangement playback without rewinding its cursor. Programme Play, Stop, seeking, another audition or an audio-device change ends master preview. The master fader and monitor mute apply. Nothing is inserted into the arrangement, written as automation or included in offline WAV export.
 
 The independent reader streams without full analysis. Switching tracks cancels the prior load; end of file stops preview. Audio settings select the master output. From 0.55.64, **Record/Perform** uses an explicitly selected private route without pausing the audience programme. Headphones are optional for recording a take, but private playback requires a valid route. See [the implemented mode plan](ARRANGE-RECORD-PERFORM-PLAN.md).

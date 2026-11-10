@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 > Current-build clarification (19 October 2026): the automatic-control admission experiment described below is not compiled or called by 0.53. Its three source files are preserved under `.local/archive/auftakt-assessment/`. Experimental results remain historical; they do not establish shipped recovered-engine admission.
 
 > Dated investigation evidence. Earlier capabilities, failures and proposed work below are historical; the root HANDOVER.md identifies the deployed build and current scope.

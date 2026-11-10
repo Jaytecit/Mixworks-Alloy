@@ -2,6 +2,7 @@
 #include "AlloyLookAndFeel.h"
 #include "AppWindow.h"
 #include "Engine.h"
+#include <cmath>
 
 namespace mixworks
 {
@@ -87,16 +88,42 @@ void LibraryPreview::stop()
     // The callback is detached: setSource clears transport playback directly.
     // stop() would wait for a final callback that can no longer arrive.
     player.setSource(nullptr); preparedSource=nullptr; transport.releaseResources(); transport.setSource(nullptr); reader.reset();
-    const bool hadSource = source.isNotEmpty(); source.clear();
+    const bool hadSource = source.isNotEmpty(); source.clear(); pendingFraction=0;
     if (hadSource) notify("Library preview stopped.");
+    if(hadSource && onProgress)onProgress();
 }
 void LibraryPreview::toggle(const juce::File& file, const juce::String& id)
 {
     if (active(id)) { stop(); return; }
+    seekToFraction(file,id,0);
+}
+double LibraryPreview::lengthSeconds() const
+{ return source.isEmpty() || preparedSource || loading ? 0 : transport.getLengthInSeconds(); }
+double LibraryPreview::positionFraction() const
+{
+    if(loading)return pendingFraction;
+    const double length=lengthSeconds(); return length>0 ? juce::jlimit(0.,1.,transport.getCurrentPosition()/length) : 0;
+}
+void LibraryPreview::seekToFraction(const juce::File& file,const juce::String& id,double fraction)
+{
+    if(!std::isfinite(fraction) || id.isEmpty()) {notify("Choose a valid source preview position.");return;}
+    fraction=juce::jlimit(0.,1.,fraction);
+    if(active(id) && !preparedSource)
+    {
+        pendingFraction=fraction;
+        if(loading) {if(onProgress)onProgress();return;}
+        if((privateOutput && allowed(output)) || (!privateOutput && engine.hasLibraryPreview(transport)))
+        {
+            const double length=transport.getLengthInSeconds();
+            const double end=std::max(0.,length-(reader && reader->getAudioFormatReader()->sampleRate>0 ? 1./reader->getAudioFormatReader()->sampleRate : 1.e-6));
+            transport.setPosition(std::min(end,length*fraction)); transport.start();
+            if(onProgress)onProgress();return;
+        }
+    }
     stop();
     if (privateOutput && (!configured() || !allowed(output))) { notify("Choose a separate headphones output before previewing."); return; }
     if (!privateOutput) masterRequest = engine.requestLibraryPreview();
-    source = id; loading = true; const auto request = generation;
+    source = id; loading = true; pendingFraction=fraction; const auto request = generation;
     notify(privateOutput ? "Loading headphone preview..." : "Loading master preview...");
     // Header/codec opening stays off the message thread and outside Engine.lock.
     loader.addJob([safe = juce::Component::SafePointer<LibraryPreview>(this),file,id,request]
@@ -148,7 +175,10 @@ void LibraryPreview::toggle(const juce::File& file, const juce::String& id)
             }
             else if (!safe->engine.startLibraryPreview(safe->transport,safe->masterRequest))
             { safe->stop(); safe->notify("Preview cancelled: the transport or master output changed, or an export is active."); return; }
+            const double length=safe->transport.getLengthInSeconds();
+            safe->transport.setPosition(std::min(std::max(0.,length-1./rate),length*safe->pendingFraction));
             safe->loading = false; safe->transport.start(); safe->startTimerHz(20);
+            if(safe->onProgress)safe->onProgress();
             safe->notify(safe->privateOutput ? "Headphone preview: " + safe->description() : "Library preview through master output. Arrangement paused.");
         });
     });
@@ -162,6 +192,7 @@ void LibraryPreview::timerCallback()
         return;
     }
     if (!loading && ((!privateOutput && !engine.hasLibraryPreview(transport)) || !transport.isPlaying())) stop();
+    else if(onProgress)onProgress();
 }
 void LibraryPreview::changeListenerCallback(juce::ChangeBroadcaster* changed)
 {

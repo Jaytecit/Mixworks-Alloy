@@ -3,6 +3,7 @@
 #include <juce_cryptography/juce_cryptography.h>
 #include <set>
 #include <map>
+#include <winsqlite/winsqlite3.h>
 
 namespace mixworks
 {
@@ -79,6 +80,124 @@ bool representableJson(const juce::MemoryBlock& bytes)
     }
     return true;
 }
+
+constexpr int storeId = 0x4d574c42; // MWLB
+constexpr int maxTrackSnapshotBytes = 2 * 1024 * 1024;
+using Database = std::unique_ptr<sqlite3, decltype(&sqlite3_close)>;
+using Statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
+
+bool execute(sqlite3* db, const char* sql) { return sqlite3_exec(db, sql, nullptr, nullptr, nullptr) == SQLITE_OK; }
+Statement prepare(sqlite3* db, const char* sql)
+{
+    sqlite3_stmt* statement = nullptr;
+    sqlite3_prepare_v2(db, sql, -1, &statement, nullptr);
+    return Statement(statement, sqlite3_finalize);
+}
+int integer(sqlite3* db, const char* sql)
+{
+    auto statement = prepare(db, sql);
+    return statement && sqlite3_step(statement.get()) == SQLITE_ROW ? sqlite3_column_int(statement.get(), 0) : -1;
+}
+bool bind(sqlite3_stmt* statement, int column, const juce::String& value)
+{
+    return sqlite3_bind_text(statement, column, value.toRawUTF8(), (int) value.getNumBytesAsUTF8(), SQLITE_TRANSIENT) == SQLITE_OK;
+}
+bool done(sqlite3_stmt* statement)
+{
+    const auto status = sqlite3_step(statement);
+    sqlite3_reset(statement);
+    sqlite3_clear_bindings(statement);
+    return status == SQLITE_DONE;
+}
+juce::String columnText(sqlite3_stmt* statement, int column)
+{
+    const auto* text = reinterpret_cast<const char*>(sqlite3_column_text(statement, column));
+    const int size = sqlite3_column_bytes(statement, column);
+    if (text == nullptr || size == 0 || std::memchr(text, 0, (size_t) size) != nullptr
+        || !juce::CharPointer_UTF8::isValidString(text, size)) return {};
+    return juce::String::fromUTF8(text, size);
+}
+
+struct StoreWriter
+{
+    Statement path, snapshot;
+    explicit StoreWriter(sqlite3* db)
+        : path(prepare(db, "INSERT OR IGNORE INTO tracks (key, path) VALUES (?, ?)")),
+          snapshot(prepare(db, "INSERT OR REPLACE INTO snapshots (key, data) VALUES (?, ?)")) {}
+
+    bool putPath(const juce::File& file)
+    {
+        const auto name = file.getFullPathName();
+        return path && bind(path.get(), 1, name.toLowerCase()) && bind(path.get(), 2, name) && done(path.get());
+    }
+    bool putSnapshot(const Media& media)
+    {
+        if (media.sourceDetailsPending || media.analysisSource.sha256.isEmpty()) return true;
+        const auto document = snapshotJson(media);
+        if (!parseAnalysisRecord(document["record"]).validAutomatic) return true;
+        const auto text = juce::JSON::toString(document, true, 17);
+        return text.getNumBytesAsUTF8() <= maxTrackSnapshotBytes && snapshot
+            && bind(snapshot.get(), 1, media.file.getFullPathName().toLowerCase())
+            && bind(snapshot.get(), 2, text) && done(snapshot.get());
+    }
+};
+
+Database connectStore(const juce::File& legacyFile)
+{
+    const auto file = libraryStoreFile(legacyFile);
+    sqlite3* raw = nullptr;
+    if (file.isSymbolicLink() || file.getSiblingFile(file.getFileName() + "-journal").isSymbolicLink()
+        || file.getParentDirectory().createDirectory().failed()) return {nullptr, sqlite3_close};
+    const auto opened = sqlite3_open_v2(file.getFullPathName().toRawUTF8(), &raw, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
+    Database db(raw, sqlite3_close);
+    if (opened != SQLITE_OK) return {nullptr, sqlite3_close};
+    sqlite3_busy_timeout(db.get(), 3000);
+    return db;
+}
+
+juce::String initialiseStore(sqlite3* db, const juce::File& legacyFile, CatalogueResult* fallback = nullptr)
+{
+    const auto busy = "The saved Library is busy. Alloy will retry pending saves.";
+    const auto migrationError = "The Library migration could not be committed. The original catalogue was kept.";
+    if (integer(db, "PRAGMA application_id") == storeId && integer(db, "PRAGMA user_version") == 1) return {};
+    if (!execute(db, "BEGIN IMMEDIATE")) return busy;
+    const auto id = integer(db, "PRAGMA application_id"), version = integer(db, "PRAGMA user_version");
+    if (id == storeId && version == 1)
+    {
+        execute(db, "ROLLBACK");
+        return {};
+    }
+    if (id != 0 || version != 0 || integer(db, "SELECT count(*) FROM sqlite_master") != 0)
+    {
+        execute(db, "ROLLBACK");
+        return "The Library database is unreadable or uses an unsupported format. It was kept.";
+    }
+    auto legacy = readLibraryCatalogue(legacyFile);
+    if (legacy.error.isNotEmpty())
+    {
+        execute(db, "ROLLBACK");
+        return legacy.error;
+    }
+    const bool schema = execute(db, "CREATE TABLE tracks (key TEXT PRIMARY KEY, path TEXT NOT NULL) WITHOUT ROWID;"
+                                    "CREATE TABLE snapshots (key TEXT PRIMARY KEY, data TEXT NOT NULL) WITHOUT ROWID;");
+    bool written = schema;
+    if (schema)
+    {
+        StoreWriter writer(db);
+        for (const auto& file : legacy.files) if (written) written = writer.putPath(file);
+        for (const auto& media : legacy.media) if (written) written = writer.putSnapshot(*media);
+    }
+    const auto finish = "PRAGMA application_id=" + juce::String(storeId) + "; PRAGMA user_version=1; COMMIT";
+    if (written && execute(db, finish.toRawUTF8()))
+    {
+        legacy.document = juce::var();
+        if (fallback != nullptr) *fallback = std::move(legacy);
+        return {};
+    }
+    execute(db, "ROLLBACK");
+    if (fallback != nullptr) *fallback = std::move(legacy);
+    return migrationError;
+}
 }
 juce::File libraryCatalogueFile() { return juce::File::getSpecialLocation(juce::File::windowsLocalAppData).getChildFile("Mixworks/library.json"); }
 CatalogueResult readLibraryCatalogue(const juce::File& file)
@@ -146,6 +265,57 @@ juce::String rememberLibraryCatalogue(const juce::File& file, const juce::Array<
     }
     juce::TemporaryFile temporary(file);
     if (!temporary.getFile().replaceWithText(text, false, false, "\n") || !temporary.overwriteTargetFileWithTemporary()) return "Cannot save the library catalogue; the previous catalogue was kept.";
+    return {};
+}
+
+juce::File libraryStoreFile(const juce::File& legacyFile) { return legacyFile.withFileExtension(".sqlite3"); }
+
+CatalogueResult openLibraryStore(const juce::File& legacyFile)
+{
+    CatalogueResult result;
+    auto db = connectStore(legacyFile);
+    if (!db)
+    {
+        result = readLibraryCatalogue(legacyFile);
+        if (result.error.isEmpty()) result.error = "The Library database could not be opened.";
+        return result;
+    }
+    result.error = initialiseStore(db.get(), legacyFile, &result);
+    if (result.error.isNotEmpty() || !result.files.isEmpty()) return result;
+    auto rows = prepare(db.get(), "SELECT tracks.path, CASE WHEN length(CAST(snapshots.data AS BLOB)) <= 2097152 THEN snapshots.data END"
+                                  " FROM tracks LEFT JOIN snapshots USING (key)");
+    if (rows)
+    {
+        std::set<juce::String> ids;
+        int status = SQLITE_OK;
+        while ((status = sqlite3_step(rows.get())) == SQLITE_ROW)
+        {
+            const auto path = columnText(rows.get(), 0);
+            if (!juce::File::isAbsolutePath(path)) break;
+            const juce::File source(path);
+            result.files.add(source);
+            if (const auto snapshot = columnText(rows.get(), 1); snapshot.isNotEmpty())
+                if (auto media = parseSnapshot(juce::JSON::parse(snapshot)); media && media->file == source && ids.insert(media->id).second)
+                    result.media.push_back(std::move(media));
+        }
+        if (status == SQLITE_DONE) return result;
+    }
+    result.error = "The Library database could not be read. It was kept.";
+    return result;
+}
+
+juce::String saveLibraryStore(const juce::File& legacyFile, const std::vector<std::shared_ptr<Media>>& changes)
+{
+    if (changes.empty()) return {};
+    auto db = connectStore(legacyFile);
+    if (!db) return "The Library database could not be opened.";
+    if (auto error = initialiseStore(db.get(), legacyFile); error.isNotEmpty()) return error;
+    if (!execute(db.get(), "BEGIN IMMEDIATE")) return "The saved Library is busy. Alloy will retry pending saves.";
+    StoreWriter writer(db.get());
+    for (const auto& media : changes)
+        if (!writer.putPath(media->file) || !writer.putSnapshot(*media))
+            return "The Library update could not be written. Alloy will retry pending saves.";
+    if (!execute(db.get(), "COMMIT")) return "The Library update could not be committed. Alloy will retry pending saves.";
     return {};
 }
 }

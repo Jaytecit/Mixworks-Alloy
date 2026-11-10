@@ -71,6 +71,8 @@ vec3 linearRGB(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec
 vec3 cold(){return mix(vec3(.012,.38,.58),vec3(.13,.025,.62),hue*.65);}
 vec3 warm(){return vec3(.95,.26,.035);}
 vec2 scene(vec3 p){
+    p.y-=.48*structureHeight(fract(vec2(p.x*.14,p.z*.19)+.5));
+
     float floorDistance=p.y;
     p=architecture(p);
     float z=mod(p.z+2.4,4.8)-2.4;

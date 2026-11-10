@@ -89,6 +89,8 @@ void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colo
 // Signed-distance sculptural families: occlusion, normals, ambient shadow and fog.
 float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
 float sdf(vec3 p){
+    p.y-=.33*structureHeight(fract(p.xz*.17+.5));
+
     float t=clockTime();
 #if FAMILY == 0
     p.xy-=vec2(.30*midSwing()*sin(p.z*.65),(.24*highSwing()+.12*trebleHit)*cos(p.z));

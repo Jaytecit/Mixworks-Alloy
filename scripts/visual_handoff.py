@@ -13,6 +13,7 @@ FLOW='velocity-pigment-relief-v1'
 REACTION='gray-scott-uv-v1'
 UV='advected-material-uv-v1'
 PIGMENTS={'posterised-mirage-premultiplied-pigment-v1','solar-wash-premultiplied-pigment-v1','solar-wash-delayed-pigment-v1'}
+TAIL_SECONDS=1.25
 
 def adapter(semantic, available):
     if semantic in available:return 'exact'
@@ -70,54 +71,49 @@ void main(){
 }
 '''
 
-ASSEMBLE='''#version 330
-uniform sampler2D sourceImage,incomingImage,velocityImage;
+EVOLVE='''#version 330
+uniform sampler2D previous,incomingImage;
 uniform vec2 resolution;
-uniform float progress;
-uniform int velocityKind,choreography;
+uniform float progress,dt,energy,treble,tail,pairPhase;
 out vec4 colour;
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float lightAt(vec2 uv){return dot(texture(incomingImage,clamp(uv,0.,1.)).rgb,vec3(.2126,.7152,.0722));}
 void main(){
- vec2 uv=gl_FragCoord.xy/resolution;
- if(progress<=0.){colour=texture(sourceImage,uv);return;}
- if(progress>=1.){colour=texture(incomingImage,uv);return;}
- vec2 cell=floor(uv*vec2(64,36));float seed=hash(cell);
- float arc=sin(progress*3.14159265);
- vec2 v=vec2(0);
- if(velocityKind==1)v=texture(velocityImage,uv).xy/vec2(textureSize(velocityImage,0));
- if(velocityKind==2)v=texture(velocityImage,uv).zw;
- // Fragments carry outgoing material along its inherited motion, then assemble.
- vec2 direction=normalize(uv-.5+vec2(.001));
- vec2 displacement=arc*(clamp(v,vec2(-.3),vec2(.3))*.35+direction*(seed-.5)*.065);
- vec2 oldUV=clamp(uv-displacement,0.,1.),newUV=clamp(uv+displacement*(1.-progress),0.,1.);
- // Local material replacement (small edge antialias), not a whole-picture dissolve.
- float region=seed;
- if(choreography==1){
-  region=clamp(uv.x*.75+uv.y*.25+.09*sin(uv.y*15.),0.,1.);
-  oldUV=clamp(uv-vec2(arc*.12*sin(uv.y*9.),arc*.035),0.,1.);
-  newUV=clamp(uv+vec2(arc*.08*sin(uv.y*9.),-arc*.035),0.,1.);
- }else if(choreography==2){
-  vec2 p=(uv-.5)*vec2(resolution.x/resolution.y,1.);
-  region=clamp(length(p)/length(vec2(resolution.x/resolution.y,1.)*.5),0.,1.);
-  vec2 tangent=vec2(-direction.y,direction.x)*arc*.13;
-  oldUV=clamp(oldUV-tangent,0.,1.);newUV=clamp(newUV+tangent*(1.-progress),0.,1.);
- }else if(choreography==3){
-  float angle=atan(uv.y-.5,uv.x-.5);
-  region=clamp(length(uv-.5)*1.2+.18*sin(angle*6.+length(uv-.5)*9.)+.12,0.,1.);
-  oldUV=clamp(uv-direction*arc*.12,0.,1.);newUV=clamp(uv+direction*arc*.08,0.,1.);
- }
- float takeover=smoothstep(region-.045,region+.045,progress*1.14-.07);
- colour=mix(texture(sourceImage,oldUV),texture(incomingImage,newUV),takeover);
+ vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;
+ float fade=exp(-tail*1.4),p=clamp(progress,0.,1.);
+ vec2 g=vec2(lightAt(uv+vec2(px.x*3.,0))-lightAt(uv-vec2(px.x*3.,0)),
+             lightAt(uv+vec2(0,px.y*3.))-lightAt(uv-vec2(0,px.y*3.)));
+ vec2 q=(uv-.5)*vec2(resolution.x/resolution.y,1.);
+ float a=dt*(.07+.13*energy)*sin(pairPhase+1.)*fade;
+ q=mat2(cos(a),-sin(a),sin(a),cos(a))*q*(1.-dt*.055*fade);
+ vec2 back=.5+q/vec2(resolution.x/resolution.y,1.)+vec2(g.y,-g.x)*dt*(.12+.15*treble)*fade;
+ vec3 old=texture(previous,clamp(back,px*.5,1.-px*.5)).rgb;
+ vec3 fresh=texture(incomingImage,uv).rgb;
+ // Incoming structure steers recurrent outgoing material before replacing it.
+ // A local colour threshold makes every scene pair grow differently.
+ float region=smoothstep(.04,.9,max(fresh.r,max(fresh.g,fresh.b)));
+ float rate=(1.6+16.*p)*(.75+region*.5);
+ float capture=1.-exp(-dt*rate);
+ colour=vec4(mix(old,fresh,capture),1.);
 }
 '''
 
+COPY='''#version 330
+uniform sampler2D sourceImage,liveImage;
+uniform vec2 resolution;
+uniform float feedbackWeight;
+out vec4 colour;
+void main(){vec2 uv=gl_FragCoord.xy/resolution;
+ colour=mix(texture(liveImage,uv),texture(sourceImage,uv),feedbackWeight);}
+'''
+
 class GenerativeHandoff:
-    def __init__(self,outgoing,pair,clock):
+    def __init__(self,outgoing,pair,clock,*,appearance=None,direct=False):
         self.pair,self.clock,self.progress=pair,clock,0.
         self.age,self.accumulator,self.tail=0.,0.,0.
-        self.source_family=outgoing.particle_family
+        self.source_family=getattr(outgoing,'particle_family',-1)
         self.source_hierarchy_mode=getattr(outgoing,'hierarchy_mode',-1)
-        self.source_controls=dict(outgoing.last_controls)
+        self.source_controls=dict(getattr(outgoing,'last_controls',{}))
+        self.direct,self.started,self.render_clock=direct,clock,clock
         # Stable scene-pair choreography; clip UUIDs and Python hash randomisation
         # must not change a saved join's appearance on reopen.
         self.choreography=sum(ord(c) for identity in pair[1] for c in identity[1]) % 4
@@ -125,8 +121,8 @@ class GenerativeHandoff:
         self.material=self.appearance=None
         try:
             # Retain the final outgoing appearance as material, and typed state separately.
-            self.appearance=self.copy(outgoing.final,format='rgba16f')
-            for entry in outgoing.passes:
+            self.appearance=self.copy(appearance or outgoing.final,format='rgba8')
+            for entry in getattr(outgoing,'passes',()):
                 if entry.get('state'):
                     semantic=entry['semantic']
                     if semantic in self.snapshots:self.snapshots[semantic].close();self.targets.remove(self.snapshots[semantic])
@@ -137,7 +133,10 @@ class GenerativeHandoff:
             self.velocity_kind=1 if FLOW in self.snapshots else 2 if PARTICLE in self.snapshots else 0
             self.seed_program=program(SEED);self.programs.append(self.seed_program)
             self.transport_program=program(TRANSPORT);self.programs.append(self.transport_program)
-            self.assemble_program=program(ASSEMBLE);self.programs.append(self.assemble_program)
+            self.evolution=Target(self.appearance.width,self.appearance.height,buffers=2)
+            self.targets.append(self.evolution);self.blit(self.appearance,self.evolution)
+            self.evolve_program=program(EVOLVE);self.programs.append(self.evolve_program)
+            self.copy_program=program(COPY);self.programs.append(self.copy_program)
         except Exception:self.close();raise
 
     @staticmethod
@@ -154,8 +153,16 @@ class GenerativeHandoff:
     def byte_size(self):return sum(t.byte_size for t in self.targets)
 
     @property
+    def feedback_weight(self):
+        # Recurrent output always lags moving detail, even after its inherited
+        # colour has decayed. Restore the live image with zero endpoint slope
+        # before releasing targets; use the same envelope for shader material.
+        x=max(0.,min(1.,self.tail/TAIL_SECONDS))
+        return 1.-x*x*(3.-2.*x)
+
+    @property
     def strength(self):
-        return max(.35,1.-self.progress)*math.exp(-self.tail*.55)
+        return max(.35,1.-self.progress)*math.exp(-self.tail*.55)*self.feedback_weight
 
     def setup(self,shader,target,bindings,values=None,ints=None):
         gl.glBindFramebuffer(gl.GL_FRAMEBUFFER,target.fbos[target.front]);gl.glViewport(0,0,target.width,target.height)
@@ -185,6 +192,7 @@ class GenerativeHandoff:
             self.seeded.append({'pass':entry['id'],'semantic':semantic,'route':route})
 
     def advance(self,clock,progress,levels):
+        self.levels=levels
         dt=max(0.,min(.3,clock-self.clock));self.clock=clock
         self.progress=progress;self.tail+=dt if progress>=1. else 0.
         self.accumulator+=dt
@@ -195,10 +203,16 @@ class GenerativeHandoff:
                 values={'dt':1/60,'energy':levels['energy'],'treble':levels['treble']},ints={'velocityKind':self.velocity_kind})
             self.accumulator=max(0.,self.accumulator-1/60);self.age+=1/60
 
-    def render(self,incoming,target,progress,readback):
-        self.setup(self.assemble_program,target,[('sourceImage',self.appearance.textures[self.appearance.front]),
-            ('incomingImage',incoming.final.textures[incoming.final.front]),('velocityImage',self.velocity.textures[0] if self.velocity else 0)],
-            values={'progress':progress},ints={'velocityKind':self.velocity_kind,'choreography':self.choreography})
+    def render(self,incoming,target,progress,readback,*,clock):
+        dt=max(0.,min(.3,clock-self.render_clock));self.render_clock=clock
+        if dt>0.:
+            previous=self.evolution.textures[self.evolution.front];self.evolution.front=1-self.evolution.front
+            self.setup(self.evolve_program,self.evolution,[('previous',previous),
+                ('incomingImage',incoming.final.textures[incoming.final.front])],
+                values={'progress':progress,'dt':dt,'energy':self.levels['energy'],'treble':self.levels['treble'],
+                        'tail':self.tail,'pairPhase':float(self.choreography)})
+        self.setup(self.copy_program,target,[('sourceImage',self.evolution.textures[self.evolution.front]),
+            ('liveImage',incoming.final.textures[incoming.final.front])],values={'feedbackWeight':self.feedback_weight})
         return bytes(gl.glReadPixels(0,0,target.width,target.height,gl.GL_BGRA,gl.GL_UNSIGNED_BYTE)) if readback else b''
 
     def close(self):

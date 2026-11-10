@@ -301,6 +301,8 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
         || juce::JUCEApplicationBase::getCommandLineParameters().contains("--save-export-workflow-only"))
     {
         Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800); ui.engine.prepareRender(8000,128);
+        ui.workspacePreference = report.getSiblingFile("save-folder-workspace.json");
+        ui.layout.saveFolder = report.getSiblingFile("save-outputs").getFullPathName();
         auto pump=[]
         {
             const auto until=juce::Time::getMillisecondCounterHiRes()+25;
@@ -385,6 +387,45 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
                 check(modal && output && png.writeImageToStream(modal->createComponentSnapshot(modal->getLocalBounds()),*output),"capture "+name);
             };
             int savedCallbacks=0;
+            if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--save-export-workflow-only"))
+            {
+                ui.layout.saveFolder.clear();
+                check(ui.defaultSaveFolder() == juce::File::getSpecialLocation(juce::File::userDesktopDirectory).getChildFile("Mixworks"),
+                    "default location follows the current user's Desktop/Mixworks without hardcoding an account");
+                const auto selectedFolder = report.getSiblingFile("chosen-save-folder"); selectedFolder.createDirectory();
+                const auto beforeProject = juce::JSON::toString(ui.engine.captureProject()); const auto beforeUndo = ui.undoHistory.size();
+                ui.menuItemSelected(96,0); auto* folderBrowser = browser(juce::Component::getCurrentlyModalComponent());
+                check(folderBrowser != nullptr,"File menu opens the default-folder chooser");
+                if (folderBrowser) { folderBrowser->setRoot(selectedFolder.getParentDirectory()); folderBrowser->setFileName(selectedFolder.getFileName()); }
+                capture("default-save-folder-chooser"); complete(1);
+                WorkspaceLayout reopened;
+                check(ui.defaultSaveFolder() == selectedFolder && readWorkspacePreferences(ui.workspacePreference,reopened).wasOk()
+                    && reopened.saveFolder == selectedFolder.getFullPathName(),"chosen default folder is persisted immediately for later launches");
+                ui.menuItemSelected(96,0); complete(0);
+                check(ui.defaultSaveFolder() == selectedFolder,"folder chooser cancellation retains the saved default");
+                auto named = ui.captureNamedWorkspace("Layout only"); named.layout.saveFolder = report.getSiblingFile("unrelated-folder").getFullPathName();
+                const auto namedFile = report.getSiblingFile("save-folder-layout.alloyworkspace");
+                check(writeNamedWorkspace(namedFile,named).wasOk() && ui.restoreNamedWorkspace(namedFile).wasOk()
+                    && ui.defaultSaveFolder() == selectedFolder,"restoring a visual layout does not change the save folder");
+                const auto prefBytes = ui.workspacePreference.loadFileAsString();
+                check(!ui.setDefaultSaveFolder(media->file) && ui.workspacePreference.loadFileAsString() == prefBytes
+                    && ui.defaultSaveFolder() == selectedFolder,"a file cannot replace a valid saved folder");
+                ui.menuItemSelected(97,0);
+                check(ui.layout.saveFolder.isEmpty() && readWorkspacePreferences(ui.workspacePreference,reopened).wasOk() && reopened.saveFolder.isEmpty(),
+                    "File menu reset persists the Desktop/Mixworks default");
+                check(ui.setDefaultSaveFolder(selectedFolder),"restore the owned folder before testing file operations");
+                const auto validPref = ui.workspacePreference; ui.workspacePreference = media->file.getChildFile("unwritable.json");
+                check(!ui.setDefaultSaveFolder(report.getParentDirectory()) && ui.defaultSaveFolder() == selectedFolder,
+                    "preference write failure keeps the previous default and reports failure");
+                ui.workspacePreference = validPref;
+                ui.layout.saveFolder = media->file.getFullPathName();
+                ui.chooseSave({},false);
+                check(!ui.choosingSave && !juce::Component::getCurrentlyModalComponent() && ui.status.contains("Cannot use default save folder"),
+                    "unavailable default folder explains the problem without opening a misleading save chooser");
+                ui.layout.saveFolder = selectedFolder.getFullPathName();
+                check(ui.dirty && ui.undoHistory.size() == beforeUndo && juce::JSON::toString(ui.engine.captureProject()) == beforeProject,
+                    "folder preferences preserve mix contents, dirty state and musical Undo");
+            }
             if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--destination-safety-only"))
             {
                 std::function<juce::Button*(juce::Component*, const juce::String&)> button = [&](juce::Component* c, const juce::String& label)->juce::Button*
@@ -511,7 +552,10 @@ void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>
                     && juce::JSON::toString(ui.engine.captureProject())==document,"failure and retry journey keeps original audio, mix, dirty state and Undo intact");
                 ui.chooser.reset(); ui.engine.devices.closeAudioDevice(); return;
             }
-            ui.chooseSave([&] { ++savedCallbacks; },false); auto cancelled=pick("cancelled.mixworks"); complete(0);
+            ui.chooseSave([&] { ++savedCallbacks; },false);
+            if (auto* initialBrowser = browser(juce::Component::getCurrentlyModalComponent()))
+                check(initialBrowser->getRoot() == ui.defaultSaveFolder(),"new mix chooser starts in the configured default folder");
+            auto cancelled=pick("cancelled.mixworks"); complete(0);
             check(!cancelled.exists() && ui.dirty && ui.sessionFile==juce::File() && savedCallbacks==0 && !ui.choosingSave,
                   "Save As cancellation preserves dirty mix and does not run its continuation");
             ui.chooseSave([&] { ++savedCallbacks; },false); auto session=pick("workflow.mixworks"); capture("save-mix-chooser"); complete(1);

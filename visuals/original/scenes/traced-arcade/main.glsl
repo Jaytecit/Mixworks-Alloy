@@ -88,6 +88,8 @@ void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colo
 
 // Layered lit architecture; distinct cross-sections and depth motions per recipe.
 float section(vec2 p,float z,float t){
+    p+=.38*structureCurrent(p*.28+.5);
+
     if(VARIANT==0)return max(abs(p.x),abs(p.y));
     if(VARIANT==1)return length(p)+.15*sin(atan(p.y,p.x)*5.+z*.4);
     if(VARIANT==2){p=abs(p);return max(p.x*.866+p.y*.5,p.y);}

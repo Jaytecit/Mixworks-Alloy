@@ -13,7 +13,7 @@ vec4 media(vec2 uv) {
     vec4 c=hasImage!=0?sampleFittedMedia(uv):vec4(0);
     vec4 s=sampleCutout(materialDomain(uv));return vec4(mix(c.rgb,s.rgb,s.a),max(c.a,s.a));
 }
-float food(vec2 uv) {vec4 c=media(uv);return smoothstep(.13,.8,dot(c.rgb,vec3(.2126,.7152,.0722)))*c.a;}
+float food(vec2 uv) {vec4 c=media(uv);return max(smoothstep(.13,.8,dot(c.rgb,vec3(.2126,.7152,.0722)))*c.a,.78*structureCoverage(uv));}
 float hash(vec2 p) {return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main() {
     vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;

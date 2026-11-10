@@ -1,0 +1,17 @@
+{
+  "TITLE": "Signal Loom",
+  "CONTROLS": [
+    {"NAME":"feedback","TYPE":"slider","LABEL":"Feedback","DEFAULT":0.62,"MIN":0,"MAX":0.94,"UI_GROUP":"Main parameters"},
+    {"NAME":"ripple","TYPE":"slider","LABEL":"Ripple amount","DEFAULT":0.2,"MIN":0,"MAX":1,"UI_GROUP":"Main parameters"},
+    {"NAME":"saturation","TYPE":"slider","LABEL":"Saturation amount","DEFAULT":0.84,"MIN":0,"MAX":1,"UI_GROUP":"Main parameters"},
+    {"NAME":"brighter","TYPE":"slider","LABEL":"Brighter","DEFAULT":0.22,"MIN":0,"MAX":1,"UI_GROUP":"Brightness"},
+    {"NAME":"darker","TYPE":"slider","LABEL":"Darker","DEFAULT":0,"MIN":0,"MAX":1,"UI_GROUP":"Brightness"},
+    {"NAME":"glitchdown","TYPE":"toggle","LABEL":"Glitch down","DEFAULT":0,"UI_GROUP":"Action"},
+    {"NAME":"fire_pulse","TYPE":"bang","LABEL":"Fire pulse","UI_GROUP":"Action"},
+    {"NAME":"glitch_speed","TYPE":"slider speed","LABEL":"Glitch speed","DEFAULT":0.6,"MIN":0,"MAX":3,"UI_GROUP":"Action"},
+    {"NAME":"rays","TYPE":"toggle","LABEL":"Rays","DEFAULT":0,"UI_GROUP":"Flow style"},
+    {"NAME":"digital","TYPE":"toggle","LABEL":"Digital mode","DEFAULT":0,"UI_GROUP":"Flow style"},
+    {"NAME":"zoom","TYPE":"slider","LABEL":"Zoom","DEFAULT":1,"MIN":0.55,"MAX":2,"UI_GROUP":"Flow style"},
+    {"NAME":"palette","TYPE":"slider","LABEL":"Colour palette","DEFAULT":0.1,"MIN":0,"MAX":1,"UI_GROUP":"Colour"}
+  ]
+}

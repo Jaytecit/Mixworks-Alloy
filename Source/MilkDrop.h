@@ -8,4 +8,6 @@ bool milkDropRendererAvailable();
 juce::File milkDropLibraryRoot();
 std::vector<VisualSceneEntry> discoverMilkDropScenes(const juce::File& library);
 juce::Result importMilkDropPreset(const juce::File& source, const juce::File& library, juce::String& key);
+juce::Result linkMilkDropFolder(const juce::File& source, const juce::File& library,
+                               int& indexed, int& skipped, const std::function<bool()>& cancelled = {});
 }

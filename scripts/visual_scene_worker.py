@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--owner-pid', type=int, default=0)
     parser.add_argument('--original', action='store_true')
     parser.add_argument('--milkdrop-library', type=Path)
+    parser.add_argument('--sprite-folder', type=Path)
     args = parser.parse_args()
     # Bind locally before loading OpenGL; parent sees readiness or a startup error.
     with socket.socket() as server:
@@ -66,14 +67,18 @@ def main():
             # native caller separately bounds response reads and reaps us.
             connection.settimeout(None)
             player = None
+            studio_mode = False
             failed_identity = None
             last_error = None
+            pending_preload = None
             try:
                 with connection.makefile('rb') as stream:
                     while True:
                         if player and player.presenter:
                             player.presenter.poll()
                         if not select.select([connection], [], [], .02)[0]:
+                            if player:
+                                player.prepare(pending_preload)
                             continue
                         request = receive(stream)
                         if request is None:
@@ -82,16 +87,28 @@ def main():
                             raise ValueError('Wrong renderer owner')
                         if request.get('stop'):
                             break
+                        requested_studio = "studioLayers" in request
+                        pending_preload = request.get('preload')
+                        if player and requested_studio != studio_mode:
+                            player.close()
+                            player = None
                         identity = tuple((a.get('clip'), a.get('scene'), a.get('revision'), json.dumps(a.get('controls', {}), sort_keys=True))
                                          for a in request.get('scenes', []) if isinstance(a, dict)) + (request.get('generation'), request.get('image'), request.get('transition'), json.dumps(request.get('views', []), sort_keys=True))
+                        if requested_studio:
+                            identity += (json.dumps(request["studioLayers"], sort_keys=True),)
                         if identity == failed_identity:
                             send(connection, dict(ok=False, error=last_error))
                             continue
                         try:
                             if player is None:
-                                from original_scene_player import OriginalScenePlayer
-                                player = OriginalScenePlayer(args.renderer_root, args.install, args.width, args.height, args.owner_pid,
-                                                             milkdrop_library=args.milkdrop_library)
+                                if requested_studio:
+                                    from studio_scene_player import StudioScenePlayer
+                                    player = StudioScenePlayer(args.install, (args.width, args.height), args.milkdrop_library)
+                                else:
+                                    from original_scene_player import OriginalScenePlayer
+                                    player = OriginalScenePlayer(args.renderer_root, args.install, args.width, args.height, args.owner_pid,
+                                                                 milkdrop_library=args.milkdrop_library, sprite_folder=args.sprite_folder)
+                                studio_mode = requested_studio
                                 # Import/context startup can take seconds. Drop the old
                                 # request and let Alloy submit its current clock/PCM.
                                 send(connection, dict(ok=True, initialised=True))
@@ -99,6 +116,9 @@ def main():
                             metadata, image = player.render(request)
                             failed_identity = None
                             send(connection, metadata, image)
+                            # Deliver the current picture before allocating and
+                            # compiling the next pipeline on the owned GL context.
+                            player.prepare(request.get('preload'))
                         except Exception as error:
                             if player:
                                 player.reset()

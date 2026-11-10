@@ -70,7 +70,7 @@ void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)
             if (i==4) { m->analysis.key=-1; m->analysis.keyGuess=4; }
             m->manualKey=i==0 ? 3 : -1; ui.engine.library.push_back(m);
         }
-        ui.refresh(); ui.libraryTable.sortOrderChanged(9,true);
+        ui.refresh();
         for (double score : {0., .0028, .05, .146, .30, .5499, .55, 1.})
         {
             Media detected; detected.analysis.key=6; detected.analysis.keyConfidence=score;
@@ -82,28 +82,62 @@ void runAnalysisRefreshTests(const std::function<void(bool, const juce::String&)
         check(Workstation::keyEvidenceText(tentative)=="Review", "invalid automatic evidence stays in review");
         tentative.manualKey=3;
         check(Workstation::keyEvidenceText(tentative)=="Manual", "manual choice remains manual regardless of detector evidence");
-        bool ordered=ui.visibleMedia.size()==6;
-        for (int i=0;i<6 && ordered;++i) ordered &= ui.visibleMedia[(size_t)i]==i;
-        check(ordered,"GRID CHECK sorts unknown/BPM/bar problems before detected and manual grids independently of key");
-        ui.libraryTable.sortOrderChanged(9,false);
-        check(ui.visibleMedia.front()==5 && ui.visibleMedia.back()==0,"GRID CHECK reverses its review ordering");
-        ui.libraryTable.sortOrderChanged(7,true);
-        check(ui.visibleMedia.front()==5 && ui.visibleMedia[1]==4 && ui.visibleMedia.back()==0,
-            "KEY CHECK independently sorts unknown/review before detected and manually chosen keys");
-        ui.libraryTable.sortOrderChanged(9,true);
-        const juce::StringArray expected {"Unknown BPM","Review BPM","Review bar","Detected","Manual bar","Manual grid"};
+        check(ui.libraryTable.table.getHeader().getIndexOfColumnId(7, true) < 0
+            && ui.libraryTable.table.getHeader().getIndexOfColumnId(9, true) < 0,
+            "library removes separate grid/key review columns");
         for (int i=0;i<6;++i)
         {
-            std::unique_ptr<juce::Component> cell(ui.libraryTable.accessibleCell(i,9,false,nullptr));
-            check(cell && cell->getTitle()=="grid check "+expected[i],"native accessible grid cell explains "+names[i]);
+            const auto& media=*ui.engine.library[(size_t)i];
+            check(Workstation::libraryNeedsReview(media)==(i!=3),"row review combines independent committed grid/key facts: "+names[i]);
+            check(ui.libraryTable.table.rowName(i).contains("Grid check:") && ui.libraryTable.getCellTooltip(i,1).contains("key"),
+                "ordinary row exposes grid/key details through hint and accessibility: "+names[i]);
         }
-        check(Workstation::keyEvidenceText(*ui.engine.library[3])=="Detected"
-            && ui.libraryTable.getCellTooltip(3,9).contains("not human confirmation"),"high detector evidence is not presented as human confirmation");
         const auto geometry=juce::JSON::toString(projectToJson(ui.engine.project));
-        ui.libraryTable.sortOrderChanged(7,false); ui.libraryTable.sortOrderChanged(9,true);
-        check(geometry==juce::JSON::toString(projectToJson(ui.engine.project)) && ui.undoHistory.empty(),"review sorting is view-only and creates no mix edits or Undo");
-        auto pixels=report.getSiblingFile("independent-review-columns.png").createOutputStream();
-        check(pixels && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*pixels),"capture native key/grid review columns");
+        ui.libraryTable.table.selectRow(0);
+        check(ui.selectedLibraryId==ui.engine.library[0]->id && ui.libraryTable.table.isEnabled(),
+            "subdued row remains ordinarily selectable");
+        const auto drag=ui.libraryTable.getDragSourceDescription(ui.libraryTable.table.getSelectedRows());
+        check(!drag.isVoid(),"subdued row still offers normal timeline drag payload");
+        auto pixels=report.getSiblingFile("library-review-rows.png").createOutputStream();
+        check(pixels && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*pixels),"capture mixed ready/subdued library rows");
+        check(geometry==juce::JSON::toString(projectToJson(ui.engine.project)) && ui.undoHistory.empty(),"review presentation creates no musical edits");
+
+        // Commit through the production source-save entry, with separate playback
+        // and catalogue objects and real identity-bound durable storage.
+        auto source=std::make_shared<Media>(); source->name="Source save refresh"; source->sampleRate=8000;
+        source->file=report.getSiblingFile("library-refresh.wav"); source->samples.setSize(1,8000); source->samples.clear();
+        { juce::WavAudioFormat wav; std::unique_ptr<juce::OutputStream> stream=source->file.createOutputStream();
+          auto writer=wav.createWriterFor(stream,juce::AudioFormatWriterOptions().withSampleRate(8000).withNumChannels(1).withBitsPerSample(24));
+          check(writer && writer->writeFromAudioSampleBuffer(source->samples,0,source->frames()),"write one-second source-refresh fixture"); }
+        source->analysisSource={audioDigest(source->file),source->file.getSize(),8000,source->frames(),1};
+        source->analysis.bpm=120; source->analysis.downbeatOrigin=0; source->analysis.beatOrigin=0;
+        source->analysis.tempoConfidence=.9; source->analysis.downbeatConfidence=.9;
+        auto catalogue=source->catalogueCopy(); ui.engine.library={catalogue};
+        Clip clip; clip.media=source; clip.length=1; ui.engine.project.clips={clip};
+        ui.selectedLibraryId=catalogue->id; ui.refresh();
+        auto correction=SourceCorrection::from(*source); correction.bpm=128;
+        check(ui.applySourceCorrection(source,correction).wasOk() && catalogue->bpm()==128 && catalogue->manualKey==-1
+            && Workstation::libraryNeedsReview(*catalogue),"BPM-only save immediately refreshes catalogue, preserving unresolved key");
+        ui.search.setText("128.00",false); ui.filterLibrary(); check(ui.visibleMedia.size()==1,"saved BPM immediately participates in library search");
+        correction.key=13;
+        check(ui.applySourceCorrection(source,correction).wasOk() && catalogue->manualKey==13 && catalogue->bpm()==128
+            && !Workstation::libraryNeedsReview(*catalogue),"key-only save preserves BPM and resolves combined row review");
+        ui.search.setText(keyNoteName(13),false); ui.filterLibrary(); check(ui.visibleMedia.size()==1,"saved key immediately participates in library search");
+        correction.bpm=130; correction.key=3;
+        check(ui.applySourceCorrection(source,correction).wasOk() && catalogue->bpm()==130 && catalogue->key()==3,"combined source correction refreshes both fields");
+        const auto recordFile=analysisRecordFile(source->file); const auto backup=report.getSiblingFile("source-save-before-failure.json");
+        check(recordFile.moveFileTo(backup) && recordFile.createDirectory().wasOk(),"isolate an owned record-path write refusal");
+        auto failed=correction; failed.bpm=140; failed.key=8;
+        check(ui.applySourceCorrection(source,failed).failed() && catalogue->bpm()==130 && catalogue->key()==3
+            && source->bpm()==130 && source->key()==3,"failed durable write rolls both source and catalogue back");
+        check(recordFile.deleteFile() && backup.moveFileTo(recordFile),"restore owned source record after refusal");
+        ui.search.setText({},false); ui.refresh();
+        const auto saved=report.getSiblingFile("library-refresh.mixworks");
+        const auto saveError=ui.engine.saveProject(saved); Engine reopened;
+        const auto openError=saveError.isEmpty()?reopened.restoreProject(saved.loadFileAsString()):saveError;
+        check(saveError.isEmpty() && openError.isEmpty() && reopened.library.size()==1 && reopened.library[0]->bpm()==130
+            && reopened.library[0]->key()==3,"source-save library values survive actual source-backed save/reopen: "+openError);
+        check(audioDigest(source->file)==source->analysisSource.sha256,"source corrections never modify original PCM");
         return;
     }
     runFocusedSignalTests(check, report);

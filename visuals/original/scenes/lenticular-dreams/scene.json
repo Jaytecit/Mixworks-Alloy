@@ -199,7 +199,7 @@
     },
     {
       "id": "electric",
-      "title": "Electric neon",
+      "title": "Teal and silver",
       "controls": {
         "intensity": 0.7,
         "motion": 0.62,
@@ -249,7 +249,7 @@
     },
     {
       "id": "solar",
-      "title": "Solar fire",
+      "title": "Copper and slate",
       "controls": {
         "intensity": 0.7,
         "motion": 0.62,

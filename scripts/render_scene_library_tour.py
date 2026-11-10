@@ -37,16 +37,10 @@ def main():
             end=round(t*44100);block=pcm[max(0,end-2048):end]
             q=dict(protocol=6,position=t,beat=(112+t-.200405)*121.98/60,bpm=121.98,rate=44100,
                 mix=(t-i*spacing)/overlap if len(actors)==2 else 0.,generation=1,capture=True,
-                pcm=base64.b64encode(block.tobytes()).decode(),image='',scenes=actors,transition='dissolve',transitionSeconds=overlap)
+                pcm=base64.b64encode(block.tobytes()).decode(),image='',scenes=actors,transition='feedback',transitionSeconds=overlap)
             facts,raw=p.render(q);assert facts['ok'] and not facts.get('mediaError'),facts;cost.append(facts['renderMs'])
             if len(actors)==2 and frame%6==0:
-                # Dissolve directly mixes both live final scenes. Check against
-                # their actual GPU pixels instead of expecting a fragment handoff.
-                a=np.frombuffer(pixels(p.instances[str(i-1)].final),np.uint8).astype(float).reshape(-1,4)
-                b=np.frombuffer(pixels(p.instances[str(i)].final),np.uint8).astype(float).reshape(-1,4)
-                actual=np.frombuffer(raw,np.uint8).reshape(-1,4)[:,[2,1,0,3]]
-                amount=q['mix'];weight=amount*amount*(3.-2.*amount)
-                assert np.max(abs(actual-(a*(1.-weight)+b*weight)))<=1.1,'Live dissolve differs from current scene pixels'
+                assert facts['transition']=='feedback' and facts['generativeHandoffs'],'Scene join lost its recurrent feedback'
                 checks.append(t)
             im=Image.frombytes('RGBA',(w,h),raw,'raw','BGRA').transpose(Image.Transpose.FLIP_TOP_BOTTOM).convert('RGB')
             draw=ImageDraw.Draw(im);draw.rectangle((0,h-28,w,h),fill='#10151d');draw.text((12,h-21),' -> '.join(scenes[j][1] for j in indices),fill='white')

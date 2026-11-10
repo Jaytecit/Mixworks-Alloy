@@ -41,6 +41,50 @@ bool autoCompatible(const Media& a, const Media& b)
 {
     return harmonicallyCompatible(a.key(), b.key()) && std::abs(std::log(a.bpm() / b.bpm())) <= std::log(1.08) + 1e-9;
 }
+
+std::optional<double> autoBodyLevel(const Clip& clip)
+{
+    const auto power = sourceEnergy(*clip.media, clip.offset + clip.sourceElapsed(clip.length * .1),
+                                    clip.offset + clip.sourceElapsed(clip.length * .9));
+    return power && *power > 1.e-8 ? std::optional<double>(10 * std::log10(*power)) : std::nullopt;
+}
+
+int finishAutoMix(Project& project, size_t first)
+{
+    constexpr double targetRmsDb = -18, peakCeilingDb = -6;
+    double target = targetRmsDb;
+    if (first > 0 && first < project.clips.size())
+        if (const auto* join = project.transitionFor(project.clips[first].id))
+            if (const auto* tail = project.clipFor(join->outgoing))
+                if (const auto body = autoBodyLevel(*tail))
+                    target = juce::jlimit(-24., targetRmsDb, *body + tail->gainDb);
+
+    int trimmed = 0;
+    std::set<juce::String> generated;
+    for (size_t i = first; i < project.clips.size(); ++i)
+    {
+        auto& clip = project.clips[i];
+        double gain = clip.gainDb;
+        if (const auto body = autoBodyLevel(clip)) gain = std::min(gain, target - *body);
+        // Waveform buckets contain channel sample maxima. Reserve room for
+        // summation and for peaks introduced by stretch or EQ.
+        const auto& peaks = clip.media->peaks;
+        if (!peaks.empty())
+        {
+            const auto peak = *std::max_element(peaks.begin(), peaks.end());
+            if (std::isfinite(peak) && peak > 0) gain = std::min(gain, peakCeilingDb - 20 * std::log10((double) peak));
+        }
+        if (gain < clip.gainDb)
+        {
+            clip.gainDb = (float) std::max(-60., gain);
+            ++trimmed;
+        }
+        generated.insert(clip.id);
+    }
+    for (auto& join : project.transitionLinks)
+        if (generated.count(join.incoming)) join.movementLocked = true;
+    return trimmed;
+}
 // Only for a newly generated arrangement: there are no user-authored nodes to
 // preserve. Omit inaudible frame guards and redundant flat/straight padding.
 void compactAutoNodes(Project& project, size_t first = 0)
@@ -56,10 +100,11 @@ void compactAutoNodes(Project& project, size_t first = 0)
         const double begin = std::max(0.,clip.sourceElapsed(playback.startCut.value_or(clip.start)-clip.start));
         const double end = clip.sourceElapsed(playback.endCut.value_or(clip.end())-clip.start);
         if (end <= begin) continue;
+        auto& controls = project.effectSettings(clip);
         for (int target = 0; target < trackAutomationCount; ++target)
         {
-            auto& curve = clip.controls.automation[(size_t) target]; if (curve.points.empty()) continue;
-            const float manual = clip.controls.manualValue((AutomationTarget) target);
+            auto& curve = controls.automation[(size_t) target]; if (curve.points.empty()) continue;
+            const float manual = controls.manualValue((AutomationTarget) target);
             const auto original = curve;
             curve = original.sliced(begin,end,manual);
             // At hard audible edges use the inside value, not a private
@@ -76,22 +121,22 @@ void compactAutoNodes(Project& project, size_t first = 0)
             for (size_t i = 1; i+1 < points.size();)
             {
                 const auto& a = points[i-1]; const auto& b = points[i]; const auto& c = points[i+1];
-                const bool flat = a.value == b.value && (b.value == c.value || b.bend >= 1);
+                const bool flat = !a.shape && a.value == b.value && (b.value == c.value || b.bend >= 1);
                 const auto level = [](const AutomationPoint& p, bool gain)
                 { return gain ? (p.value <= -160 ? 0. : juce::Decibels::decibelsToGain((double) p.value)) : (double) p.value; };
-                const bool straight = a.bend == 0 && b.bend == 0 && a.gainSpace == b.gainSpace
+                const bool straight = !a.shape && !b.shape && a.bend == 0 && b.bend == 0 && a.gainSpace == b.gainSpace
                     && std::abs(level(b,a.gainSpace) - (level(a,a.gainSpace)+(level(c,a.gainSpace)-level(a,a.gainSpace))
                         *(b.time-a.time)/(c.time-a.time))) < 1.e-8;
                 if (flat || straight)
                 {
-                    if (flat) { points[i-1].bend = b.bend; points[i-1].exponential = b.exponential; points[i-1].gainSpace = b.gainSpace; }
+                    if (flat) { points[i-1].bend = b.bend; points[i-1].exponential = b.exponential; points[i-1].gainSpace = b.gainSpace; points[i-1].shape = b.shape; }
                     points.erase(points.begin()+(int) i);
                     if (i > 1) --i;
                 }
                 else ++i;
             }
-            while (points.size() > 1 && points[0].value == points[1].value) points.erase(points.begin());
-            while (points.size() > 1 && points.back().value == points[points.size()-2].value) points.pop_back();
+            while (points.size() > 1 && !points[0].shape && points[0].value == points[1].value) points.erase(points.begin());
+            while (points.size() > 1 && !points[points.size()-2].shape && points.back().value == points[points.size()-2].value) points.pop_back();
             if (points.size() == 1 && points.front().value == manual) points.clear();
         }
     }
@@ -102,81 +147,68 @@ juce::Result styleAutoTransition(Project& project, AutoTransitionStyle choice, c
     const auto& incoming = project.clips.back();
     const auto* link = project.transitionFor(incoming.id);
     if (!link) return juce::Result::fail("The next blend could not be prepared.");
-    TransitionStyle style; style.volume = {0, 1, 0, 1};
-    if (choice == AutoTransitionStyle::varied)
+    const auto range = project.transitionRange(*link);
+    const auto clock = project.gridClock();
+    const auto firstBeat = clock.beatsAt(range.getStart()), lastBeat = clock.beatsAt(range.getEnd());
+    const auto cut = lastBeat > firstBeat ? (clock.beatsAt(alignedSectionCut(project, *link)) - firstBeat) / (lastBeat - firstBeat) : .5;
+    TransitionStyle style;
+    if (choice == AutoTransitionStyle::smooth)
     {
-        const auto activity = autoTransitionActivity(project, *link);
-        decision = "Phrase blend: musical activity unavailable; conservative fade";
-        if (activity)
-        {
-            const double change = ((*activity)[2] + (*activity)[3] - (*activity)[0] - (*activity)[1]) * .5;
-            const double density = (*std::max_element(activity->begin(), activity->end()));
-            bool recentFilter = false;
-            for (int i = std::max(0, history.size() - 2); i < history.size(); ++i) recentFilter |= history[i].startsWith("Filter handover:");
-            const auto* outgoing = project.clipFor(link->outgoing);
-            const auto range = project.transitionRange(*link);
-            const auto bassAt = [&](const Clip& clip)
-            {
-                const double a = clip.offset + clip.audioSourceElapsed(range.getStart() - clip.start);
-                const double b = clip.offset + clip.audioSourceElapsed(range.getEnd() - clip.start);
-                double value = 0, weight = 0;
-                for (const auto& w : clip.media->energy.windows)
-                { const double span = std::max(0., std::min(b, w.end) - std::max(a, w.start)); value += span * w.bass(); weight += span; }
-                return weight > 0 ? value / weight : 0.;
-            };
-            const bool bassPressure = outgoing && bassAt(*outgoing) > .08 && bassAt(incoming) > .08;
-            decision = "Phrase blend: restrained compatible join";
-            if (bassPressure)
-            {
-                style.volume = {0, 0, 1, 1};
-                style.bands[1] = TransitionBandSettings{TransitionBandMode::swap, 1, 0, sectionSwapPosition(project, *link)};
-                decision = "Bass handover: rhythmic low-end activity on both sources";
-            }
-            if (density > .5 && std::abs(change) > .1 && !recentFilter)
-            {
-                style.filter = {change > 0 ? TransitionFilterMode::lowToHigh : TransitionFilterMode::highToLow, .3};
-                decision = "Filter handover: activity change; restrained depth and two-join cooldown";
-            }
-            const auto clock = project.gridClock();
-            if (!bassPressure && !style.filter.active() && clock.beatsAt(range.getEnd()) - clock.beatsAt(range.getStart()) <= 32.001)
-                decision = "Quick phrase blend: short feasible handover without competing rhythmic bass";
-        }
-        return project.applyTransitionStyle(incoming.id, style);
+        style.volume = {0, 1, 0, 1};
+        decision = "Crossfade: gradual full-band blend";
     }
-    if (choice == AutoTransitionStyle::hardCut || choice == AutoTransitionStyle::constantPower)
+    else if (choice == AutoTransitionStyle::constantPower)
     {
-        style.volume = {0, 0, 1, 1};
-        style.bands[0] = TransitionBandSettings {choice == AutoTransitionStyle::hardCut ? TransitionBandMode::swap : TransitionBandMode::constantPower, 1, 0, .5};
-        return project.applyTransitionStyle(incoming.id, style);
+        style.bands[0] = TransitionBandSettings{TransitionBandMode::constantPower, 1, 0, .5};
+        decision = "Power blend: curved volume handover";
     }
-    if (choice != AutoTransitionStyle::smooth)
+    else
     {
-        // RMS indicates measured source energy, never perceived loudness,
-        // vocals, instruments or named song sections.
-        if (const auto power = autoTransitionEnergy(project, *link))
+        if (lastBeat <= firstBeat + 1.e-7) { decision = "Hard cut: aligned clip edges"; return juce::Result::ok(); }
+        style.bands[0] = TransitionBandSettings{TransitionBandMode::swap, 1, 0, cut};
+        decision = "Hard cut: aligned section or bar boundary";
+        if (choice != AutoTransitionStyle::hardCut)
         {
-            // The chosen treatment replaces placement's provisional crossfade.
-            // Keep a plain volume fade only for Smooth or unknown energy.
-            style.volume = {0, 0, 1, 1};
             const bool bold = choice == AutoTransitionStyle::bold;
-            const double threshold = bold ? 1.5 : 3.;
-            const auto db = [](double a, double b) { return 10 * std::log10(std::max(a, 1e-10) / std::max(b, 1e-10)); };
-            const double change = db((*power)[2] + (*power)[3], (*power)[0] + (*power)[1]);
-            const double rise = db((*power)[3], (*power)[2]), fall = db((*power)[1], (*power)[0]);
-            // Hand the low end over once; tighter ramps suit a busier, bolder mix.
-            style.bands[1] = TransitionBandSettings {TransitionBandMode::swap, 1, 0, sectionSwapPosition(project, *link)};
-            if (change >= threshold || rise >= threshold)
-                style.filter = {TransitionFilterMode::lowToHigh, bold ? .65 : .35};
-            else if (change <= -threshold || fall <= -threshold)
-                style.filter = {TransitionFilterMode::highToLow, bold ? .65 : .35};
-            if (bold)
+            style.bands[1] = TransitionBandSettings{TransitionBandMode::swap, bold ? .18 : .16, 0, cut};
+            style.bands[2] = TransitionBandSettings{TransitionBandMode::crossfade, bold ? .20 : .10, 0, cut};
+            style.bands[3] = TransitionBandSettings{TransitionBandMode::crossfade, bold ? .16 : .08, 0, cut};
+            if (choice == AutoTransitionStyle::varied)
             {
-                style.bands[2] = TransitionBandSettings {TransitionBandMode::crossfade, .3, 0, .5};
-                style.bands[3] = TransitionBandSettings {TransitionBandMode::crossfade, .25, 0, .5};
+                if (const auto activity = autoTransitionActivity(project, *link))
+                {
+                    const double change = ((*activity)[2] + (*activity)[3] - (*activity)[0] - (*activity)[1]) * .5;
+                    const double density = *std::max_element(activity->begin(), activity->end());
+                    bool recentFilter = false;
+                    for (int i = std::max(0, history.size() - 2); i < history.size(); ++i)
+                        recentFilter |= history[i].startsWith("Filter handover:");
+                    if (density > .5 && std::abs(change) > .1 && !recentFilter)
+                        style.filter = {change > 0 ? TransitionFilterMode::lowToHigh : TransitionFilterMode::highToLow, .165};
+                }
             }
+            else if (const auto power = autoTransitionEnergy(project, *link))
+            {
+                // RMS is measured source energy. Trim with the existing level matcher.
+                const double threshold = bold ? 1.5 : 3.;
+                const auto db = [](double a, double b) { return 10 * std::log10(std::max(a, 1e-10) / std::max(b, 1e-10)); };
+                const double change = db((*power)[2] + (*power)[3], (*power)[0] + (*power)[1]);
+                const double rise = db((*power)[3], (*power)[2]), fall = db((*power)[1], (*power)[0]);
+                if (change >= threshold || rise >= threshold)
+                    style.filter = {TransitionFilterMode::lowToHigh, bold ? .36 : .19};
+                else if (change <= -threshold || fall <= -threshold)
+                    style.filter = {TransitionFilterMode::highToLow, bold ? .36 : .19};
+            }
+            decision = style.filter.active() ? "Filter handover: aligned cut with EQ and filter" : "Hard cut: aligned handover with EQ";
         }
     }
-    return project.applyTransitionStyle(incoming.id, style);
+    const auto applied = project.applyTransitionStyle(incoming.id, style);
+    if (applied.wasOk() || choice == AutoTransitionStyle::hardCut || choice == AutoTransitionStyle::constantPower
+        || choice == AutoTransitionStyle::smooth) return applied;
+
+    TransitionStyle fallback;
+    fallback.bands[0] = TransitionBandSettings{TransitionBandMode::swap, 1, 0, cut};
+    decision = "Hard cut: aligned gain handover";
+    return project.applyTransitionStyle(incoming.id, fallback);
 }
 }
 juce::String normalizedAutoGenre(const juce::String& label)
@@ -222,8 +254,7 @@ MatchResult prepareOrderedTimeline(Project input, int64_t existing)
         clip.start = 0; clip.pendingPlacement = PendingPlacement::append; clip.pendingAutoTransition = true;
         auto candidate = result; candidate.clips.push_back(clip);
         auto planned = planTempoMap(candidate, 128, TransitionPreset::crossfade, true);
-        bool musical = planned.error.isEmpty();
-        if (!musical)
+        if (planned.error.isNotEmpty())
         {
             // A bounded blend also works for short songs and uncertain timing.
             const double bpm = clip.media->bpm() > 0 ? clip.media->bpm() : result.bpm;
@@ -232,7 +263,7 @@ MatchResult prepareOrderedTimeline(Project input, int64_t existing)
             planned = planTempoMap(candidate, beats, TransitionPreset::crossfade, false);
         }
         if (planned.error.isNotEmpty()) return {input, planned.error};
-        if (musical && planned.project.clips.size() > 1)
+        if (planned.project.clips.size() > 1)
         {
             auto styled = planned.project; juce::String decision;
             if (styleAutoTransition(styled, AutoTransitionStyle::balanced, history, decision).wasOk())
@@ -242,6 +273,7 @@ MatchResult prepareOrderedTimeline(Project input, int64_t existing)
     }
     auto prepared = prepareTempoMap(std::move(result), false, 32, existing, 0, {}, TransitionPreset::crossfade, false);
     if (prepared.error.isNotEmpty()) return {input, prepared.error};
+    finishAutoMix(prepared.project, 0);
     return prepared;
 }
 AutoArrangementResult planAutoArrangement(const std::vector<std::shared_ptr<Media>>& library, const AutoArrangementOptions& requested,
@@ -542,6 +574,7 @@ AutoArrangementResult planAutoArrangement(const std::vector<std::shared_ptr<Medi
     if (stopped()) { result.error = "Auto arrangement cancelled. The current mix was kept."; return result; }
     const auto count = juce::String((int) (result.project.clips.size()-prefix));
     compactAutoNodes(result.project,prefix);
+    const int trimmed = finishAutoMix(result.project, prefix);
     result.summary = (extending ? "Added: " : "Finished: ") + count + (options.targetSeconds ? " tracks" : " of " + juce::String(options.trackCount) + " requested tracks")
         + " / " + timeText(result.project.duration()) + ".";
     if (options.targetSeconds) result.summary += " Requested " + juce::String(extending ? "additional length: " : "length: ")
@@ -552,8 +585,19 @@ AutoArrangementResult planAutoArrangement(const std::vector<std::shared_ptr<Medi
         if (result.stopReason.isEmpty()) result.stopReason = "No more ready tracks in your library.";
         result.summary += "\nStopped: " + result.stopReason;
     }
+    if (!result.decisions.isEmpty())
+    {
+        std::map<juce::String, int> counts;
+        for (const auto& decision : result.decisions) ++counts[decision.upToFirstOccurrenceOf(":", false, false)];
+        juce::StringArray blends;
+        for (const auto& [name, uses] : counts) blends.add(name + " (" + juce::String(uses) + ")");
+        result.summary += (options.transitions == AutoTransitionStyle::varied ? "\nVariety: " : "\nBlends: ") + blends.joinIntoString(", ") + ".";
+    }
     result.summary += "\nUndo brings back your previous mix.";
     if (extending) result.summary += " Existing joins and source timing kept; the new handover uses the last song's tail.";
+    if (trimmed > 0) result.summary += "\nLevel trims on " + juce::String(trimmed) + " tracks.";
+    if (result.project.clips.size() > std::max<size_t>(prefix, 1))
+        result.summary += "\nNew pairs are locked for movement.";
     const std::array<const char*, 4> policies {"Unrestricted", "Keep pace", "Build energy", "Wind down"};
     result.summary += "\nEnergy: " + juce::String(policies[(size_t) options.energy]) + ".";
     if (shaped)
@@ -571,13 +615,6 @@ AutoArrangementResult planAutoArrangement(const std::vector<std::shared_ptr<Medi
         for (const auto& clip : result.project.clips)
         { const auto genre = normalizedAutoGenre(clip.media->assets.genre); if (genre.isEmpty()) ++unknown; else if (genre != preferredGenre) ++other; }
         result.summary += "\nGenre preference: " + preferredGenre + "; other genres: " + juce::String(other) + "; unlabelled: " + juce::String(unknown) + ".";
-    }
-    if (!result.decisions.isEmpty())
-    {
-        std::map<juce::String, int> counts;
-        for (const auto& decision : result.decisions) ++counts[decision.upToFirstOccurrenceOf(":", false, false)];
-        result.summary += "\nVariety: ";
-        for (const auto& item : counts) result.summary += item.first + " " + juce::String(item.second) + "; ";
     }
     return result;
 }

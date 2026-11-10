@@ -12,6 +12,10 @@ Use the repository's local bridge to set up reproducible sessions, inspect real 
 
 The bridge starts a separate application with isolated analysis, audio preparation caches, library/workspace preferences and MIDI profile. It does not restore the production session. Physical MIDI input is disabled. Normal application launches retain their usual behaviour. The app still opens an audio device; use a desktop session with working audio for live transport checks. Device discovery text in the UI does not prove MIDI input is enabled or tested.
 
+Normal Save and Export dialogs in a bridge instance default to its owned
+`sessions/` folder, reported by `state.saveFolder`. Inspect the destination before submitting a dialog; desktop
+interaction can still explicitly choose a path outside the bridge.
+
 ## Quick start
 
 Prerequisites: Python 3.11 or newer (standard library only) and a trusted local build containing `--dev-control`. Existing build prerequisites are described in the [app README](../README.md). From the repository root in PowerShell:
@@ -84,17 +88,21 @@ All indices are zero-based except built-in preset IDs. Successful replies contai
 | `select_transition` | Incoming clip `index`; selects its transition. Verify `selectedTransition`. |
 | `transition_preset` | Built-in `index`: 1 None, 2 Bass Swap, 3 Crossfade; requires a selected transition. |
 | `insertion_preset` | Built-in `index`: 1 Align IN/OUT, 2 Bass swap, 3 Crossfade. Sets the actual new-track picker before Add. State reports `insertionPreset` and `sectionInsertion`; existing transitions stay unchanged. |
+| `preview` | Owned-library `index` and `fraction` 0–1 start/seek source audition; `stop:true` stops it. Same-source seeking does not toggle off. Poll `state.preview` sourceId/loading/fraction/duration/privateOutput and inspect status; acknowledgement alone does not prove decoded output. |
+| `work_mode` | `name`: `arrange` or `record-perform`. Selects the real mode menu while stopped and outside take capture. Wait for ready and assert `state.workMode`; menu completion is asynchronous. `capturingTake`/`takeCount` expose the actual capture lifecycle. |
+| `timeline_cue` | Selected segment's zero-based `slot` 0–8, through the actual whole-mix cue owner. Verify position, playing and capture state; an empty slot opens its real editor and is not a successful seek. |
+| `transition_confirm` | Explicit boolean `replace` and exact `incoming` from `state.transitionQuestion`. Only answers the current **Replace transition curves?** dialog; other dialogs/targets are refused. Inspect its actual message first. Wait for ready and assert publication or cancellation; answering does not bypass the editor's stale-state checks. |
 | `control` | `lane` 0–3, `parameter`, `value`. Volume is dB (−60 to +12); pan is −1 left to +1 right; cutoff is −1 to +1 (negative LP, 0 off, positive HP). Calls the real control path with Undo. |
 | `undo` | Actual application Undo. |
 | `play` | Boolean `enabled`. Starting requires nonempty, prepared playback. |
 | `stop` | Stops transport. |
-| `seek` | `seconds` inside the audible mix. |
+| `seek` | `seconds` inside the audible mix. Live apps prepare asynchronously while the old position continues. Wait with `ready()`, then assert empty `seekError`, `seekPending:false`, the actual position and playing state. |
 | `jump_bars` | `bars`: 4, 8, 16 or 32; `direction`: −1 or +1. Uses native mix-bar navigation, including end limits. |
 | `timing` | Clip `index`, `source_seconds` within a forward, non-looped source. Returns source/project/grid/waveform coordinates, current cursor source time, detected sections and actual paired bass-swap times. Read-only. |
 | `audio_probe` | Stopped transport; `seconds` inside the mix, integer `frames` 1–8192, optional `lane` 0–3. Returns stereo float PCM and sample rate from a separate real export renderer. Leaves live transport and controls unchanged. |
 | `move_clip` | Stopped transport; clip `index`, target `seconds` (0–10800), explicit boolean `snap`, `mode`: body or following. Uses native model movement and real Undo. |
 | `transition_edit` | Stopped transport and selected transition; `action`: window, start, end, outgoing or incoming; `delta` seconds (±3600), explicit boolean `snap`. Uses native model transition edits and real Undo. |
-| `view` | Timeline `start` (0–10800 seconds), visible `seconds` (2–10800); disables follow-playhead. |
+| `view` | Timeline `start` (0–10800 seconds), visible `seconds` (2–10800); disables follow-playhead. Optional boolean `monitorMuted` uses the actual isolated app's monitor control; mute before audition verification. |
 | `panel` | `name`: controller, transitions or editing. |
 | `save` | New simple `name`; writes `sessions/name.mixworks`, returns `path`, clears dirty state. |
 | `open` | Existing session `name`; requires a clean current session and owned references. Asynchronous: wait and assert expected state. |
@@ -102,6 +110,20 @@ All indices are zero-based except built-in preset IDs. Successful replies contai
 | `close` | Requires clean, idle state. Stops transport and schedules normal app exit after writing the response. |
 
 Names allow ASCII letters, numbers, hyphens and underscores, maximum 96 characters; omit extensions. Lane values in `state.lanes` are manual values, not the complete automation curves or effective values during automated playback. Query capabilities rather than assuming future commands exist. Unsupported actions still need appropriate native tests or UI/hardware interaction.
+
+`state.seekPending` also contributes to `busy`. `state.seekError` reports the
+latest completed preparation failure. A seek acknowledgement is acceptance of
+the request; it does not establish destination publication. A newer seek
+supersedes the earlier destination; Stop or Play/Pause cancels a pending seek.
+Source/device/arrangement changes are revalidated before publication. Timeline
+cues and bar jumps use this same owner: wait and inspect their result too.
+
+`state.audioCallbacks` reads the engine's existing lock-free cumulative callback
+counters: `callbacks`, `overBudget`, `lockMisses`, `oversized`, `exportSilence`,
+`totalMs` and `peakMs`. Subtract snapshots around an interaction. The counters
+measure work after callback entry, not driver underruns or physical output;
+combine them with source-wait counts, actual clocks, PCM and moving pictures.
+Status inspection does not reset counters or acquire the audio render lock.
 
 `state.visuals` is read-only: `validFrame`, `status`, the renderer's `frame` facts,
 `paintedFrames`, `lastPaintMs`, `maxGapMs`, and `gapHistogramCeilMs`. Paint counts

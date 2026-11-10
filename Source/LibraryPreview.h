@@ -15,6 +15,11 @@ public:
     std::vector<Output> outputs();
     juce::Result select(Output);
     void toggle(const juce::File&, const juce::String& sourceId);
+    void seekToFraction(const juce::File&, const juce::String& sourceId, double fraction);
+    double positionFraction() const;
+    double lengthSeconds() const;
+    juce::String sourceId() const { return source; }
+    bool isLoading() const { return loading; }
     void stop();
     void chooseOutput(juce::Component& parent, std::function<void()> after = {});
     juce::Result playPrepared(juce::AudioSource&,const juce::String& id);
@@ -28,6 +33,7 @@ public:
     bool usesPrivateOutput() const { return privateOutput; }
     juce::String description() const;
     std::function<void(const juce::String&)> onChange;
+    std::function<void()> onProgress;
     // Exposed for isolated driver fixtures; does not initialise a real device.
     juce::AudioDeviceManager inventory;
 private:
@@ -51,5 +57,6 @@ private:
     bool privateOutput = false;
     juce::AudioSource* preparedSource = nullptr;
     float privateLevel = .5f;
+    double pendingFraction = 0;
 };
 }

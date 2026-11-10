@@ -34,6 +34,8 @@ void main(){
     force=vec2(sign(p.y)*(.05+.05*mid),sin(p.x*6.+t)*.035);
 #endif
     force+=vec2(-grad.y,grad.x)*(.18+warp*.3)+grad*bassHit*pulse*.45;
+    force+=structureCurrent(uv)*.36;
+
     force+=vec2(sin(p.y*9.+midImpulse),cos(p.x*8.-trebleImpulse))*(midHit*.025+trebleHit*.012)*pulse;
     if(simulationReset>.5){colour=vec4(force*.2,0,source);return;}
     vec2 old=texture(input0,clamp(uv,0.,1.)).rg;

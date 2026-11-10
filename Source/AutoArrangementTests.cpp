@@ -22,12 +22,17 @@ float nodeValue(const Project& p,int side,int target,double fraction)
     if (p.transitionLinks.empty() || p.clips.size() < 2) return std::numeric_limits<float>::quiet_NaN();
     const auto& link = p.transitionLinks.front(); const auto* clip = p.clipFor(side == 0 ? link.outgoing : link.incoming);
     const auto range = p.transitionRange(link); const AutomationAddress address{clip->track,(AutomationTarget) target,{},{},clip->id};
-    return clip->controls.automation[(size_t) target].valueAt(p.automationTime(address,range.getStart()+range.getLength()*fraction),p.manualValue(address));
+    return p.effectSettings(*clip).automation[(size_t) target].valueAt(p.automationTime(address,range.getStart()+range.getLength()*fraction),p.manualValue(address));
 }
 bool nodeFade(const Project& p)
 { return nodeValue(p,0,0,.25) > nodeValue(p,0,0,.75) && nodeValue(p,1,0,.25) < nodeValue(p,1,0,.75); }
 bool nodeSwap(const Project& p)
 { return nodeValue(p,0,1,.1) == 0 && nodeValue(p,0,1,.9) <= -60 && nodeValue(p,1,1,.1) <= -60 && nodeValue(p,1,1,.9) == 0; }
+bool restrainedBass(const Project& p)
+{
+    return std::abs(nodeValue(p,0,1,.1)) < .01f && nodeValue(p,0,1,.9) < -.2f && nodeValue(p,0,1,.9) > -4
+        && nodeValue(p,1,1,.1) < -.2f && nodeValue(p,1,1,.1) > -4 && std::abs(nodeValue(p,1,1,.9)) < .01f;
+}
 void activityProfile(Media& m, double onsets, double bass = 1, double ratio = .2)
 {
     m.energy = {}; m.energy.revision = musicalEnergyRevision; m.energy.duration = m.duration();
@@ -62,6 +67,16 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     auto wrongKey = source("Incompatible key", 120, 1), fast = source("Too fast", 160), unknown = source("Unknown key"); unknown->analysis.key = -1;
     AutoArrangementOptions options; options.startingId = a->id; options.trackCount = 20;
     juce::Random random(548);
+    {
+        Project catalogue; Clip clip; clip.media = a; clip.length = a->duration(); catalogue.clips.push_back(clip);
+        const auto before = juce::JSON::toString(projectToJson(catalogue));
+        check(catalogue.moveClip(clip.id,clip.start,false).wasOk()
+            && juce::JSON::toString(projectToJson(catalogue)) == before && !a->hasPlayback(),
+            "catalogue-only no-op movement validates without loading audio or changing the document");
+        check(catalogue.moveClip(clip.id,1,false).failed()
+            && juce::JSON::toString(projectToJson(catalogue)) == before,
+            "actual movement still rejects unloaded audio and preserves the document");
+    }
     auto weakA = a->catalogueCopy(), weakB = b->catalogueCopy();
     weakA->analysis.keyConfidence = .018; weakB->analysis.keyConfidence = .027;
     const auto weakPlan = planAutoArrangement({weakA, weakB}, options, random);
@@ -72,7 +87,11 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         && plan.project.clips[1].media == b && plan.project.clips[2].media == c,
         "auto arrangement preserves a chosen start, ranks nearby BPM, rejects incompatible keys and avoids duplicates");
     check(plan.project.transitionLinks.size() == 2 && nodeFade(plan.project)
-        && plan.project.validateTransitionLinks().wasOk(), "auto arrangement uses production section Crossfade and valid transition ownership");
+        && plan.project.validateTransitionLinks().wasOk(), "auto arrangement produces valid section handovers and transition ownership");
+    check(!plan.project.clips.empty() && plan.project.movementGroup(plan.project.clips.front().id).size() == 3
+        && std::all_of(plan.project.transitionLinks.begin(), plan.project.transitionLinks.end(),
+                       [](const auto& link) { return link.movementLocked && !link.locked; }),
+        "all generated tracks move together and the movement locks leave transition curves editable");
     bool aligned = true;
     for (const auto& clip : plan.project.clips)
         aligned &= clip.beatmatched && std::abs(std::remainder(plan.project.tempo.beatsAt(clip.start + clip.firstDownbeatTime()), 4.0)) < 1e-6
@@ -152,12 +171,12 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         AutoArrangementOptions styled; styled.startingId = quiet->id; styled.trackCount = 2;
         auto rising = planAutoArrangement({quiet, loud}, styled, random);
         check(rising.error.isEmpty() && rising.project.transitionLinks.size() == 1
-            && nodeValue(rising.project,0,5,.5) > 0 && nodeValue(rising.project,1,5,.5) < 0 && nodeSwap(rising.project)
+            && nodeValue(rising.project,0,5,.5) > 0 && nodeValue(rising.project,1,5,.5) < 0 && restrainedBass(rising.project)
             && !rising.project.transitionLinks[0].filter.active() && !rising.project.transitionLinks[0].bands[1],
             "Balanced uses a gentle opening filter and bass handover for measured energy increase");
         bool sparse = rising.error.isEmpty();
         for (const auto& clip : rising.project.clips) for (int target = 0; target < trackAutomationCount; ++target)
-            sparse &= clip.controls.automation[(size_t) target].points.size() <= (target == (int) AutomationTarget::cutoff ? 20u : 48u);
+            sparse &= rising.project.effectSettings(clip).automation[(size_t) target].points.size() <= (target == (int) AutomationTarget::cutoff ? 20u : 48u);
         check(sparse,"actual Auto Arrange keeps Filter and all other generated parameters sparse");
         const auto noDefaultFade = [](const Project& project)
         {
@@ -169,7 +188,13 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
                     && out->envelope().gainAt(mid - out->start) == 1 && in->envelope().gainAt(mid - in->start) == 1;
             });
         };
-        check(noDefaultFade(rising.project), "Balanced replaces placement's default volume crossfade instead of layering bass/filter treatment over it");
+        const auto volumeGain = [](const Project& p, int side, double fraction)
+        { return juce::Decibels::decibelsToGain(nodeValue(p, side, 0, fraction), -160.f); };
+        check(noDefaultFade(rising.project) && volumeGain(rising.project,0,.25) > .999 && volumeGain(rising.project,1,.25) < .001
+            && volumeGain(rising.project,0,.75) < .001 && volumeGain(rising.project,1,.75) > .999
+            && rising.project.clips[0].gainDb == 0 && rising.project.clips[1].gainDb < -7
+            && rising.summary.contains("Filter handover"),
+            "Balanced combines a cut with bass and filter treatment and trims the louder source");
         styled.startingId = loud->id;
         auto falling = planAutoArrangement({quiet, loud}, styled, random);
         check(falling.error.isEmpty() && falling.project.transitionLinks.size() == 1 && nodeValue(falling.project,0,5,.5) < 0 && nodeValue(falling.project,1,5,.5) > 0,
@@ -177,7 +202,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         styled.startingId = quiet->id; styled.transitions = AutoTransitionStyle::bold;
         auto bold = planAutoArrangement({quiet, loud}, styled, random);
         check(bold.error.isEmpty() && bold.project.transitionLinks.size() == 1 && nodeValue(bold.project,0,5,.5) > nodeValue(rising.project,0,5,.5)
-            && nodeSwap(bold.project) && nodeValue(bold.project,0,2,.75) < nodeValue(bold.project,0,2,.25),
+            && restrainedBass(bold.project) && nodeValue(bold.project,0,2,.75) < nodeValue(bold.project,0,2,.25),
             "Bold uses stronger filters, tighter bass handover and extra tone fades");
         check(noDefaultFade(bold.project), "Bold has no inherited full-band volume crossfade beneath its selected band/filter treatment");
         styled.transitions = AutoTransitionStyle::smooth;
@@ -187,21 +212,29 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
             "Smooth keeps simple volume blends despite available energy evidence");
         styled.transitions = AutoTransitionStyle::balanced; waveform(*loud, .1f);
         auto steady = planAutoArrangement({quiet, loud}, styled, random);
-        check(steady.error.isEmpty() && steady.project.transitionLinks.size() == 1 && nodeValue(steady.project,0,5,.5) == 0 && nodeValue(steady.project,1,5,.5) == 0 && nodeSwap(steady.project),
+        check(steady.error.isEmpty() && steady.project.transitionLinks.size() == 1 && nodeValue(steady.project,0,5,.5) == 0 && nodeValue(steady.project,1,5,.5) == 0 && restrainedBass(steady.project),
             "steady similar energy uses bass handover without an unnecessary filter sweep");
+        loud->peaks.assign(loud->waveformRms.size(), .99f);
+        const auto hotPeaks = planAutoArrangement({quiet, loud}, styled, random);
+        check(hotPeaks.project.clips.size() == 2 && hotPeaks.project.clips[1].gainDb < -5.8f,
+            "hot peaks are trimmed for overlap headroom even on a low-RMS track");
+        loud->peaks.clear();
         loud->waveformRms.pop_back();
         auto missingEnergy = planAutoArrangement({quiet, loud}, styled, random);
         check(missingEnergy.error.isEmpty() && missingEnergy.project.transitionLinks.size() == 1 && !missingEnergy.project.transitionLinks[0].filter.active()
             && !missingEnergy.project.transitionLinks[0].bands[1] && !sourceEnergy(*loud, 0, 10)
             && nodeFade(missingEnergy.project),
-            "incomplete waveform stays unknown and falls back to plain fade");
+            "incomplete waveform stays unknown and keeps the aligned cut");
         waveform(*loud, 0);
         check(!planAutoArrangement({quiet, loud}, styled, random).project.transitionLinks[0].filter.active(),
             "silence cannot manufacture energy evidence for effect selection");
         waveform(*loud, .1f); loud->waveformRms[0] = std::numeric_limits<float>::quiet_NaN();
         check(!planAutoArrangement({quiet, loud}, styled, random).project.transitionLinks[0].bands[1],
-            "nonfinite values in the examined source window retain the safe fade fallback");
+            "nonfinite values do not create a separate filter or legacy bass treatment");
         const auto saved = parseProject(juce::JSON::toString(projectToJson(bold.project)));
+        check(saved.error.isEmpty() && saved.project.transitionLinks.size() == 1
+            && saved.project.transitionLinks.front().movementLocked && !saved.project.transitionLinks.front().locked,
+            "session parsing preserves the generated movement lock without protecting curve edits");
         check(saved.error.isEmpty() && saved.project.transitionLinks.size() == 1 && saved.project.transitionLinks[0].filter == bold.project.transitionLinks[0].filter
             && saved.project.transitionLinks[0].bands == bold.project.transitionLinks[0].bands,
             "automatic treatments persist through the existing session format without recomputation");
@@ -221,7 +254,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
             styled.transitions = choice;
             const auto selected = planAutoArrangement({quiet, loud}, styled, random);
             check(selected.error.isEmpty() && selected.project.transitionLinks.size() == 1 && noDefaultFade(selected.project)
-                && selected.project.clips[0].controls.automation[0].active() && !selected.project.transitionLinks[0].bands[0]
+                && selected.project.effectSettings(selected.project.clips[0]).automation[0].active() && !selected.project.transitionLinks[0].bands[0]
                 && !selected.project.transitionLinks[0].bands[1] && !selected.project.transitionLinks[0].filter.active(),
                 "explicit volume style replaces default fades and adds no automatic bass or filter treatment: " + selected.error + " / " + selected.stopReason);
             if (selected.project.transitionLinks.empty()) continue;
@@ -241,7 +274,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
             else
             {
                 check(gain(0,.25) == 1 && gain(1,.25) == 0 && gain(0,.75) == 0 && gain(1,.75) == 1,
-                    "hard cuts keep only one song audible away from the short midpoint click-prevention ramp");
+                    "hard cuts keep only one song audible away from the short click-prevention ramp");
             }
             const auto document = parseProject(juce::JSON::toString(projectToJson(p)));
             check(document.error.isEmpty() && document.project.transitionLinks[0].bands == link.bands,
@@ -364,7 +397,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         int filters = 0, bassJoins = 0; bool cooldown = true;
         for (int i = 0; i < variedMix.decisions.size(); ++i)
         {
-            if (variedMix.decisions[i].startsWith("Bass handover:")) ++bassJoins;
+            if (variedMix.decisions[i].startsWith("Hard cut:")) ++bassJoins;
             if (!variedMix.decisions[i].startsWith("Filter handover:")) continue;
             ++filters;
             for (int j = std::max(0, i - 2); j < i; ++j) cooldown &= !variedMix.decisions[j].startsWith("Filter handover:");
@@ -390,6 +423,58 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     check(plan.error.isEmpty() && plan.project.transitionLinks.size() == 1 && nodeSwap(plan.project),
         "auto arrangement reuses selected fixed-length Bass swap rather than imposing Crossfade");
 
+    {
+        auto quiet = source("Quiet render", 120, 0, 24), loud = source("Hot render", 120, 0, 24);
+        for (const auto& media : {quiet, loud})
+        {
+            media->samples.setSize(1, media->frames());
+            const double scale = media == quiet ? .22 : .9;
+            for (int i = 0; i < media->frames(); ++i)
+            {
+                const double phase = 2 * juce::MathConstants<double>::pi * i / media->sampleRate;
+                media->samples.setSample(0, i, (float) (scale * (.7 * std::sin(440 * phase)
+                    + .2 * std::sin(80 * phase) + .1 * std::sin(1760 * phase))));
+            }
+            media->prepareWaveformBody();
+        }
+        Project ordered;
+        for (const auto& media : {quiet, loud})
+        {
+            Clip clip;
+            clip.media = media; clip.length = media->duration(); clip.start = ordered.duration();
+            clip.track = (int) ordered.clips.size(); ordered.clips.push_back(std::move(clip));
+        }
+        auto prepared = prepareOrderedTimeline(ordered);
+        const bool ready = prepared.error.isEmpty() && prepared.project.transitionLinks.size() == 1
+            && prepared.project.transitionLinks.front().movementLocked && nodeFade(prepared.project);
+        check(ready, "Auto Arrange timeline prepares curved audio with the pair movement locked: " + prepared.error);
+        if (ready)
+        {
+            auto engine = std::make_unique<Engine>();
+            engine->project = std::move(prepared.project); engine->prepareClipProcessing();
+            const auto frame = engine->project.transitionRange(engine->project.transitionLinks.front());
+            juce::AudioBuffer<float> output(2, 512); juce::MidiBuffer midi;
+            const auto measure = [&](double time)
+            {
+                engine->render(output, 512, time, midi);
+                return output.getRMSLevel(0, 0, 512);
+            };
+            const double before = measure(frame.getStart() * .5);
+            const double after = measure((frame.getEnd() + engine->project.duration()) * .5);
+            float peak = 0, minimumRms = 1;
+            for (int i = 0; i <= 32; ++i)
+            {
+                minimumRms = std::min(minimumRms, measure(frame.getStart() + frame.getLength() * i / 32));
+                peak = std::max(peak, output.getMagnitude(0, 512));
+            }
+            check(before > .03 && after > .03 && std::abs(20 * std::log10(before / after)) < 2,
+                "rendered bodies with a 12 dB source mismatch finish within 2 dB");
+            check(peak < .8f && minimumRms > .015f,
+                "rendered handover stays audible with peak headroom (peak " + juce::String(peak, 3)
+                + ", minimum RMS " + juce::String(minimumRms, 3) + ")");
+        }
+    }
+
     a->samples.setSize(1, a->frames()); a->samples.clear(); b->samples.setSize(1, b->frames()); b->samples.clear();
     activityProfile(*a, 2); activityProfile(*b, 4); a->assets.genre = "House"; b->assets.genre = "Techno";
     for (auto* m : {a.get(), b.get()})
@@ -397,19 +482,18 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     {
         AutoArrangementOptions compact; compact.startingId = a->id; compact.trackCount = 2;
         const auto generated = planAutoArrangement({a,b},compact,random);
-        bool neutral = generated.error.isEmpty(), tidy = neutral;
+        bool curved = generated.error.isEmpty() && nodeFade(generated.project), tidy = curved;
         for (const auto& clip : generated.project.clips)
         {
-            neutral &= clip.controls.automation[0].points.empty();
-            const auto& bass = clip.controls.automation[1]; tidy &= bass.points.size() <= 2;
+            const auto& bass = generated.project.effectSettings(clip).automation[1]; tidy &= bass.points.size() <= 2;
             for (size_t i = 1; i < bass.points.size(); ++i) tidy &= bass.points[i].time-bass.points[i-1].time > 1.e-8;
         }
-        check(neutral && tidy,"Balanced Auto Arrange omits neutral Volume and keeps each fresh bass handover to two distinct nodes");
+        check(curved && tidy,"Balanced Auto Arrange uses a volume handover and sparse bass nodes");
         compact.transitions = AutoTransitionStyle::smooth;
         auto sameBpm = source("Same tempo fade"); sameBpm->samples.setSize(1,sameBpm->frames()); sameBpm->samples.clear();
         const auto smooth = planAutoArrangement({a,sameBpm},compact,random);
         check(smooth.error.isEmpty() && smooth.project.clips.size() == 2
-            && smooth.project.clips[0].controls.automation[0].points.size() == 2 && smooth.project.clips[1].controls.automation[0].points.size() == 2,
+            && smooth.project.effectSettings(smooth.project.clips[0]).automation[0].points.size() == 2 && smooth.project.effectSettings(smooth.project.clips[1]).automation[0].points.size() == 2,
             "simple automatic crossfades use two endpoints per source without stacked exterior guards");
     }
     {
@@ -427,6 +511,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         if (kept)
         {
             kept &= added.project.name == prefix.name && added.project.transitionLinks.front() == prefix.transitionLinks.front()
+                && added.project.movementGroup(added.project.clips.back().id).size() == 4
                 && juce::JSON::toString(projectToJson(added.project)["clips"][0]) == juce::JSON::toString(projectToJson(prefix)["clips"][0])
                 && juce::JSON::toString(projectToJson(added.project)["tracks"]) == juce::JSON::toString(projectToJson(prefix)["tracks"])
                 && juce::JSON::toString(projectToJson(added.project)["masterAutomation"]) == juce::JSON::toString(projectToJson(prefix)["masterAutomation"]);
@@ -457,8 +542,9 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     }
     auto ownedStackFixture_ui = std::make_unique<Workstation>(false); auto& ui = *ownedStackFixture_ui; ui.stopTimer(); ui.setSize(1440, 940); ui.engine.library = {a, b};
     Clip oldClip; oldClip.media = a; oldClip.length = a->duration(); ui.engine.project.clips.push_back(oldClip);
-    const auto before = juce::JSON::toString(projectToJson(ui.engine.project));
     ui.refresh();
+    const auto before = juce::JSON::toString(projectToJson(ui.engine.project));
+    const auto details = [&] { return ui.getProperties().getWithDefault("lastMessageDetails",juce::String()).toString().replaceCharacters("\r\n","  "); };
     auto capture = [&](juce::Component& component, const juce::String& name)
     {
         juce::PNGImageFormat png; auto out = report.getSiblingFile(name + ".png").createOutputStream();
@@ -513,6 +599,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
     if (dialog)
     {
+        dialog->getComboBoxComponent("action")->setSelectedItemIndex(0, juce::sendNotificationSync);
         dialog->getComboBoxComponent("start")->setSelectedItemIndex(1, juce::dontSendNotification);
         dialog->getComboBoxComponent("energy")->setSelectedItemIndex(2, juce::dontSendNotification);
         dialog->getComboBoxComponent("genre")->setSelectedItemIndex(1, juce::dontSendNotification);
@@ -525,19 +612,74 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     check(ui.attractState.enabled && ui.attractState.motion == AttractMotion::animated && ui.layout.forgeEffects && ui.forgeMotionAllowed(),
         "successful Auto Arrange activates full attract lighting and animated forge effects");
     check(ui.engine.project.transitionLinks.size() == 1 && nodeValue(ui.engine.project,0,5,.5) != 0
-        && nodeSwap(ui.engine.project), "background audio preparation preserves the chosen automatic filter and bass treatment");
+        && ui.engine.project.transitionLinks.front().movementLocked && nodeFade(ui.engine.project)
+        && restrainedBass(ui.engine.project), "background preparation preserves the cut, filter, bass and movement lock");
     check(ui.engine.project.clips[0].fadeOut == 0 && ui.engine.project.clips[1].fadeIn == 0,
         "production Auto Arrange commits the chosen treatment without the default volume crossfade");
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
-    check(dialog && dialog->getName() == "Auto Arrange complete", "completed auto arrangement displays a native completion report");
-    check(ui.status.contains("2 of 2 requested tracks"), "a pending initial mode notification cannot overwrite the caller's entered track count");
-    if (dialog)
-    {
-        juce::PNGImageFormat png; auto out = report.getSiblingFile("auto-arrange-complete.png").createOutputStream();
-        check(out && png.writeImageToStream(dialog->createComponentSnapshot(dialog->getLocalBounds()), *out), "capture the complete native arrangement report");
-        dialog->exitModalState(0); pumpAutoMessages(30);
-    }
+    check(!dialog && details().contains("2 of 2 requested tracks"), "completed auto arrangement retains its full completion report without a blocking dialog: " + details());
+    check(ui.status.contains("2 of 2 requested tracks") && ui.status.contains("Filter handover"),
+        "the native completion status shows the requested count and chosen blend technique: " + ui.status);
+    check(capture(ui,"auto-arrange-complete"),"capture the completed playable arrangement and visible result");
     const auto generated = juce::JSON::toString(projectToJson(ui.engine.project));
+    if (ui.engine.project.transitionLinks.size() == 1)
+    {
+        const auto link = ui.engine.project.transitionLinks.front();
+        const auto range = ui.engine.project.transitionRange(link);
+        const auto* incoming = ui.engine.project.clipFor(link.incoming);
+        const int track = incoming->track;
+        const double outside = std::min(range.getEnd() + 8, (range.getEnd() + incoming->end()) / 2);
+        const auto position = ui.engine.position.load();
+        ui.selectedTransition.clear(); ui.selectedClip = link.incoming;
+        ui.setFollowPlayhead(false); ui.timeline.pixelsPerSecond = 14; ui.refresh();
+        ui.viewport.setViewPosition(std::max(0, (int) ((range.getStart() - 2) * ui.timeline.pixelsPerSecond)), 0);
+        ClipCurveTools* tools = nullptr;
+        for (auto* child : ui.timeline.getChildren())
+            if (auto* strip = dynamic_cast<ClipCurveTools*>(child)) { tools = strip; break; }
+        check(tools && tools->isVisible(), "the arranged track has its waveform automation controls without selecting the transition");
+        auto choose = [&](int index)
+        {
+            if (tools->selector.isVisible()) tools->selector.setSelectedId(index + 1, juce::sendNotificationSync);
+            else tools->buttons[(size_t) index].onClick();
+        };
+        if (tools && tools->isVisible())
+        {
+            const AutomationAddress filter {track, AutomationTarget::cutoff, {}, {}, link.incoming};
+            const auto history = ui.undoHistory.size();
+            choose(4);
+            const auto nodes = ui.engine.project.curve(filter)->points;
+            const auto inside = std::find_if(nodes.begin(), nodes.end(), [&](const auto& node)
+                { return range.contains(ui.engine.project.automationSessionTime(filter, node.time)); });
+            check(ui.displayedAddress(track) == filter && tools->buttons[4].hasCurve && ui.automationNext.isEnabled()
+                && inside != nodes.end() && ui.undoHistory.size() == history && ui.engine.position == position,
+                "the waveform Filter control exposes Auto Arrange's editable nodes without changing the mix or playhead");
+            if (inside != nodes.end() && ui.displayedAddress(track) == filter)
+            {
+                const int index = (int) (inside - nodes.begin());
+                for (int i = 0; i <= index; ++i) ui.automationNext.onClick();
+                check(ui.timeline.automationPointLabel(filter, index).isNotEmpty() && ui.automationDelete.isEnabled(),
+                    "the editor can select a node inside the movement-locked transition");
+                ui.automationDelete.onClick();
+                check(ui.engine.project.curve(filter)->points.size() + 1 == nodes.size() && ui.undoHistory.size() == history + 1,
+                    "deleting the selected transition node edits the track's actual curve with one Undo");
+                if (ui.undoHistory.size() == history + 1) ui.undo(false);
+                const bool added = ui.insertAutomationNode(filter, outside, false);
+                check(added && ui.engine.project.curve(filter)->points.size() == nodes.size() + 1,
+                    "the same track curve accepts an exterior node past the transition");
+                check(capture(ui,"auto-arrange-track-filter"),"capture the shared track curve through and past the transition");
+                if (ui.undoHistory.size() == history + 1) ui.undo(false);
+            }
+            ui.selectTransition(link.incoming, false);
+            ui.changeSelectedTransition({}, TransitionPreset::crossfade, false, true);
+            ui.selectedTransition.clear(); ui.refresh(); choose(0);
+            const AutomationAddress volume {track, AutomationTarget::volume, {}, {}, link.incoming};
+            check(ui.undoHistory.size() == history + 1 && ui.displayedAddress(track) == volume
+                && tools->buttons[0].hasCurve && ui.automationNext.isEnabled(),
+                "a manually applied Crossfade preset is reachable through the same waveform controls");
+            if (ui.undoHistory.size() == history + 1) ui.undo(false);
+            check(juce::JSON::toString(projectToJson(ui.engine.project)) == generated, "Undo restores the exact original auto arrangement");
+        }
+    }
     ui.undo(false); check(juce::JSON::toString(projectToJson(ui.engine.project)) == before, "Undo restores the complete pre-auto arrangement");
     ui.undo(true); check(juce::JSON::toString(projectToJson(ui.engine.project)) == generated, "Redo restores the prepared auto arrangement");
     const auto history = ui.undoHistory.size();
@@ -554,7 +696,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     check(!ui.busy && generated == juce::JSON::toString(projectToJson(ui.engine.project)) && ui.undoHistory.size() == history,
         "missing chosen audio rejects transactionally without losing the previous mix");
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
-    check(dialog && dialog->getName() == "Auto Arrange stopped", "source preparation failure displays a visible stopped report");
+    check(!dialog && ui.status.contains("Auto Arrange stopped") && details().contains("missing-auto-source"), "source preparation failure reports the stopped action and retains source details: " + ui.status);
     if (dialog) { dialog->exitModalState(0); pumpAutoMessages(30); }
     ui.engine.library = {a, b}; ui.refresh();
     ui.autoArrangeButton.onClick();
@@ -574,7 +716,8 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
         if (dialog)
         {
-            dialog->getComboBoxComponent("start")->setSelectedItemIndex(1, juce::dontSendNotification);
+            dialog->getComboBoxComponent("action")->setSelectedItemIndex(0, juce::sendNotificationSync);
+        dialog->getComboBoxComponent("start")->setSelectedItemIndex(1, juce::dontSendNotification);
             dialog->getComboBoxComponent("transitions")->setSelectedItemIndex(style, juce::dontSendNotification);
             dialog->getComboBoxComponent("energy")->setSelectedItemIndex(1, juce::dontSendNotification);
             dialog->getTextEditor("amount")->setText("2"); dialog->exitModalState(1); pumpAutoMessages(30);
@@ -582,9 +725,9 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
         const auto until = juce::Time::getMillisecondCounterHiRes() + 20000;
         while (ui.busy && juce::Time::getMillisecondCounterHiRes() < until) pumpAutoMessages(20);
         check(!ui.busy && ui.engine.playbackReady() && ui.engine.project.clips.size() == 2 && ui.engine.project.transitionLinks.size() == 1
-            && ui.engine.project.clips[0].controls.automation[0].active() && !ui.engine.project.transitionLinks[0].bands[0]
-            && ui.engine.project.clips[0].fadeOut == 0 && ui.engine.project.clips[1].fadeIn == 0 && ui.status.contains("Keep pace"),
-            "native Auto Arrange dialog passes selected energy and volume style through background preparation into the playable mix");
+            && ui.engine.project.effectSettings(ui.engine.project.clips[0]).automation[0].active() && !ui.engine.project.transitionLinks[0].bands[0]
+            && ui.engine.project.clips[0].fadeOut == 0 && ui.engine.project.clips[1].fadeIn == 0 && details().contains("Keep pace"),
+            "native Auto Arrange dialog passes selected energy and volume style through background preparation into the playable mix: " + details());
         dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
         if (dialog) { dialog->exitModalState(0); pumpAutoMessages(30); }
     }
@@ -592,6 +735,7 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
     if (dialog)
     {
+        dialog->getComboBoxComponent("action")->setSelectedItemIndex(0, juce::sendNotificationSync);
         dialog->getComboBoxComponent("start")->setSelectedItemIndex(1, juce::dontSendNotification);
         dialog->getComboBoxComponent("transitions")->setSelectedItemIndex(6, juce::dontSendNotification);
         dialog->getComboBoxComponent("energy")->setSelectedItemIndex(2, juce::dontSendNotification);
@@ -600,9 +744,13 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     }
     const auto variedDeadline = juce::Time::getMillisecondCounterHiRes() + 20000;
     while (ui.busy && juce::Time::getMillisecondCounterHiRes() < variedDeadline) pumpAutoMessages(20);
-    check(!ui.busy && ui.engine.playbackReady() && ui.engine.project.clips.size() == 2 && ui.status.contains("Variety:")
-        && ui.status.contains("Bass handover") && ui.status.contains("Genre preference: trance") && ui.status.contains("other genres: 2"),
-        "native DJ set/genre choices pass through preparation and report a playable technique and genre fallback");
+    check(!ui.busy && ui.engine.playbackReady() && ui.engine.project.clips.size() == 2 && details().contains("Variety:")
+        && (details().contains("Hard cut") || details().contains("Filter handover"))
+        && ui.engine.project.transitionLinks.size()==1
+        && ui.engine.project.effectSettings(ui.engine.project.clips[0]).automation[0].active()
+        && ui.engine.project.effectSettings(ui.engine.project.clips[1]).automation[0].active()
+        && details().contains("Genre preference: trance") && details().contains("other genres: 2"),
+        "native DJ set/genre choices pass through preparation and report a playable technique and genre fallback: "+details());
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
     if (dialog) { check(capture(*dialog, "auto-arrange-varied-complete"), "capture native varied/genre completion report"); dialog->exitModalState(0); pumpAutoMessages(30); }
     a->energy = {}; b->energy = {};
@@ -614,21 +762,16 @@ void runAutoArrangementTests(const std::function<void(bool, const juce::String&)
     while (ui.busy && juce::Time::getMillisecondCounterHiRes() < energyDeadline) pumpAutoMessages(20);
     check(!ui.busy && ui.engine.playbackReady() && ui.engine.project.clips.size() == 2 && a->energy.complete() && b->energy.complete()
         && ui.undoHistory.size() == beforeUpgradeHistory + 1 && a->manualBpm == oldManualBpm && a->manualBeatOrigin == oldManualDownbeat && a->manualKey == oldManualKey
-        && ui.status.contains("energy unavailable: 1"), "native Auto Arrange backfills missing profiles asynchronously, preserves corrections and keeps silent activity unknown");
+        && details().contains("energy unavailable: 1"), "native Auto Arrange backfills missing profiles asynchronously, preserves corrections and keeps silent activity unknown: " + details());
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
     if (dialog) { dialog->exitModalState(0); pumpAutoMessages(30); }
     ui.engine.library = {a}; ui.startAutoArrangement(shortageOptions);
     const auto shortageDeadline = juce::Time::getMillisecondCounterHiRes() + 20000;
     while (ui.busy && juce::Time::getMillisecondCounterHiRes() < shortageDeadline) pumpAutoMessages(20);
     dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
-    check(!ui.busy && dialog && dialog->getName() == "Auto Arrange complete" && ui.status.contains("1 of 10")
-        && ui.status.containsIgnoreCase("no more ready tracks"), "a single-track shortfall visibly reports finished, count and reason rather than appearing to run silently");
-    if (dialog)
-    {
-        juce::PNGImageFormat png; auto out = report.getSiblingFile("auto-arrange-shortfall.png").createOutputStream();
-        check(out && png.writeImageToStream(dialog->createComponentSnapshot(dialog->getLocalBounds()), *out), "capture the native single-track shortfall report");
-        dialog->exitModalState(0); pumpAutoMessages(30);
-    }
+    check(!ui.busy && !dialog && ui.status.contains("1 of 10")
+        && ui.status.containsIgnoreCase("no more ready tracks"), "a single-track shortfall visibly reports finished, count and reason rather than appearing to run silently: " + ui.status);
+    check(capture(ui,"auto-arrange-shortfall"),"capture the single-track shortfall and visible reason");
     ui.undo(false); ui.engine.library = {a, b}; ui.refresh();
     for (int width : {1250, 1440, 1920, 2560})
     {

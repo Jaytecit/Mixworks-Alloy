@@ -16,6 +16,7 @@ struct SectionTransitionChoice
 std::optional<SectionTransitionChoice> chooseSectionTransition(const Clip& outgoing, const Clip& incoming, double maxBeats = 256);
 std::optional<juce::Range<double>> sectionTransitionWindow(const Clip&, const Clip&, const TempoMap&);
 double sectionSwapPosition(const Project&, const Project::TransitionLink&); // Beat-relative; .5 only without a shared change.
+double alignedSectionCut(const Project&, const Project::TransitionLink&);
 // Mean-square energy over an exact source interval; incomplete/malformed displays stay unknown.
 std::optional<double> sourceEnergy(const Media&, double begin, double end);
 void paintEnergySections(juce::Graphics&, const Clip&, juce::Rectangle<float>, double pixelsPerSecond);

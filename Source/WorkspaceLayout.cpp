@@ -54,7 +54,7 @@ void WorkspaceLayout::update(int width, int height, bool performanceDocked, bool
     visualHeader = headers.removeFromBottom(std::min(visualLaneHeight, headers.getHeight() / 2));
     visuals = timeline.removeFromBottom(visualHeader.getHeight());
     ruler = {timeline.getX(), timelineY - timeRulerHeight - labelHeight, timeline.getWidth(), timeRulerHeight + labelHeight};
-    tempo = {timeline.getX(), visuals.getBottom(), timeline.getWidth(), tempoStripHeight};
+    tempo = {timeline.getX(), timeline.getBottom(), timeline.getWidth(), tempoStripHeight};
     peakPanel = {centreX + timelineWidth + 8, bodyTop, peakPanelWidth, tempo.getBottom() - bodyTop};
     timelineDivider = {centreX, tempo.getBottom(), centreWidth, 8};
     performance = {centreX, tempo.getBottom() + 8, centreWidth, bodyBottom - tempo.getBottom() - 8};
@@ -130,13 +130,16 @@ juce::Result readDocument(const juce::File& file, juce::var& doc)
 }
 juce::Result validateLayoutDocument(const juce::var& doc)
 {
+    if (doc.hasProperty("saveFolder") && (!doc["saveFolder"].isString()
+        || (doc["saveFolder"].toString().isNotEmpty() && !juce::File::isAbsolutePath(doc["saveFolder"].toString()))))
+        return juce::Result::fail("Invalid default save folder; workspace preferences were kept.");
     if (!doc.isObject() || !doc["format"].isString() || doc["format"].toString() != "mixworks-workspace" || !doc["version"].isInt() || (int) doc["version"] != 1
         || !doc["libraryWidth"].isInt() || !doc["inspectorWidth"].isInt() || (int) doc["libraryWidth"] < WorkspaceLayout::minimumPanelWidth || (int) doc["inspectorWidth"] < WorkspaceLayout::minimumPanelWidth
         || (doc.hasProperty("monitorMuted") && !doc["monitorMuted"].isBool())
         || (doc.hasProperty("inspectorCollapsed") && !doc["inspectorCollapsed"].isBool())
         || (doc.hasProperty("libraryCollapsed") && !doc["libraryCollapsed"].isBool())
         || (doc.hasProperty("gridBrightness") && (!(doc["gridBrightness"].isDouble() || doc["gridBrightness"].isInt()) || !std::isfinite((double) doc["gridBrightness"]) || (double) doc["gridBrightness"] < 0 || (double) doc["gridBrightness"] > 1))
-        || (doc.hasProperty("toolPage") && (!doc["toolPage"].isInt() || (int) doc["toolPage"] < 0 || (int) doc["toolPage"] > 2))
+        || (doc.hasProperty("toolPage") && (!doc["toolPage"].isInt() || (int) doc["toolPage"] < 0 || (int) doc["toolPage"] > 3))
         || (doc.hasProperty("editingDetached") && !doc["editingDetached"].isBool())
         || (doc.hasProperty("popupHints") && !doc["popupHints"].isBool())
         || (doc.hasProperty("followPlayhead") && !doc["followPlayhead"].isBool())
@@ -185,6 +188,7 @@ void decodeLayoutDocument(const juce::var& doc, WorkspaceLayout& layout)
     if (const auto* bounds = doc["editingWindowBounds"].getArray())
         layout.editingWindowBounds = {(int) (*bounds)[0], (int) (*bounds)[1], (int) (*bounds)[2], (int) (*bounds)[3]};
     layout.popupHints = !doc.hasProperty("popupHints") || (bool) doc["popupHints"];
+    layout.saveFolder = doc["saveFolder"].toString();
     if (doc["workMode"].isInt() && (int)doc["workMode"]>=0 && (int)doc["workMode"]<=1) layout.workMode=(int)doc["workMode"];
     if (doc["privateDeviceType"].isString() && doc["privateDeviceName"].isString()) { layout.privateDeviceType=doc["privateDeviceType"].toString(); layout.privateDeviceName=doc["privateDeviceName"].toString(); }
     if (doc["privateFirstChannel"].isInt() && (int)doc["privateFirstChannel"]>=-1 && (int)doc["privateFirstChannel"]<256) layout.privateFirstChannel=(int)doc["privateFirstChannel"];
@@ -202,6 +206,7 @@ juce::var layoutDocument(const WorkspaceLayout& layout)
 {
     auto* root = new juce::DynamicObject(); root->setProperty("format", "mixworks-workspace"); root->setProperty("version", 1); juce::var doc(root);
     root->setProperty("libraryCollapsed", layout.libraryCollapsed);
+    root->setProperty("saveFolder", layout.saveFolder);
     root->setProperty("workMode",layout.workMode); root->setProperty("privateDeviceType",layout.privateDeviceType); root->setProperty("privateDeviceName",layout.privateDeviceName);
     root->setProperty("privateFirstChannel",layout.privateFirstChannel); root->setProperty("privateLevel",layout.privateLevel);
     juce::Array<juce::var> sizes; for (const double scale : layout.laneScale) sizes.add(scale); const juce::var laneSizes(sizes);
@@ -296,7 +301,7 @@ juce::Result writeNamedWorkspace(const juce::File& file, const NamedWorkspace& p
     struct Unlock { juce::InterProcessLock& lock; ~Unlock() { lock.exit(); } } unlock {lock};
     if (file.exists() || file.isSymbolicLink() || file.getParentDirectory().isSymbolicLink()) return juce::Result::fail("Choose a new workspace layout file. Existing files were kept.");
     auto doc = layoutDocument(preset.layout); auto* object = doc.getDynamicObject();
-    object->removeProperty("monitorMuted"); object->removeProperty("editingDetached"); object->removeProperty("editingWindowBounds");
+    object->removeProperty("monitorMuted"); object->removeProperty("saveFolder"); object->removeProperty("editingDetached"); object->removeProperty("editingWindowBounds");
     object->setProperty("namedLayoutVersion", 1); object->setProperty("layoutName", preset.name);
     object->setProperty("inspectorPage", preset.inspectorPage); object->setProperty("browserPage", preset.browserPage);
     object->setProperty("zoom", preset.zoom); object->setProperty("viewX", preset.view.x); object->setProperty("viewY", preset.view.y);

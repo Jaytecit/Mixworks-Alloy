@@ -3,6 +3,7 @@
 #include "AutoArrangement.h"
 #include "Beatmatch.h"
 #include "MilkDrop.h"
+#include "StudioWorkspace.h"
 #include <cmath>
 #include <climits>
 #include <set>
@@ -33,7 +34,7 @@ void Workstation::showAutoArrangement()
     dialog->addComboBox("mode", {"Number of songs", "Total length (minutes)"}, "Arrange by");
     dialog->addTextEditor("amount", juce::String(std::min(10, (int) choices.size())), "Songs or minutes");
     dialog->addComboBox("transitions", {"Balanced", "Smooth", "Bold", "Use my settings", "Constant power", "Hard cuts only", "DJ set (varied)"}, "Blend style");
-    dialog->getComboBoxComponent("transitions")->setTooltip("Choose how songs blend: gentle fades, bass swaps, quick cuts or a varied DJ set. Song volumes stay unchanged.");
+    dialog->getComboBoxComponent("transitions")->setTooltip("Choose how songs blend. Auto Arrange trims loud tracks for level matching and peak headroom, and locks new pairs to move together.");
     dialog->addComboBox("energy", {"Unrestricted", "Keep pace", "Build energy", "Wind down"}, "Energy direction");
     dialog->getComboBoxComponent("energy")->setTooltip("Keep the pace steady, build energy or wind down. This guides song choice without changing volume.");
     juce::StringArray genres {"Any genre"}; std::set<juce::String> genreKeys;
@@ -48,10 +49,10 @@ void Workstation::showAutoArrangement()
     dialog->getComboBoxComponent("genre")->setTooltip("Choose a preferred genre. Other genres and unlabelled songs can still be used.");
     dialog->addComboBox("visuals", {"Create automatic visual show", "Keep visual lane"}, "Visuals");
     dialog->getComboBoxComponent("visuals")->setSelectedItemIndex(engine.project.visualScenes.empty() ? 0 : 1, juce::dontSendNotification);
-    dialog->getComboBoxComponent("visuals")->setTooltip("Choose a coherent visual family and transitions following music handovers. Uses the image selected in Visuals / scenes. Replaces existing visual blocks.");
-    dialog->addComboBox("visualSources", {"Originals", "MilkDrop", "Both"}, "Scene sources");
-    dialog->getComboBoxComponent("visualSources")->setSelectedId((int)visualSceneSourceFromId((int)getProperties().getWithDefault("visualSceneSource",1)),juce::dontSendNotification);
-    dialog->getComboBoxComponent("visualSources")->setTooltip("Use original scenes, your imported MilkDrop presets, or a balanced mix of both. Images apply to original scenes; imported presets keep their own appearance.");
+    dialog->getComboBoxComponent("visuals")->setTooltip("Arrange the Visual Studio lanes along music handovers. Replaces existing visual clips.");
+    dialog->addComboBox("visualSources", {"GLSL scenes", "MilkDrop presets", "GLSL + MilkDrop"}, "Scene sources");
+    dialog->getComboBoxComponent("visualSources")->setSelectedId((int)visualSceneSourceFromId((int)getProperties().getWithDefault("visualSceneSource",3)),juce::dontSendNotification);
+    dialog->getComboBoxComponent("visualSources")->setTooltip("Both uses the MilkDrop layer as an input in compatible GLSL scenes. Background and sprite lanes are also arranged.");
     dialog->getComboBoxComponent("visualSources")->onChange=[safe=juce::Component::SafePointer<Workstation>(this),dialog]
     { if(safe) safe->getProperties().set("visualSceneSource",dialog->getComboBoxComponent("visualSources")->getSelectedId()); };
     dialog->getTextEditor("amount")->setInputRestrictions(7, "0123456789.");
@@ -129,12 +130,9 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
     if (options.extendExisting && (engine.project.clips.empty() || engine.rehearsalActive() || engine.recordingAutomation()
         || engine.automationRecordMode != AutomationRecordMode::read))
     { setStatus("Choose an existing arrangement, stop rehearsal and finish automation in Read before extending."); return; }
-    const auto visualLibrary = sceneLane ? sceneLane->catalogue() : std::vector<VisualSceneEntry>();
     if(options.createVisualScenes && options.visualSceneSource!=VisualSceneSource::originals
-        && (!milkDropRendererAvailable() || automaticVisualScenes(visualLibrary,VisualSceneSource::milkdrop).empty()))
-    { setStatus("Import a MilkDrop preset in Visuals / scenes and install MilkDrop support before choosing MilkDrop or Both. The current mix was kept."); return; }
-    if (options.createVisualScenes && automaticVisualScenes(visualLibrary,options.visualSceneSource).empty())
-    { setStatus("No music visual scenes are available. Choose Keep visual lane to arrange only music."); return; }
+        && !milkDropRendererAvailable())
+    { setStatus("MilkDrop support is unavailable. Choose GLSL scenes or keep the current visual lanes."); return; }
     const auto original = engine.project;
     const auto before = options.extendExisting ? juce::JSON::toString(projectToJson(original)) : juce::String();
     auto library = engine.library;
@@ -150,7 +148,7 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
     setBusy(true); importProgress.begin(1); importProgress.setAutoArrangement();
     autoArrangeButton.setButtonText("Arranging...");
     setStatus("Preparing musical energy and choosing compatible songs. The current mix stays available until the new mix is ready.");
-    workers.addJob([safe = juce::Component::SafePointer<Workstation>(this), library = std::move(library), options, visualLibrary, cancelled, resident, original, before]() mutable
+    workers.addJob([safe = juce::Component::SafePointer<Workstation>(this), library = std::move(library), options, cancelled, resident, original, before]() mutable
     {
         juce::Random random;
         juce::AudioFormatManager formats; formats.registerBasicFormats();
@@ -238,13 +236,9 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
         }
         if (result.error.isEmpty() && !*cancelled && options.createVisualScenes)
         {
-            juce::Random visualRandom;
-            result.project.visualImage=original.visualImage;
-            const auto visuals = arrangeVisualScenes(result.project, visualLibrary, visualRandom,options.visualSceneSource);
+            const auto visuals = StudioWorkspace::arrangeProject(result.project, options.visualSceneSource);
             if (visuals.failed()) result.error = visuals.getErrorMessage();
-            else result.summary += " Visuals: " + juce::String((int)result.project.visualScenes.size()) + " scenes / "
-                + visualSceneSourceName(options.visualSceneSource) + ", with music-matched transitions"
-                + juce::String(original.visualImage.isNotEmpty() && options.visualSceneSource!=VisualSceneSource::milkdrop ? " and your image inside original scenes." : ".");
+            else result.summary += " Visual Studio: " + juce::String((int)result.project.visualScenes.size()) + " layered clips.";
         }
         juce::MessageManager::callAsync([safe, cancelled, result = std::move(result), energyUpdates = std::move(energyUpdates), options, before, prefix = original.clips.size()]() mutable
         {
@@ -258,7 +252,7 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
             for (const auto& update : energyUpdates)
                 for (const auto& media : safe->engine.library)
                     if (media->id == update.first->id && media->analysisSource == update.first->analysisSource)
-                    { const juce::ScopedLock guard(safe->engine.lock); media->energy = update.second; safe->markCatalogueChanged(); }
+                    { const juce::ScopedLock guard(safe->engine.lock); media->energy = update.second; safe->markCatalogueChanged(media); }
             if (result.error.isNotEmpty())
             {
                 safe->fail("Auto Arrange stopped. " + result.error);
@@ -275,6 +269,7 @@ void Workstation::startAutoArrangement(const AutoArrangementOptions& options)
                 // Preserve the user's mixer, plugins and master settings; replace arrangement-owned data only.
                 auto candidate = safe->engine.project;
                 candidate.name = result.project.name; candidate.clips = std::move(result.project.clips);
+                candidate.effectControls = std::move(result.project.effectControls);
                 if (options.createVisualScenes) candidate.visualScenes = std::move(result.project.visualScenes);
                 candidate.tempo = std::move(result.project.tempo); candidate.bpm = result.project.bpm;
                 candidate.followTrackTempo = result.project.followTrackTempo;

@@ -72,6 +72,8 @@ void main() {
         vec2 centre=vec2(.30*sin(worldZ*.17)+.26*sin(midImpulse*1.3+worldZ*.2),.18*sin(trebleImpulse*1.4+worldZ*.2));
         vec2 p=rotate(.12*worldZ+.32*sin(t*.32))*(ray*z-centre);
         float radius=1.32+.13*sin(worldZ*.32-t*.7)+.10*bass+.19*bassHit;
+        radius+=.40*structureHeight(p*.26+.5);
+
         float distance=abs(octagon(p)-radius);
         float aa=max(fwidth(distance),.001);
         float body=1.-smoothstep(.07,.07+aa,distance);

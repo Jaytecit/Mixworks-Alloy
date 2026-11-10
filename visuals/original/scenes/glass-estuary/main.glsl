@@ -88,7 +88,9 @@ void finish(vec3 c,vec2 p){c*=.65+intensity*.6;c*=.85+.15*exp(-dot(p,p)*.4);colo
 
 // Bounded temporal field. This is a new simulation, not reference simulation code.
 uniform float deltaTime;
-void main(){vec2 uv=gl_FragCoord.xy/resolution;vec2 p=domain();float t=clockTime();vec2 px=1./resolution;float style=float(VARIANT%5);vec2 flow=vec2(sin(p.y*(2.+style*.7)+t*.2),cos(p.x*(2.5+style*.4)-t*.17));
+void main(){
+    vec2 artworkUV=gl_FragCoord.xy/resolution;
+vec2 uv=gl_FragCoord.xy/resolution;vec2 p=domain()+.35*structureCurrent(artworkUV);float t=clockTime();vec2 px=1./resolution;float style=float(VARIANT%5);vec2 flow=vec2(sin(p.y*(2.+style*.7)+t*.2),cos(p.x*(2.5+style*.4)-t*.17));
     if(VARIANT%3==1)flow=vec2(-p.y,p.x)/(length(p)+.4);if(VARIANT%3==2)flow=rot(t*.1)*vec2(sin(p.y*5.),.5);
     // Alternating jets, snare shear and high-frequency eddies move the history.
     flow=rot(midImpulse*.7+.2*midSwing())*flow*(.4+1.8*bass+3.2*bassHit);

@@ -14,10 +14,13 @@ void main(){
     vec4 cut=sampleCutout(materialDomain(uv));
     vec3 ink=(hasImage!=0||hasCutout!=0)?mix(background.rgb,cut.rgb,cut.a):vec3(.5+.3*sin(uv.x*17.)*cos(uv.y*13.));
     float source=dot(ink,vec3(.2126,.7152,.0722))-.35;
+    if(hasCutout!=0)source=mix(source,structureHeight(uv)-.20,.72);
     if(simulationReset>.5){colour=vec4(source*.45,0.,source,1.);return;}
     vec2 grad=vec2(height(uv+vec2(px.x,0))-height(uv-vec2(px.x,0)),height(uv+vec2(0,px.y))-height(uv-vec2(0,px.y)));
     vec2 spin=vec2(-grad.y,grad.x);
     vec2 drift=vec2(sin(uv.y*7.+simulationTime*.23),cos(uv.x*6.-simulationTime*.19));
+    drift+=structureCurrent(uv)*6.;
+
     vec2 chart=clamp(uv-(drift*.13+spin*(12.+mid*10.))*px*(.4+warp),0.,1.);
     vec2 s=texture(input0,chart).rg;
     float lap=height(chart+vec2(px.x,0))+height(chart-vec2(px.x,0))+height(chart+vec2(0,px.y))+height(chart-vec2(0,px.y))-4.*s.x;

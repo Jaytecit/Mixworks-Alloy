@@ -1,0 +1,54 @@
+{
+  "TITLE": "Salt Weather / Salt Pan Drydown",
+  "MEDIA": [
+    {
+      "WRAP": "clamp"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.55,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Trace strength",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Nested",
+      "DESCRIPTION": "Image residue dries into a crust and keeps migrating."
+    },
+    {
+      "NAME": "clear_nested",
+      "TYPE": "bang",
+      "LABEL": "Clear Nested history",
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ],
+  "PASSES": [
+    {
+      "TARGET": "nestedHistory",
+      "WIDTH": 384,
+      "HEIGHT": 216,
+      "WRAP": "clamp"
+    }
+  ]
+}

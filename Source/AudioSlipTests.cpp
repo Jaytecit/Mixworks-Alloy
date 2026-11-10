@@ -1,7 +1,14 @@
 #include "Workstation.h"
 #include "ElasticAudio.h"
+#include "Beatmatch.h"
 #include <cmath>
 #include <limits>
+#if JUCE_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace mixworks
 {
@@ -22,6 +29,274 @@ void runAudioSlipTests(const std::function<void(bool, const juce::String&)>& che
     base.clips.push_back(partner); base.transitionLinksKnown = true; base.transitionLinks = {{clip.id, partner.id}};
     base.clips[0].controls.automation[0] = {true, {{0, -9}, {1, -3}, {4, -12}}};
     base.clips[0].fadeIn = .2; base.clips[0].fadeOut = .4;
+    if(juce::JUCEApplicationBase::getCommandLineParameters().contains("--pair-movement-only"))
+    {
+        Project fixture; fixture.followTrackTempo=false; fixture.bpm=fixture.tempo.fallback=120; fixture.snapDivision=1; fixture.masterDb=0; fixture.transitionLinksKnown=true;
+        for(int n=0;n<4;++n)
+        {
+            Clip c; c.media=media; c.track=n; c.start=.17+n*2; c.length=4; c.introAnchor=.043; c.outroAnchor=2.043; c.effects=makeClipEffects(); fixture.clips.push_back(c);
+        }
+        for(int n=1;n<4;++n) { Project::TransitionLink link{fixture.clips[(size_t)n-1].id,fixture.clips[(size_t)n].id}; link.frame=std::array<double,2>{2.043,4}; fixture.transitionLinks.push_back(link); }
+        fixture.updateLaneHandles(); const auto a=fixture.clips[0].id,b=fixture.clips[1].id,c=fixture.clips[2].id,d=fixture.clips[3].id;
+        const auto json=[](const Project& p) {return juce::JSON::toString(projectToJson(p),true,17);};
+        const auto join=[](const Project& p,const juce::String& id,bool intro) {const auto* c=p.clipFor(id);return c->start+c->transitionTime(intro);};
+        check(fixture.validateTransitionLinks().wasOk(),"authored four-track fixture has deliberately off-grid IN/OUT joins");
+        auto out=fixture; const auto outMove=out.moveTransitionAnchor(a,false,2.64,true);
+        check(outMove.wasOk() && out.clips[0].start==fixture.clips[0].start && std::abs(join(out,a,false)-2.5)<1.e-8
+            && std::abs(join(out,b,true)-2.5)<1.e-8 && out.clips[1].start!=fixture.clips[1].start && out.clips[2].start==fixture.clips[2].start,
+            "OUT snaps to timeline beat and moves only next audio while its own track stays put / "+outMove.getErrorMessage());
+        auto in=fixture; const double fixedJoin=join(in,a,false); const auto inMove=in.moveTransitionAnchor(b,true,3,true);
+        check(inMove.wasOk() && in.clips[0].start==fixture.clips[0].start && join(in,a,false)==fixedJoin
+            && std::abs(join(in,b,true)-fixedJoin)<1.e-8 && in.clips[1].start!=fixture.clips[1].start && in.clips[2].start==fixture.clips[2].start,
+            "IN changes the incoming source beneath fixed OUT without moving earlier or unrelated audio / "+inMove.getErrorMessage());
+        check(std::abs(in.clips[1].sourceTimeAt(fixedJoin-in.clips[1].start)-.83)<1.e-7,"IN drag selects the snapped source point requested by the pointer");
+        for(bool snap:{false,true})
+        {
+            auto p=fixture; const auto result=p.moveTransitionAnchor(a,false,2.647,snap);
+            check(result.wasOk() && std::abs(join(p,a,false)-(snap?2.5:2.647))<1.e-8,"free adjustment then Snap uses fixed timeline lattice, never prior marker phase / "+juce::String((int)snap));
+        }
+        auto freeThenSnap=fixture; freeThenSnap.moveTransitionAnchor(a,false,2.647,false); freeThenSnap.moveTransitionAnchor(a,false,2.78,true);
+        check(std::abs(join(freeThenSnap,a,false)-3)<1.e-8,"switching Snap back on after fine OUT alignment does not establish a new snap origin");
+        auto independently=fixture; const auto moved=independently.moveClip(b,3.37,false);
+        check(moved.wasOk() && independently.clips[1].start==3.37 && independently.clips[0].start==fixture.clips[0].start
+            && independently.clips[2].start==fixture.clips[2].start && std::abs(join(independently,a,false)-join(independently,b,true))<1.e-8,
+            "unlocked header moves one track and keeps paired markers aligned without reflowing the chain");
+        for(int locks=1;locks<=3;++locks)
+        {
+            auto p=fixture; for(int n=0;n<locks;++n)p.setTransitionMovementLocked(p.transitionLinks[(size_t)n].incoming,true);
+            const auto result=p.moveClip(b,3.37,false); bool correct=result.wasOk();
+            for(size_t n=0;n<4;++n)correct &= std::abs(p.clips[n].start-(fixture.clips[n].start+(n<=(size_t)locks ? 1.2:0)))<1.e-8;
+            check(correct,"only transitively locked pairs move together / "+juce::String(locks)+" / "+result.getErrorMessage());
+        }
+        auto locked=fixture; locked.setTransitionMovementLocked(b,true); const auto frozen=json(locked);
+        check(locked.moveTransitionAnchor(a,false,2.5,true).failed() && json(locked)==frozen,"pair movement lock explains and prevents independent OUT alignment until unlocked");
+        auto invalid=fixture; invalid.setTransitionMovementLocked(b,true); invalid.setTransitionMovementLocked(c,true);
+        const auto beforeInvalid=json(invalid); check(invalid.moveClip(b,.01,false).failed() && json(invalid)==beforeInvalid,"complete locked group cannot be moved before project zero, atomically");
+        for(int division:{1,2,4})
+        {
+            auto p=fixture; p.snapDivision=division;
+            check(std::abs(p.snappedMoveTime(.213,2.647,true)-p.gridClock().snap(2.647,true,p.snapStep()))<1.e-10,
+                "move snapping ignores a deliberately off-grid original reference / "+juce::String(division));
+            const double placed=p.snappedClipStart(p.clips[1],3.37,true,1);
+            check(std::abs(std::remainder(p.gridClock().beatsAt(placed+p.clips[1].firstBeatTime()),p.snapStep()))<1.e-8,
+                "track pulse destination uses only project grid despite a closer off-grid neighbouring pulse / "+juce::String(division));
+        }
+        auto append=fixture; append.clips.resize(1); append.transitionLinks.clear();
+        Clip added=fixture.clips[1]; added.start=4.17; added.introAnchor.reset(); added.outroAnchor.reset(); added.pendingPlacement=PendingPlacement::append; added.pendingAutoTransition=false; append.clips.push_back(added);
+        const auto planned=planTempoMap(append,0,TransitionPreset::alignOnly,false);
+        check(planned.error.isEmpty() && std::abs(join(planned.project,a,false)-join(planned.project,b,true))<1.e-7 && planned.project.transitionFor(b),
+            "ordinary next-track append aligns IN to existing last OUT and retains explicit pair identity / "+planned.error);
+        auto drop=append; drop.tempo.setPoint(0,120);
+        auto incoming=std::make_shared<Media>();
+        incoming->sampleRate=media->sampleRate; incoming->manualBpm=118; incoming->manualBeatOrigin=.213; incoming->samples=media->samples;
+        drop.clips[1].media=incoming; drop.clips[1].pendingPlacement=PendingPlacement::drop; drop.clips[1].start=2.9;
+        const auto pairedDrop=planTempoMap(drop,0,TransitionPreset::alignOnly,false);
+        const auto* dropLink=pairedDrop.project.transitionFor(b);
+        check(pairedDrop.error.isEmpty() && dropLink && !dropLink->movementLocked && pairedDrop.project.clips[1].track==1
+            && std::abs(join(pairedDrop.project,a,false)-join(pairedDrop.project,b,true))<1.e-7
+            && std::abs(join(pairedDrop.project,a,false)-join(drop,a,false))<1.e-7
+            && pairedDrop.project.tempo.bpmAt(3)==120 && pairedDrop.project.clips[1].fadeIn==0
+            && std::any_of(pairedDrop.project.tempo.points.begin(),pairedDrop.project.tempo.points.end(),
+                [&](const auto& point) { return point.clipId==b && point.bpm==120; }),
+            "short alignment-only drop keeps the existing tempo, with an editable marker and aligned IN/OUT / "+pairedDrop.error);
+        if (dropLink)
+        {
+            auto movedDrop=pairedDrop.project;
+            const auto unlockedMove=movedDrop.moveClip(b,movedDrop.clips[1].start+.5,false);
+            check(unlockedMove.wasOk() && movedDrop.clips[0].start==drop.clips[0].start
+                && std::abs(join(movedDrop,a,false)-join(movedDrop,b,true))<1.e-7,
+                "different-BPM drop can move independently while paired markers stay together / "+unlockedMove.getErrorMessage());
+            movedDrop.setTransitionMovementLocked(b,true);
+            const auto lockedMove=movedDrop.moveClip(b,movedDrop.clips[1].start+.5,false);
+            check(lockedMove.wasOk() && std::abs(movedDrop.clips[0].start-drop.clips[0].start-.5)<1.e-7
+                && std::abs(join(movedDrop,a,false)-join(movedDrop,b,true))<1.e-7,
+                "locking the different-BPM drop moves both tracks and preserves their join / "+lockedMove.getErrorMessage());
+        }
+        drop.clips[1].start=5;
+        const auto separateDrop=planTempoMap(drop,0,TransitionPreset::crossfade,false);
+        check(separateDrop.error.isEmpty() && !separateDrop.project.transitionFor(b),
+            "a drop outside the marked track remains independent / "+separateDrop.error);
+        auto ramped=fixture; ramped.clips.resize(2); ramped.transitionLinks.resize(1);
+        ramped.followTrackTempo=true; ramped.tempo.points={{0,120,false},{10,132,true}};
+        const auto clock=std::make_shared<const TempoMap>(ramped.tempo);
+        for(auto& track:ramped.clips) { track.beatmatched=true; track.retime(track.start,clock); }
+        auto& first=ramped.clips[0]; auto& next=ramped.clips[1];
+        first.outroAnchor=first.sourceElapsed(2.5-first.start);
+        next.introAnchor=next.sourceElapsed(2.5-next.start);
+        ramped.transitionLinks[0].frame=std::array<double,2>{*first.outroAnchor,first.sourceElapsed(3.5-first.start)};
+        auto rigid=ramped; const auto rigidBefore=json(rigid);
+        check(rigid.moveClipGroup({a,b},b,next.start+.5,next.track,false).failed() && json(rigid)==rigidBefore,
+            "explicit multi-selection keeps its rigid clock contract across a ramp");
+        auto musical=ramped; musical.setTransitionMovementLocked(b,true);
+        const auto movedPair=musical.moveClip(b,next.start+.5,false);
+        check(movedPair.wasOk() && musical.tempo.points==ramped.tempo.points
+            && musical.clips[0].start>first.start && std::abs(musical.clips[1].start-next.start-.5)<1.e-8
+            && std::abs(musical.clips[1].length-next.length)>1.e-4 && std::abs(musical.clips[1].sourceSpan()-next.sourceSpan())<1.e-8
+            && std::abs(join(musical,a,false)-join(musical,b,true))<1.e-8,
+            "single-header locked pair retimes both tracks, keeps source spans and joins, and leaves tempo points fixed / "+movedPair.getErrorMessage());
+        auto earlierClock=ramped; earlierClock.tempo.setPoint(7,128.4,true); earlierClock.tempo.setPoint(10,144,true);
+        const auto earlierBefore=json(earlierClock);
+        check(earlierClock.moveClip(b,7.5,false).failed() && json(earlierClock)==earlierBefore,
+            "moving a captured playback clock into a different future ramp cannot create unreopenable geometry");
+        const auto pcm=[](const Project& p,double at) {Engine e;e.sampleRate=8000;e.project=p;juce::AudioBuffer<float> audio(2,64);juce::MidiBuffer midi;e.render(audio,64,at,midi);return audio;};
+        auto treated=fixture; treated.applyTransitionPreset(b,TransitionPreset::crossfade); treated.transitionLinks[0].muteOutside=true;
+        auto kept=treated; const auto removed=kept.removeTransition(b,false); float keepError=0;
+        for(double at:{1.,2.3,3.5,4.5}) {const auto x=pcm(treated,at),y=pcm(kept,at);for(int ch=0;ch<2;++ch)for(int i=0;i<64;++i)keepError=std::max(keepError,std::abs(x.getSample(ch,i)-y.getSample(ch,i)));}
+        check(removed.wasOk() && !kept.transitionFor(b) && kept.transitionFor(c) && kept.transitionFor(d) && keepError<2.e-6f,"remove just one pair/frame and keep actual heard PCM, including exterior cuts / "+removed.getErrorMessage());
+        auto cleared=treated; const auto clear=cleared.removeTransition(b,true); const auto clearAudio=pcm(cleared,3),plainAudio=pcm(fixture,3);float clearError=0;
+        for(int ch=0;ch<2;++ch)for(int i=0;i<64;++i)clearError=std::max(clearError,std::abs(clearAudio.getSample(ch,i)-plainAudio.getSample(ch,i)));
+        check(clear.wasOk() && clearError<2.e-6f && cleared.transitionFor(c) && cleared.transitionFor(d),"clear treatment removes this pair's frame automation without deleting neighbouring frames / "+clear.getErrorMessage());
+        Workstation ui(false);ui.stopTimer();ui.setSize(1440,940);ui.engine.sampleRate=8000;ui.timeline.pixelsPerSecond=80;ui.layout.followPlayhead=false;
+        const auto reset=[&](const Project& p) {ui.engine.setPlaying(false);ui.engine.project=p;ui.selectedClip=ui.selectedTransition=b;ui.clearEditSelection();ui.undoHistory.clear();ui.redoHistory.clear();ui.refresh();ui.viewport.setViewPosition(0,0);};
+        const auto mouse=juce::Desktop::getInstance().getMainMouseSource();
+        const auto event=[&](juce::Point<float> at,juce::Point<float> down,bool drag,bool free)
+        {return juce::MouseEvent(mouse,at,juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier|(free?juce::ModifierKeys::altModifier:0)),1,0,0,0,0,&ui.timeline,&ui.timeline,juce::Time::getCurrentTime(),down,juce::Time::getCurrentTime(),1,drag);};
+        for(bool intro:{false,true})
+        {
+            reset(fixture);const auto id=intro?b:a;const auto* placed=ui.engine.project.clipFor(id);const auto bounds=ui.timeline.clipBounds(*placed);
+            juce::Point<float> down;bool hittable=false;
+            for(float y:{bounds.getY()+28,bounds.getCentreY(),bounds.getBottom()-14})
+            { const juce::Point<float> point{(float)(join(ui.engine.project,id,intro)*80),y};const auto hit=ui.timeline.anchorAt(point);
+                if(hit && hit->first==id && hit->second==intro && !ui.timeline.transitionAt(point) && !ui.timeline.automationPointAt(point)) {down=point;hittable=true;break;} }
+            check(hittable,"ordinary waveform IN/OUT marker has a reachable gesture target / "+juce::String((int)intro));
+            if(hittable)
+            {
+                const juce::Point<float> to{(float)((intro?3.:2.64)*80),down.y};
+                ui.timeline.mouseDown(event(down,down,false,false));
+                check(ui.timeline.anchorDrag.has_value() && !ui.timeline.rangeDragAnchor,"marker mouse-down reaches alignment instead of waveform range selection");
+                ui.timeline.mouseDrag(event(to,down,true,false));ui.timeline.mouseUp(event(to,down,true,false));
+                const auto& actual=ui.engine.project;
+                check(actual.clips[0].start==fixture.clips[0].start && (intro ? std::abs(join(actual,b,true)-fixedJoin)<1.e-7 : std::abs(join(actual,a,false)-2.5)<1.e-7)
+                    && actual.clips[1].start!=fixture.clips[1].start && actual.clips[2].start==fixture.clips[2].start && ui.undoHistory.size()==1,
+                    "actual IN/OUT mouse handlers implement stationary OUT owner and fixed-join IN / "+juce::String((int)intro)+" / "+ui.status);
+                ui.undo(false);check(json(ui.engine.project)==json(fixture),"marker gesture Undo restores complete pre-drag pair geometry");
+            }
+        }
+        for(bool free:{false,true})
+        {
+            reset(fixture);const AutomationAddress address{0,AutomationTarget::volume,{},{},a};
+            ui.engine.project.effectSettings(ui.engine.project.clips[0]).automation[0]={true,{{0,-9},{1,-6},{4,-9}}};
+            ui.timeline.selectAutomationCurve(address);ui.refresh();
+            const juce::Point<float> down{(float)(1.17*80),ui.timeline.automationY(0,ui.timeline.automationDisplayValue(address,1.17,-6),0)},to{(float)(1.71*80),down.y};
+            ui.timeline.mouseDown(event(down,down,false,free));ui.timeline.mouseDrag(event(to,down,true,free));ui.timeline.mouseUp(event(to,down,true,free));
+            const auto* curve=ui.engine.project.curve(address);const double at=curve && curve->points.size()>1 ? ui.engine.project.automationSessionTime(address,curve->points[1].time):-1;
+            check(std::abs(at-(free?1.71:1.5))<1.e-5,"actual source-node drag uses project grid despite off-grid clip/source clocks; Alt is free / "+juce::String((int)free));
+        }
+        reset(fixture); const auto beforeUi=json(ui.engine.project);
+        auto* pairButton=ui.timeline.movementLockButtons[b].get();
+        check(pairButton && pairButton->isVisible() && pairButton->getButtonText()=="Unlocked" && pairButton->getTitle().contains("Pair movement lock"),"LINK replaced by an accessible actual pair-specific movement button");
+        if(pairButton)pairButton->onClick();
+        check(ui.engine.project.transitionFor(b)->movementLocked && !ui.engine.project.transitionFor(c)->movementLocked && ui.undoHistory.size()==1,"actual pair button changes only its own movement lock in one Undo");
+        ui.undo(false);check(json(ui.engine.project)==beforeUi,"Undo restores exact pair movement state");ui.undo(true);
+        check(ui.engine.project.transitionFor(b)->movementLocked,"Redo restores the pair movement lock");
+        media->analysisSource={audioDigest(media->file),media->file.getSize(),8000,media->frames(),1};check(writeAnalysisRecord(media->file,media->analysisRecord()).isEmpty(),"seed owned marker fixture analysis without detection");
+        const auto file=report.getSiblingFile("pair-movement.mixworks");const auto saved=ui.engine.saveProject(file);Engine reopened;const auto opened=saved.isEmpty()?reopened.restoreProject(file.loadFileAsString()):saved;
+        check(saved.isEmpty() && opened.isEmpty() && reopened.project.transitionFor(b) && reopened.project.transitionFor(c)
+            && reopened.project.transitionFor(b)->movementLocked && !reopened.project.transitionFor(c)->movementLocked,"actual source-backed save/reopen retains pair movement locks / "+opened);
+        reset(treated);ui.selectTransition(b,false);ui.showToolPage(1);ui.refresh();ui.removeTransitionButton.onClick();
+        auto* question=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
+        check(question && question->getName()=="Remove transition?" && ui.removeTransitionButton.isEnabled(),"visible Remove transition opens explicit keep-mix/clear-treatment choices");
+        const auto pump=[] {
+            #if JUCE_WINDOWS
+            MSG message;while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageW(&message);}
+            #endif
+        };
+        if(question) {auto capture=report.getSiblingFile("remove-transition-question.png").createOutputStream();check(capture && juce::PNGImageFormat().writeImageToStream(question->createComponentSnapshot(question->getLocalBounds()),*capture),"capture real remove-transition choices");question->exitModalState(0);pump();}
+        check(json(ui.engine.project)==json(treated) && ui.undoHistory.empty(),"Cancel removal keeps the complete treatment and pair");
+        ui.removeTransitionButton.onClick();question=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());if(question){question->exitModalState(1);pump();}
+        check(!ui.engine.project.transitionFor(b) && ui.engine.project.transitionFor(c) && ui.undoHistory.size()==1,"confirmed visible removal removes only the selected pair");
+        ui.undo(false);check(json(ui.engine.project)==json(treated),"Undo visible removal restores complete paired treatment");
+        ui.selectTransition(b,false);ui.showToolPage(1);ui.refresh();auto capture=report.getSiblingFile("pair-lock-controls.png").createOutputStream();
+        check(capture && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*capture),"capture actual pair buttons, IN/OUT markers, movement lock and Remove controls");
+        return;
+    }
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--edge-trim-only"))
+    {
+        media->analysisSource={audioDigest(media->file),media->file.getSize(),8000,media->frames(),1};
+        check(writeAnalysisRecord(media->file,media->analysisRecord()).isEmpty(),"seed only owned trim fixture analysis to avoid detector work on reopen");
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1440,940); ui.engine.sampleRate=8000;
+        ui.timeline.pixelsPerSecond=160; ui.layout.followPlayhead=false; base.followTrackTempo=false; base.tempo.points.clear(); base.snap=false; base.masterDb=0;
+        base.clips[0].fadeIn=base.clips[0].fadeOut=0; base.clips[0].controls={}; base.clips[1].effects=makeClipEffects();
+        const auto json=[](const Project& p) { return juce::JSON::toString(projectToJson(p),true,17); };
+        auto reset=[&] { ui.engine.setPlaying(false); ui.engine.project=base; ui.engine.position=1.5;
+            ui.selectedClip=clip.id; ui.selectedTransition.clear(); ui.undoHistory.clear(); ui.redoHistory.clear(); ui.refresh(); ui.viewport.setViewPosition(0,0); };
+        const auto mouse=juce::Desktop::getInstance().getMainMouseSource();
+        auto event=[&](juce::Point<float> at,juce::Point<float> down,bool dragging,bool free)
+        { return juce::MouseEvent(mouse,at,juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier|(free?juce::ModifierKeys::altModifier:0)),
+            1,0,0,0,0,&ui.timeline,&ui.timeline,juce::Time::getCurrentTime(),down,juce::Time::getCurrentTime(),1,dragging); };
+        auto drag=[&](bool left,double delta,bool free)
+        { const auto* c=ui.engine.project.clipFor(clip.id); const auto down=ui.timeline.edgeTrimBounds(*c,left).getCentre();
+          const auto at=down.translated((float)(delta*ui.timeline.pixelsPerSecond),0);
+          ui.timeline.mouseDown(event(down,down,false,free)); ui.timeline.mouseDrag(event(at,down,true,free)); ui.timeline.mouseUp(event(at,down,true,free)); };
+        auto render=[&](Project p,double at)
+        { Engine engine; engine.sampleRate=8000; p.tracks[1].mute=true; engine.project=std::move(p);
+          juce::AudioBuffer<float> pcm(2,64); juce::MidiBuffer midi; engine.render(pcm,64,at,midi); return pcm; };
+        reset(); const auto original=json(ui.engine.project); const auto frame=base.transitionRange(base.transitionLinks[0]);
+        const double sourceBefore=base.clips[0].sourceTimeAt(1.5);
+        drag(true,1,true); drag(false,-1,true);
+        const auto& trimmed=*ui.engine.project.clipFor(clip.id);
+        check(trimmed.start==1 && trimmed.end()==3 && trimmed.offset==1,"ordinary left/right edge drags trim the retained source range");
+        check(ui.engine.project.clips[1].start==2 && trimmed.sourceTimeAt(1.5-trimmed.start)==sourceBefore
+            && ui.engine.position==1.5,"edge trims preserve other placement, source alignment and playhead");
+        check(ui.engine.project.transitionRange(ui.engine.project.transitionLinks[0])==frame
+            && trimmed.start+trimmed.transitionTime(false)==2,"transition frame and OUT marker stay independent of audio edges");
+        check(ui.status.contains("excluded audio") && ui.engine.project.validateTransitionLinks().wasOk(),"excluded transition audio has an explicit consequence and remains a valid project");
+        const auto before=render(ui.engine.project,.5), after=render(ui.engine.project,3.5), retained=render(ui.engine.project,1.5), reference=render(base,1.5);
+        float error=0; for(int ch=0;ch<2;++ch)for(int i=0;i<64;++i)error=std::max(error,std::abs(retained.getSample(ch,i)-reference.getSample(ch,i)));
+        check(before.getMagnitude(0,64)==0 && after.getMagnitude(0,64)==0 && retained.getMagnitude(0,64)>.01 && error<1.e-6f,
+            "rendered PCM excludes both trimmed intervals and preserves the retained sound");
+        const auto trimmedDocument=json(ui.engine.project); ui.undo(false); ui.undo(false);
+        check(json(ui.engine.project)==original,"Undo restores both edge gestures exactly"); ui.undo(true); ui.undo(true);
+        check(json(ui.engine.project)==trimmedDocument,"Redo restores both trims exactly");
+        auto pixels=report.getSiblingFile("edge-trim-conflict.png").createOutputStream();
+        check(pixels && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*pixels),"capture distinct trim edges with retained transition markers");
+        const auto file=report.getSiblingFile("edge-trim.mixworks"); const auto save=ui.engine.saveProject(file); Engine reopened;
+        const auto opened=save.isEmpty()?reopened.restoreProject(file.loadFileAsString()):save;
+        check(save.isEmpty() && opened.isEmpty() && reopened.project.clips[0].start==1 && reopened.project.clips[0].end()==3
+            && reopened.project.transitionRange(reopened.project.transitionLinks[0])==frame,"actual save/reopen retains trim and independent frame: "+opened);
+        if(opened.isEmpty())
+        { juce::String exportError; auto exporter=reopened.createExportRenderer(exportError);
+          check(exporter && exportError.isEmpty(),"trimmed source admits actual offline export renderer");
+          if(exporter) { const auto pcm=render(exporter->project,3.5); check(pcm.getMagnitude(0,64)==0,"export path cannot restore excluded tail audio"); }
+          ui.engine.project=reopened.project; ui.refresh(); drag(true,-1,true); drag(false,1,true);
+          check(ui.engine.project.clips[0].start==0 && ui.engine.project.clips[0].end()==4 && ui.engine.project.clips[0].offset==0,
+            "extending both edges after reopen restores the available original audio"); }
+        reset(); ui.engine.project.snap=true; drag(true,.73,false);
+        check(ui.engine.project.clips[0].start==.5,"ordinary edge drag snaps to the project beat");
+        reset(); ui.engine.project.snap=true; drag(true,.73,true);
+        check(std::abs(ui.engine.project.clips[0].start-.73125)<.01,"Alt edge drag bypasses beat snapping");
+        reset(); ui.engine.project.setTransitionLocked(partner.id,true); const auto locked=json(ui.engine.project); drag(false,-1,true);
+        check(json(ui.engine.project)==locked && ui.undoHistory.empty() && ui.status.contains("Unlock"),"locked trim explains refusal without edits or history");
+        for(const auto mode:{"raw","reverse","loop","clip-local","elastic"})
+        {
+            auto p=base; auto& c=p.clips[0]; c.introAnchor=0; const juce::String name(mode);
+            if(name=="reverse")c.reversed=true; if(name=="loop")c.loopSpan=2;
+            if(name=="clip-local") { auto prepared=std::make_shared<PreparedAudio>(); prepared->clipLocal=true; prepared->samples.makeCopyOf(media->samples); c.prepared=prepared; }
+            if(name=="elastic")
+            { p.followTrackTempo=true; p.tempo.setPoint(0,120); c.beatmatched=c.elasticPlayback=true; c.tempoSourceBpm=120;
+              c.tempoMap=std::make_shared<const TempoMap>(p.tempo); c.elasticSource=std::make_shared<const ElasticSource>(c); }
+            const auto expected=render(p,2.75);
+            const auto originalFrame=p.transitionRange(p.transitionLinks[0]);
+            check(p.trimClip(clip.id,2.5,3).wasOk() && p.validateTransitionLinks().wasOk()
+                && p.transitionRange(p.transitionLinks[0])==originalFrame,"trim beyond OUT retains off-segment markers / "+name);
+            const auto kept=render(p,2.75), excluded=render(p,2.25); float difference=0;
+            for(int ch=0;ch<2;++ch)for(int i=0;i<64;++i)difference=std::max(difference,std::abs(kept.getSample(ch,i)-expected.getSample(ch,i)));
+            check(difference<1.e-5f && kept.getMagnitude(0,64)>.001f && excluded.getMagnitude(0,64)==0,
+                "trim preserves retained PCM and excludes source head / "+name+" / error "+juce::String(difference,8));
+            const auto parsed=parseProject(juce::JSON::toString(projectToJson(p),true,17));
+            check(parsed.error.isEmpty(),"signed off-segment transition frame parses / "+name+" / "+parsed.error);
+        }
+        auto shared=base; shared.clips[1].effects=shared.clips[0].effects;
+        const auto expectedShared=render(shared,2.75);
+        check(shared.trimClip(clip.id,2.5,3).wasOk(),"trim one shared piece across its partner's start");
+        const auto actualShared=render(shared,2.75); float sharedError=0;
+        for(int ch=0;ch<2;++ch)for(int i=0;i<64;++i)sharedError=std::max(sharedError,std::abs(expectedShared.getSample(ch,i)-actualShared.getSample(ch,i)));
+        check(sharedError<1.e-6f && shared.clips[0].routeStart()==0,"left trim preserves shared-return lane ownership across overlapping pieces");
+        const auto sharedParsed=parseProject(juce::JSON::toString(projectToJson(shared),true,17));
+        check(sharedParsed.error.isEmpty() && sharedParsed.clips[0].clip.routeStart()==0,"shared routing clock survives session parsing");
+        check(audioDigest(media->file)==media->analysisSource.sha256,"original fixture hash is unchanged after every trim gesture");
+        return;
+    }
     const auto json = [](const Project& p) { return juce::JSON::toString(projectToJson(p)); };
     auto changed = base; auto expected = base; expected.clips[0].audioSlip = .65;
     check(changed.setClipAudioSlip(clip.id, .65).wasOk() && json(changed) == json(expected)

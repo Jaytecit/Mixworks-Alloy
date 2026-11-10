@@ -1,6 +1,7 @@
 #include "VisualScenes.h"
 #include "MilkDrop.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <set>
 
@@ -17,14 +18,33 @@ bool originalKey(const juce::String& key)
 }
 bool validKey(const juce::String& key)
 {
-    return originalKey(key) || isMilkDropKey(key);
+    const auto path = key.fromFirstOccurrenceOf("/", false, false);
+    return originalKey(key) || isMilkDropKey(key) || key == "studio-milk/prism"
+        || key == "studio-bg/copper" || key == "studio-sprite/circuit" || key == "studio-sprite/flare"
+        || (key.startsWith("studio/") && path.isNotEmpty() && path.length() <= 64
+            && path.containsOnly("abcdefghijklmnopqrstuvwxyz0123456789-"))
+        || ((key.startsWith("sprite/") || key.startsWith("background/") || key.startsWith("glsl/"))
+            && juce::File::isAbsolutePath(path) && path.length() <= 4096);
 }
 bool number(const juce::var& v)
 { return (v.isDouble() || v.isInt() || v.isInt64()) && std::isfinite((double)v); }
 }
+VisualLayer visualLayer(const juce::String& key)
+{
+    if (key.startsWith("background/") || key.startsWith("studio-bg/")) return VisualLayer::background;
+    if (isMilkDropKey(key) || key.startsWith("studio-milk/")) return VisualLayer::milk;
+    if (key.startsWith("sprite/") || key.startsWith("studio-sprite/")) return VisualLayer::sprite;
+    return VisualLayer::shader;
+}
+double visualCycleAt(double elapsedBeats)
+{
+    constexpr double leg = 128 * 4;
+    const auto phase = std::fmod(std::max(0., elapsedBeats), 2 * leg) / leg;
+    return 1. - std::abs(1. - phase);
+}
 bool validVisualTransition(const juce::String& value)
 {
-    return value == "dissolve" || value == "zoom" || value == "radial" || value == "sweep" || value == "cut" || value == "sweep-reverse";
+    return value == "feedback" || value == "dissolve" || value == "zoom" || value == "radial" || value == "sweep" || value == "cut" || value == "sweep-reverse";
 }
 juce::var visualControlsToJson(const std::map<juce::String, double>& controls)
 {
@@ -70,7 +90,7 @@ std::vector<VisualSceneEntry> discoverVisualScenes(const juce::File& install)
                         if (number(prop.value["default"]) && (double)prop.value["min"]==0 && (double)prop.value["max"]==1
                             && (double)prop.value["default"]>=0 && (double)prop.value["default"]<=1)
                             item.controlSpecs[prop.name.toString()]={(double)prop.value["default"],(int)prop.value["steps"]};
-                if (item.controlSpecs.empty() || item.controlSpecs.size()>32) continue;
+                if (item.controlSpecs.empty() || item.controlSpecs.size()>48) continue;
                 item.imageControls.clear();
                 if(const auto image=item.controlSpecs.find("imageMix");image!=item.controlSpecs.end())
                     item.imageControls["imageMix"]=image->second.initial;
@@ -120,7 +140,7 @@ std::vector<VisualSceneEntry> automaticVisualScenes(const std::vector<VisualScen
 VisualSceneFrame visualFrameAt(const std::vector<VisualSceneClip>& clips, double at)
 {
     VisualSceneFrame frame;
-    for (const auto& c : clips) if (at >= c.start && at < c.end())
+    for (const auto& c : clips) if ((originalKey(c.scene) || isMilkDropKey(c.scene)) && at >= c.start && at < c.end())
     {
         if (!frame.outgoing) frame.outgoing = &c;
         else frame.incoming = &c;
@@ -132,24 +152,27 @@ VisualSceneFrame visualFrameAt(const std::vector<VisualSceneClip>& clips, double
 juce::Result validateVisualScenes(const std::vector<VisualSceneClip>& clips)
 {
     std::set<juce::String> ids;
-    double previousStart = -1, previousEnd = -1, earlierEnd = -1;
+    double previousStart = -1;
+    std::array<double, 4> previousEnd {-1, -1, -1, -1}, earlierEnd = previousEnd;
     for (const auto& c : clips)
     {
+        const auto layer = (size_t)visualLayer(c.scene);
         if (c.id.isEmpty() || !ids.insert(c.id).second || !validKey(c.scene) || c.title.isEmpty()
             || !std::isfinite(c.start) || !std::isfinite(c.length) || !std::isfinite(c.offset)
             || c.start < 0 || c.length < .05 || c.offset < 0 || c.offset > 1.0e9 || !std::isfinite(c.end()) || c.end() > 1.0e9
-            || c.start < previousStart || c.end() < previousEnd || c.start < earlierEnd
+            || c.start < previousStart || c.end() < previousEnd[layer] || c.start < earlierEnd[layer]
             || !validVisualTransition(c.transition) || !std::isfinite(c.pivot) || c.pivot<0 || c.pivot>1)
             return juce::Result::fail("Scenes must stay in order, with at most two overlapping for a blend.");
         for (const auto& [name,value] : c.controls)
             if (name.isEmpty() || !name.containsOnly("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
                 || juce::CharacterFunctions::isDigit(name[0]) || !std::isfinite(value))
                 return juce::Result::fail("Invalid generated visual control.");
-        if(c.automation.size()>32) return juce::Result::fail("Too many visual automation controls.");
+        if(c.automation.size()>256) return juce::Result::fail("Too many visual automation controls.");
         for(const auto& [name,curve] : c.automation)
         {
             if(name.isEmpty() || !name.containsOnly("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
-                || juce::CharacterFunctions::isDigit(name[0]) || curve.points.size()<2 || curve.points.size()>64)
+                || juce::CharacterFunctions::isDigit(name[0]) || curve.points.size()>64
+                || (curve.points.size()<2 && (!curve.cycle || !curve.points.empty())))
                 return juce::Result::fail("Invalid visual automation curve.");
             double previous=-1;
             for(const auto& point:curve.points)
@@ -158,9 +181,10 @@ juce::Result validateVisualScenes(const std::vector<VisualSceneClip>& clips)
                     return juce::Result::fail("Visual automation points must be ordered and bounded.");
                 previous=point.at;
             }
-            if(curve.points.front().at!=0 || curve.points.back().at!=1) return juce::Result::fail("Visual automation must cover its block.");
+            if(!curve.points.empty() && (curve.points.front().at!=0 || curve.points.back().at!=1))
+                return juce::Result::fail("Visual automation must cover its block.");
         }
-        earlierEnd = previousEnd; previousStart = c.start; previousEnd = c.end();
+        earlierEnd[layer] = previousEnd[layer]; previousStart = c.start; previousEnd[layer] = c.end();
     }
     return juce::Result::ok();
 }
@@ -178,6 +202,7 @@ juce::var visualScenesToJson(const std::vector<VisualSceneClip>& clips)
         for(const auto& [name,curve]:c.automation)
         {
             auto* value=new juce::DynamicObject(); value->setProperty("stepped",curve.stepped);
+            if (curve.cycle) value->setProperty("cycle", true);
             juce::Array<juce::var> points;
             for(const auto& point:curve.points) points.add(juce::var(juce::Array<juce::var>{point.at,point.value}));
             value->setProperty("points",points);automation->setProperty(name,juce::var(value));
@@ -210,13 +235,14 @@ juce::Result readVisualScenes(const juce::var& value, std::vector<VisualSceneCli
         if(v.hasProperty("automation"))
         {
             const auto* object=v["automation"].getDynamicObject();
-            if(!object || object->getProperties().size()>32) return juce::Result::fail("Invalid visual automation object.");
+            if(!object || object->getProperties().size()>256) return juce::Result::fail("Invalid visual automation object.");
             for(const auto& prop:object->getProperties())
             {
                 const auto* points=prop.value["points"].getArray();
-                if(!prop.value["stepped"].isBool() || !points || points->size()<2 || points->size()>64)
+                if(!prop.value["stepped"].isBool() || !points || points->size()>64
+                    || (!prop.value["cycle"].isVoid() && !prop.value["cycle"].isBool()))
                     return juce::Result::fail("Invalid visual automation points.");
-                VisualControlCurve curve;curve.stepped=(bool)prop.value["stepped"];
+                VisualControlCurve curve;curve.stepped=(bool)prop.value["stepped"]; curve.cycle=(bool)prop.value["cycle"];
                 for(const auto& point:*points)
                 {
                     if(!point.isArray() || point.size()!=2 || !number(point[0]) || !number(point[1]))
@@ -232,12 +258,13 @@ juce::Result readVisualScenes(const juce::var& value, std::vector<VisualSceneCli
     destination = std::move(parsed); return juce::Result::ok();
 }
 
-std::map<juce::String,double> visualControlsAt(const VisualSceneClip& scene,double localTime)
+std::map<juce::String,double> visualControlsAt(const VisualSceneClip& scene,double localTime,double elapsedBeats)
 {
     auto values=scene.controls;
     const double at=juce::jlimit(0.,1.,(localTime-scene.offset)/std::max(.05,scene.length));
     for(const auto& [name,curve]:scene.automation)
     {
+        if(curve.cycle) { values[name]=visualCycleAt(elapsedBeats); continue; }
         if(curve.points.empty()) continue;
         double value=curve.points.back().value;
         for(size_t i=1;i<curve.points.size();++i) if(at<curve.points[i].at)
@@ -254,7 +281,7 @@ double visualMotionTime(const VisualSceneClip& scene,double localTime)
 {
     const auto found=scene.automation.find("motion");
     const double duration=std::max(.05,scene.length),elapsed=juce::jlimit(0.,duration,localTime-scene.offset);
-    if(found==scene.automation.end())
+    if(found==scene.automation.end() || found->second.points.empty())
     { const auto value=scene.controls.find("motion");return localTime*(.25+.75*(value==scene.controls.end()?.5:value->second)); }
     const auto& curve=found->second;double integrated=0.;
     for(size_t i=1;i<curve.points.size();++i)
@@ -274,7 +301,7 @@ void automateVisualScene(VisualSceneClip& scene,const VisualSceneEntry& entry,do
         // Image choice is fixed for each scene; the pool advances on project phrases.
         if(name=="imageIndex") { scene.controls[name]=random.nextDouble();continue; }
         // A palette is an authored choice, not another independently wandering hue.
-        if(name=="paletteStyle" || name=="paletteAmount") continue;
+        if(name=="paletteStyle" || name=="paletteAmount" || name=="reliefDepth" || name=="meltWarp" || name=="displacementColour") continue;
         VisualControlCurve curve;curve.stepped=spec.steps>1;
         for(int i=0;i<5;++i)
         {

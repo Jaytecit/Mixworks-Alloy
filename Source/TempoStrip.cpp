@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "UiMessages.h"
 #include <cmath>
 #include <cstring>
 
@@ -74,12 +75,12 @@ void TempoStrip::refreshAccessibleMarkers()
         {
             const int i = find(key); if (i < 0) return juce::String("Removed tempo marker");
             const auto& p = owner.engine.project.tempo.points[(size_t) i]; const auto* c = owner.engine.project.clipFor(p.clipId);
-            return "Tempo marker " + juce::String(i + 1) + ", " + juce::String(p.bpm, 4) + " BPM, project time " + timeText(p.time - owner.engine.project.tempo.origin)
+            return "Tempo marker " + juce::String(i + 1) + ", " + wholeBpmText(p.bpm) + " BPM, project time " + timeText(p.time - owner.engine.project.tempo.origin)
                 + (c ? ", segment / " + c->media->libraryTitle() : ", independent marker") + (p.ramp ? ", ramp from previous" : ", held tempo")
                 + (owner.engine.project.hasLockedTransitions() ? ", locked" : "");
         };
         item->value = [this, key, find] { const int i = find(key); return i >= 0 ? owner.engine.project.tempo.points[(size_t) i].bpm : 0.; };
-        item->valueText = [value = item->value] { return juce::String(value(), 4) + " BPM"; };
+        item->valueText = [value = item->value] { return wholeBpmText(value()) + " BPM"; };
         item->selected = [this, key, find] { const int i = find(key); return i >= 0 && selectedTempoPoint == i; };
         item->choose = [this, key, find] { selectAccessibleMarker(find(key)); };
         item->open = [this, key, find]
@@ -139,7 +140,7 @@ void TempoStrip::paint(juce::Graphics& g)
             AlloyLookAndFeel::drawMoltenMetal(g, bounds.withTop(bounds.getBottom() - 1.5f).reduced(2, 0), false, .55f);
         }
         g.setColour(index == selectedTempoPoint ? colour::orange : colour::text);
-        g.drawText(juce::String(tempo.points[(size_t) index].bpm, 2), bounds, juce::Justification::centredLeft);
+        g.drawText(wholeBpmText(tempo.points[(size_t) index].bpm), bounds, juce::Justification::centredLeft);
     };
     for (int i = 0; i < (int) tempo.points.size(); ++i) value(i);
     // Small hourglass pins keep values aligned to time without turning the footer into a graph.
@@ -154,7 +155,7 @@ void TempoStrip::paint(juce::Graphics& g)
     if (tempo.points.empty() || std::none_of(tempo.points.begin(), tempo.points.end(), [&](const auto& p) { const auto x = p.time * owner.timeline.pixelsPerSecond - owner.viewport.getViewPositionX(); return x >= -4 && x < 90; }))
     {
         g.setColour(colour::muted); const double bpm = project.followTrackTempo ? tempo.bpmAt(timeAt(0)) : project.bpm;
-        g.drawText("BPM " + juce::String(bpm, 2), 7, 0, 80, stripHeight, juce::Justification::centredLeft);
+        g.drawText("BPM " + wholeBpmText(bpm), 7, 0, 80, stripHeight, juce::Justification::centredLeft);
     }
     if (hasKeyboardFocus(true)) { g.setColour(colour::focus); g.drawRect(getLocalBounds(), 1); }
 }
@@ -200,7 +201,7 @@ void TempoStrip::mouseDrag(const juce::MouseEvent& event)
     moved = true;
     tempoDraft.movePoint(selectedTempoPoint, owner.engine.project.snappedTime(timeAt(event.position.x), owner.engine.project.snap && !event.mods.isAltDown()), tempoDraft.points[(size_t) selectedTempoPoint].bpm);
     const auto& point = tempoDraft.points[(size_t) selectedTempoPoint];
-    owner.setStatus(timeText(point.time - owner.engine.project.tempo.origin) + " / " + juce::String(point.bpm, 2) + " BPM"); repaint();
+    owner.setStatus(timeText(point.time - owner.engine.project.tempo.origin) + " / " + wholeBpmText(point.bpm) + " BPM"); repaint();
 }
 void TempoStrip::mouseUp(const juce::MouseEvent&)
 {

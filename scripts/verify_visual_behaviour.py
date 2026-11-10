@@ -61,25 +61,16 @@ def main():
         return Image.frombytes('RGBA', (w, h), raw, 'raw', 'BGRA').transpose(Image.Transpose.FLIP_TOP_BOTTOM).convert('RGB')
 
     try:
-        for transition in ('dissolve', 'radial', 'sweep', 'sweep-reverse'):
+        for transition in ('feedback', 'dissolve', 'radial', 'sweep', 'sweep-reverse'):
             player.reset()
-            for progress in (.2, .5, .8):
-                q = request(progress, [actor('mosaic-kiln', progress), actor('pulse-gallery', progress, 'b')],
-                            transition=transition, transitionSeconds=16., mix=progress)
-                facts, raw = player.render(q)
-                a = np.frombuffer(pixels(player.instances['a'].final), np.uint8).reshape(-1, 4).astype(float)
-                b = np.frombuffer(pixels(player.instances['b'].final), np.uint8).reshape(-1, 4).astype(float)
-                actual = np.frombuffer(raw, np.uint8).reshape(-1, 4)[:, [2, 1, 0, 3]]
-                weight = progress*progress*(3.-2.*progress)
-                check(np.max(abs(actual-(a*(1.-weight)+b*weight))) <= 1.1,
-                      f'{transition} long overlap equals both current live frames at {progress}')
-                check(not facts['generativeHandoffs'], f'{transition} long overlap has no fragment handoff at {progress}')
-        player.reset()
-        q = request(1., [actor('mosaic-kiln', 1.), actor('pulse-gallery', 1., 'b')],
-                    transition='radial', transitionSeconds=2., mix=.5)
-        facts, raw = player.render(q)
-        check(bool(facts['generativeHandoffs']), 'short radial reveal retains its authored handoff')
-        check(player.render(q)[1] == raw, 'paused short transition is exact')
+            for frame in range(31):
+                progress=frame/30
+                q=request(frame/30,[actor('mosaic-kiln',frame/30),actor('pulse-gallery',frame/30,'b')],
+                          transition=transition,transitionSeconds=16.,mix=progress)
+                facts,raw=player.render(q)
+            check(facts['transition']=='feedback' and bool(facts['generativeHandoffs']),
+                  f'{transition} request retains recurrent feedback through a long overlap')
+            check(player.render(q)[1]==raw,f'{transition} feedback pauses exactly')
 
         paths = []
         for loud in (False, True):

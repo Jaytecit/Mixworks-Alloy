@@ -1,6 +1,8 @@
+> Read/Touch/Latch/Arm discoverability and the role of Editing need reassessment under W02–W04 in [the roadmap](../FINISHING-PLAN.md); existing capture controls are not accepted newcomer usability.
+
 # Live desk and MIDI profiles
 
-Current guide for 0.55.64. [Earlier desk notes (archived)](MAINTENANCE-20261103.md) preserve original device captures and version history. Current modes and original-track ownership supersede earlier arming/per-piece descriptions.
+Workflow reference; exact current candidate and verification limits are in [HANDOVER](../HANDOVER.md). [Earlier desk notes (archived)](MAINTENANCE-20261103.md) preserve original device captures and version history. Current modes and original-track ownership supersede earlier arming/per-piece descriptions.
 
 ## Programme controls and ownership
 
@@ -25,6 +27,14 @@ targets; Follow timeline changes on-screen parameter controls only.
 The cutoff is centre-off: left is low-pass, right high-pass. Precise entry accepts Off/LP/HP and frequencies. Lane-header/desk cutoff remains lane-owned, so a finished selected segment cannot capture another segment's live lane cutoff. Transition Filter presets and original-track Filter automation have separate named owners.
 
 The small right desk pads use Spare/Spare/Undo/Redo then Play/Stop/Record/Snap. Historical physical FLkey messages were measured; no factory CC assignments should be guessed or installed during maintenance. Keys can drive an enabled live VST instrument. Hosting is in-process; active reported-latency inserts are blocked pending compensation.
+
+The on-screen **Pitch wheel** and **Mod wheel** sit to the left of the pots.
+The selector below each wheel chooses a mixer lane and its cutoff, pan, bass,
+mid or treble. Pitch starts on lane 1 cutoff and returns to neutral after a
+mouse drag. Mod starts on lane 2 cutoff and holds its last setting. Both write
+through the same mixer controls used by automation. The wheel selectors are
+local to the current Controller and the existing MIDI profile is independent
+of those selectors.
 
 ## Arrange and Record Perform
 

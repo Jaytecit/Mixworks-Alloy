@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Source waveform/grid alignment and fine controls - ua16, 1 November 2026
 
 **Activation update:** [ua17](UA17-VERSION-ACTIVATION-20261101.md) changes only the production version to0.55.65 and activates the verified local preview. Fresh37/0 and visible version verified; prior112/0 remains this checkpoint's separate evidence.

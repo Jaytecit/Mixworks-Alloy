@@ -3,8 +3,9 @@
 Current state: [handover](../HANDOVER.md), [app guide](../README.md),
 [visual direction](VISUAL-DIRECTION.md), [roadmap](../FINISHING-PLAN.md) and
 [verification](../VERIFICATION.md). Source version is 0.55.68; exact local activation
-and candidate hashes live in the handover. The current library has 123 scenes and
-738 named looks, with musical motion, full-image/glass treatments and colour cycling.
+and candidate hashes live in the handover. The current catalogue has 204 scenes: 203 with six named looks plus Jumping Techno Tunnel.
+[The roadmap](../FINISHING-PLAN.md) is the single outstanding-work queue;
+[the 4 November audit](DOCUMENTATION-AUDIT-20261104.md) records reconciliation.
 
 The [3 November audit](MAINTENANCE-20261103.md) consolidated obsolete documents and
 retired external-renderer/prototype checks. Historical research, requirement detail,
@@ -15,7 +16,7 @@ apply to their original candidates; they are not instructions to resume old work
 
 Product audit, 21 October 2026 (0.55.12; audit only): [findings](ALLOY_PRODUCT_AUDIT.md), [interface/workflow coverage](ALLOY_AUDIT_COVERAGE.md), [prioritised remediation](ALLOY_REMEDIATION_PLAN.md). The audit records runtime/source evidence and remaining acceptance gaps; it does not mark planned features implemented.
 
-Editing comparison,22 October2026 (0.55.42; audit and plan only): [editing audit against DJ.Studio](EDITING-SYSTEM-AUDIT-20261022.md), [parity implementation plan](DJSTUDIO-EDITING-PARITY-PLAN.md). Existing transition/node tools are credited; range/snippet, effect-region and stem work remains staged.
+Editing comparison,22 October2026 (0.55.42; audit and plan only): [editing audit against DJ.Studio](EDITING-SYSTEM-AUDIT-20261022.md), [parity implementation plan](DJSTUDIO-EDITING-PARITY-PLAN.md). Existing editing/stem implementations are credited; remaining scope is in W02–W03 and W17–W21 of the roadmap.
 
 | Task | Guide |
 | --- | --- |
@@ -47,7 +48,8 @@ Editing comparison,22 October2026 (0.55.42; audit and plan only): [editing audit
 | Folder ownership and future cleanup | [Project maintenance](PROJECT-MAINTENANCE.md) |
 | Choosing focused/full checks and retaining test data | [Testing policy](TESTING.md) |
 | Codex control, isolated sessions and live integration tests | [Development bridge](DEVELOPMENT-BRIDGE.md) |
-| Future requests | [Wishlist](../WISHLIST.md) |
+| Outstanding work and documentation reconciliation | [Roadmap](../FINISHING-PLAN.md), [documentation audit](DOCUMENTATION-AUDIT-20261104.md) |
+| Future visualiser video integration and test files | [Video integration](VIDEO-INTEGRATION.md) |
 
 ## Research and history
 

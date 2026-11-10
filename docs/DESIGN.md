@@ -1,6 +1,6 @@
 # Mixworks Alloy design
 
-Current specification for 0.55.64. The approved direction is subtle studio hardware: graphite, brushed metal and copper, rounded hexagonal dials and restrained daily-workspace lighting. Source tokens remain in `Source/AlloyLookAndFeel.h`; [the archived design narrative (archived)](MAINTENANCE-20261103.md) preserves previous version notes and the approved concept references.
+Workflow reference; exact current candidate and verification limits are in [HANDOVER](../HANDOVER.md). The approved direction is subtle studio hardware: graphite, brushed metal and copper, rounded hexagonal dials and restrained daily-workspace lighting. Source tokens remain in `Source/AlloyLookAndFeel.h`; [the archived design narrative (archived)](MAINTENANCE-20261103.md) preserves previous version notes and the approved concept references.
 
 ## Palette and type
 
@@ -14,7 +14,7 @@ Timeline tools stay below their own waveform and never overlap another lane. Com
 
 ## Editing and transport
 
-Ordinary placements remain independent; Add Transition/arranging deliberately creates links. Four-lane overlap and independent frames are allowed within available audio. Presets create ordinary nodes, empty curves invent none, and swap timing/amount handles are distinct. Selection preserves musical state; each committed gesture has one Undo. Locked/busy/unavailable/stale targets explain refusal. See [timeline editing](TIMELINE-EDITING.md).
+Ordinary placements remain independent; Add Transition/arranging deliberately creates links. Four-lane overlap and independent frames are allowed within available audio. Presets create editable treatments; shared lane curves have neutral handles while track transition fades retain explicit owners. Swap timing/amount handles are distinct. Selection preserves musical state; each committed gesture has one Undo. Locked/busy/unavailable/stale targets explain refusal. See [timeline editing](TIMELINE-EDITING.md).
 
 Arrange and Record/Perform are the two top-level modes. Private preparation has explicit identity/status, independent transport/level and Apply/Launch. Missing headphones never use audience output. Keep take/master WAV outcomes and incomplete capture notices clear. Details belong in context hints and [the current mode contract](ARRANGE-RECORD-PERFORM-PLAN.md).
 

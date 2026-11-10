@@ -4,41 +4,148 @@
 
 namespace mixworks
 {
+juce::String Workstation::timelineActionUnavailable(TimelineAction action,double time,int track) const
+{
+    if(busy)return "Wait for preparation to finish, then try this edit again.";
+    if(engine.exporting)return "Finish or cancel export before editing the mix.";
+    if(track<0 || track>=trackCount || !std::isfinite(time))return "Choose a valid timeline position and lane, then try again.";
+    const auto* clip=engine.project.clipFor(selectedClip);
+    const bool copy=action==TimelineAction::copy || action==TimelineAction::cut;
+    const bool paste=action==TimelineAction::paste;
+    const bool range=action==TimelineAction::repeatSelection || action==TimelineAction::cropSelection
+        || action==TimelineAction::replaceSelection || action==TimelineAction::unlinkSelection
+        || (editSelection.multiple() && (copy || action==TimelineAction::remove)) || (paste && editClipboard.has_value());
+    if (editSelection.multiple() && (action == TimelineAction::rippleDelete || action == TimelineAction::closeGap
+        || action == TimelineAction::reverse || action == TimelineAction::loopStart || action == TimelineAction::loopEnd
+        || action == TimelineAction::configureLoop || action == TimelineAction::settings
+        || action == TimelineAction::insertBefore || action == TimelineAction::insertAfter))
+        return "Clear the range or group to edit one segment.";
+    const bool structural=range || paste || copy || action==TimelineAction::remove || action==TimelineAction::removePiece
+        || action==TimelineAction::split || action==TimelineAction::reverse || action==TimelineAction::rippleDelete
+        || action==TimelineAction::closeGap || action==TimelineAction::loopStart || action==TimelineAction::loopEnd || action==TimelineAction::configureLoop;
+    if(!structural)return {};
+    if(pendingTempo>0 || tempoPreparationPending || !timelineLoads.empty() || engine.project.hasPendingPlacement())
+        return "Wait for track and tempo preparation to finish, then try this edit again.";
+    if(paste && !editClipboard && !clipClipboard)return "Copy audio first, then choose where to paste it.";
+    if(action==TimelineAction::replaceSelection && !editClipboard && !clipClipboard)return "Copy replacement audio first, then select the audio to replace.";
+    if(!paste && !clip)return "Select an audio segment before using this edit.";
+    if(!paste && (!clip->media || !clip->media->hasPlayback()))return "This source is unavailable. Relink or reload its audio before editing.";
+    if(!paste && clip->media->sourceDetailsPending)return "Wait for this source to finish loading before editing its audio.";
+    if(range && (engine.playing || engine.rehearsalActive()))return "Stop playback or rehearsal before editing an audio range or group.";
+    if(range && (engine.recordingAutomation() || engine.automationRecordMode!=AutomationRecordMode::read))
+        return "Finish automation recording and choose Read before editing an audio range or group.";
+    if(action==TimelineAction::cropSelection && !editSelection.range)return "Drag over the waveform to select an audio range before cropping.";
+    if(action==TimelineAction::unlinkSelection && editSelection.range)return "Clear the audio range and select whole segments before unlinking.";
+    if(action!=TimelineAction::copy && !paste && clip && engine.project.clipTransitionLocked(clip->id))
+        return "Unlock this segment's transition before changing its audio.";
+    if(paste && engine.project.hasLockedTransitions())return "Unlock transitions before pasting audio and its tempo markers.";
+    if(action==TimelineAction::split)
+    {
+        if(editSelection.multiple())return "Clear the range or group before splitting one segment.";
+        time=engine.project.snappedTime(time,engine.project.snap);
+        if(time<=clip->start || time>=clip->end())return "Place the cursor inside the selected segment before splitting it.";
+    }
+    if(action==TimelineAction::loopStart && (time<clip->start || time>=clip->end()))return "Place Loop Start inside the selected segment.";
+    if(action==TimelineAction::loopEnd && (loopStartClip!=clip->id || time<=clip->start+clip->localTimeForSource(loopStartSource) || time>clip->end()))
+        return "Mark Loop Start first, then place Loop End later inside the same segment.";
+    return {};
+}
 juce::PopupMenu Workstation::timelineMenu(double time, int track)
 {
     juce::PopupMenu menu; const auto* clip = currentClip();
+    const bool scoped = clip && editSelection.multiple() && editSelection.primary == selectedClip;
+    if (scoped && editSelection.range)
+    {
+        const auto range = *editSelection.range;
+        const double origin = engine.project.tempo.origin;
+        menu.addSectionHeader("Selected audio / " + timeText(range.getStart() - origin) + " to " + timeText(range.getEnd() - origin)
+            + " / " + juce::String((int) editSelection.clips.size()) + (editSelection.clips.size() == 1 ? " segment" : " segments"));
+    }
+    else if (scoped) menu.addSectionHeader(juce::String((int) editSelection.clips.size()) + " selected segments");
+    else if (clip) menu.addSectionHeader(clip->media->libraryTitle() + " / lane " + juce::String(track + 1));
+    else menu.addSectionHeader("Lane " + juce::String(track + 1) + " / " + timeText(time - engine.project.tempo.origin));
     const bool editable = clip && clip->media->hasPlayback() && !clip->media->sourceDetailsPending && clip->pendingPlacement == PendingPlacement::none;
+    const bool linkedRange=editSelection.range && std::any_of(engine.project.transitionLinks.begin(),engine.project.transitionLinks.end(),[&](const auto& link)
+        { return editSelection.contains(link.incoming) || editSelection.contains(link.outgoing); });
+    const auto surgery=linkedRange ? juce::String(" / unlink affected transitions") : juce::String();
+    auto add = [&](juce::PopupMenu& target, TimelineAction action, const juce::String& label, const juce::String& key, bool enabled)
+    {
+        const auto reason=timelineActionUnavailable(action,time,track);
+        juce::PopupMenu::Item entry(label + (reason.isEmpty() ? juce::String() : " / " + reason));
+        entry.itemID = (int) action; entry.isEnabled = enabled && reason.isEmpty(); entry.shortcutKeyDescription = key; target.addItem(std::move(entry));
+    };
     auto item = [&](TimelineAction action, const juce::String& label, const juce::String& key, bool enabled)
-    { juce::PopupMenu::Item entry(label); entry.itemID = (int) action; entry.isEnabled = !busy && enabled; entry.shortcutKeyDescription = key; menu.addItem(std::move(entry)); };
-    item(TimelineAction::stems, clip && clip->stems ? "Stems / mix, automate or collapse..." : "Separate stems for this track...", {}, editable);
-    item(TimelineAction::cut, "Cut", "Ctrl+X", editable); item(TimelineAction::copy, "Copy", "Ctrl+C", editable);
-    item(TimelineAction::paste, "Paste", "Ctrl+V", editClipboard || (clipClipboard && (engine.project.followTrackTempo || !clipClipboard->tempoMap))); menu.addSeparator();
-    item(TimelineAction::removePiece, "Delete this piece", editSelection.multiple() ? "" : "Del", clip != nullptr);
-    if (editSelection.multiple()) item(TimelineAction::remove, "Delete selected audio", "Del", clip != nullptr);
-    menu.addSeparator();
-    const bool selectionReady = editable && !engine.playing && !engine.rehearsalActive() && !engine.exporting
-        && pendingTempo <= 0 && !tempoPreparationPending && !engine.project.hasPendingPlacement()
-        && !engine.recordingAutomation() && engine.automationRecordMode == AutomationRecordMode::read;
-    item(TimelineAction::repeatSelection, "Repeat selected audio...", {}, selectionReady);
+    { add(menu, action, label, key, enabled); };
+    const bool canPaste = editClipboard || (clipClipboard && (engine.project.followTrackTempo || !clipClipboard->tempoMap));
+    const auto addTransitionText = "Add Transition / " + transitionPreset.getText() + " / " + transitionLength.getText();
     const bool transitionReady = editable && !engine.rehearsalActive() && !engine.exporting
         && pendingTempo <= 0 && !tempoPreparationPending && timelineLoads.empty()
-        && !engine.project.hasPendingPlacement() && !engine.recordingAutomation()
-        && engine.automationRecordMode == AutomationRecordMode::read;
-    item(TimelineAction::addTransition, "Add Transition", {}, transitionReady && !editSelection.range);
-    item(TimelineAction::unlinkSelection, "Unlink / move independently", {}, selectionReady && !editSelection.range
-        && std::any_of(engine.project.transitionLinks.begin(), engine.project.transitionLinks.end(), [&](const auto& link)
-        { return editSelection.clips.empty() ? link.incoming == selectedClip || link.outgoing == selectedClip
-            : editSelection.contains(link.incoming) || editSelection.contains(link.outgoing); }));
-    item(TimelineAction::cropSelection, "Crop selected segments to range", {}, selectionReady && editSelection.range.has_value());
-    item(TimelineAction::replaceSelection, "Replace selected audio...", {}, selectionReady && (editClipboard || clipClipboard) && !engine.project.hasLockedTransitions());
+        && !engine.project.hasPendingPlacement() && (engine.workMode == WorkMode::recordPerform
+        || (!engine.recordingAutomation() && engine.automationRecordMode == AutomationRecordMode::read));
+    const bool linked = clip && std::any_of(engine.project.transitionLinks.begin(), engine.project.transitionLinks.end(),
+        [&](const auto& link) { return scoped ? editSelection.contains(link.incoming) || editSelection.contains(link.outgoing)
+            : link.incoming == selectedClip || link.outgoing == selectedClip; });
+    if (!clip)
+    {
+        item(TimelineAction::paste, "Paste here", {}, canPaste);
+        item(TimelineAction::label, "Add label here...", "L", true);
+        item(TimelineAction::tempo, "Add tempo marker here...", "P", true);
+        menu.addSeparator();
+        item(TimelineAction::selectSegment, "Choose segment...", {}, !engine.project.clips.empty());
+        item(TimelineAction::selectAll, "Select all segments", "Ctrl+A", !engine.project.clips.empty());
+        return menu;
+    }
+    if (scoped)
+    {
+        item(TimelineAction::cut, "Cut" + surgery, "Ctrl+X", editable);
+        item(TimelineAction::copy, "Copy", "Ctrl+C", editable);
+        item(TimelineAction::remove, "Delete selected audio" + surgery, "Del", editable);
+        item(TimelineAction::repeatSelection, "Repeat selected audio...", {}, editable);
+        item(TimelineAction::replaceSelection, "Replace with clipboard...", {}, editable && canPaste && !engine.project.hasLockedTransitions());
+        if (editSelection.range) item(TimelineAction::cropSelection, "Keep only selected range" + surgery, {}, editable);
+        else
+        {
+            if (editSelection.clips.size() == 2)
+            {
+                item(TimelineAction::addTransition, addTransitionText, {}, transitionReady);
+                item(TimelineAction::newTransitionDefaults, "Defaults for new transitions...", {}, true);
+            }
+            if (linked) item(TimelineAction::unlinkSelection, "Unlink / move independently", {}, editable);
+        }
+        menu.addSeparator();
+        item(TimelineAction::exactRange, "Exact range...", {}, true);
+        menu.addSubMenu("Range selection", rangePolicyMenu());
+        item(TimelineAction::clearSelection, "Clear selection", "Esc", true);
+        return menu;
+    }
+    item(TimelineAction::split, "Split here", {}, editable);
+    item(TimelineAction::cut, "Cut segment", "Ctrl+X", editable);
+    item(TimelineAction::copy, "Copy segment", "Ctrl+C", editable);
+    item(TimelineAction::paste, "Paste here", {}, canPaste);
+    item(TimelineAction::removePiece, "Delete segment", "Del", clip != nullptr);
+    item(TimelineAction::settings, "Segment settings...", "Ctrl+T", clip != nullptr);
     menu.addSeparator();
-    item(TimelineAction::rippleDelete, "Ripple delete segment (all lanes)", "Ctrl+Shift+Del", editable);
-    item(TimelineAction::closeGap, "Close gap before segment (all lanes)", "Ctrl+Shift+G", editable); menu.addSeparator();
-    item(TimelineAction::insertBefore, "Insert song before this segment...", {}, editable && canInsertArrangement() && !engine.library.empty());
-    item(TimelineAction::insertAfter, "Insert song after this segment...", {}, editable && canInsertArrangement() && !engine.library.empty()); menu.addSeparator();
-    item(TimelineAction::volume, "Add Volume Node Here", "V", editable); item(TimelineAction::treble, "Add Treble Node Here", "T", editable);
-    item(TimelineAction::filter, "Add Filter Node Here", "F", editable);
-    item(TimelineAction::mid, "Add Mid Node Here", "M", editable); item(TimelineAction::bass, "Add Bass Node Here", "B", editable);
+    item(TimelineAction::addTransition, addTransitionText, {}, transitionReady);
+    item(TimelineAction::newTransitionDefaults, "Defaults for new transitions...", {}, true);
+    if (linked) item(TimelineAction::unlinkSelection, "Unlink / move independently", {}, editable);
+    item(TimelineAction::exactRange, "Exact range...", {}, true);
+    menu.addSubMenu("Range selection", rangePolicyMenu());
+    juce::PopupMenu arrange;
+    add(arrange, TimelineAction::repeatSelection, "Repeat segment...", {}, editable);
+    add(arrange, TimelineAction::replaceSelection, "Replace with clipboard...", {}, editable && canPaste && !engine.project.hasLockedTransitions());
+    add(arrange, TimelineAction::insertBefore, "Insert song before...", {}, editable && canInsertArrangement() && !engine.library.empty());
+    add(arrange, TimelineAction::insertAfter, "Insert song after...", {}, editable && canInsertArrangement() && !engine.library.empty());
+    arrange.addSectionHeader("Across all lanes");
+    add(arrange, TimelineAction::rippleDelete, "Ripple delete segment", "Ctrl+Shift+Del", editable);
+    add(arrange, TimelineAction::closeGap, "Close gap before segment", "Ctrl+Shift+G", editable);
+    menu.addSubMenu("Arrange", arrange);
+    juce::PopupMenu curves;
+    add(curves, TimelineAction::automationDetails, "Automation details...", {}, true);
+    add(curves, TimelineAction::volume, "Add Volume node here", {}, editable);
+    add(curves, TimelineAction::treble, "Add Treble node here", {}, editable);
+    add(curves, TimelineAction::filter, "Add Filter node here", {}, editable);
+    add(curves, TimelineAction::mid, "Add Mid node here", {}, editable);
+    add(curves, TimelineAction::bass, "Add Bass node here", {}, editable);
     const bool linkedBass = clip && clip->track == track && std::any_of(engine.project.transitionLinks.begin(), engine.project.transitionLinks.end(),
         [&](const auto& link) { return link.incoming == clip->id || link.outgoing == clip->id; });
     const bool swapReady = !busy && editable && linkedBass && pendingTempo <= 0 && !tempoPreparationPending && !engine.exporting && !engine.project.clipTransitionLocked(clip->id);
@@ -50,59 +157,110 @@ juce::PopupMenu Workstation::timelineMenu(double time, int track)
     swaps.addItem((int)TimelineAction::placeTrebleSwap,"Place Treble swap here",insideFrame);
     swaps.addItem((int)TimelineAction::placeVolumeSwap,"Place Volume swap here",insideFrame);
     swaps.addSeparator(); swaps.addItem((int)TimelineAction::pairBassSwap,"Pair existing full bass cut",swapReady);
-    menu.addSubMenu("Swaps",swaps);
-    menu.addSubMenu("Automation", automationMenu(track));
-    menu.addSeparator(); item(TimelineAction::label, "Add Label Marker", "L", true);
-    item(TimelineAction::tempo, "Add Tempo Marker", "P", true);
-    item(TimelineAction::sectionBoundary, "Add Section Boundary Here...", {}, editable && clip->track == track && !clip->reversed && clip->loopSpan <= 0
+    if (linkedBass) curves.addSubMenu("Swaps", swaps);
+    curves.addSubMenu("Curve and recording", automationMenu(track));
+    juce::PopupMenu markers;
+    add(markers, TimelineAction::label, "Add label here...", "L", true);
+    add(markers, TimelineAction::tempo, "Add tempo marker here...", "P", true);
+    add(markers, TimelineAction::sectionBoundary, "Add section boundary here...", {}, editable && clip->track == track && !clip->reversed && clip->loopSpan <= 0
         && time >= clip->start && time < clip->end() && pendingTempo <= 0 && !tempoPreparationPending && !engine.exporting
         && !engine.rehearsalActive() && engine.automationRecordMode == AutomationRecordMode::read && !engine.recordingAutomation()
         && !engine.project.hasPendingPlacement() && !engine.project.clipTransitionLocked(clip->id));
     const auto& chain = engine.pluginChain(track);
     const bool effects = std::any_of(chain.begin(), chain.end(), [](const auto& slot) { return !slot->parameters.empty(); });
-    item(TimelineAction::effect, "Add FX Node Here", "E", editable && effects); menu.addSeparator();
-    item(TimelineAction::loopStart, "Add Loop Start Marker", "9", editable && time >= clip->start && time < clip->end());
-    item(TimelineAction::loopEnd, "Add Loop End Marker", "0", editable && loopStartClip == clip->id && time > clip->start + clip->localTimeForSource(loopStartSource) && time <= clip->end());
-    menu.addSeparator(); item(TimelineAction::split, "Split Segment at Cursor", "S", editable && time > clip->start && time < clip->end());
-    item(TimelineAction::reverse, "Reverse", {}, editable); menu.addSeparator();
-    item(TimelineAction::tweaks, "Tweaks / BPM, key and downbeat...", "Ctrl+W", editable);
-    item(TimelineAction::harmonise, "Harmonise by ear...", {}, clip != nullptr && !busy && !engine.exporting);
-    item(TimelineAction::settings, "Adjust Segment Settings...", "Ctrl+T", clip != nullptr);
-    menu.addSeparator(); item(TimelineAction::downbeat, "Set first downbeat here (4/4)", {}, editable && time >= clip->start && time < clip->end());
+    add(curves, TimelineAction::effect, "Add FX node here", {}, editable && effects);
+    menu.addSubMenu("Automation", curves);
+    add(markers, TimelineAction::downbeat, "Set first downbeat here (4/4)", {}, editable && time >= clip->start && time < clip->end());
+    menu.addSubMenu("Markers and grid", markers);
+    juce::PopupMenu audio;
+    add(audio, TimelineAction::reverse, "Reverse", {}, editable);
+    add(audio, TimelineAction::configureLoop, "Loop section...", {}, editable);
+    add(audio, TimelineAction::loopStart, "Mark loop start here", {}, editable);
+    add(audio, TimelineAction::loopEnd, "Mark loop end here", {}, editable && loopStartClip == clip->id
+        && time > clip->start + clip->localTimeForSource(loopStartSource) && time <= clip->end());
+    add(audio, TimelineAction::tweaks, "BPM, key and downbeat...", "Ctrl+W", editable);
+    add(audio, TimelineAction::harmonise, "Harmonise by ear...", {}, true);
+    add(audio, TimelineAction::stems, clip->stems ? "Stem tools..." : "Separate stems...", {}, editable);
+    menu.addSubMenu("Source and playback", audio);
     return menu;
 }
-void Workstation::showTimelineMenu(double time, int track)
+juce::PopupMenu::Options Workstation::timelineMenuOptions(juce::Rectangle<int> anchor)
 {
-    if (busy) return;
+    auto options = juce::PopupMenu::Options().withTargetComponent(&timeline);
+    return anchor.isEmpty() ? options.withMousePosition() : options.withTargetScreenArea(anchor);
+}
+
+juce::PopupMenu Workstation::rangePolicyMenu() const
+{
+    juce::PopupMenu sizes;
+    for (const int id : {8, 1, 7, 2, 3, 4, 5, 6})
+    {
+        if (id == 2) sizes.addSeparator();
+        sizes.addItem((int) TimelineAction::rangeDragFree + id - 1,
+            editingRangeSize.getItemText(editingRangeSize.indexOfItemId(id)), true, editingRangeSize.getSelectedId() == id);
+    }
+    return sizes;
+}
+
+void Workstation::setRangePolicy(int id)
+{
+    editingRangeSize.setSelectedId(id, juce::dontSendNotification);
+    timeline.rangeDragAnchor.reset();
+    timelineRuler.refreshEditTools();
+}
+
+void Workstation::showTimelineMenu(double time, int track, juce::Rectangle<int> anchor)
+{
+    if (busy) { setStatus("Wait for preparation to finish, then open the editing menu again."); return; }
     const auto clipId = selectedClip;
     const auto scope = editSelection;
     const auto revision = editClipboardRevision;
     const auto before = scope.multiple() || editClipboard ? juce::JSON::toString(projectToJson(engine.project)) : juce::String();
-    selectTrack(track);
     auto menu = timelineMenu(time, track);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&timeline).withMousePosition(),
-        [safe = juce::Component::SafePointer<Workstation>(this), clipId, time, track, scope, revision, before](int id)
+    const auto screenAnchor = anchor.isEmpty() ? juce::Rectangle<int>(1, 1).withPosition(juce::Desktop::getMousePosition()) : anchor;
+    menu.showMenuAsync(timelineMenuOptions(screenAnchor),
+        [safe = juce::Component::SafePointer<Workstation>(this), clipId, time, track, scope, revision, before, screenAnchor](int id)
         {
-            if (!safe || id == 0 || safe->busy) return;
-            if (before.isNotEmpty() && (before != juce::JSON::toString(projectToJson(safe->engine.project))
-                || scope.primary != safe->editSelection.primary || scope.clips != safe->editSelection.clips || scope.range != safe->editSelection.range
-                || revision != safe->editClipboardRevision))
+            if (!safe || id == 0) return;
+            if(safe->busy) { safe->setStatus("Preparation started while the menu was open. Wait for it to finish, then open the menu again."); return; }
+            if (safe->selectedClip != clipId || scope.primary != safe->editSelection.primary
+                || scope.clips != safe->editSelection.clips || scope.range != safe->editSelection.range
+                || revision != safe->editClipboardRevision
+                || (before.isNotEmpty() && before != juce::JSON::toString(projectToJson(safe->engine.project))))
             { safe->setStatus("Document, clipboard or selection changed while the menu was open. Open it again."); return; }
-            if (clipId.isNotEmpty() && std::none_of(safe->engine.project.clips.begin(), safe->engine.project.clips.end(), [&](const auto& c) { return c.id == clipId; })) return;
-            safe->selectedClip = clipId; safe->selectTrack(track);
+            if (clipId.isNotEmpty() && std::none_of(safe->engine.project.clips.begin(), safe->engine.project.clips.end(), [&](const auto& c) { return c.id == clipId; }))
+            { safe->setStatus("The selected segment was removed. Select another segment and reopen the menu."); return; }
+            if (id == (int) TimelineAction::addTransition) { safe->chooseAddTransition(screenAnchor); return; }
+            if (id == (int) TimelineAction::newTransitionDefaults) { safe->showNewTransitionDefaults(screenAnchor); return; }
+            if (id == (int) TimelineAction::selectSegment) { safe->chooseTimelineSegment(screenAnchor); return; }
             safe->performTimelineAction((TimelineAction) id, time, track);
         });
 }
 void Workstation::addTimelineAutomation(AutomationTarget target, double time, int track)
 {
     const bool selectedCurve = automationLane() == (int) target && engine.selectedTrack == track;
+    const auto* clip = currentClip();
     auto address = selectedCurve ? displayedAddress(track) : target == AutomationTarget::plugin ? pluginLane
         : AutomationAddress {target == AutomationTarget::master ? -1 : track, target};
+    if ((int) target < trackAutomationCount && address.clipId.isEmpty() && clip && clip->track == track) address.clipId = clip->id;
     insertAutomationNode(address, time);
 }
 void Workstation::performTimelineAction(TimelineAction action, double time, int track)
 {
-    if (busy || engine.exporting || track < 0 || track >= trackCount || !std::isfinite(time)) return;
+    if(const auto reason=timelineActionUnavailable(action,time,track); reason.isNotEmpty()) { setStatus(reason); return; }
+    if (action >= TimelineAction::rangeDragFree && action <= TimelineAction::rangeDragProject)
+    { setRangePolicy((int) action - (int) TimelineAction::rangeDragFree + 1); return; }
+    if (action == TimelineAction::exactRange) { editRangeTime(); return; }
+    if (action == TimelineAction::clearSelection) { clearEditSelection(); refresh(); return; }
+    if (action == TimelineAction::selectAll) { selectAllSegments(); return; }
+    if (action == TimelineAction::selectSegment) { chooseTimelineSegment(); return; }
+    if (action == TimelineAction::automationDetails)
+    {
+        if (const auto* clip = currentClip(); clip && (automationLane() < 0 || displayedAddress(track).clipId != clip->id))
+            timeline.selectAutomationCurve({clip->track, AutomationTarget::volume, {}, {}, clip->id});
+        showAutomationDetails(); return;
+    }
+    if (action == TimelineAction::configureLoop) { configureLoop(); return; }
     if (action == TimelineAction::replaceSelection) { replaceSelectedAudio(); return; }
     if (action == TimelineAction::removePiece)
     {
@@ -114,10 +272,6 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
         setStatus("Choose a track piece to delete."); return;
     }
     if (performSelectionAction(action, time, track)) return;
-    if (editSelection.multiple() && (action == TimelineAction::rippleDelete || action == TimelineAction::closeGap
-        || action == TimelineAction::reverse || action == TimelineAction::loopStart || action == TimelineAction::loopEnd || action == TimelineAction::settings
-        || action == TimelineAction::insertBefore || action == TimelineAction::insertAfter))
-    { setStatus("Clear the range/group before editing one segment or closing global time."); return; }
     if (action >= TimelineAction::curveRead && engine.exporting) return;
     auto* clip = currentClip(); selectTrack(track);
     switch (action)
@@ -167,7 +321,7 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             remember(); // Ends rehearsal before capturing the transport position.
             const double position = engine.position.load();
             engine.project = std::move(candidate);
-            engine.seek(position < begin ? position : position < end ? begin : begin + (position - end));
+            engine.commitSeek(engine.prepareSeek(position < begin ? position : position < end ? begin : begin + (position - end)));
             timeline.selectAutomationPoint({}, -1); tempoStrip.selectedTempoPoint = -1;
             selectedTransition.clear(); loopStartClip.clear();
             if (removing) selectedClip.clear();
@@ -224,9 +378,7 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (!automationEditable(address)) { setStatus("Automation is unavailable, busy or locked."); return; }
             auto candidate = engine.project; auto* curve = materialiseAutomation(candidate,address); if (!curve || curve->points.empty()) return;
             if (action == TimelineAction::curveRead) curve->enabled = !curve->enabled;
-            else { candidate.automationEdited(address, AutomationEdit::clearCurve); *curve = {};
-                if (address.clipId.isEmpty() && address.track >= 0 && (int) address.target < trackAutomationCount)
-                    candidate.laneHandles.erase(address.track * trackAutomationCount + (int) address.target); }
+            else { candidate.automationEdited(address, AutomationEdit::clearCurve); *curve = {}; }
             engine.setAutomationRecordMode(AutomationRecordMode::read); remember(); const juce::ScopedLock guard(engine.lock);
             engine.project = std::move(candidate);
             refresh(); return;
@@ -281,7 +433,14 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (automationLane() == (int) AutomationTarget::plugin && pluginLane.track == track && automationPluginParameter(pluginLane)) insertAutomationNode(pluginLane, time);
             else chooseAutomationPlugin(time);
             break;
-        case TimelineAction::split: engine.seek(engine.project.snappedTime(time, engine.project.snap)); splitClip(); break;
+        case TimelineAction::split:
+        {
+            // Splitting consumes the cursor immediately. A navigation request
+            // would leave it at the old audible position until preparation ends.
+            const auto moved = engine.commitSeek(engine.prepareSeek(engine.project.snappedTime(time, engine.project.snap)));
+            if (moved.failed()) { setStatus(moved.getErrorMessage()); break; }
+            splitClip(); break;
+        }
         case TimelineAction::reverse: reverseButton.triggerClick(); break;
         case TimelineAction::tweaks: editAnalysis(); break;
         case TimelineAction::settings: showInspectorPage(0); showEditingPage(1); refresh(); clipSliders[0].grabKeyboardFocus(); break;

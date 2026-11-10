@@ -135,6 +135,10 @@ vec3 relief(vec2 p,float layer){
     float d=VARIANT==2?max(abs(f.x)*.866+abs(f.y)*.5,abs(f.y)):max(abs(f.x),abs(f.y));
     mask=1.-smoothstep(.38,.44,d);h=mask*(.2+.14*sin(id*8.+mi*.6)+.12*cos(d*6.));
 #endif
+    // The cutout changes the height and lip of the generated layers.
+    float raised=structureHeight(p*.22+.5);
+    h+=raised*(.19+.24*mask);
+    mask=max(mask,raised*.56);
     return vec3(h,mask,id);
 }
 vec3 imageMaterial(vec2 uv,float id){

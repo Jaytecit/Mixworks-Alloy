@@ -1,7 +1,8 @@
 # Owned Alloy visual library
 
-The active catalogue is `original-scenes.json`: 203 scenes and six named looks per
-scene. It preserves the retained shortlist and does not restore retired entries.
+The active catalogue is `original-scenes.json`: 204 scenes. The 203 image scenes
+offer six named looks each; Jumping Techno Tunnel preserves its original cyan/pink
+look and needs no textures. It preserves the retained shortlist and does not restore retired entries.
 `retained-scenes.json` and `retired-scenes.json` preserve review choices; retired
 shader source remains available for reference but is not staged in the active bundle.
 
@@ -19,6 +20,14 @@ transport pause remains exact. The full [eighty-scene collection](../../docs/IMA
 image-driven instruments; [verification and limits](../../docs/VISUAL-EIGHTY-20261103.md).
 
 ## Authoring and staging
+
+The [4 November scene energy pass](../../docs/SCENE-ENERGY-20261104.md) supersedes
+older recipes for its explicitly listed scene instances. Their checked-in shaders
+are authoritative: do not overwrite their camera routes, optical excursions,
+growth recruitment or landscape skies from the shared starting templates.
+The approved Prism Bloom, Liquid Torus, Orbit Theatre and first Jumping Techno
+Tunnel are independently preserved. This pass keeps descriptors and named-look
+controls intact; authoring changes apply only to the listed scenes.
 
 The [landscape pair refinement](../../docs/LANDSCAPE-PAIR-20261103.md) gives Dunes
 a continuous wind-driven surface and Escarpment a steep wall with along-face

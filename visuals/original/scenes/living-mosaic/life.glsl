@@ -25,7 +25,7 @@ void main(){
 #elif COMPOSITION == 7
     q=fract(uv*2.);
 #endif
-    vec4 image=art(q);float food=dot(image.rgb,vec3(.2126,.7152,.0722))*image.a;
+    vec4 image=art(q);float food=max(dot(image.rgb,vec3(.2126,.7152,.0722))*image.a,.82*structureCoverage(uv));
 #if COMPOSITION == 4
     float radius=length((uv-.5)*vec2(1.78,1.));
     food*=smoothstep(.2,.3,radius)*(1.-smoothstep(.55,.72,radius));

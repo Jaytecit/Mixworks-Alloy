@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # Installed scene mechanism index — 2 November 2026
 
 Companion to [the technique audit](SYNESTHESIA-TECHNIQUE-AUDIT-20261102.md). Every installed package is accounted for. Mechanism descriptions classify shipped source; they are not 89 native runtime acceptance results. User-example dataflow is detailed in the main audit. The current Alloy names identify existing creative recipes, not fidelity or complete feature coverage.

@@ -16,7 +16,7 @@ vec4 pigmentArt(vec2 uv){
     if(hasImage==0&&hasCutout==0)c=vec4(.3+.3*sin(uv.x*12.),.35+.25*cos(uv.y*9.),.7,1.);
     return vec4(c.rgb*c.a,c.a);
 }
-vec2 jetOrigin(){return vec2(.12,.5+.12*sin(travelTime*.68+midImpulse*.14*pulse));}
+vec2 jetOrigin(){return vec2(.10,.5+.36*sin(travelTime*1.15+midImpulse*.30*pulse));}
 float pressCentre(vec2 uv,float side){
     float squeeze=.04*sin(travelTime*.72)+bassHit*pulse*.035;
     return .5+side*(.25-squeeze)+.024*sin(uv.y*(6.+detail*6.)+midImpulse*.25*pulse);
@@ -55,6 +55,10 @@ void main(){
     c=pigment.rgb*3.2;
     float edge=length(g)*(.12+.75*trebleHit*pulse);
     c+=edge*vec3(.1,.6,1.);
+    // Broad image-fed undertow remains behind the narrow retained jet.
+    vec2 chart=uv+vec2(travelTime*.035,.10*sin(uv.x*7.-travelTime*.8));
+    float current=.5+.5*sin(uv.y*14.+sin(uv.x*6.-travelTime*.7)*2.+midImpulse*.4*pulse);
+    c+=pigmentArt(fract(chart)).rgb*(.08+.13*bassHit*pulse)*pow(current,3.);
 #elif PIGMENT_KIND == 1
     // Two independent fronts carry complementary source halves, never two logos.
     float left=pressMask(uv,-1.),right=pressMask(uv,1.),mask=max(left,right);

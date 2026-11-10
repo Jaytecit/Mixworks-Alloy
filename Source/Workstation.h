@@ -29,7 +29,10 @@ enum class TimelineAction
     loopStart, loopEnd, split, reverse, tweaks, settings, downbeat, tempo,
     curveRead, curvePoint, curveClear, choosePlugin, recordOff, recordTouch, recordLatch, armAutomation, pairBassSwap,
     filter, rippleDelete, closeGap, insertBefore, insertAfter, sectionBoundary, stems, repeatSelection, cropSelection, replaceSelection,
-    placeVolumeSwap, placeBassSwap, placeMidSwap, placeTrebleSwap, unlinkSelection, addTransition, removePiece, harmonise
+    placeVolumeSwap, placeBassSwap, placeMidSwap, placeTrebleSwap, unlinkSelection, addTransition, removePiece, harmonise,
+    exactRange, clearSelection, selectAll, selectSegment, configureLoop, automationDetails,
+    rangeDragFree, rangeOneBeat, rangeOneBar, rangeEightBars, rangeSixteenBars, rangeThirtyTwoBars,
+    rangeDragBeat, rangeDragProject, newTransitionDefaults
 };
 class TempoStrip final : public juce::Component, public juce::SettableTooltipClient
 {
@@ -114,7 +117,8 @@ public:
     TimelineHeader(Workstation&, bool overview);
     void resized() override;
     std::optional<double> alignmentGuide; // View-only reference, independent of transport and saved music.
-    juce::TextButton guideButton {"Guide"};
+    juce::TextButton guideButton {"Guide"}, selectionTools {"Edit selection..."}, pairTools {"Edit transition..."}, rangePolicy {"Range: Snap"};
+    void refreshEditTools();
     void paint(juce::Graphics&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -163,6 +167,18 @@ struct ClipCurveTools final : public juce::Component
     juce::TextButton hotcues {"HC"}, sections {"S"};
     juce::ComboBox selector;
 };
+inline bool isTimelineContextKey(const juce::KeyPress& key)
+{
+    const auto mods = key.getModifiers();
+    if (mods.isCtrlDown() || mods.isAltDown() || mods.isCommandDown()) return false;
+    if (key.getKeyCode() == juce::KeyPress::F10Key && mods.isShiftDown()) return true;
+   #if JUCE_WINDOWS
+    // JUCE delivers VK_APPS through its extended virtual-key path.
+    return key.getKeyCode() == (0x10000 | 0x5d) && !mods.isShiftDown();
+   #else
+    return false;
+   #endif
+}
 class TimelineAccessItem final : public juce::Component
 {
 public:
@@ -170,7 +186,7 @@ public:
     std::function<juce::String()> read;
     std::function<bool()> selected;
     std::function<void()> choose;
-    std::function<void()> open;
+    std::function<void()> open, context;
     std::function<double()> value;
     std::function<juce::String()> valueText;
     const bool valueObject;
@@ -276,6 +292,7 @@ private:
     void finishEditSelection();
     void paintEditSelection(juce::Graphics&);
     std::optional<double> rangeDragAnchor;
+    bool directRangeDrag = false;
     EditSelection rangeDragBefore;
     struct GroupMoveGesture
     {
@@ -323,10 +340,18 @@ private:
     std::optional<SwapGesture> swapDrag;
     struct AudioSlipGesture { Clip baseline; float x = 0; bool audioOnly = false; double lastStart = 0, lastLength = 0; };
     std::optional<AudioSlipGesture> audioSlipDrag;
+    struct EdgeTrimGesture { Clip baseline; float x = 0; bool left = false; double lastStart = 0, lastLength = 0; };
+    std::optional<EdgeTrimGesture> edgeTrimDrag;
+    juce::Rectangle<float> edgeTrimBounds(const Clip&, bool left) const;
+    std::optional<std::pair<juce::String,bool>> edgeTrimAt(juce::Point<float>) const;
+    bool beginEdgeTrim(const juce::MouseEvent&);
+    bool continueEdgeTrim(const juce::MouseEvent&);
     juce::Rectangle<float> audioSlipBounds(const Clip&) const;
     std::optional<juce::String> audioSlipAt(juce::Point<float>) const;
     void paintAudioSlipHandles(juce::Graphics&);
     bool beginAudioSlip(const juce::MouseEvent&);
+    void refreshMovementLocks();
+    std::map<juce::String,std::unique_ptr<juce::TextButton>> movementLockButtons;
     bool continueAudioSlip(const juce::MouseEvent&);
     bool resetAudioSlip(juce::Point<float>);
     std::vector<SwapHandle> swapHandles() const;
@@ -496,7 +521,7 @@ public:
     friend void runLibraryPreviewTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runPerformanceTakeTests(const std::function<void(bool,const juce::String&)>&,const juce::File&);
     friend void runZoomHandleTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
-    void previewLibraryTrack(const juce::String&);
+    void previewLibraryTrack(const juce::String&, std::optional<double> fraction = {});
     friend void runLiveHotcueTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runTempoBrowserTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
@@ -548,11 +573,17 @@ public:
     Clip* currentClip();
 private:
     friend void runVisualArrangementTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+    friend void runStudioAudioLinkTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::StringArray&);
     friend class SceneLane;
     friend class SceneBrowser;
+    friend class StudioWorkspace;
     friend void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runMilkDropTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
     std::unique_ptr<SceneLane> sceneLane;
+    std::unique_ptr<StudioWorkspace> studioWorkspace;
+    std::unique_ptr<ToolPanel> studioPanel;
+    std::unique_ptr<juce::DocumentWindow> studioWindow;
+    juce::TextButton studioTab {"Visual Studio"};
     std::shared_ptr<StemJob> stemJob;
     juce::String stemSourceName, stemSourceId;
     void attachStems(const juce::String& sourceId, const juce::File&);
@@ -583,7 +614,7 @@ private:
     PanelViewport performanceViewport;
     ToolPanel performancePanel {performanceViewport, "Controller"};
     std::unique_ptr<juce::DocumentWindow> performanceWindow, transitionWindow, editingWindow;
-    juce::TextButton controllerTab {"Controller"}, editingTab {"Editing"};
+    juce::TextButton controllerTab {"Controller"}, editingTab {"Details"}, recordingTools {"Read"};
     juce::Component editingBody;
     PanelViewport editingViewport;
     ToolPanel editingPanel {editingViewport, "Editing"};
@@ -591,6 +622,7 @@ private:
     void layoutEditing();
     void showEditingPage(int);
     void showEditingMore();
+    void chooseTimelineSegment(juce::Rectangle<int> anchor = {});
     void restoreEditingWorkspace();
     void trackEditingWorkspace();
     juce::ComboBox automationOwner, automationParameter, automationMode;
@@ -603,10 +635,13 @@ private:
     void refreshAutomationEditor(bool rebuildChoices = true);
     bool automationEditable(const AutomationAddress&) const;
     juce::AudioProcessorParameter* automationPluginParameter(const AutomationAddress&) const;
+    Project automationEditSnapshot();
+    bool publishAutomationEdit(Project, const AutomationAddress&, bool addUndo);
     AutomationCurve* materialiseAutomation(Project&, const AutomationAddress&);
     bool insertAutomationNode(const AutomationAddress&, double time, bool snap = true);
     bool deleteAutomationNode(const AutomationAddress&, int index);
-    void showAutomationNodeMenu(const AutomationAddress&, int index, double time);
+    void showAutomationNodeMenu(const AutomationAddress&, int index, double time, juce::Rectangle<int> anchor = {});
+    void showAutomationDetails();
     int toolPage = 0;
     void showToolPage(int page);
     void layoutToolPanels();
@@ -655,14 +690,23 @@ private:
     juce::Component trackHeaders;
     juce::TextButton keyboardButton {"Keyboard"}, instrumentSetupButton {"Audio / MIDI..."};
     juce::TextButton transitionTab { "Transitions" }, transitionLock { "Lock transition" };
+    juce::ToggleButton transitionProtection {"Protect edits"};
+    void togglePairMovementLock(const juce::String& incoming);
+    juce::TextButton removeTransitionButton {"Remove transition"};
+    void removeSelectedTransition();
     juce::TextButton addTransitionButton {"Add Transition"};
     juce::ToggleButton transitionMuteOutside {"Mute outside bounds"};
-    void chooseAddTransition();
+    void chooseAddTransition(juce::Rectangle<int> anchor = {});
+    void showNewTransitionDefaults(juce::Rectangle<int> anchor = {});
+    void showTransitionMenu(const juce::String& incoming, juce::Rectangle<int> anchor);
+    void openTransitionEditor(const juce::String& incoming, bool rehearsal = false);
+    void setTransitionProtection(bool);
+    void setTransitionMuteOutside(bool);
     void addSelectedTransition(const juce::String& outgoing, const juce::String& incoming);
     friend void runIndependentTimelineTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     juce::TextButton previousTransition { "< Previous" }, nextTransition { "Next >" };
     juce::ComboBox selectedTransitionLength, transitionPresetForSelection;
-    juce::Label transitionLengthLabel, transitionPresetLabel, transitionDefaultsLabel;
+    juce::Label transitionLengthLabel, transitionPresetLabel, transitionPairLabel;
     juce::Component transitionBody;
     PanelViewport transitionViewport;
     ToolPanel transitionPanel {transitionViewport, "Transitions"};
@@ -692,7 +736,8 @@ private:
     void layoutTransitionRehearsalUI(juce::Rectangle<int>&);
     void refreshTransitionRehearsalUI(bool editable);
     void storeSelectedAlternative(int);
-    void applySelectedStyle(const TransitionStyle&);
+    void applySelectedStyle(const TransitionStyle&, const juce::String& name);
+    bool confirmTransitionReplacement(const Project&, const Project&, std::function<void()>, const juce::String& incoming = {});
     void prepareSelectedRehearsal(int slot = -1);
     void chooseTransitionPresetName();
     void chooseTransitionPresetFile(bool writing);
@@ -708,7 +753,7 @@ private:
     void moveTrackBars(int bars, int direction);
     juce::String transitionKeySummary(const Project::TransitionLink&) const;
     void navigateTransition(int direction);
-    void changeSelectedTransition(std::optional<double> bars, std::optional<TransitionPreset> preset, bool toggleLock = false);
+    void changeSelectedTransition(std::optional<double> bars, std::optional<TransitionPreset> preset, bool toggleLock = false, bool confirmed = false);
     juce::Label clipDetail, sidebarHelp;
     int inspectorPage = 1;
     TimelineViewport viewport;
@@ -787,13 +832,22 @@ private:
     std::shared_ptr<ExportTask> exportTask; // Released on the message thread after its worker has let go.
     juce::File catalogueFile; // Empty in Workstation(false); tests supply an owned fixture explicitly.
     bool catalogueRestorePending = false, catalogueDirty = false, catalogueWritePending = false, catalogueRefreshPending = false;
+    bool catalogueOpening = false;
+    bool catalogueTablePending = false;
+    double nextCatalogueTableUpdate = 0;
     std::vector<std::shared_ptr<Media>> catalogueRefreshQueue;
+    struct CatalogueChange { std::shared_ptr<Media> media; uint64_t scan = 0; };
+    std::map<juce::String, CatalogueChange> catalogueChanges, catalogueWriting;
+    juce::String catalogueSaveError;
     double catalogueChangedAt = 0;
     void tickLibraryCatalogue();
-    void markCatalogueChanged();
+    void markCatalogueChanged(const std::shared_ptr<Media>&, uint64_t scan = 0);
+    void flushLibraryCatalogue();
     bool adoptLibraryRefresh(const std::shared_ptr<Media>& previous, const std::shared_ptr<Media>& verified);
     void writeLibraryCatalogue();
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::DocumentWindow> tutorialWindow;
+    void showTutorial();
     std::unique_ptr<juce::DialogWindow> settingsWindow;
     std::unique_ptr<juce::DialogWindow> gridWindow;
     std::unique_ptr<juce::DialogWindow> earWindow;
@@ -832,8 +886,12 @@ private:
     juce::ThreadPool workers { 1 };
     bool musicScanEnabled = false, musicScanJobPending = false;
     bool musicScanManual = false;
+    bool discoverLibraryOnStartup = true;
     uint64_t musicScanGeneration = 0;
+    uint64_t musicScanSerial = 0;
+    int musicChecked = 0, musicUnchanged = 0, musicReused = 0, musicAnalysed = 0, musicSaved = 0;
     juce::File musicFolder = juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+    juce::File musicFolderPreference;
     juce::File musicPreference = scanPreferenceFile();
     double nextMusicScan = 0;
     int musicAdded = 0, musicRefreshed = 0, musicProblems = 0, musicFailures = 0;
@@ -841,8 +899,10 @@ private:
     juce::String musicLastIssue;
     juce::String musicScanSummary;
     std::shared_ptr<MusicScan> musicScan;
+    std::shared_ptr<MusicFolderWatch> musicFolderWatch;
     std::map<juce::String, juce::String> musicAttempts;
     void beginMusicScan(bool manuallyRequested = false);
+    void selectMusicScanFolder(const juce::File&);
     void tickMusicScan();
     void stopMusicScan(bool completed = false);
     void refreshMusicScanStatus();
@@ -894,6 +954,7 @@ private:
     friend void runTransitionRehearsalTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runTransitionCutTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runLibraryAssetTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&, const juce::File&);
+    friend void runLibraryStartupTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     void timerCallback() override;
     juce::StringArray getMenuBarNames() override;
     juce::PopupMenu getMenuForIndex(int, const juce::String&) override;
@@ -902,6 +963,10 @@ private:
     void layoutTrackHeaders();
     void chooseImport();
     void chooseSave(std::function<void()> onSaved = {}, bool useSessionFile = false);
+    juce::File defaultSaveFolder() const;
+    juce::File defaultSaveLocation(const juce::String& filename);
+    bool setDefaultSaveFolder(const juce::File&);
+    void chooseDefaultSaveFolder();
     bool saveSessionFile(const juce::File&);
     void confirmChangedDestination(const juce::File& chosen, const juce::File& destination, std::function<void(bool)>);
     void chooseOpen();
@@ -946,10 +1011,16 @@ private:
     juce::String loopStartClip;
     double loopStartSource = 0;
     juce::PopupMenu timelineMenu(double time, int track);
-    void showTimelineMenu(double time, int track);
+    juce::String timelineActionUnavailable(TimelineAction, double time, int track) const;
+    void showTimelineMenu(double time, int track, juce::Rectangle<int> anchor = {});
+    juce::PopupMenu rangePolicyMenu() const;
+    void setRangePolicy(int);
+    void showAutomationRecordingMenu();
+    juce::PopupMenu automationRecordingMenu(int track, bool master) const;
     void performTimelineAction(TimelineAction, double time, int track);
     juce::PopupMenu automationMenu(int track) const;
     void addTimelineAutomation(AutomationTarget, double time, int track);
+    juce::PopupMenu::Options timelineMenuOptions(juce::Rectangle<int> anchor);
     void newSession();
     void syncMix(bool align);
     void prepareTempo(Project, bool align, bool addUndo = true, size_t alignFrom = 0, bool ordered = false);
@@ -978,6 +1049,8 @@ private:
     juce::String keyText(const Media&) const;
     static int keyEvidenceLevel(const Media&); // 0 = manual; 1..4 = detector evidence bands.
     static juce::String keyEvidenceText(const Media&);
+    static bool libraryNeedsReview(const Media&);
+    static juce::String libraryReviewHint(const Media&);
     static juce::String keyEvidenceHint(const Media&);
     void guardUnsaved(std::function<void()>);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Workstation)

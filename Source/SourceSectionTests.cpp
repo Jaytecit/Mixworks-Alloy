@@ -113,7 +113,7 @@ void runSourceSectionTests(const std::function<void(bool,const juce::String&)>& 
     {
         const auto baseline = juce::JSON::toString(projectToJson(ui.engine.project),true,17); const auto history = ui.undoHistory.size();
         const auto menu = ui.timelineMenu(40.12,0); bool enabled = false;
-        for (juce::PopupMenu::MenuItemIterator i(menu); i.next();)
+        for (juce::PopupMenu::MenuItemIterator i(menu, true); i.next();)
             if (i.getItem().itemID == (int) TimelineAction::sectionBoundary) enabled = i.getItem().isEnabled;
         check(enabled,"segment context menu exposes Add Section Boundary Here");
         auto openBoundary = [&]()

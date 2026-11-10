@@ -1,6 +1,6 @@
 # WAV export and live recording
 
-Current guide for 0.55.64. Arrange exports an offline mix; Record/Perform exports a reconstructed take and can optionally capture a live master WAV. WAV is the implemented output format; MP3/FLAC and label-split publishing remain planned.
+Workflow reference; exact current candidate and verification limits are in [HANDOVER](../HANDOVER.md). Arrange exports an offline mix; Record/Perform exports a reconstructed take and can optionally capture a live master WAV. WAV is the implemented output format; MP3/FLAC and label-split publishing remain planned.
 
 ## Arrangement endings
 
@@ -17,3 +17,19 @@ Takes / preview exports through the same ordered event/control path as replay, r
 Enable master WAV in Record/Perform for the audible programme after master processing and before monitor-only mute. Private preparation is excluded. A bounded FIFO/threaded writer avoids file writes in the audio callback. Write/flush/FIFO failure retains a labelled partial file and reports incomplete recording while programme and editable capture continue. Final accepted frames are checked.
 
 JUCE supports RF64, but long-capacity recording and latest-build 60/90-minute hardware/listening acceptance remain open. Native short fixtures/software routing are evidence for their stated scope. [Mode contract](ARRANGE-RECORD-PERFORM-PLAN.md), [mastering](MASTERING.md) and [request register](REQUEST-STATUS-20261024.md) describe limits. [Earlier export notes (archived)](MAINTENANCE-20261103.md) preserve dated cancellation/tail evidence and original formats.
+
+
+## Default save folder
+
+New mix saves, Save As, WAV/take/live-master output, source playlists, track lists
+and transition-preset exports start in **Desktop / Mixworks**. On Jay's PC this
+is `C:\Users\jayte\Desktop\Mixworks`; other users get their own Desktop.
+Use **File → Default save folder → Choose default save folder...** to select a
+different directory, or **Use Desktop / Mixworks** to reset it. The choice persists
+outside musical Undo and is not changed by named layouts. A one-off file choice
+does not change the default. MIDI profile export keeps its own profile workflow.
+
+**Save / Ctrl+S** updates the current mix file. Save As starts in the configured
+folder with the existing filename. The default directory is created on first use;
+an unavailable folder gives a reason and directs you to the File menu to change it.
+Cancelled folder selection and failed preference writes keep the previous choice.

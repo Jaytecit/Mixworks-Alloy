@@ -15,6 +15,7 @@ public:
     OriginalAudio(juce::File, double rate, int channels, int frames);
     float sample(int channel, int frame) const;
     bool request(int first, int last) const; // Exclusive end; queues without waiting.
+    bool prepare(int first, int last) const; // Non-realtime destination preparation; waits outside the engine lock.
     // Display-only, exclusive end. Queues missing blocks and never waits for
     // decoding or the pool mutex. False means detail is not available yet.
     bool waveformRange(int first, int last, float& peak, float& rms) const;

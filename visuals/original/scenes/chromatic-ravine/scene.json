@@ -123,9 +123,37 @@
     "paletteAmount": {
       "min": 0,
       "max": 1,
-      "default": 1.0,
+      "default": 0.0,
       "type": "continuous",
       "label": "Palette amount"
+    },
+    "reliefDepth": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous",
+      "label": "Relief depth"
+    },
+    "meltWarp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous",
+      "label": "Domain warping"
+    },
+    "displacementColour": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous",
+      "label": "Displacement colour"
+    },
+    "lattice": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous",
+      "label": "Lattice overlay"
     }
   },
   "passSchema": 2,
@@ -155,8 +183,8 @@
   ],
   "motionProfile": "Carved central valley with raised walls",
   "audioMapping": {
-    "bass": "Raise terrain and camera clearance",
-    "mid": "Shift terrain shape phase",
+    "kick": "Lift the valley floor and brighten the strata",
+    "bass": "Bend the terrain gently",
     "treble": "Palette articulation"
   },
   "mediaRole": "image-derived generation",
@@ -186,7 +214,38 @@
         "viewPattern": 0.0,
         "finishGlow": 0.12,
         "paletteStyle": 0.14285714285714285,
-        "paletteAmount": 1.0
+        "paletteAmount": 0.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 0.0
+      }
+    },
+    {
+      "id": "lattice",
+      "title": "Lattice",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.65,
+        "imageMix": 0.9,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.0,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.14285714285714285,
+        "paletteAmount": 0.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 1.0
       }
     },
     {
@@ -209,7 +268,11 @@
         "viewPattern": 0.0,
         "finishGlow": 0.12,
         "paletteStyle": 0.7142857142857143,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 0.0
       }
     },
     {
@@ -232,12 +295,16 @@
         "viewPattern": 0.0,
         "finishGlow": 0.12,
         "paletteStyle": 0.2857142857142857,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 0.0
       }
     },
     {
       "id": "solar",
-      "title": "Solar fire",
+      "title": "Copper and slate",
       "controls": {
         "intensity": 0.7,
         "motion": 0.65,
@@ -255,7 +322,11 @@
         "viewPattern": 0.0,
         "finishGlow": 0.12,
         "paletteStyle": 0.42857142857142855,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 0.0
       }
     },
     {
@@ -278,7 +349,11 @@
         "viewPattern": 0.0,
         "finishGlow": 0.12,
         "paletteStyle": 0.5714285714285714,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 0.0
       }
     },
     {
@@ -301,7 +376,146 @@
         "viewPattern": 0.0,
         "finishGlow": 0.12,
         "paletteStyle": 0.8571428571428571,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.0,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0,
+        "lattice": 0.0
+      }
+    },
+    {
+      "id": "relief-only",
+      "title": "Relief only",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.65,
+        "imageMix": 0.9,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.0,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.0,
+        "paletteAmount": 0.0,
+        "reliefDepth": 0.85,
+        "meltWarp": 0,
+        "displacementColour": 0,
+        "lattice": 0.0
+      }
+    },
+    {
+      "id": "warp-only",
+      "title": "Domain warping only",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.65,
+        "imageMix": 0.9,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.0,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.0,
+        "paletteAmount": 0.0,
+        "reliefDepth": 0,
+        "meltWarp": 0.85,
+        "displacementColour": 0,
+        "lattice": 0.0
+      }
+    },
+    {
+      "id": "colour-only",
+      "title": "Displacement colour only",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.65,
+        "imageMix": 0.9,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.0,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.0,
+        "paletteAmount": 0.0,
+        "reliefDepth": 0,
+        "meltWarp": 0,
+        "displacementColour": 0.9,
+        "lattice": 0.0
+      }
+    },
+    {
+      "id": "relief-melt",
+      "title": "Relief and melting",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.65,
+        "imageMix": 0.9,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.0,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.0,
+        "paletteAmount": 0.0,
+        "reliefDepth": 0.85,
+        "meltWarp": 0.85,
+        "displacementColour": 0,
+        "lattice": 0.0
+      }
+    },
+    {
+      "id": "all-methods",
+      "title": "Relief, melting and neon",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.65,
+        "imageMix": 0.9,
+        "detail": 0.55,
+        "pulse": 0.7,
+        "imageZoom": 0.35,
+        "hue": 0.15,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.7,
+        "materialMotion": 0.0,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.12,
+        "paletteStyle": 0.0,
+        "paletteAmount": 0.0,
+        "reliefDepth": 0.85,
+        "meltWarp": 0.85,
+        "displacementColour": 0.9,
+        "lattice": 0.0
       }
     }
   ],

@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "UiMessages.h"
 #include "PresetNodes.h"
 #include <cstdlib>
 #include <cmath>
@@ -10,6 +11,24 @@ namespace
 juce::String editorTargetName(AutomationTarget target)
 {
     return target == AutomationTarget::treble ? "Treble" : juce::String(automationName(target));
+}
+juce::String automationEditReason(const Engine& engine,const AutomationAddress& address,bool busy,bool preparing,bool pluginAvailable)
+{
+    if(busy || preparing)return "Wait for source and tempo preparation before editing automation.";
+    if(engine.exporting)return "Finish or cancel export before editing automation.";
+    if(engine.rehearsalActive())return "End the transition rehearsal before editing automation.";
+    if(engine.recordingAutomation())return "Finish automation recording or choose Read before editing saved nodes.";
+    if(engine.project.automationLocked(address))return "Unlock the participating transition before editing this curve.";
+    if(address.target==AutomationTarget::master)return {};
+    if(address.clipId.isEmpty() && address.target!=AutomationTarget::plugin)return "Select a track to edit its automation.";
+    if(!engine.project.settings(address))return "Select an available track, mixer lane or master curve before editing nodes.";
+    if(const auto* clip=engine.project.clipFor(address.clipId))
+    {
+        if(!clip->media || !clip->media->hasPlayback())return "Relink or reload this track's missing audio before editing its curve.";
+        if(clip->media->sourceDetailsPending || clip->pendingPlacement!=PendingPlacement::none)return "Wait for this source to finish loading before editing its curve.";
+    }
+    if(address.target==AutomationTarget::plugin && !pluginAvailable)return "Load the effect and select an available parameter before editing its curve.";
+    return {};
 }
 }
 
@@ -29,13 +48,24 @@ juce::AudioProcessorParameter* Workstation::automationPluginParameter(const Auto
 
 bool Workstation::automationEditable(const AutomationAddress& address) const
 {
-    if (busy || engine.exporting || pendingTempo > 0 || tempoPreparationPending || engine.rehearsalActive()
-        || engine.recordingAutomation() || engine.project.automationLocked(address)) return false;
-    if (address.target == AutomationTarget::master) return true;
-    if (!engine.project.settings(address)) return false;
-    if (const auto* clip = engine.project.clipFor(address.clipId))
-        if (clip->media->sourceDetailsPending || !clip->media->hasPlayback() || clip->pendingPlacement != PendingPlacement::none) return false;
-    return address.target != AutomationTarget::plugin || automationPluginParameter(address);
+    return automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr).isEmpty();
+}
+
+Project Workstation::automationEditSnapshot()
+{
+    const juce::ScopedLock guard(engine.lock); return engine.project;
+}
+bool Workstation::publishAutomationEdit(Project candidate,const AutomationAddress& address,bool addUndo)
+{
+    if (const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
+    { setStatus(why); return false; }
+    const auto protectedEdit=engine.project.validateTransitionLocks(candidate);
+    if (protectedEdit.failed()) { setStatus(protectedEdit.getErrorMessage()); return false; }
+    if (addUndo) { engine.setAutomationRecordMode(AutomationRecordMode::read); remember(); }
+    // Preparation, history/UI notification and retirement stay outside the
+    // callback lock. Preserve take events appended while the candidate was built.
+    { const juce::ScopedLock guard(engine.lock); candidate.performanceTakes.swap(engine.project.performanceTakes); std::swap(candidate,engine.project); }
+    dirty=true; return true;
 }
 
 AutomationCurve* Workstation::materialiseAutomation(Project& candidate, const AutomationAddress& address)
@@ -49,65 +79,70 @@ AutomationCurve* Workstation::materialiseAutomation(Project& candidate, const Au
     return candidate.curve(address);
 }
 
-bool Workstation::insertAutomationNode(const AutomationAddress& address, double time, bool snap)
+bool Workstation::insertAutomationNode(const AutomationAddress& address,double time,bool snap)
 {
-    if (!automationEditable(address) || !std::isfinite(time)) { setStatus("Automation is unavailable, busy or locked. The curve was kept."); return false; }
-    const juce::ScopedLock guard(engine.lock);
-    time = engine.project.snappedTime(time, snap && engine.project.snap);
-    const auto* clip = engine.project.clipFor(address.clipId);
-    const auto bounds = engine.project.automationBounds(address);
-    if (time < 0 || time > 1.e9 || (clip && (time < bounds.getStart() || time > bounds.getEnd())))
+    if (const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
+    { setStatus(why); return false; }
+    if (!std::isfinite(time)) { setStatus("Choose a valid timeline position before adding a node."); return false; }
+    engine.finishAutomation(); auto candidate=automationEditSnapshot();
+    time=candidate.snappedTime(time,snap && candidate.snap);
+    const auto* clip=candidate.clipFor(address.clipId); const auto bounds=candidate.automationBounds(address);
+    if (time<0 || time>1.e9 || (clip && (time<bounds.getStart() || time>bounds.getEnd())))
     { setStatus("Place the node inside its automation span. Effect curves include all split pieces, gaps and the effect ending."); return false; }
-    engine.finishAutomation();
-    auto candidate = engine.project; auto* curve = materialiseAutomation(candidate, address); if (!curve) return false;
-    const double local = candidate.automationTime(address, time);
-    const float manual = candidate.manualValue(address), value = curve->interpolatedValue(local, manual);
-    if (curve->enabled) for (int i = 0; i < (int) curve->points.size(); ++i) if (curve->points[(size_t) i].time == local)
-    { timeline.selectAutomationPoint(address, i); refresh(); return true; }
-    candidate.automationEdited(address); curve->enabled = true;
-    const int index = curve->setPoint(local, value);
-    const auto valid = engine.project.validateTransitionLocks(candidate);
-    if (valid.failed()) { setStatus(valid.getErrorMessage()); return false; }
-    remember(); engine.project = std::move(candidate); timeline.selectAutomationPoint(address, index);
-    refresh(); setStatus("Node added.");
-    return true;
+    auto* curve=materialiseAutomation(candidate,address); if (!curve) return false;
+    const double local=candidate.automationTime(address,time); const float value=curve->interpolatedValue(local,candidate.manualValue(address));
+    int index=-1; bool existing=false;
+    if (curve->enabled) for (int i=0;i<(int)curve->points.size();++i) if (curve->points[(size_t)i].time==local) { index=i; existing=true; break; }
+    if (!existing)
+    { candidate.automationEdited(address); curve->enabled=true; index=curve->setPoint(local,value); if (!publishAutomationEdit(std::move(candidate),address,true)) return false; }
+    timeline.selectAutomationPoint(address,index); refresh(); setStatus(existing ? "Existing node selected." : "Node added."); return true;
 }
-
-bool Workstation::deleteAutomationNode(const AutomationAddress& address, int index)
+bool Workstation::deleteAutomationNode(const AutomationAddress& address,int index)
 {
-    if (!automationEditable(address)) return false;
-    const juce::ScopedLock guard(engine.lock);
-    auto candidate = engine.project; auto* curve = materialiseAutomation(candidate,address);
-    if (!curve || index < 0 || index >= (int) curve->points.size())
-    { setStatus("Select an available automation node to delete."); return false; }
-    engine.setAutomationRecordMode(AutomationRecordMode::read);
-    auto* updated = candidate.curve(address);
-    candidate.automationEdited(address, AutomationEdit::removePoint, updated->points[(size_t) index].time);
-    updated->points.erase(updated->points.begin() + index);
-    const auto valid = engine.project.validateTransitionLocks(candidate);
-    if (valid.failed()) { setStatus(valid.getErrorMessage()); return false; }
-    remember(); engine.project = std::move(candidate); timeline.editingAutomationPoint.reset(); refresh();
-    setStatus("Node deleted."); return true;
+    if (const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
+    { setStatus(why); return false; }
+    auto candidate=automationEditSnapshot(); auto* curve=materialiseAutomation(candidate,address);
+    if (!curve || index<0 || index>=(int)curve->points.size()) { setStatus("Select an available automation node to delete."); return false; }
+    candidate.automationEdited(address,AutomationEdit::removePoint,curve->points[(size_t)index].time);
+    curve->points.erase(curve->points.begin()+index);
+    if (!publishAutomationEdit(std::move(candidate),address,true)) return false;
+    timeline.editingAutomationPoint.reset(); refresh(); setStatus("Node deleted."); return true;
 }
 
-void Workstation::showAutomationNodeMenu(const AutomationAddress& address, int index, double time)
+void Workstation::showAutomationNodeMenu(const AutomationAddress& address, int index, double time, juce::Rectangle<int> anchor)
 {
     const auto view = timeline.automationViewCurve(address); const auto* saved = &view; const bool editable = automationEditable(address);
     const auto before = juce::JSON::toString(projectToJson(engine.project));
+    const auto reason=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);
+    const auto label=[&](const juce::String& name) {return name+(reason.isEmpty() ? juce::String() : " — "+reason);};
     juce::PopupMenu menu;
-    menu.addItem(1, "Edit time / value...", editable);
-    menu.addItem(2, "Delete node", editable && index >= 0 && index < (int) saved->points.size());
-    menu.addItem(3, "Add node here", editable);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&timeline).withMousePosition(),
+    if (index >= 0 && index < (int) saved->points.size())
+    {
+        menu.addItem(1, label("Edit time / value..."), editable);
+        menu.addItem(2, label("Delete node"), editable);
+    }
+    menu.addItem(3, label("Add node here"), editable);
+    menu.addItem(4, "Automation details...");
+    menu.showMenuAsync(timelineMenuOptions(anchor),
         [safe = juce::Component::SafePointer<Workstation>(this), address, index, time, before](int result)
         {
-            if (!safe || result == 0 || !safe->automationEditable(address)) return;
+            if (!safe || result == 0) return;
+            if (result != 4 && !safe->automationEditable(address))
+            { safe->setStatus(automationEditReason(safe->engine,address,safe->busy,safe->pendingTempo>0 || safe->tempoPreparationPending,safe->automationPluginParameter(address)!=nullptr)); return; }
             if (before != juce::JSON::toString(projectToJson(safe->engine.project))) { safe->setStatus("The curve changed while the menu was open. Select it again."); return; }
             safe->timeline.selectAutomationCurve(address); safe->timeline.selectAutomationPoint(address, index);
             if (result == 1) safe->editAutomationPoint(address.target == AutomationTarget::master ? 0 : address.track, index);
             else if (result == 2) safe->deleteAutomationNode(address, index);
             else if (result == 3) safe->insertAutomationNode(address, time);
+            else if (result == 4) safe->showAutomationDetails();
         });
+}
+
+void Workstation::showAutomationDetails()
+{
+    showEditingPage(2);
+    showToolPage(2);
+    refresh();
 }
 
 void Workstation::initialiseAutomationEditor()
@@ -118,18 +153,18 @@ void Workstation::initialiseAutomationEditor()
     editingBody.addChildComponent(automationArm); // Capture exclusions live in the advanced take menu.
     automationHeading.setText("AUTOMATION", juce::dontSendNotification);
     automationOwner.setTitle("Automation owner"); automationParameter.setTitle("Automation parameter"); automationMode.setTitle("Automation recording mode");
-    automationOwner.setTextWhenNothingSelected("Select lane or master"); automationParameter.setTextWhenNothingSelected("Select parameter");
-    automationOwner.setTooltip("Lane curves affect every track on that lane. Per-track fades and effects are available separately. Browsing leaves sound, playhead and recording unchanged.");
-    automationParameter.setTooltip("Select Volume, Bass, Mid, Treble, Pan, manual Filter or a named effect parameter. Selection is view-only.");
+    automationOwner.setTextWhenNothingSelected("Select automation owner"); automationParameter.setTextWhenNothingSelected("Select parameter");
+    automationOwner.setTooltip("Choose the track, stem, master or current effect. Track curves include preset and manual nodes across the track.");
+    automationParameter.setTooltip("Select Volume, Bass, Mid, Treble, Pan, Filter or a named effect parameter. Selection is view-only.");
     automationMode.addItem("Read mode", 1); automationMode.addItem("Touch", 2); automationMode.addItem("Latch", 3);
-    automationMode.setTooltip("Read mode does not record. Touch returns after 0.5 seconds without control input; Latch writes until stopped or Read is selected. Curve Read is separate.");
+    automationMode.setTooltip("Read plays saved automation. Touch writes to the playing track's curve on an armed lane, then returns to the curve after 0.5 seconds without input. Latch keeps writing until the track ends, Stop or Read.");
     automationRead.setTooltip("Enable or disable this owner's automation nodes. Preset nodes use the same Read control. Undo restores the change.");
     automationAdd.setTooltip("Add a point at the playhead for the selected control. Snap applies.");
     automationPrevious.setTooltip("Select the previous node without seeking; Left on the timeline does the same.");
     automationNext.setTooltip("Select the next node without seeking; Right on the timeline does the same.");
     automationEdit.setTooltip("Set the selected point's exact time and value. With no point selected, this adds one at the playhead.");
     automationDelete.setTooltip("Delete the selected automation node, including a point placed by a preset. One Undo restores it.");
-    automationArm.setTooltip("Enable movement recording for this lane or the master output. Controller Record enables it for all lanes and master.");
+    automationArm.setTooltip("Arm lets this mixer lane record moved controls during playback in Touch or Latch. It does not start playback or writing. Disarm to protect the lane; saved curves still play in Read.");
     automationPairedFilter.setButtonText("Filters...");
     automationPairedFilter.setTooltip("Choose a transition filter preset, then edit its regular Filter nodes in this same editor.");
     automationOwner.onChange = [this]
@@ -137,6 +172,7 @@ void Workstation::initialiseAutomationEditor()
         if (refreshing) return; const int i = automationOwner.getSelectedItemIndex();
         if (i < 0 || i >= (int) automationOwnerChoices.size()) return;
         auto address = automationOwnerChoices[(size_t) i];
+        if (address.target == AutomationTarget::plugin) return; // The active mixer effect already identifies its parameter.
         selectedStem = address.stem;
         address.target = address.target == AutomationTarget::master ? AutomationTarget::master
             : automationLane() >= 0 && automationLane() < trackAutomationCount ? (AutomationTarget) automationLane() : AutomationTarget::volume;
@@ -173,7 +209,7 @@ void Workstation::initialiseAutomationEditor()
         const auto* selected = engine.project.transitionFor(selectedTransition);
         if (!selected || (selected->incoming != address.clipId && selected->outgoing != address.clipId))
             for (const auto& link : engine.project.transitionLinks) if (link.incoming == address.clipId || link.outgoing == address.clipId) { selected = &link; break; }
-        if (selected) { const auto id = selected->incoming; selectTransition(id); showToolPage(1); setStatus("Paired filter stages are in Transitions. Manual Filter nodes remain separate."); }
+        if (selected) { const auto id = selected->incoming; selectTransition(id); showToolPage(1); setStatus("Choose a filter preset in Transitions. Its nodes appear on each track's Filter curve."); }
     };
 }
 
@@ -190,9 +226,10 @@ void Workstation::refreshAutomationEditor(bool rebuildChoices)
             if ((address.target == AutomationTarget::master && choice.target == AutomationTarget::master)
                 || (address.target != AutomationTarget::master && choice.target != AutomationTarget::master && choice.track == address.track && choice.clipId == address.clipId && choice.stem == address.stem)) ownerIndex = id;
         };
-        for (int i = 0; i < trackCount; ++i) addOwner("Lane " + juce::String(i + 1) + " / all tracks", {i, AutomationTarget::volume});
+        if (const auto* clip = currentClip()) addOwner("Track / " + clip->media->libraryTitle(), {clip->track, AutomationTarget::volume, {}, {}, clip->id});
         addOwner("Master output", {-1, AutomationTarget::master});
-        if (const auto* clip = currentClip()) addOwner("Track fades / " + clip->media->libraryTitle(), {clip->track, AutomationTarget::volume, {}, {}, clip->id});
+        if (address.target == AutomationTarget::plugin && address.clipId.isEmpty())
+            addOwner("Mixer lane " + juce::String(address.track + 1) + " FX", address);
         for (const auto& clip : engine.project.clips) if (clip.stems) for (int s = 0; s < stemCount; ++s)
             addOwner(clip.media->libraryTitle() + " / " + stemNames[s], {clip.track, AutomationTarget::volume, {}, {}, clip.id, s});
         automationOwner.setSelectedId(ownerIndex, juce::dontSendNotification);
@@ -205,7 +242,7 @@ void Workstation::refreshAutomationEditor(bool rebuildChoices)
         if (address.target == AutomationTarget::master) addParameter("Master volume", address);
         else if (address.track >= 0 && address.track < trackCount)
         {
-            for (int target = 0; target < trackAutomationCount; ++target)
+            for (int target = 0; address.clipId.isNotEmpty() && target < trackAutomationCount; ++target)
             { if (address.stem >= 0 && target != 0 && target != 4) continue; auto choice = address; choice.target = (AutomationTarget) target; choice.slotId.clear(); choice.parameterId.clear(); addParameter(target == (int) AutomationTarget::cutoff ? "Filter" : editorTargetName(choice.target), choice); }
             const auto* clip = engine.project.clipFor(address.clipId); const auto& chain = clip ? clip->effects->plugins : engine.plugins[(size_t) address.track];
             for (size_t i = 0; address.stem < 0 && i < chain.size(); ++i) for (const auto& [id, parameter] : chain[i]->parameters)
@@ -244,6 +281,18 @@ void Workstation::refreshAutomationEditor(bool rebuildChoices)
     automationPrevious.setEnabled(selected && !busy && !view.points.empty()); automationNext.setEnabled(automationPrevious.isEnabled());
     automationDelete.setEnabled(editable && node);
     automationRead.setEnabled(editable && !view.points.empty()); automationRead.setToggleState(view.enabled, juce::dontSendNotification);
+    const auto unavailable=!selected ? juce::String("Select a curve owner and parameter before editing automation.")
+        : automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);
+    const auto explain=[&](juce::Component& control,const juce::String& fallback)
+    {
+        const auto reason=control.isEnabled() ? juce::String() : unavailable.isNotEmpty() ? unavailable : fallback;
+        control.getProperties().set("mixworksHintDisabled",reason); control.setDescription(reason);
+    };
+    explain(automationAdd,{}); explain(automationEdit,{});
+    explain(automationDelete,"Select an available automation node before deleting it.");
+    explain(automationRead,"Add a node before changing this curve's Read state.");
+    explain(automationPrevious,"This curve has no nodes to navigate. Add one first.");
+    explain(automationNext,"This curve has no nodes to navigate. Add one first.");
     automationMode.setSelectedId(engine.automationRecordMode == AutomationRecordMode::touch ? 2 : engine.automationRecordMode == AutomationRecordMode::write ? 3 : 1, juce::dontSendNotification);
     automationMode.setEnabled(!busy && !engine.exporting && address.stem < 0);
     const bool master = selected && address.target == AutomationTarget::master;
@@ -253,6 +302,10 @@ void Workstation::refreshAutomationEditor(bool rebuildChoices)
         + ". This control arms this owner's lane, including its segments. Controller Record arms all four lanes and master.");
     automationArm.setButtonText(master ? "Arm master" : "Arm lane " + juce::String(engine.selectedTrack.load() + 1)); automationArm.setToggleState(armed, juce::dontSendNotification);
     automationArm.setEnabled(!busy && !engine.exporting && address.stem < 0);
+    const auto mode = engine.automationRecordMode;
+    const auto name = mode == AutomationRecordMode::read ? "Read" : mode == AutomationRecordMode::touch ? "Touch" : "Latch";
+    recordingTools.setButtonText(juce::String(name) + " / " + juce::String(armedLanes) + " lanes armed" + (engine.masterAutomationArmed ? " + master" : ""));
+    recordingTools.setTooltip("Automation recording mode and arm state. Open to change mode or arm the selected lane or master.");
     automationPairedFilter.setEnabled(selected && address.clipId.isNotEmpty() && std::any_of(engine.project.transitionLinks.begin(), engine.project.transitionLinks.end(), [&](const auto& link) { return link.incoming == address.clipId || link.outgoing == address.clipId; }));
 }
 
@@ -272,22 +325,39 @@ juce::PopupMenu Workstation::automationMenu(int track) const
     add(TimelineAction::curveClear, "Clear curve nodes", editable && !curve->points.empty());
     add(TimelineAction::choosePlugin, "Choose effect control...", available);
     menu.addSeparator();
+    menu.addSubMenu("Recording options", automationRecordingMenu(track, automationLane() == (int) AutomationTarget::master));
+    return menu;
+}
+
+juce::PopupMenu Workstation::automationRecordingMenu(int track, bool master) const
+{
     juce::PopupMenu recording;
+    const bool available = !busy && !engine.exporting;
     recording.addItem((int) TimelineAction::recordOff, "Read (no recording)", available, engine.automationRecordMode == AutomationRecordMode::read);
     recording.addItem((int) TimelineAction::recordTouch, "Touch", available, engine.automationRecordMode == AutomationRecordMode::touch);
     recording.addItem((int) TimelineAction::recordLatch, "Latch", available, engine.automationRecordMode == AutomationRecordMode::write);
-    const bool master = automationLane() == (int) AutomationTarget::master;
     recording.addSeparator(); recording.addItem((int) TimelineAction::armAutomation, master ? "Arm master" : "Arm lane " + juce::String(track + 1), available,
         master ? engine.masterAutomationArmed : engine.automationArmed[(size_t) track]);
-    menu.addSubMenu("Recording options", recording);
-    return menu;
+    return recording;
+}
+
+void Workstation::showAutomationRecordingMenu()
+{
+    const int track = engine.selectedTrack.load();
+    const bool master = automationLane() == (int) AutomationTarget::master;
+    automationRecordingMenu(track, master).showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&recordingTools),
+        [safe = juce::Component::SafePointer<Workstation>(this), track, master](int id)
+        {
+            if (safe && id && (id != (int) TimelineAction::armAutomation || (track == safe->engine.selectedTrack && master == (safe->automationLane() == (int) AutomationTarget::master))))
+                safe->performTimelineAction((TimelineAction) id, safe->engine.position.load(), track);
+        });
 }
 std::vector<AutomationAddress> Workstation::automationAddresses(int track) const
 {
     std::vector<AutomationAddress> addresses;
     auto add = [&](const TrackSettings& settings, const juce::String& clipId)
     {
-        for (int target = 0; target < trackAutomationCount; ++target)
+        for (int target = 0; clipId.isNotEmpty() && target < trackAutomationCount; ++target)
             if (!settings.automation[(size_t) target].points.empty()) addresses.push_back({track, (AutomationTarget) target, {}, {}, clipId});
         for (const auto& lane : settings.pluginAutomation)
             if (!lane.curve.points.empty()) addresses.push_back({track, AutomationTarget::plugin, lane.slotId, lane.parameterId, clipId});
@@ -299,7 +369,7 @@ std::vector<AutomationAddress> Workstation::automationAddresses(int track) const
     add(engine.project.tracks[(size_t) track], {});
     for (const auto& clip : engine.project.clips) if (clip.track == track)
     {
-        auto settings = clip.controls; settings.pluginAutomation.clear(); add(settings, clip.id);
+        auto settings = engine.project.effectSettings(clip); settings.pluginAutomation.clear(); add(settings, clip.id);
         const auto* effectOwner = engine.project.effectOwner(clip);
         const bool firstOnLane = std::none_of(engine.project.clips.begin(), engine.project.clips.begin() + (&clip - engine.project.clips.data()),
             [&](const auto& other) { return other.track == track && other.effects == clip.effects; });
@@ -320,9 +390,10 @@ void Workstation::editTempoPoint(int point, double time)
     const auto expected = juce::JSON::toString(projectToJson(engine.project), true, 17);
     auto* dialog = new juce::AlertWindow("Tempo marker", "Set the speed here. Drag the marker to move it.", juce::MessageBoxIconType::NoIcon, this);
     dialog->addTextEditor("time", juce::String(time - engine.project.tempo.origin, 6), "Timeline seconds (negative is pre-roll)");
-    dialog->addTextEditor("bpm", juce::String(bpm, 4), "Speed (BPM, 20-400)");
+    const auto bpmText = preciseBpmText(bpm);
+    dialog->addTextEditor("bpm", bpmText, "Speed (BPM, 20-400)");
     dialog->addButton("Apply", 1, juce::KeyPress(juce::KeyPress::returnKey)); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
-    dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, point, expected](int answer)
+    dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, point, expected, bpm, bpmText](int answer)
     {
         if (!safe || answer != 1 || safe->busy) return;
         if (safe->engine.exporting || safe->pendingTempo > 0 || safe->tempoPreparationPending || safe->engine.project.hasLockedTransitions()
@@ -334,6 +405,7 @@ void Workstation::editTempoPoint(int point, double time)
         const bool validTime = number(dialog->getTextEditorContents("time"), seconds); seconds += safe->engine.project.tempo.origin;
         if (!validTime || !number(dialog->getTextEditorContents("bpm"), target) || seconds < 0 || seconds > 1.0e9 || target < 20 || target > 400)
         { safe->fail("Enter a valid time and BPM between 20 and 400. The tempo map was kept."); return; }
+        if (dialog->getTextEditorContents("bpm").trim() == bpmText) target = bpm;
         auto candidate = safe->engine.project; auto& tempo = candidate.tempo;
         if (tempo.points.empty()) tempo.setPoint(0, candidate.bpm);
         if (point >= 0)
@@ -408,10 +480,12 @@ void Workstation::chooseAutomationPlugin(std::optional<double> markerTime)
 }
 void Workstation::editAutomationPoint(int track, int point, std::optional<double> at)
 {
-    if (busy || automationLane() < 0) return;
-    const auto address = displayedAddress(track); if (!automationEditable(address)) { setStatus("Automation is unavailable, busy or locked."); return; }
+    if(automationLane()<0) { setStatus("Select a curve owner and parameter before editing a node."); return; }
+    const auto address = displayedAddress(track);
+    if(const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
+    { setStatus(why); return; }
     const auto viewCurve = timeline.automationViewCurve(address);
-    if (point >= (int) viewCurve.points.size()) return;
+    if (point >= (int) viewCurve.points.size()) { setStatus("This node is no longer available. Select a current node and try again."); return; }
     const auto* curve = &viewCurve;
     const auto before = juce::JSON::toString(projectToJson(engine.project));
     const auto range = automationRange(address.target); const bool percent = address.target == AutomationTarget::pan || address.target == AutomationTarget::plugin;
@@ -433,7 +507,9 @@ void Workstation::editAutomationPoint(int track, int point, std::optional<double
     dialog->addButton("Apply", 1, juce::KeyPress(juce::KeyPress::returnKey)); dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true, juce::ModalCallbackFunction::create([safe = juce::Component::SafePointer<Workstation>(this), dialog, address, range, scale, point, viewCurve, gain, before](int result)
     {
-        if (!safe || result != 1 || !safe->automationEditable(address)) return;
+        if (!safe || result != 1) return;
+        if(!safe->automationEditable(address))
+        { safe->setStatus(automationEditReason(safe->engine,address,safe->busy,safe->pendingTempo>0 || safe->tempoPreparationPending,safe->automationPluginParameter(address)!=nullptr)); return; }
         if (before != juce::JSON::toString(projectToJson(safe->engine.project))) { safe->setStatus("The project changed while the node editor was open. Select the node again."); return; }
         auto number = [](const juce::String& text, double& value)
         {
@@ -454,8 +530,8 @@ void Workstation::editAutomationPoint(int track, int point, std::optional<double
         value /= scale;
         timeValue = safe->engine.project.automationTime(address, timeValue);
         if (timeValue < 0) { safe->fail("Place the marker inside its audio track."); return; }
-        const juce::ScopedLock guard(safe->engine.lock);
-        auto candidate = safe->engine.project;
+        {
+        auto candidate = safe->automationEditSnapshot();
         auto* envelope = safe->materialiseAutomation(candidate, address); if (!envelope) return;
         const auto editing = envelope->points.empty() && point >= 0 ? viewCurve : *envelope;
         if (point >= 0 && (point >= (int) editing.points.size() || (point > 0 && timeValue <= editing.points[(size_t) point - 1].time)
@@ -478,8 +554,8 @@ void Workstation::editAutomationPoint(int track, int point, std::optional<double
         }
         const auto protection = safe->engine.project.validateTransitionLocks(candidate);
         if (protection.failed()) { safe->setStatus(protection.getErrorMessage()); return; }
-        safe->engine.setAutomationRecordMode(AutomationRecordMode::read);
-        safe->remember(); safe->engine.project = std::move(candidate);
+        if (!safe->publishAutomationEdit(std::move(candidate),address,true)) return;
+        }
         const auto* updated = safe->engine.project.curve(address);
         if (updated)
             for (int i = 0; i < (int) updated->points.size(); ++i)

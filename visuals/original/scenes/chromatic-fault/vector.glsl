@@ -60,6 +60,8 @@ void main(){
     target=vec2(side*(.075+.13*midHit*pulse),side*bassHit*pulse*.018);
 #endif
     target*=.8+.4*warp;
+    target+=structureCurrent(uv)*.22;
+
     if(simulationReset>.5){colour=vec4(target,0.,pigmentArt(uv).a);return;}
     vec2 old=texture(input0,uv).rg;
     vec2 previous=texture(input0,clamp(uv-old*stepDelta,0.,1.)).rg;

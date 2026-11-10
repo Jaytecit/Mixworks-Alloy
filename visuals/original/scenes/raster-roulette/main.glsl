@@ -35,6 +35,7 @@ void main(){
     float front=fract(travelTime*.31),distance=abs(uv.y-front);
     float beam=exp(-distance*distance*18000.);
     vec2 q=uv+vec2(sin(uv.y*22.)*midHit*pulse*.025,0);
+    q.y=.5+(q.y-.5)/(1.+2.6*bassHit*pulse);q.y+=.28*sin(travelTime*1.4+midImpulse*.2)*pulse;
     c=remembered(q);
     float wake=1.-smoothstep(.015,.11,mod(front-uv.y+1.,1.));
     c=mix(c,imageAt(q+vec2(bassHit*pulse*.018,0)),wake*.65);

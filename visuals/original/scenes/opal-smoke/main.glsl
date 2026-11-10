@@ -56,11 +56,11 @@ void main(){
     decay=.64+feedback*.18;
 #else
     // Broad, softly lit billows. Mids roll the volume; bass adds local pressure.
-    vec2 q=p;
+    vec2 q=p-vec2(.75*sin(t*.8+midImpulse*.25),0);
     q.x+=.30*sin(q.y*2.-t*.13+midImpulse*.22)*( .3+warp);
     float n=cloud(q*2.2+vec2(t*.055,-t*.16));
     q+=vec2(n-.5,cloud(q.yx*1.8-t*.07)-.5)*(.45+warp*.35);
-    float body=exp(-pow(q.x/(.43+.24*clamp(q.y+.8,0.,1.7)),2.))*smoothstep(-1.0,-.62,q.y)*(1.-smoothstep(.35,1.05,q.y));
+    float body=exp(-pow(q.x/(.82+.30*clamp(q.y+.8,0.,1.7)+lo*.8),2.))*smoothstep(-1.4,-.95,q.y)*(1.-smoothstep(.75,1.4,q.y));
     float billow=smoothstep(.24,.76,cloud(q*3.1+vec2(-t*.035,-midTime*.45)));
     float density=body*(.28+.72*billow);
     float light=.35+.65*cloud(q*2.8+vec2(.3,.4)-t*.04);
@@ -69,6 +69,9 @@ void main(){
     flow=vec2(.0014*sin(p.y*2.-midImpulse*.3)*( .3+warp),-.0013-.0010*mid);
     decay=.938+feedback*.049;
 #endif
+    vec4 deposit=structurePigment(uv);
+    injection+=deposit.rgb*(.012+.022*spriteStructurePush);
+    flow+=structureCurrent(uv)*.007;
     vec2 chart=uv+flow*stepSize;
     vec3 previous=historyValid!=0?texture(historyImage,clamp(chart,0.,1.)).rgb:vec3(0);
 #if FLOW_KIND == 2

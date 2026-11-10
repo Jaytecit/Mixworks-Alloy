@@ -65,7 +65,7 @@ void Timeline::selectHotcue(const CueFlag& flag)
     if (x < view.getX() + 90 || x > view.getRight() - 90)
     { owner.setFollowPlayhead(false); owner.viewport.setViewPosition(std::max(0, x - view.getWidth() / 2), view.getY()); }
     owner.setStatus("HC" + juce::String(flag.slot + 1) + " / source " + juce::String(cue->sourceSeconds, 6)
-        + " s / Enter: exact source position; Delete: clear slot; drag: move cue; Controller pad: locate while stopped.");
+        + " s / Enter: exact source position; Delete: clear slot; drag while stopped: move cue; Controller pad or Alt+1–9: jump the whole mix, stopped or playing.");
     refreshCurveTools(); repaint();
 }
 bool Timeline::beginHotcue(const juce::MouseEvent& event)
@@ -146,7 +146,7 @@ void Timeline::refreshAccessibleHotcues(const std::function<TimelineAccessItem&(
             const auto time = hotcueTimelineTime(*clip, flag.slot, owner.engine.position.load());
             fresh.available = time.has_value(); fresh.time = time.value_or(clip->start); return fresh;
         };
-        item.setHelpText("Source-owned hotcue slot. Focus selects/reveals without seeking; Enter edits source seconds. Delete clears only this slot. Controller pad locates while stopped. Live cue launch is not available yet.");
+        item.setHelpText("Source-owned hotcue slot. Focus selects/reveals without seeking; Enter edits source seconds. Delete clears only this slot. Controller pad or Alt+1–9 jumps the whole mix immediately, stopped or playing; all lanes follow the new timeline position.");
         item.read = [this, find]
         { const auto f = find(); if (!f) return juce::String("Removed hotcue"); const auto* clip = owner.engine.project.clipFor(f->clipId); const auto* cue = hotcueFor(*clip, f->slot); return "HC" + juce::String(f->slot + 1) + " / " + clip->media->libraryTitle() + (cue->manual ? " / manual" : " / initial default") + (f->available ? " / project " + timeText(f->time - owner.engine.project.tempo.origin) : " / outside segment") + (owner.engine.project.clipTransitionLocked(f->clipId) ? " / locked" : ""); };
         item.value = [find] { const auto f = find(); return f ? f->source : 0.; };

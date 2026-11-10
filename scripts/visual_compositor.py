@@ -2,7 +2,7 @@
 from OpenGL import GL as gl
 from OpenGL.GL.shaders import compileProgram, compileShader
 
-TRANSITIONS = ('dissolve', 'zoom', 'radial', 'sweep', 'cut', 'sweep-reverse')
+TRANSITIONS = ('dissolve', 'zoom', 'radial', 'sweep', 'cut', 'sweep-reverse', 'feedback')
 
 FRAGMENT = '''#version 330
 uniform sampler2D outgoingImage, incomingImage;

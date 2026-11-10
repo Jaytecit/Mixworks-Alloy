@@ -1,0 +1,14 @@
+{
+  "TITLE": "Vector Tunnel",
+  "CONTROLS": [
+    {"NAME":"radius","TYPE":"knob","LABEL":"Radius","DEFAULT":0.6,"MIN":0.2,"MAX":1.2,"UI_GROUP":"Tunnel"},
+    {"NAME":"ripples","TYPE":"slider","LABEL":"Ripples","DEFAULT":0.28,"MIN":0,"MAX":1,"UI_GROUP":"Tunnel"},
+    {"NAME":"camera_look","TYPE":"xy","LABEL":"Camera look","DEFAULT":[0,0],"MIN":[-1,-1],"MAX":[1,1],"UI_GROUP":"Tunnel"},
+    {"NAME":"speed","TYPE":"slider speed","LABEL":"Travel speed","DEFAULT":0.65,"MIN":-2,"MAX":3,"UI_GROUP":"Motion"},
+    {"NAME":"twist","TYPE":"slider","LABEL":"Twist","DEFAULT":0.38,"MIN":-1,"MAX":1,"UI_GROUP":"Motion"},
+    {"NAME":"audio_depth","TYPE":"slider","LABEL":"Music response","DEFAULT":0.7,"MIN":0.5,"MAX":6,"UI_GROUP":"Motion"},
+    {"NAME":"segments","TYPE":"dropdown","LABEL":"Structure","DEFAULT":1,"LABELS":["Hex","Octagon","Dodecagon"],"VALUES":[6,8,12],"UI_GROUP":"Light"},
+    {"NAME":"edge_colour","TYPE":"color","LABEL":"Edge colour","DEF_COLOR":[0.24,0.76,0.94],"UI_GROUP":"Light"},
+    {"NAME":"warm_lights","TYPE":"toggle","LABEL":"Warm lamps","DEFAULT":1,"UI_GROUP":"Light"}
+  ]
+}

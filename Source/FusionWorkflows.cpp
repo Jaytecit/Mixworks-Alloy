@@ -70,8 +70,9 @@ void Workstation::choosePlaylistExport(bool text)
     if (busy) return;
     if (!ensureTempoReady([safe = juce::Component::SafePointer<Workstation>(this), text] { if (safe) safe->choosePlaylistExport(text); })) return;
     if (engine.project.clips.empty()) { setStatus("Arrange some segments before exporting a playlist."); return; }
+    const auto initial = defaultSaveLocation(text ? "Mix tracklist.txt" : "Mix sources.m3u8"); if (initial == juce::File()) return;
     chooser = std::make_unique<juce::FileChooser>(text ? "Export track list" : "Export source playlist",
-        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(text ? "Mix tracklist.txt" : "Mix sources.m3u8"), text ? "*.txt" : "*.m3u8;*.m3u", false);
+        initial, text ? "*.txt" : "*.m3u8;*.m3u", false);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
         [safe = juce::Component::SafePointer<Workstation>(this), text](const auto& files)
     {

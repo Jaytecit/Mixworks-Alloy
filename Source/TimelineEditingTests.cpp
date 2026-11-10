@@ -627,7 +627,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
     }
     ui.engine.project = original; ui.selectedClip = a.id; ui.refresh();
     auto menu = ui.timelineMenu(8, 0); bool copyFound = false, fxDisabled = false, loopEndDisabled = false;
-    for (juce::PopupMenu::MenuItemIterator i(menu); i.next();)
+    for (juce::PopupMenu::MenuItemIterator i(menu, true); i.next();)
     { copyFound |= i.getItem().itemID == (int) TimelineAction::copy && i.getItem().isEnabled; fxDisabled |= i.getItem().itemID == (int) TimelineAction::effect && !i.getItem().isEnabled; loopEndDisabled |= i.getItem().itemID == (int) TimelineAction::loopEnd && !i.getItem().isEnabled; }
     check(copyFound && fxDisabled && loopEndDisabled, "RMB menu exposes editing and disables effects/loop end until their prerequisites exist");
     ui.performTimelineAction(TimelineAction::copy, 8, 0);
@@ -806,7 +806,7 @@ void runTimelineEditingTests(const std::function<void(bool, const juce::String&)
         ui.engine.project = original; ui.selectedClip = a.id; ui.selectedTransition.clear();
         ui.selectedAutomationTarget = -1; ui.undoHistory.clear(); ui.redoHistory.clear(); ui.refresh();
         auto context = ui.timelineMenu(8, 0); bool filter = false;
-        for (juce::PopupMenu::MenuItemIterator i(context); i.next();) filter |= i.getItem().text.contains("Add Filter");
+        for (juce::PopupMenu::MenuItemIterator i(context, true); i.next();) filter |= i.getItem().text.contains("Add Filter");
         check(filter, "P55 Filter has direct context insertion parity with Volume and EQ");
         const auto plugin = juce::File::getCurrentWorkingDirectory().getChildFile("build/MixworksTestGain_artefacts/Release/VST3/Mixworks Test Gain.vst3");
         const auto error = ui.engine.addPlugin(0, plugin); check(error.isEmpty(), "P55 native FX fixture loads: " + error);

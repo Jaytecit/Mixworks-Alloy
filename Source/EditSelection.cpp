@@ -15,7 +15,36 @@ struct RepeatedSelection
     std::vector<juce::String> added;
     juce::String error;
     double end = 0;
+    int unlinkedTransitions = 0;
 };
+juce::Result prepareLinkedRangeEdit(Project& project,const EditSelection& selection,double begin,double end,bool cropping,int& unlinked)
+{
+    std::vector<juce::String> affected;
+    const auto changes=[&](const Clip& clip)
+    { return selection.contains(clip.id) && (cropping ? begin>clip.start || end<clip.end() : begin<clip.end() && end>clip.start); };
+    const auto survives=[&](const Clip& clip)
+    {
+        if(!selection.contains(clip.id))return true;
+        return cropping ? std::max(begin,clip.start)<std::min(end,clip.end())
+            : clip.start<begin || clip.end()>end;
+    };
+    for(const auto& link:project.transitionLinks)
+    {
+        const auto* out=project.clipFor(link.outgoing); const auto* in=project.clipFor(link.incoming);
+        if(!out || !in)return juce::Result::fail("A connected transition source is unavailable. Select current audio and try again.");
+        if(!(changes(*out) || changes(*in)) || !(survives(*out) || survives(*in)))continue;
+        for(const auto* clip:{out,in})if(changes(*clip) && std::find(affected.begin(),affected.end(),clip->id)==affected.end())affected.push_back(clip->id);
+    }
+    const auto count=project.transitionLinks.size();
+    if(!affected.empty())
+    {
+        // Reuse the audible unlink operation before slicing. It materialises
+        // treatments and exterior hard cuts, including the unedited partner.
+        // The surviving pieces then use ordinary source clocks and shared FX.
+        const auto result=project.unlinkClips(affected); if(result.failed())return result;
+    }
+    unlinked=(int)(count-project.transitionLinks.size()); return juce::Result::ok();
+}
 bool sameSourceTiming(const Clip& original, const Clip& moved)
 {
     if (!std::isfinite(moved.end()) || std::abs(moved.length - original.length) > 1.e-8) return false;
@@ -93,16 +122,14 @@ RepeatedSelection planReplacement(const Project& source, const EditSelection& se
     if (!std::isfinite(begin) || !std::isfinite(end) || begin < 0 || end <= begin || end > 1.e9)
         return fail("Choose a valid destination interval.");
     auto touched = [&](const Clip& c) { return selection.contains(c.id) && c.start < end && c.end() > begin; };
-    auto removed = [&](const Clip& c) { return touched(c) && begin <= c.start && end >= c.end(); };
-    for (const auto& link : source.transitionLinks)
-    {
-        const auto* a = source.clipFor(link.outgoing); const auto* b = source.clipFor(link.incoming);
-        if (!a || !b) return fail("A destination transition is unavailable.");
-        if ((touched(*a) || touched(*b)) && (!removed(*a) || !removed(*b)))
-            return fail("Replace needs whole selected transition pairs. Partial linked-transition replacement is not supported yet.");
-    }
+    std::vector<juce::String> deleted;
+    for (const auto& clip : result.project.clips)
+        if (touched(clip) && begin <= clip.start && end >= clip.end()) deleted.push_back(clip.id);
+    result.project.clearDeletedTrackTransitions(deleted);
+    const auto prepared=prepareLinkedRangeEdit(result.project,selection,begin,end,false,result.unlinkedTransitions);
+    if(prepared.failed())return fail(prepared.getErrorMessage());
     std::vector<Clip> kept; bool changed = false;
-    for (const auto& c : source.clips)
+    for (const auto& c : result.project.clips)
     {
         if (!touched(c)) { kept.push_back(c); continue; }
         changed = true;
@@ -183,7 +210,9 @@ void Workstation::replaceSelectedAudio(bool commit)
         if (!selection.range) for (const auto& id : selection.clips) if (auto* c = source.clipFor(id)) begin = std::min(begin, c->start);
         auto* dialog = new juce::AlertWindow("Replace selected audio", plan.error.isNotEmpty() ? plan.error
             : "Replace selected audio from " + juce::String(begin - source.tempo.origin, 3) + " to " + juce::String(plan.end - source.tempo.origin, 3)
-                + " s with " + juce::String((int) plan.added.size()) + " copied segments. Shorter copies leave a gap; other audio stays in place. Undo restores the mix.",
+                + " s with " + juce::String((int) plan.added.size()) + " copied segments. Shorter copies leave a gap; other audio stays in place."
+                + (plan.unlinkedTransitions>0 ? " Unlink "+juce::String(plan.unlinkedTransitions)+" affected transitions, keeping their audible curves and outside-bounds cuts on surviving audio." : juce::String())
+                + " Undo restores the mix.",
             juce::MessageBoxIconType::NoIcon, this);
         dialog->addButton("Replace", 1, juce::KeyPress(juce::KeyPress::returnKey));
         dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
@@ -204,7 +233,8 @@ void Workstation::replaceSelectedAudio(bool commit)
     editSelection.clips = plan.added; selectedClip = plan.added.front(); editSelection.primary = selectedClip;
     engine.selectedTrack = engine.project.clipFor(selectedClip)->track;
     selectedTransition.clear(); timeline.selectAutomationPoint({}, -1); refresh();
-    setStatus("Selected audio replaced with independent copies. Clipboard, playhead and other positions kept; one Undo restores the mix.");
+    setStatus((plan.unlinkedTransitions>0 ? juce::String("Affected transition frames unlinked; surviving treatments kept as nodes. ") : juce::String())
+        + "Selected audio replaced with independent copies. Clipboard, playhead and other positions kept; one Undo restores the mix.");
 }
 void Workstation::clearEditSelection()
 {
@@ -228,13 +258,9 @@ void Workstation::refreshEditSelection()
     editingSelectionInfo.setText(text, juce::dontSendNotification);
     editingSelectionInfo.setTooltip(text);
     editingMove.setToggleState(!editingRange.getToggleState(), juce::dontSendNotification);
-    const auto hint = editingPage == 2 ? juce::String("Lane curves affect all tracks on that lane. Track fades have their own owner.")
-        : editingPage == 1 ? juce::String("These settings affect the selected track piece only.")
-        : editingRange.getToggleState() ? juce::String(editingRangeSize.getSelectedId() == 1
-            ? "Click to place the playhead; drag to select freely. S splits. Ctrl+C copies; Ctrl+V pastes."
-            : editingRangeSize.getSelectedId() == 7 ? "Drag the waveform to select on the beat grid. Alt bypasses snapping."
-            : "Click a waveform for the chosen musical length. Choose Free drag for any length.")
-        : juce::String("Drag tracks to move. Shift-drag selects audio. Click the ruler, then Split at playhead (S).");
+    const auto hint=editingPage==2 ? juce::String("Curve on controls playback of this curve. Touch/Latch write moved controls to the playing track on an armed lane.")
+        : editingPage==1 ? juce::String("Exact settings affect the selected placement. Outer edge handles trim audio; transition markers stay independent.")
+        : juce::String("Drag a waveform to highlight audio, then right-click for tools. Drag its title to move; edge bars trim. Alt ignores snapping.");
     editingHint.setText(hint, juce::dontSendNotification); editingHint.setTooltip(hint);
     editingRangeTime.setEnabled(!busy && !engine.exporting && currentClip());
     editingAll.setEnabled(!busy && !engine.exporting && !engine.project.clips.empty());
@@ -313,9 +339,13 @@ bool Timeline::beginEditSelection(const juce::MouseEvent& e)
     const auto& clips = owner.engine.project.clips;
     const auto found = std::find_if(clips.rbegin(), clips.rend(), [&](const auto& c) { return clipBounds(c).contains(e.position); });
     if (found == clips.rend()) return false;
-    // Headers remain move handles. Shift-drag is the temporary range tool on a waveform.
+    // Waveform dragging selects audio; the header moves the placement. Nodes
+    // and visible curve/marker handles retain their direct manipulation.
     const bool waveform = e.position.y >= clipBounds(*found).getY() + 20;
-    const bool rangeTool = waveform && (owner.editingRange.getToggleState() || e.mods.isShiftDown());
+    const bool handle = automationPointAt(e.position).has_value() || automationCurveAt(e.position).has_value()
+        || hotcueAt(e.position).has_value() || sectionFlagAt(e.position).has_value() || cutAmountAt(e.position).has_value()
+        || anchorAt(e.position).has_value() || transitionAt(e.position).has_value() || audioSlipAt(e.position).has_value() || swapHandleAt(e.position).has_value();
+    const bool rangeTool = waveform && !e.mods.isCtrlDown() && !handle;
     if (!rangeTool && (!e.mods.isCtrlDown() || automationPointAt(e.position))) return false;
     const auto id = found->id; const int track = found->track;
     auto& s = owner.editSelection;
@@ -338,7 +368,8 @@ bool Timeline::beginEditSelection(const juce::MouseEvent& e)
     if (!s.contains(id)) { s.clear(); s.clips.push_back(id); }
     owner.selectedClip = id; s.primary = id;
     owner.selectedTransition.clear();
-    const int size = owner.editingRangeSize.getSelectedId();
+    directRangeDrag = owner.editingRangeSize.getSelectedId()==8;
+    const int size = directRangeDrag ? (owner.engine.project.snap ? 7 : 1) : owner.editingRangeSize.getSelectedId();
     const bool snapRange = size != 1 && !e.mods.isAltDown();
     rangeDragAnchor = owner.engine.project.snappedTime(e.position.x / pixelsPerSecond, snapRange);
     owner.selectedAutomationTarget = -1; editingAutomationPoint.reset(); selectedCutAmount.reset();
@@ -356,7 +387,7 @@ bool Timeline::continueEditSelection(const juce::MouseEvent& e)
 {
     if (!rangeDragAnchor) return false;
     moved = moved || e.mouseWasDraggedSinceMouseDown();
-    const int size = owner.editingRangeSize.getSelectedId();
+    const int size = directRangeDrag ? (owner.engine.project.snap ? 7 : 1) : owner.editingRangeSize.getSelectedId();
     if (size == 1 || size == 7)
     {
         const double end = owner.engine.project.snappedTime(std::max(0., e.position.x / pixelsPerSecond), size == 7 && !e.mods.isAltDown());
@@ -551,9 +582,14 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
         if (!c || !c->media || !c->media->hasPlayback() || c->media->sourceDetailsPending || c->pendingPlacement != PendingPlacement::none)
             return refuse("A selected source is unavailable or changed.");
         if (removing && candidate.clipTransitionLocked(id)) return refuse("Unlock the selected transition before deleting its material.");
-        if (removing && selection.range && (selection.range->getStart() > c->start || selection.range->getEnd() < c->end()))
-            for (const auto& link : candidate.transitionLinks) if (link.incoming == id || link.outgoing == id)
-                return refuse("Trimming or deleting part of linked transition material is not supported yet. Select whole segments, or copy the range.");
+    }
+    int unlinked=0;
+    std::vector<juce::String> deleted;
+    if (removing && !cropping) for (const auto& id : selection.clips)
+    {
+        const auto* clip = candidate.clipFor(id);
+        if (!selection.range || (selection.range->getStart() <= clip->start && selection.range->getEnd() >= clip->end()))
+            deleted.push_back(id);
     }
     EditFragment fragment;
     fragment.origin = selection.range ? selection.range->getStart() : std::numeric_limits<double>::max();
@@ -653,6 +689,12 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
     }
     if (removing)
     {
+        candidate.clearDeletedTrackTransitions(deleted);
+        if (selection.range)
+        {
+            const auto prepared = prepareLinkedRangeEdit(candidate,selection,selection.range->getStart(),selection.range->getEnd(),cropping,unlinked);
+            if (prepared.failed()) return refuse(prepared.getErrorMessage());
+        }
         std::vector<Clip> clips;
         std::vector<juce::String> retained;
         bool cropChanged = false;
@@ -713,9 +755,10 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
         selectedTransition.clear(); timeline.selectAutomationPoint({}, -1);
     }
     if (copying) { editClipboard = std::move(fragment); clipClipboard.reset(); pasteEnd = -1; ++editClipboardRevision; }
-    refresh(); setStatus(cropping ? "Selected segments cropped to the range. Other audio, clipboard and playhead kept; one Undo restores the mix."
+    refresh(); setStatus((unlinked>0 ? juce::String("Affected transition frames unlinked; surviving treatments kept as nodes. ") : juce::String())
+        + (cropping ? juce::String("Selected segments cropped to the range. Other audio, clipboard and playhead kept; one Undo restores the mix.")
         : removing ? "Selected audio removed, leaving a gap. Other positions kept; one Undo restores the mix."
-        : "Selected audio copied with independent effects. Paste at the playhead on an empty destination lane/time.");
+        : "Selected audio copied with independent effects. Paste at the playhead on an empty destination lane/time."));
     return true;
 }
 }

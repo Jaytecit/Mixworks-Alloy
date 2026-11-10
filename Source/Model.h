@@ -17,7 +17,7 @@
 namespace mixworks
 {
 constexpr int trackCount = 4;
-constexpr int projectVersion = 47;
+constexpr int projectVersion = 53;
 enum class LaunchTiming { immediate, nextBeat, nextBar, nextPhrase };
 struct LaunchSettings
 {
@@ -183,8 +183,40 @@ const char* automationName(AutomationTarget);
 // Bend belongs to the following segment: -1 brings the change forward, +1
 // holds the first value until the second node. Zero preserves legacy ramps.
 double automationProgress(double fraction, double bend, bool exponential = false);
+// A generated fade keeps its formula, rather than samples of that formula.
+// The optional local clock maps source progress back to the original fade time.
+struct AutomationShape
+{
+    int kind = 0; // 0 gain, 1 power, 2/3 filters, 4 product, 5 authored gain, 6 minimum, 7 step.
+    double strength = 1, bend = 0, upper = 20000, from = 0, to = 1;
+    bool rising = true;
+    TempoMap clock;
+    // Composite terms keep their analytical domains, never sampled interior nodes.
+    double inputBegin = 0, inputEnd = 1, first = 0, last = 0;
+    bool forwardClock = false, gainInterpolation = false, exponential = false, endpointStep = false;
+    std::vector<AutomationShape> terms;
+    double position(double fraction) const;
+    double value(double position) const;
+    double progress(double fraction) const;
+    double interpolate(double fraction, double a, double b) const;
+    AutomationShape sliced(double begin, double end) const;
+    bool valid() const;
+    bool operator==(const AutomationShape&) const;
+    bool operator!=(const AutomationShape& other) const { return !(*this == other); }
+};
+juce::var automationShapeToJson(const AutomationShape&);
+bool readAutomationShape(const juce::var&, std::optional<AutomationShape>&);
 // Exponential spans represent frequency sweeps directly; false retains existing rational bends.
-struct AutomationPoint { double time = 0; float value = 0; double bend = 0; bool exponential = false; bool gainSpace = false; };
+struct AutomationPoint
+{
+    double time = 0;
+    float value = 0;
+    double bend = 0;
+    bool exponential = false;
+    bool gainSpace = false;
+    juce::String presetOwner;
+    std::optional<AutomationShape> shape;
+};
 struct AutomationCurve
 {
     bool enabled = false;
@@ -348,6 +380,8 @@ struct Clip
     bool hotcuesPending = false; // New-instance intent only; never seeded by Open/view/reanalysis.
     int track = 0;
     double start = 0, offset = 0, length = 0, fadeIn = 0, fadeOut = 0;
+    std::optional<double> routingStart; // Trims keep the shared return on its original lane clock.
+    double routeStart() const { return routingStart.value_or(start); }
     double audioSlip = 0; // Timeline seconds of audio-only delay; automation and frame clocks stay fixed.
     // Alignment-only source positions; independent of playback and parameters.
     std::optional<double> introAnchor, outroAnchor;
@@ -414,7 +448,10 @@ struct Project
         TransitionFilterSettings filter;
         std::optional<std::array<double, 2>> frame; // Outgoing source-elapsed start/end, independent of fades.
         bool muteOutside = false;
-        bool operator==(const TransitionLink& other) const { return outgoing == other.outgoing && incoming == other.incoming && bassSwap == other.bassSwap && locked == other.locked && bands == other.bands && alternatives == other.alternatives && filter == other.filter && frame == other.frame && muteOutside == other.muteOutside; }
+        bool movementLocked = false; // This pair moves together; distinct from edit protection.
+        bool alignmentOnly = false;
+        juce::String presetOwner, presetName;
+        bool operator==(const TransitionLink& other) const { return outgoing == other.outgoing && incoming == other.incoming && bassSwap == other.bassSwap && locked == other.locked && bands == other.bands && alternatives == other.alternatives && filter == other.filter && frame == other.frame && muteOutside == other.muteOutside && movementLocked == other.movementLocked && alignmentOnly == other.alignmentOnly && presetOwner == other.presetOwner && presetName == other.presetName; }
     };
     juce::String name = "Untitled session";
     double bpm = 120;
@@ -460,9 +497,9 @@ struct Project
     void ensureTransitionLinks();
     juce::Result validateTransitionLinks() const;
     juce::Result linkClips(const juce::String& outgoing, const juce::String& incoming);
-    juce::Result addTransition(const juce::String& outgoing, const juce::String& incoming, double beats, TransitionPreset);
+    juce::Result addTransition(const juce::String& outgoing, const juce::String& incoming, double beats, TransitionPreset, bool explicitPreset = false);
     juce::Result setTransitionMuteOutside(const juce::String& incoming, bool);
-    void detachTransitionLinks(const juce::String& clipId);
+    void clearDeletedTrackTransitions(const std::vector<juce::String>& clipIds);
     juce::Result unlinkClips(const std::vector<juce::String>& clipIds);
     juce::Result moveClipFollowing(const juce::String& clipId, double start, bool snapping);
     // Global half-open splice. An optional unpaired segment must exactly fill
@@ -475,6 +512,7 @@ struct Project
     juce::Result removeHotcue(const juce::String& clipId, int slot);
     juce::Result seedHotcues(const juce::String& clipId);
     juce::Result setClipAudioSlip(const juce::String& clipId, double seconds);
+    juce::Result trimClip(const juce::String& clipId, double begin, double end);
     juce::Result moveClip(const juce::String& clipId, double start, bool snapping, double magnetSeconds = 0, bool adoptMarkedNeighbours = true);
     juce::Result moveClipGroup(const std::vector<juce::String>& ids, const juce::String& anchor, double start, int track, bool snapping);
     juce::Result applyPlacements(const Project&);
@@ -482,9 +520,11 @@ struct Project
     juce::Result editTransition(const juce::String& incoming, TransitionEdit, double delta, bool snapping);
     const TransitionLink* transitionFor(const juce::String& incoming) const;
     juce::Result setTransitionLength(const juce::String& incoming, double bars);
-    juce::Result applyTransitionPreset(const juce::String& incoming, TransitionPreset);
+    juce::Result applyTransitionPreset(const juce::String& incoming, TransitionPreset, bool explicitPreset = false);
+    juce::Result removeOwnedTransitionPreset(const juce::String& incoming);
+    juce::Result applyNamedTransitionStyle(const juce::String& incoming, const TransitionStyle&, const juce::String& name);
     juce::Result captureTransitionStyle(const juce::String& incoming, TransitionStyle&) const;
-    juce::Result applyTransitionStyle(const juce::String& incoming, const TransitionStyle&);
+    juce::Result applyTransitionStyle(const juce::String& incoming, const TransitionStyle&, const juce::String& presetName = {});
     juce::Result storeTransitionAlternative(const juce::String& incoming, int slot);
     juce::Result putTransitionPreset(const NamedTransitionStyle&);
     juce::Result setTransitionBand(const juce::String& incoming, int band, const TransitionBandSettings&);
@@ -501,6 +541,9 @@ struct Project
     TransitionPlayback transitionPlaybackFor(const Clip&) const;
     void clearTransitionBass(TransitionLink&, bool preservePoints = false);
     juce::Result setTransitionLocked(const juce::String& incoming, bool);
+    juce::Result setTransitionMovementLocked(const juce::String& incoming, bool);
+    juce::Result removeTransition(const juce::String& incoming, bool clearTreatment = false);
+    std::vector<juce::String> movementGroup(const juce::String&) const;
     bool hasLockedTransitions() const;
     bool clipTransitionLocked(const juce::String&) const;
     bool automationLocked(const AutomationAddress&) const;
@@ -529,7 +572,7 @@ MediaResult readMedia(juce::AudioFormatManager&, const juce::File&, const MediaP
 double snapTime(double seconds, double bpm, bool enabled);
 juce::String timeText(double seconds);
 enum class MidiActionKind { play, start, stop, home, master, volume, pan, mute, select, pluginParameter, bass, mid, treble,
-    solo, record, read, arm, previousTrack, nextTrack, previousTransition, nextTransition, undo, redo, snap, panic, armTrack, armMaster, resetEq, cutoff, deskPot, cyclePot, resetCutoff, resetPans };
+    solo, record, read, arm, previousTrack, nextTrack, previousTransition, nextTransition, undo, redo, snap, panic, armTrack, armMaster, resetEq, cutoff, deskPot, cyclePot, resetCutoff, resetPans, timelineCue };
 struct MidiAction
 {
     MidiActionKind kind = MidiActionKind::play;

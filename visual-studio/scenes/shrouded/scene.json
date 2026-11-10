@@ -1,0 +1,18 @@
+{
+  "TITLE": "Shrouded",
+  "PASSES": [
+    {"TARGET":"cells","WIDTH":480,"HEIGHT":270,"FLOAT":true,"FILTER":"mipmap"}
+  ],
+  "CONTROLS": [
+    {"NAME":"cam_look","TYPE":"xy","LABEL":"Cam Look","DEFAULT":[0,0],"MIN":[-1,0],"MAX":[1,1],"UI_GROUP":"Camera","DESCRIPTION":"Look left or right with pitch bend and tilt up with the mod wheel."},
+    {"NAME":"shimmer","TYPE":"bang smooth","LABEL":"Shimmer","MIN":0,"MAX":1,"PARAMS":0.08,"UI_GROUP":"Surface","DESCRIPTION":"Send a bright colour pulse through the membranes."},
+    {"NAME":"shock","TYPE":"bang smooth","LABEL":"Shock","MIN":0,"MAX":1,"PARAMS":0.12,"UI_GROUP":"Surface","DESCRIPTION":"Send a vertical pressure wave through the fluid."},
+    {"NAME":"reset_center","TYPE":"bang smooth","LABEL":"Reset Center","MIN":0,"MAX":1,"PARAMS":0.09,"UI_GROUP":"Surface","DESCRIPTION":"Feed new cells into the centre of the simulation."},
+    {"NAME":"bpm_oscillate","TYPE":"toggle","LABEL":"BPM Oscillate","DEFAULT":0,"MIN":0,"MAX":1,"UI_GROUP":"Motion","DESCRIPTION":"Reverse the flow in time with the beat."},
+    {"NAME":"media_color","TYPE":"toggle","LABEL":"Media Color","DEFAULT":2,"MIN":0,"MAX":2,"UI_GROUP":"Motion","DESCRIPTION":"Change which cell population is fed by the image or video mask."},
+    {"NAME":"tunnel","TYPE":"xy smooth","LABEL":"Tunnel","DEFAULT":[0,0],"MIN":[0,0],"MAX":[1,1],"PARAMS":0.25,"UI_GROUP":"Motion","DESCRIPTION":"Pull the feedback towards the centre independently on each axis."},
+    {"NAME":"pyramid","TYPE":"toggle","LABEL":"Pyramid","DEFAULT":0,"MIN":0,"MAX":1,"UI_GROUP":"Mirrors","DESCRIPTION":"Fold the surface into triangular reflections."},
+    {"NAME":"mirror","TYPE":"toggle","LABEL":"Mirror","DEFAULT":1,"MIN":0,"MAX":1,"UI_GROUP":"Mirrors","DESCRIPTION":"Reflect the fluid across the centre of the view."},
+    {"NAME":"palette","TYPE":"dropdown","LABEL":"Palette","DEFAULT":0,"LABELS":["Ice & Amber","Jade","Copper","Ember","Oil & Flame"],"UI_GROUP":"Colour"}
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "TITLE": "Waxfall",
+  "MEDIA": [{"WRAP": "clamp"}],
+  "PASSES": [
+    {"TARGET": "beatClock", "WIDTH": 1, "HEIGHT": 1},
+    {"TARGET": "moltenWax", "WIDTH": 480, "HEIGHT": 270, "WRAP": "clamp"}
+  ],
+  "CONTROLS": [
+    {"NAME": "melt_depth", "TYPE": "slider", "LABEL": "Melt depth", "DEFAULT": 0.72, "MIN": 0, "MAX": 1, "UI_GROUP": "Melt", "DESCRIPTION": "Sets how far the artwork sags and how much wax a beat sheds."},
+    {"NAME": "gravity", "TYPE": "slider", "LABEL": "Gravity", "DEFAULT": 0.58, "MIN": 0, "MAX": 1, "UI_GROUP": "Melt", "DESCRIPTION": "Changes how quickly the shed pigment falls."},
+    {"NAME": "drip_life", "TYPE": "slider", "LABEL": "Drip life", "DEFAULT": 0.86, "MIN": 0.22, "MAX": 1.8, "UI_GROUP": "Melt", "DESCRIPTION": "Changes how long the falling wax keeps its colour."},
+    {"NAME": "rivulets", "TYPE": "slider", "LABEL": "Rivulets", "DEFAULT": 13, "MIN": 5, "MAX": 26, "UI_GROUP": "Melt", "DESCRIPTION": "Sets the spacing of the channels that draw wax from the artwork."},
+    {"NAME": "warmth", "TYPE": "slider", "LABEL": "Wax warmth", "DEFAULT": 0.27, "MIN": 0, "MAX": 1, "UI_GROUP": "Finish", "DESCRIPTION": "Blends amber into the pigment sampled from the artwork."},
+    {"NAME": "backdrop", "TYPE": "slider", "LABEL": "Backdrop", "DEFAULT": 0.86, "MIN": 0, "MAX": 1, "UI_GROUP": "Finish", "DESCRIPTION": "Sets the strength of the surrounding molten currents."},
+    {"NAME": "demo_stamp", "TYPE": "toggle", "LABEL": "Demo stamp", "DEFAULT": 1, "MIN": 0, "MAX": 1, "UI_GROUP": "Finish", "DESCRIPTION": "Show a built-in wax stamp when no Nested artwork is active."}
+  ]
+}

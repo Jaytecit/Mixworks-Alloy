@@ -60,8 +60,8 @@ GridCorrectionEditor::GridCorrectionEditor(Engine& e, std::shared_ptr<const Medi
     bpmLabel.setText("BPM", juce::dontSendNotification);
     phaseLabel.setText("A / beat one (source seconds)", juce::dontSendNotification);
     keyLabel.setText("Key", juce::dontSendNotification);
-    bpm.setText(draft.bpm > 0 ? juce::String(draft.bpm, 17) : juce::String(), false);
-    bpm.setTextToShowWhenEmpty(source->analysis.bpm > 0 ? "Detected: " + juce::String(source->analysis.bpm, 2) : "Tap or enter BPM", colour::muted);
+    setDraftBpm(draft.bpm);
+    bpm.setTextToShowWhenEmpty(source->analysis.bpm > 0 ? "Detected: " + preciseBpmText(source->analysis.bpm) : "Tap or enter BPM", colour::muted);
     phase.setText(draft.downbeat >= 0 ? juce::String(draft.downbeat, 17) : juce::String(), false);
     bpm.setName("BPM override"); phase.setName("Downbeat anchor in source seconds");
     key.addItem("Automatic key", 1); for (int i = 0; i < 24; ++i) key.addItem(keyNoteName(i) + " / " + keyCamelot(i), i + 2);
@@ -141,12 +141,20 @@ GridCorrectionEditor::GridCorrectionEditor(Engine& e, std::shared_ptr<const Medi
     faster.setTooltip("Increase source BPM by 0.01 to fine tune steady timing drift. The downbeat anchor stays fixed until saved. You can also type an exact BPM.");
     slower.onClick = [this] { adjustTempo(-0.01); }; faster.onClick = [this] { adjustTempo(0.01); };
     cancel.setTooltip("Close source-grid review without applying the draft corrections.");
-    bpm.onTextChange = [this] { calculated = false; changed(); };
+    bpm.onTextChange = [this] { exactBpm = 0; calculated = false; changed(); };
+    bpm.onFocusLost = [this]
+    {
+        if (readDraft().wasOk())
+        {
+            setDraftBpm(draft.bpm);
+            lastGrid = gridEdit();
+        }
+    };
     phase.onTextChange = key.onChange = click.onClick = sourceAudio.onClick = level.onValueChange = [this] { changed(); };
     half.onClick = [this] { changeRate(0.5); }; twice.onClick = [this] { changeRate(2); };
     tap.onClick = [this]
     {
-        if (auto value = taps.tap(juce::Time::getMillisecondCounterHiRes() / 1000)) { calculated = false; bpm.setText(juce::String(*value, 4), false); changed(); }
+        if (auto value = taps.tap(juce::Time::getMillisecondCounterHiRes() / 1000)) { calculated = false; setDraftBpm(*value); changed(); }
         else status.setText("Tap three or more steady beats.", juce::dontSendNotification);
     };
     resetTap.onClick = [this] { taps.reset(); status.setText("Tap tempo reset.", juce::dontSendNotification); };
@@ -155,7 +163,7 @@ GridCorrectionEditor::GridCorrectionEditor(Engine& e, std::shared_ptr<const Medi
     earlier.onClick = [this] { nudge(-precisionSeconds()); }; later.onClick = [this] { nudge(precisionSeconds()); };
     earlier.setTooltip("Move the whole grid earlier by the selected 1 ms or 10 ms step. BPM stays fixed.");
     later.setTooltip("Move the whole grid later by the selected 1 ms or 10 ms step. BPM stays fixed.");
-    automatic.onClick = [this] { calculated = false; bpm.setText({}, false); phase.setText({}, false); taps.reset(); changed(); };
+    automatic.onClick = [this] { calculated = false; setDraftBpm(0); phase.setText({}, false); taps.reset(); changed(); };
     beginning.onClick = [this] { setCursor(0); }; middle.onClick = [this] { setCursor(source->duration() * 0.5); };
     end.onClick = [this] { setCursor(std::max(0.0, source->duration() - 12)); };
     quiet.onClick = [this]
@@ -221,9 +229,19 @@ void GridCorrectionEditor::shiftBar(int beats)
     phase.setText(juce::String(anchor, 8), false); changed();
 }
 GridCorrectionEditor::~GridCorrectionEditor() { closePreview(); }
+void GridCorrectionEditor::setDraftBpm(double value)
+{
+    exactBpm = value;
+    bpm.setText(value > 0 ? preciseBpmText(value) : juce::String(), false);
+}
+
 juce::Result GridCorrectionEditor::readDraft()
 {
-    return SourceCorrection::parse(bpm.getText(), phase.getText(), key.getSelectedId() - 2, source->duration(), draft);
+    const auto text = bpm.getText();
+    // Opening the editor, measuring the grid or editing another field must
+    // not replace the source tempo with the rounded text shown to the user.
+    const auto input = exactBpm > 0 && text == preciseBpmText(exactBpm) ? juce::String(exactBpm, 17) : text;
+    return SourceCorrection::parse(input, phase.getText(), key.getSelectedId() - 2, source->duration(), draft);
 }
 void GridCorrectionEditor::commit(bool rebuildTimeline)
 {
@@ -251,7 +269,7 @@ void GridCorrectionEditor::changed()
     applyNotice.setText(!inTimeline ? "Save keeps this track's correction for future use. Add the track to a mix to enable rebuilding."
         : engine.project.hasLockedTransitions() ? "Save keeps the current mix unchanged. Unlock transitions before rebuilding the mix."
         : "Save keeps the current mix unchanged. Save + rebuild uses the correction now, but can move tracks and transitions.", juce::dontSendNotification);
-    effectiveTempo.setText(validDraft ? juce::String(draft.grid(*source).bpm, 4) + " BPM" + (calculated ? "  /  measured" : draft.bpm > 0 ? "  /  manual" : "  /  detected") : "Correct the invalid fields before saving.", juce::dontSendNotification);
+    effectiveTempo.setText(validDraft ? preciseBpmText(draft.grid(*source).bpm) + " BPM" + (calculated ? "  /  measured" : draft.bpm > 0 ? "  /  manual" : "  /  detected") : "Correct the invalid fields before saving.", juce::dontSendNotification);
     if (!validDraft) { engine.gridAudition.stop(); status.setText(result.getErrorMessage(), juce::dontSendNotification); }
     else
     {
@@ -275,11 +293,12 @@ void GridCorrectionEditor::changed()
 }
 GridCorrectionEditor::GridEdit GridCorrectionEditor::gridEdit() const
 {
-    return {bpm.getText(), phase.getText(), (int) bars.getValue(), calculated, points,
+    return {bpm.getText(), phase.getText(), exactBpm, (int) bars.getValue(), calculated, points,
         (int) barsAB.getValue(), (int) barsBC.getValue(), countsConfirmed.getToggleState()};
 }
 void GridCorrectionEditor::restoreGrid(const GridEdit& edit)
 {
+    exactBpm = edit.exactBpm;
     bpm.setText(edit.bpm, false); phase.setText(edit.phase, false); bars.setValue(edit.bars, juce::dontSendNotification);
     points = edit.points; barsAB.setValue(edit.barsAB, juce::dontSendNotification); barsBC.setValue(edit.barsBC, juce::dontSendNotification);
     countsConfirmed.setToggleState(edit.confirmed, juce::dontSendNotification);
@@ -313,7 +332,7 @@ void GridCorrectionEditor::measurePoints()
     {
         const double measured = barsAB.getValue() * 240.0 / (points[1] - points[0]);
         if (std::isfinite(measured) && measured >= 20 && measured <= 400)
-        { bpm.setText(juce::String(measured, 8), false); calculated = true; }
+        { setDraftBpm(measured); calculated = true; }
         else calculated = false;
     }
     else calculated = false;
@@ -344,12 +363,12 @@ void GridCorrectionEditor::updateSimpleControls()
     {
         const double ab = barsAB.getValue() * 240.0 / (points[1] - points[0]);
         if (ab < 20 || ab > 400) result = "A to B gives a tempo outside 20-400 BPM. Check the marks and complete bar count.";
-        else if (points[2] < 0) result = "A to B: " + juce::String(ab, 4) + " BPM / suggested count. Set a still later C to check it.";
+        else if (points[2] < 0) result = "A to B: " + preciseBpmText(ab) + " BPM / suggested count. Set a still later C to check it.";
         else
         {
             const double bc = barsBC.getValue() * 240.0 / (points[2] - points[1]);
             const double error = points[2] - points[1] - barsBC.getValue() * 240.0 / ab;
-            result = "A-B: " + juce::String(ab, 4) + " / B-C: " + juce::String(bc, 4) + " BPM. C is "
+            result = "A-B: " + preciseBpmText(ab) + " / B-C: " + preciseBpmText(bc) + " BPM. C is "
                 + juce::String(std::abs(error) * 1000, 1) + " ms " + (error >= 0 ? "after" : "before") + " the grid. ";
             const bool gridMatches = validDraft && std::abs(draft.bpm - ab) < 1.e-6 && std::abs(draft.downbeat - points[0]) < 1.e-6;
             result += !gridMatches ? "Grid changed in other tools: Set B again to remeasure."
@@ -412,7 +431,7 @@ bool GridCorrectionEditor::alignSecond(double at)
         status.setText("Keep B after A, inside the source, with BPM between 20 and 400. Check the bars A to B count.", juce::dontSendNotification);
         return false;
     }
-    bpm.setText(juce::String(value, 4), false); calculated = true; selectedHandle = 2;
+    setDraftBpm(value); calculated = true; selectedHandle = 2;
     spacing.setToggleState(true, juce::dontSendNotification); changed(); return true;
 }
 void GridCorrectionEditor::changeBars()
@@ -524,14 +543,14 @@ void GridCorrectionEditor::changeRate(double factor)
     if (readDraft().failed()) return;
     const double value = draft.grid(*source).bpm * factor;
     if (value < 20 || value > 400) { status.setText("The corrected BPM must remain between 20 and 400.", juce::dontSendNotification); return; }
-    calculated = false; bpm.setText(juce::String(value, 4), false); changed();
+    calculated = false; setDraftBpm(value); changed();
 }
 void GridCorrectionEditor::adjustTempo(double delta)
 {
     if (readDraft().failed()) return;
     const double value = draft.grid(*source).bpm + delta;
     if (value < 20 || value > 400) { status.setText("Source BPM must remain between 20 and 400.", juce::dontSendNotification); return; }
-    calculated = false; bpm.setText(juce::String(value, 4), false); changed();
+    calculated = false; setDraftBpm(value); changed();
 }
 void GridCorrectionEditor::nudge(double seconds)
 {
@@ -828,7 +847,7 @@ void GridCorrectionEditor::resized()
 }
 GridCorrectionWindow::GridCorrectionWindow(GridCorrectionEditor* editor) : AlloyPopupWindow("Source beat grid / corrections", colour::background, true)
 {
-    setUsingNativeTitleBar(true); setContentOwned(editor, true); setResizable(false, false);
+    setUsingNativeTitleBar(false); setContentOwned(editor, true); setResizable(false, false);
     centreWithSize(editor->getWidth(), editor->getHeight());
 }
 void GridCorrectionWindow::closeButtonPressed()

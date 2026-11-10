@@ -1,0 +1,88 @@
+--- a/src/api/include/projectM-4/render_opengl.h
++++ b/src/api/include/projectM-4/render_opengl.h
+@@ -41,6 +41,14 @@
+  */
+ PROJECTM_EXPORT void projectm_opengl_render_frame(projectm_handle instance);
+ 
++/** Draw into the bound Milkdrop feedback buffer before the preset warps it.
++ * The callback runs synchronously on the render thread, with the viewport set.
++ * It must preserve the bound framebuffer and leave blending disabled.
++ */
++typedef void (*projectm_feedback_input)(void* user_data);
++PROJECTM_EXPORT void projectm_opengl_render_frame_with_feedback(
++    projectm_handle instance, projectm_feedback_input input, void* user_data);
++
+ #ifdef __cplusplus
+ } // extern "C"
+ #endif
+--- a/src/libprojectM/Renderer/RenderContext.hpp
++++ b/src/libprojectM/Renderer/RenderContext.hpp
+@@ -29,6 +29,9 @@
+     int perPixelMeshX{64}; //!< Per-pixel/per-vertex mesh X resolution.
+     int perPixelMeshY{48}; //!< Per-pixel/per-vertex mesh Y resolution.
+ 
++    void (*feedbackInput)(void*){nullptr};
++    void* feedbackUserData{nullptr};
++
+     TextureManager* textureManager{nullptr}; //!< Holds all loaded textures for shader access.
+ };
+ 
+--- a/src/libprojectM/ProjectM.hpp
++++ b/src/libprojectM/ProjectM.hpp
+@@ -101,7 +101,7 @@
+ 
+     void ResetTextures();
+ 
+-    void RenderFrame();
++    void RenderFrame(void (*feedbackInput)(void*) = nullptr, void* feedbackUserData = nullptr);
+ 
+     void SetBeatSensitivity(float sensitivity);
+ 
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -90,7 +90,7 @@
+     m_textureManager = std::make_unique<Renderer::TextureManager>(m_textureSearchPaths);
+ }
+ 
+-void ProjectM::RenderFrame()
++void ProjectM::RenderFrame(void (*feedbackInput)(void*), void* feedbackUserData)
+ {
+     // Don't render if window area is zero.
+     if (m_windowWidth == 0 || m_windowHeight == 0)
+@@ -147,6 +147,8 @@
+     }
+ 
+     auto renderContext = GetRenderContext();
++    renderContext.feedbackInput = feedbackInput;
++    renderContext.feedbackUserData = feedbackUserData;
+ 
+     if (m_transition != nullptr && m_transitioningPreset != nullptr)
+     {
+--- a/src/libprojectM/ProjectMCWrapper.cpp
++++ b/src/libprojectM/ProjectMCWrapper.cpp
+@@ -171,6 +171,11 @@
+     projectMInstance->RenderFrame();
+ }
+ 
++void projectm_opengl_render_frame_with_feedback(projectm_handle instance, projectm_feedback_input input, void* user_data)
++{
++    handle_to_instance(instance)->RenderFrame(input, user_data);
++}
++
+ void projectm_set_beat_sensitivity(projectm_handle instance, float sensitivity)
+ {
+     auto projectMInstance = handle_to_instance(instance);
+--- a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+@@ -102,6 +102,11 @@
+         m_motionVectors.Draw(m_perFrameContext, m_motionVectorUVMap->Texture());
+     }
+ 
++    if (renderContext.feedbackInput)
++    {
++        renderContext.feedbackInput(renderContext.feedbackUserData);
++    }
++
+     // y-flip the previous frame and assign the flipped texture as "main"
+     m_flipTexture.Draw(m_framebuffer.GetColorAttachmentTexture(m_previousFrameBuffer, 0), nullptr, true, false);
+     m_state.mainTexture = m_flipTexture.Texture();

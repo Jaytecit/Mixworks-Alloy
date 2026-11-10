@@ -115,7 +115,7 @@ void runTransitionCutTests(const std::function<void(bool, const juce::String&)>&
     check(zero.editTransition(id, Project::TransitionEdit::resizeEnd, first - firstEnd, false).wasOk()
         && zero.transitionPlaybackFor(zero.clips[0]).endCut == first && zero.transitionPlaybackFor(zero.clips[1]).audibleAt(first),
           "a zero-width transition makes an exact outgoing-to-incoming cut");
-    auto detached = base; detached.detachTransitionLinks(id);
+    auto detached = base; detached.clearDeletedTrackTransitions({id});
     check(detached.transitionLinks.empty() && !detached.transitionPlaybackFor(detached.clips[1]).startCut && !detached.transitionPlaybackFor(detached.clips[0]).endCut,
           "unlinked clips regain their original source/fade playback boundaries");
     {

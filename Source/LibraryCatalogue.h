@@ -8,4 +8,7 @@ juce::File libraryCatalogueFile();
 CatalogueResult readLibraryCatalogue(const juce::File&);
 // Additive union under an interprocess lock; refuses unidentified/newer/malformed data.
 juce::String rememberLibraryCatalogue(const juce::File&, const juce::Array<juce::File>&, const std::vector<std::shared_ptr<Media>>& snapshots = {});
+juce::File libraryStoreFile(const juce::File& legacyFile);
+CatalogueResult openLibraryStore(const juce::File& legacyFile);
+juce::String saveLibraryStore(const juce::File& legacyFile, const std::vector<std::shared_ptr<Media>>& changes);
 }

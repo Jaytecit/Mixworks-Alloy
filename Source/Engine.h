@@ -185,7 +185,9 @@ public:
     std::atomic<bool> masterClipped { false };
     SpectrumFeed spectrum;
     std::atomic<juce::uint64> visualClockRevision {0}; // Seek/reset identity, independent of playback frame cadence.
-    SpectrumFeed visualSpectrum; // Independent SPSC feed; renderer never consumes the master analyser feed.
+    SpectrumFeed visualSpectrum {true}; // Independent stamped SPSC feed for visual audio.
+    SpectrumFeed studioSpectrum; // Optional feed for the standalone Visual Studio.
+    std::atomic<juce::uint64> studioTempo {0}; // One clock snapshot for the Studio publisher.
     std::atomic<bool> monitorMuted { false }; // Device output only; project renders and exports remain audible.
     std::atomic<float> privatePreviewGain {.5f};
     void prepareRender(double rate,int size);
@@ -196,6 +198,9 @@ public:
     AutomationAddress deskPotAddress(int slot) const;
     void cycleDeskLane(int slot);
     std::function<void(bool)> onControl;
+    std::function<void(const juce::String&)> onSeekStatus;
+    std::atomic<bool> seekPending {false};
+    juce::String seekError; // Message-thread result of the latest request; never saved.
     std::function<void()> onMidiChanged;
     std::function<void(MidiAction)> onPerformanceAction;
     std::function<void()> onProjectSwitchBegin; // Before an admitted Snap/mute/solo edit, on the message thread.
@@ -241,8 +246,26 @@ public:
     MidiConnectionStatus midiConnectionStatus();
     juce::Result correctSource(const std::shared_ptr<Media>&, const SourceCorrection&);
     void stop();
-    void seek(double seconds);
-    void resetPlugins();
+    class PreparedSeek
+    {
+        friend class Engine;
+        std::vector<Clip> clips;
+        ElasticRenderer renderer;
+        const Engine* owner = nullptr;
+        double seconds = 0, rate = 0;
+        int frames = 0;
+        uint64_t request = 0, revision = 0;
+        bool running = false;
+        juce::String error;
+    public:
+        uint64_t windowsRendered() const { return renderer.windowsRendered(); }
+    };
+    PreparedSeek prepareSeek(double seconds); // Snapshot, then read/decode/stretch without holding lock.
+    juce::Result commitSeek(PreparedSeek); // Revalidate and swap; displaced streams retire after unlocking.
+    juce::Result queueSeek(double seconds); // One worker; newer requests supersede pending destinations.
+    juce::Result seek(double seconds);
+    void resetPlugins(bool resetElastic = true);
+    uint64_t elasticWindowsRendered() const { return elasticRenderer.windowsRendered(); } // Locked diagnostic reader.
     void prepareClipProcessing();
     juce::String addPlugin(int track, const juce::File&);
     juce::String instantiate(const juce::PluginDescription&, std::unique_ptr<PluginSlot>&);
@@ -302,6 +325,10 @@ public:
     void audioDeviceStopped() override;
     void audioDeviceIOCallbackWithContext(const float* const*, int, float* const*, int, int, const juce::AudioIODeviceCallbackContext&) override;
 private:
+    class SeekWorker;
+    std::unique_ptr<SeekWorker> seekWorker;
+    PreparedSeek snapshotSeek(double seconds);
+    static void warmSeek(PreparedSeek&, const std::function<bool()>& cancelled = {});
     struct ProcessorCapture final : juce::AudioProcessorListener
     {
         juce::AudioProcessor& processor; std::atomic<bool> changed {false};
@@ -374,6 +401,7 @@ private:
     juce::MidiBuffer liveClipMidi;
     // Device transport owns elapsed integer frames; position remains the public seconds view.
     bool deviceClockValid = false;
+    uint64_t seekRequest = 0;
     ScheduledPauseStatus pauseStatus;
     TempoMap pauseGrid;
     LaunchSettings pauseSettings;

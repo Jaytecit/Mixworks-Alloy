@@ -146,6 +146,7 @@ void Workstation::insertTimelineMedia(const std::vector<std::shared_ptr<Media>>&
         const juce::ScopedLock guard(engine.lock);
         engine.project.ensureTransitionLinks();
         double time = placement ? placement->time : first > 0 ? engine.project.clips.back().end() : 0;
+        const auto preset = selectedTransitionPreset();
         juce::String predecessor; bool pendingOrder = false;
         for (const auto& media : loaded)
         {
@@ -153,6 +154,7 @@ void Workstation::insertTimelineMedia(const std::vector<std::shared_ptr<Media>>&
             if (found == engine.library.end()) engine.library.push_back(media); else *found = media;
             Clip clip; clip.media = media; clip.length = media->duration() > 0 ? media->duration() : 8; clip.start = time;
             clip.pendingPlacement = placement ? PendingPlacement::drop : PendingPlacement::append;
+            clip.pendingTransitionPreset = preset;
             clip.hotcuesPending = true;
             clip.awaitingSourceLength = media->sourceDetailsPending;
             if (pendingOrder) clip.pendingPredecessor = predecessor;
@@ -162,7 +164,7 @@ void Workstation::insertTimelineMedia(const std::vector<std::shared_ptr<Media>>&
             time = clip.end(); selectedClip = clip.id; engine.project.clips.push_back(std::move(clip));
         }
     }
-    markCatalogueChanged(); selectTrack(engine.project.clips.back().track); refresh();
+    selectTrack(engine.project.clips.back().track); refresh();
     setStatus("Track added. Preparing independent audio and beat alignment...");
 }
 
@@ -193,7 +195,8 @@ void Workstation::prepareTimelineAudio(const std::shared_ptr<Media>& source)
                 if (sameSource || source->sessionMetadataPending) { media->name = source->name; media->manualBpm = source->manualBpm; media->manualBeatOrigin = source->manualBeatOrigin; media->manualKey = source->manualKey; }
                 if (safe->selectedLibraryId == source->id) safe->selectedLibraryId = media->id;
                 const juce::ScopedLock guard(safe->engine.lock);
-                for (auto& item : safe->engine.library) if (item == source) item = media;
+                for (auto& item : safe->engine.library)
+                    if (item == source) { item = media; safe->markCatalogueChanged(media); }
                 auto replace = [&](Project& project)
                 {
                     std::map<juce::String, std::pair<double, double>> ends;
@@ -209,7 +212,6 @@ void Workstation::prepareTimelineAudio(const std::shared_ptr<Media>& source)
                 };
                 replace(safe->engine.project); for (auto& project : safe->undoHistory) replace(project); for (auto& project : safe->redoHistory) replace(project);
                 if (safe->tempoEditBaseline) replace(*safe->tempoEditBaseline);
-                safe->markCatalogueChanged();
             }
             else { const juce::ScopedLock guard(safe->engine.lock); source->playbackError = result.error; }
             safe->refresh(); safe->finishTimelineAudio();

@@ -46,7 +46,7 @@ juce::Result Project::captureTransitionStyle(const juce::String& incoming, Trans
         style.bassPositions.emplace();
         for (size_t side = 0; side < 2; ++side)
         {
-            const auto* clip = side == 0 ? out : in; const auto& curve = clip->controls.automation[1]; style.bassEnabled[side] = curve.enabled;
+            const auto* clip = side == 0 ? out : in; const auto& curve = effectSettings(*clip).automation[1]; style.bassEnabled[side] = curve.enabled;
             for (size_t end = 0; end < 2; ++end)
             {
                 const auto i = side * 2 + end; const double source = (*link->bassSwap)[i];
@@ -63,10 +63,41 @@ juce::Result Project::captureTransitionStyle(const juce::String& incoming, Trans
     const auto checked = style.validate(); if (checked.failed()) return checked;
     result = style; return juce::Result::ok();
 }
-juce::Result Project::applyTransitionStyle(const juce::String& incoming, const TransitionStyle& style)
+juce::Result Project::applyNamedTransitionStyle(const juce::String& incoming, const TransitionStyle& style, const juce::String& name)
+{
+    const auto* link = transitionFor(incoming);
+    if (!link || hasPendingPlacement()) return juce::Result::fail("Select a ready transition first.");
+    if (clipTransitionLocked(link->outgoing) || clipTransitionLocked(incoming))
+        return juce::Result::fail("Unlock both tracks before applying a preset.");
+    const auto* out = clipFor(link->outgoing);
+    const auto* in = clipFor(incoming);
+    if (!out || !in || !out->media || !in->media) return juce::Result::fail("Select two ready tracks first.");
+    const auto range = transitionRange(*link);
+    const double join = out->start + out->transitionTime(false);
+    const double inMarker = in->start + in->transitionTime(true);
+    const double begin = std::max(join,std::max(out->start,in->start));
+    const double end = std::min({out->end(),in->end(),begin + range.getLength()});
+    if (std::abs(join-inMarker) > 1.e-7 || begin-join > 1.e-7 || end-begin <= 1.e-6)
+        return juce::Result::fail("Align OUT and IN inside the shared audio and leave room after the join for the preset.");
+    Project candidate = *this;
+    if (link->presetOwner.isNotEmpty())
+    {
+        const auto removed = candidate.removeOwnedTransitionPreset(incoming);
+        if (removed.failed()) return removed;
+    }
+    auto& edited = candidate.transitionLinks[(size_t)(link-transitionLinks.data())];
+    edited.frame = std::array<double,2>{out->sourceElapsed(begin-out->start),out->sourceElapsed(end-out->start)};
+    const auto applied = candidate.applyTransitionStyle(incoming,style,name);
+    if (applied.failed()) return applied;
+    const auto locked = validateTransitionLocks(candidate); if (locked.failed()) return locked;
+    *this = std::move(candidate);
+    return juce::Result::ok();
+}
+juce::Result Project::applyTransitionStyle(const juce::String& incoming, const TransitionStyle& style, const juce::String& presetName)
 {
     auto valid = style.validate(); if (valid.failed()) return valid;
-    if (style.nodes) return applyPresetNodes(*this,incoming,*style.nodes);
+    if (style.nodes) return presetName.isEmpty() ? applyPresetNodes(*this,incoming,*style.nodes)
+        : applyOwnedPresetNodes(*this,incoming,*style.nodes,presetName);
     valid = validateTransitionLinks(); if (valid.failed()) return valid;
     const auto* current = transitionFor(incoming); if (!current || hasPendingPlacement()) return juce::Result::fail("Select a ready transition first.");
     if (clipTransitionLocked(current->outgoing) || clipTransitionLocked(incoming)) return juce::Result::fail("Unlock transitions on both participating tracks before applying a treatment.");
@@ -76,7 +107,7 @@ juce::Result Project::applyTransitionStyle(const juce::String& incoming, const T
     if (range.getLength() <= 1e-6 || range.getStart() < std::max(out->start, in->start) - 1e-7 || range.getEnd() > std::min(out->end(), in->end()) + 1e-7)
         return juce::Result::fail("Keep the transition inside both songs before applying a treatment.");
     // Reapplying an identical treatment must leave surrounding/manual data exact.
-    TransitionStyle existing; if (captureTransitionStyle(incoming, existing).wasOk() && existing == style) return juce::Result::ok();
+    TransitionStyle existing; if (presetName.isEmpty() && captureTransitionStyle(incoming, existing).wasOk() && existing == style) return juce::Result::ok();
     // Compile an isolated template, then replace only the selected frame in
     // the original project. Existing ordinary nodes are not generator input.
     candidate.transitionLinks.erase(std::remove_if(candidate.transitionLinks.begin(),candidate.transitionLinks.end(),
@@ -84,7 +115,14 @@ juce::Result Project::applyTransitionStyle(const juce::String& incoming, const T
     auto& templateLink = candidate.transitionLinks.front();
     templateLink.locked = false; templateLink.bassSwap.reset(); templateLink.bands = style.bands; templateLink.filter = style.filter;
     out = candidate.clipFor(current->outgoing); in = candidate.clipFor(incoming);
-    for (auto* clip : {out,in}) { clip->controls.automation = {}; clip->fadeIn = clip->fadeOut = 0; }
+    for (auto* clip : {out,in})
+    {
+        // Active source curves live in effectControls after the first edit or
+        // load. Clearing only Clip.controls leaves the previous treatment in
+        // this private compiler and multiplies it into the replacement.
+        candidate.effectSettings(*clip).automation = {}; clip->controls.automation = {};
+        clip->fadeIn = clip->fadeOut = 0;
+    }
     const auto time = [&](double fraction) { return range.getStart() + range.getLength() * fraction; };
     in->fadeInAnchor = in->sourceElapsed(time(style.volume[0]) - in->start); in->fadeIn = time(style.volume[1]) - time(style.volume[0]);
     out->fadeOutAnchor = out->sourceElapsed(time(style.volume[2]) - out->start); out->fadeOut = range.getEnd() - time(style.volume[2]);
@@ -93,7 +131,7 @@ juce::Result Project::applyTransitionStyle(const juce::String& incoming, const T
         std::array<double, 4> sources;
         for (size_t side = 0; side < 2; ++side)
         {
-            auto* clip = side == 0 ? out : in; auto& curve = clip->controls.automation[1];
+            auto* clip = side == 0 ? out : in; auto& curve = candidate.effectSettings(*clip).automation[1];
             for (size_t end = 0; end < 2; ++end) sources[side * 2 + end] = clip->sourceElapsed(time((*style.bassPositions)[side * 2 + end]) - clip->start);
             const double first = sources[side * 2], last = sources[side * 2 + 1];
             if (std::any_of(curve.points.begin(), curve.points.end(), [&](const auto& point) { return point.time >= first - 1e-7 && point.time <= last + 1e-7; }))
@@ -107,7 +145,7 @@ juce::Result Project::applyTransitionStyle(const juce::String& incoming, const T
     }
     valid = materialisePresetNodes(candidate,incoming); if (valid.failed()) return valid;
     TransitionStyle::Nodes nodes; valid = capturePresetNodes(candidate,incoming,nodes); if (valid.failed()) return valid;
-    return applyPresetNodes(*this,incoming,nodes);
+    return presetName.isEmpty() ? applyPresetNodes(*this,incoming,nodes) : applyOwnedPresetNodes(*this,incoming,nodes,presetName);
 }
 juce::Result Project::storeTransitionAlternative(const juce::String& incoming, int slot)
 {
@@ -179,7 +217,7 @@ juce::Result readNamedTransitionStyles(const juce::var& data, std::vector<NamedT
 juce::Result writeTransitionPreset(const juce::File& file, const NamedTransitionStyle& preset)
 {
     Project checked; const auto valid = checked.putTransitionPreset(preset); if (valid.failed()) return valid;
-    auto* root = new juce::DynamicObject(); root->setProperty("format", "alloy-transition-preset"); root->setProperty("version", 5); root->setProperty("presets", namedTransitionStylesToJson({preset}));
+    auto* root = new juce::DynamicObject(); root->setProperty("format", "alloy-transition-preset"); root->setProperty("version", 7); root->setProperty("presets", namedTransitionStylesToJson({preset}));
     const auto text = juce::JSON::toString(juce::var(root), juce::JSON::FormatOptions().withMaxDecimalPlaces(17));
     juce::TemporaryFile temp(file); if (!temp.getFile().replaceWithText(text)) return juce::Result::fail("Cannot write transition preset.");
     if (file.existsAsFile() && !file.copyFileTo(file.getSiblingFile(file.getFileName() + ".bak").getNonexistentSibling())) return juce::Result::fail("Cannot back up the existing preset.");
@@ -190,7 +228,7 @@ juce::Result readTransitionPreset(const juce::File& file, NamedTransitionStyle& 
     // Input expansion is bounded before parsing a standalone preset file.
     if (!file.existsAsFile() || file.getSize() > 1024 * 1024) return juce::Result::fail("Preset is missing or exceeds the 1 MiB input budget.");
     const auto data = juce::JSON::parse(file);
-    if (!data.isObject() || data["format"].toString() != "alloy-transition-preset" || !data["version"].isInt() || ((int) data["version"] < 1 || (int) data["version"] > 5)) return juce::Result::fail("Unsupported transition preset file.");
+    if (!data.isObject() || data["format"].toString() != "alloy-transition-preset" || !data["version"].isInt() || ((int) data["version"] < 1 || (int) data["version"] > 7)) return juce::Result::fail("Unsupported transition preset file.");
     std::vector<NamedTransitionStyle> presets; const auto valid = readNamedTransitionStyles(data["presets"], presets); if (valid.failed()) return valid;
     if (presets.size() != 1) return juce::Result::fail("A portable preset must contain one named treatment.");
     result = presets.front(); return juce::Result::ok();

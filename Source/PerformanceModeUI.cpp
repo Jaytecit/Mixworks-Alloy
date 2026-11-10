@@ -77,8 +77,17 @@ void Workstation::initialiseWorkModes()
     engine.setWorkMode(layout.workMode==1 ? WorkMode::recordPerform : WorkMode::arrange);
     libraryPreview.setPrivateOutput(engine.workMode==WorkMode::recordPerform);
     libraryPreview.restoreOutputPreference({layout.privateDeviceType,layout.privateDeviceName,layout.privateFirstChannel}); libraryPreview.setLevel(layout.privateLevel);
-    engine.onPerformanceBegin=[this] { remember(); };
-    engine.onPerformanceFinalised=[this] { editors.clear(); dirty=true; setStatus("Performance take finalised. Save retains it; Takes / preview offers audition, event editing and WAV export."); };
+    engine.onPerformanceBegin=[this]
+    {
+        // Starting a take does not change the selected audio. Preserve the pair
+        // the user chose for a live transition instead of dropping its scope.
+        const auto selection=editSelection; remember(); editSelection=selection;
+        getProperties().set("liveUndoBase",(int)undoHistory.size());
+    };
+    engine.onPerformanceFinalised=[this] {
+        const auto base=(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",(int)undoHistory.size()));
+        if(undoHistory.size()>base)undoHistory.resize(base); redoHistory.clear(); getProperties().remove("liveUndoBase");
+        editors.clear(); dirty=true; setStatus("Performance take finalised. Save retains it; Takes / preview offers audition, event editing and WAV export."); };
     workModeButton.setButtonText(engine.workMode==WorkMode::arrange ? "Arrange" : "Record/Perform");
     workModeButton.onClick=[this]
     {
@@ -144,7 +153,8 @@ void Workstation::showTakeMenu()
         {
             if (safe->engine.playing || safe->engine.capturingPerformance()) return;
             if (safe->engine.recordMasterWav) { safe->engine.recordMasterWav=false; safe->setStatus("Master WAV off. Editable performance capture remains enabled."); return; }
-            safe->chooser=std::make_unique<juce::FileChooser>("New live master WAV (existing files are kept)",juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Performance.wav"),"*.wav",false);
+            const auto initial = safe->defaultSaveLocation("Performance.wav"); if (initial == juce::File()) return;
+            safe->chooser=std::make_unique<juce::FileChooser>("New live master WAV (existing files are kept)",initial,"*.wav",false);
             safe->chooser->launchAsync(juce::FileBrowserComponent::saveMode|juce::FileBrowserComponent::canSelectFiles,[safe](const auto& chooser)
             { if (!safe || safe->busy || safe->engine.exporting || safe->engine.playing || safe->engine.capturingPerformance() || chooser.getResult()==juce::File()) return; const auto file=chooser.getResult().withFileExtension("wav"); if (file.exists()) { safe->setStatus("Choose a new recording filename; existing files were kept."); return; } safe->engine.masterRecordingDestination=file; safe->engine.recordMasterWav=true; safe->setStatus("Next take also records master WAV: "+file.getFullPathName()); });
         }

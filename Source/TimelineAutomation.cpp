@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "UiMessages.h"
 #include "PresetNodes.h"
 #include <cmath>
 #include <limits>
@@ -35,6 +36,7 @@ void TimelineAccessItem::focusGained(FocusChangeType)
 { const juce::Component::SafePointer<TimelineAccessItem> safe(this); activate(); if (safe) repaint(); }
 bool TimelineAccessItem::keyPressed(const juce::KeyPress& key)
 {
+    if (isTimelineContextKey(key) && context) { const auto action = context; action(); return true; }
     if (key.getKeyCode() != juce::KeyPress::returnKey || key.getModifiers().isAnyModifierKeyDown()) return false;
     invoke(); return true;
 }
@@ -117,13 +119,13 @@ void Timeline::refreshAccessibleItems()
     {
         const auto id = clip.id, key = "segment:" + id;
         auto& item = itemFor(key, clipBounds(clip).toNearestInt());
-        item.setHelpText("Enter selects this segment in Editing without seeking. Existing Copy/Cut, Delete and Undo shortcuts apply to this segment; transition locks still protect it.");
+        item.setHelpText("Enter selects this segment without seeking. Shift+F10 opens its menu. Ctrl+T opens segment settings.");
         item.read = [this, id]
         {
             const auto* c = owner.engine.project.clipFor(id); if (!c) return juce::String("Removed segment");
             return "Segment " + juce::String((int) (c - owner.engine.project.clips.data()) + 1) + ", " + c->media->libraryTitle()
                 + ", mixer lane " + juce::String(c->track + 1) + ", start " + timeText(c->start - owner.engine.project.tempo.origin)
-                + ", length " + timeText(c->length) + ", BPM " + juce::String(c->media->bpm(), 2) + ", key " + owner.keyText(*c->media)
+                + ", length " + timeText(c->length) + ", BPM " + wholeBpmText(c->media->bpm()) + ", key " + owner.keyText(*c->media)
                 + (owner.engine.project.clipTransitionLocked(id) ? ", locked" : ", unlocked");
         };
         item.selected = [this, id] { return owner.selectedClip == id || owner.editSelection.contains(id); };
@@ -134,14 +136,29 @@ void Timeline::refreshAccessibleItems()
             const int track = c->track;
             selectedLabel.clear(); editingAutomationPoint.reset(); selectedCutAmount.reset(); selectedSection.reset(); selectedHotcue.reset(); hotcueGesture.reset();
             owner.correctionFromLibrary = false; owner.selectedAutomationTarget = -1; owner.selectedClip = id;
-            owner.selectTrack(track); owner.showToolPage(2); reveal(key);
+            owner.selectTrack(track); reveal(key);
+        };
+        item.context = [this, id, &item]
+        {
+            const auto anchor = item.getScreenBounds().withSizeKeepingCentre(1, 1);
+            const auto* target = owner.engine.project.clipFor(id);
+            if (!target) return;
+            const int track = target->track;
+            if (owner.selectedClip != id)
+            {
+                if (owner.editSelection.contains(id)) owner.editSelection.primary = id;
+                else owner.clearEditSelection();
+                owner.selectedClip = id;
+                owner.selectTrack(track);
+            }
+            owner.showTimelineMenu(owner.engine.position.load(), track, anchor);
         };
     }
     for (const auto& link : owner.engine.project.transitionLinks)
     {
         const auto id = link.incoming, key = "transition:" + id;
         auto& item = itemFor(key, transitionBounds(link).toNearestInt());
-        item.setHelpText("Enter selects this pair in Transitions without seeking. Existing transition navigation, move, resize and lock shortcuts apply. Delete targets the selected incoming segment, not the whole pair.");
+        item.setHelpText("Enter selects this pair without seeking. Shift+F10 opens its transition menu. Alt+Left/Right navigates between pairs.");
         item.read = [this, id]
         {
             const auto* pair = owner.engine.project.transitionFor(id); if (!pair) return juce::String("Removed transition");
@@ -159,6 +176,7 @@ void Timeline::refreshAccessibleItems()
             selectedLabel.clear(); editingAutomationPoint.reset(); selectedCutAmount.reset(); selectedSection.reset(); selectedHotcue.reset(); hotcueGesture.reset(); owner.correctionFromLibrary = false;
             owner.selectTransition(id, false); reveal(key);
         };
+        item.context = [this, id, &item] { owner.showTransitionMenu(id, item.getScreenBounds().withSizeKeepingCentre(1, 1)); };
     }
     auto locate = [this](const AutomationAddress& address, double time, int duplicate)
     {
@@ -234,7 +252,12 @@ void Timeline::refreshAccessibleItems()
     owner.selectedAutomationTarget = (int) address.target;
                     if (address.target == AutomationTarget::plugin) owner.pluginLane = address;
                     owner.selectTrack(address.target == AutomationTarget::master ? 0 : address.track);
-                    selectAutomationPoint(address, i); owner.showToolPage(2); reveal(key);
+                    selectAutomationPoint(address, i); owner.refresh(); reveal(key);
+                };
+                item.context = [this, address, storedTime, duplicate, locate, &item]
+                {
+                    const int i = locate(address, storedTime, duplicate);
+                    if (i >= 0) owner.showAutomationNodeMenu(address, i, owner.engine.project.automationSessionTime(address, storedTime), item.getScreenBounds());
                 };
                 item.open = [this, address, storedTime, duplicate, locate]
                 {
@@ -441,14 +464,14 @@ void Timeline::refreshCurveTools()
     for (size_t i = 0; i < curveTools->buttons.size(); ++i)
     {
         auto& button = curveTools->buttons[i];
-        const AutomationAddress address {clip->track, curveTargets[i]};
+        const AutomationAddress address {clip->track, curveTargets[i], {}, {}, clip->id};
         const auto* curve = owner.engine.project.curve(address);
         button.hasCurve = hasGeneratedAutomation(address) || (curve && !curve->points.empty());
         const bool active = owner.automationLane() == (int) address.target && owner.displayedAddress(clip->track) == address;
         if (active) selected = (int) i + 1;
         button.setToggleState(active, juce::dontSendNotification);
         button.setTooltip(juce::String(curveNames[i]) + (button.hasCurve ? " / existing automation" : " / no saved nodes")
-            + ". Select the shared lane curve. Neutral handles mark each track and its first/last eight bars. Filled dot: automation exists."
+            + ". Edit this track's automation across its full span, including transition preset nodes. Filled dot: automation exists."
             + (owner.engine.project.automationLocked(address) ? " Locked: viewing is available; unlock to edit." : ""));
         button.setEnabled(available); button.setVisible(!compact);
         button.setBounds(row.removeFromLeft(std::max(0, width)).withTrimmedRight(2));
@@ -483,13 +506,13 @@ void Timeline::chooseCurveTool(int index)
     }
     if (index == 6) { owner.editSavedDownbeat(id); refreshCurveTools(); return; }
     if (index == 5) { owner.selectTrack(track); owner.chooseAutomationPlugin(); return; }
-    const AutomationAddress address {track, curveTargets[(size_t) index]};
+    const AutomationAddress address {track, curveTargets[(size_t) index], {}, {}, id};
+    const auto title = clip->media->libraryTitle();
     // Reveal the requested curve even when the inspector previously hid or isolated another band.
     owner.transitionCurveOnlyBand = -1;
     if (index < 4) owner.transitionCurveShown[(size_t) index] = true;
     selectAutomationCurve(address);
-    owner.setStatus(juce::String(curveNames[(size_t) index]) + " / Lane " + juce::String(track + 1) + " / all tracks. Transition fades remain per track.");
-    owner.refresh();
+    owner.setStatus(juce::String(curveNames[(size_t) index]) + " automation / " + title);
 }
 
 void Timeline::selectAutomationCurve(const AutomationAddress& address)
@@ -530,12 +553,13 @@ std::vector<AutomationAddress> Timeline::visibleAutomationAddresses(int track) c
         if (std::find(addresses.begin(), addresses.end(), selected) == addresses.end()) addresses.push_back(selected);
     }
     // One visible line per original track, even when another split piece is selected.
-    for (size_t i = 0; i < addresses.size(); ++i) if (addresses[i].target == AutomationTarget::plugin)
+    for (size_t i = 0; i < addresses.size(); ++i) if (addresses[i].stem<0 && addresses[i].clipId.isNotEmpty() && !hasGeneratedAutomation(addresses[i]))
         for (size_t j = i + 1; j < addresses.size();)
         {
             const auto* a = owner.engine.project.clipFor(addresses[i].clipId);
             const auto* b = owner.engine.project.clipFor(addresses[j].clipId);
-            if (a && b && a->effects == b->effects && addresses[i].slotId == addresses[j].slotId && addresses[i].parameterId == addresses[j].parameterId)
+            if (a && b && a->effects == b->effects && addresses[i].target==addresses[j].target && addresses[j].stem<0
+                && !hasGeneratedAutomation(addresses[j]) && addresses[i].slotId == addresses[j].slotId && addresses[i].parameterId == addresses[j].parameterId)
             {
                 if (addresses[j] == owner.displayedAddress(track)) addresses[i] = addresses[j];
                 addresses.erase(addresses.begin() + (ptrdiff_t)j);
@@ -590,7 +614,7 @@ juce::Path Timeline::automationPath(const AutomationAddress& address, double beg
                     line.lineTo(x, y(before, valueAt(before))); line.lineTo(x, y(jump, valueAt(jump)));
                 }
             }
-            for (size_t i = 1; i < curve->points.size(); ++i) if (curve->points[i - 1].bend >= 1)
+            for (size_t i = 1; i < curve->points.size(); ++i) if (curve->points[i - 1].bend >= 1 || (curve->points[i-1].shape && curve->points[i-1].shape->endpointStep))
             {
                 const double jump = p.automationSessionTime(address, curve->points[i].time);
                 if (jump > previous && jump <= time)
@@ -645,10 +669,9 @@ bool Timeline::continueCurveBend(const juce::MouseEvent& event)
     if (!curveBendDrag) return false;
     if (owner.busy || owner.engine.exporting || !event.mouseWasDraggedSinceMouseDown()) return true;
     const auto gesture = *curveBendDrag;
-    const juce::ScopedLock guard(owner.engine.lock);
     if (!owner.automationEditable(gesture.address)) return true;
     const double bend = juce::jlimit(-1., 1., gesture.bend + (event.position.y - gesture.y) / (gesture.rising ? 80. : -80.));
-    auto candidate = owner.engine.project;
+    auto candidate = owner.automationEditSnapshot();
     if (gesture.segment >= 0)
     {
         auto* curve = owner.materialiseAutomation(candidate,gesture.address);
@@ -665,8 +688,8 @@ bool Timeline::continueCurveBend(const juce::MouseEvent& event)
     }
     const auto protection = owner.engine.project.validateTransitionLocks(candidate);
     if (protection.failed()) { owner.setStatus(protection.getErrorMessage()); return true; }
-    if (!moved) { owner.engine.setAutomationRecordMode(AutomationRecordMode::read); owner.remember(); moved = true; }
-    owner.engine.project = std::move(candidate);
+    if (!owner.publishAutomationEdit(std::move(candidate),gesture.address,!moved)) return true;
+    moved=true;
     owner.setStatus(bend >= 1 ? "Hard cut / snap at the second node" : "Curve bend " + juce::String(bend, 2) + " / end nodes fixed");
     repaint(); return true;
 }
@@ -698,17 +721,14 @@ bool Timeline::automationVisible(const AutomationAddress& address) const
     const int target = (int) address.target;
     if (target != owner.automationLane()) return false;
     if (address.target == AutomationTarget::plugin) return address == owner.pluginLane;
-    if (address.clipId.isEmpty()) return true;
-    if (address.stem < 0 && address.target != AutomationTarget::plugin && owner.automationClip.isEmpty()) return false;
+    const auto selected = owner.displayedAddress(owner.engine.selectedTrack);
+    if (address.clipId.isEmpty()) return address.target == AutomationTarget::master;
+    if (selected.clipId.isEmpty()) return false;
     if (address.stem >= 0) return owner.selectedStem == address.stem && owner.selectedClip == address.clipId;
     if (target < 4 && hasGeneratedAutomation(address) && !owner.transitionCurveVisible(target)) return false;
     const auto* link = owner.engine.project.transitionFor(owner.selectedTransition);
-    const auto* outgoing = link ? owner.engine.project.clipFor(link->outgoing) : nullptr;
-    const auto* incoming = link ? owner.engine.project.clipFor(link->incoming) : nullptr;
-    if (address.clipId != owner.automationClip && (!link || (address.clipId != link->incoming && address.clipId != link->outgoing))) return false;
-    const bool mixerLane = address.clipId.isEmpty() && address.target != AutomationTarget::master
-        && ((outgoing && outgoing->track == address.track) || (incoming && incoming->track == address.track));
-    if (link && (mixerLane || address.clipId == link->incoming || address.clipId == link->outgoing))
+    if (address.clipId != selected.clipId && (!link || (address.clipId != link->incoming && address.clipId != link->outgoing))) return false;
+    if (link && (address.clipId == link->incoming || address.clipId == link->outgoing))
     {
         if (owner.transitionCurveOnlyBand >= 0 && target != owner.transitionCurveOnlyBand) return false;
         if (target < 4 && !owner.transitionCurveVisible(target)) return false;
@@ -800,6 +820,15 @@ void Timeline::paintAutomationNodes(juce::Graphics& g)
 
 bool Timeline::keyPressed(const juce::KeyPress& key)
 {
+    if (isTimelineContextKey(key))
+    {
+        const auto anchor = owner.timelineRuler.getScreenBounds().withWidth(1);
+        const auto time = owner.engine.position.load();
+        if (editingAutomationPoint) owner.showAutomationNodeMenu(editingAutomationPoint->first, editingAutomationPoint->second, time, anchor);
+        else if (!owner.editSelection.multiple() && owner.selectedTransition.isNotEmpty()) owner.showTransitionMenu(owner.selectedTransition, anchor);
+        else owner.showTimelineMenu(time, owner.engine.selectedTrack, anchor);
+        return true;
+    }
     if (hotcueKeyPressed(key)) return true;
     if (sectionKeyPressed(key)) return true;
     if (key.getKeyCode() == 'D' && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown() && !owner.busy)
@@ -994,13 +1023,12 @@ bool Timeline::beginCutAmount(const juce::MouseEvent& event)
 bool Timeline::setCutAmount(const CutAmountHandle& h, float value, bool newUndo)
 {
     if (!std::isfinite(value) || !owner.automationEditable(h.address)) return false;
-    const juce::ScopedLock guard(owner.engine.lock);
     const auto handles = cutAmountHandles();
     const auto found = std::find_if(handles.begin(), handles.end(), [&](const auto& now) { return now.sameOwner(h) && now.value == h.value; });
     if (found == handles.end()) { owner.setStatus("The cut changed. Select its current amount handle."); return false; }
     const auto range = automationUsesGain(h.address.target) ? juce::Range<float>(0, h.incoming.isEmpty() ? 1.3f : 1.f) : automationRange(h.address.target);
     value = range.clipValue(value); if (std::abs(value - h.value) < 1.e-7f) return false;
-    auto candidate = owner.engine.project;
+    auto candidate = owner.automationEditSnapshot();
     const auto plateau = [](AutomationCurve& curve,int node,bool before,float next)
     {
         const float previous = curve.points[(size_t) node].value;
@@ -1050,8 +1078,7 @@ bool Timeline::setCutAmount(const CutAmountHandle& h, float value, bool newUndo)
     }
     const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) { owner.setStatus(valid.getErrorMessage()); return false; }
     const auto protection = owner.engine.project.validateTransitionLocks(candidate); if (protection.failed()) { owner.setStatus(protection.getErrorMessage()); return false; }
-    if (newUndo) { owner.engine.setAutomationRecordMode(AutomationRecordMode::read); owner.remember(); }
-    owner.engine.project = std::move(candidate);
+    if (!owner.publishAutomationEdit(std::move(candidate),h.address,newUndo)) return false;
     selectedCutAmount = h; selectedCutAmount->value = value;
     owner.setStatus(cutAmountText(*selectedCutAmount) + ""); repaint(); return true;
 }

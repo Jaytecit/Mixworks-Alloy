@@ -1,0 +1,14 @@
+{
+  "TITLE": "Glass Garden",
+  "PASSES": [{"TARGET":"prism","WIDTH":400,"HEIGHT":225,"FLOAT":true,"DOUBLE_BUFFER":true,"WRAP":"clamp"}],
+  "CONTROLS": [
+    {"NAME":"position","TYPE":"xy smooth","LABEL":"Garden position","DEFAULT":[0,0],"MIN":[-0.5,-0.3],"MAX":[0.5,0.3],"PARAMS":0.14,"UI_GROUP":"Composition"},
+    {"NAME":"petals","TYPE":"dropdown","LABEL":"Petals","LABELS":["Five","Seven","Nine"],"VALUES":[5,7,9],"DEFAULT":1,"UI_GROUP":"Composition"},
+    {"NAME":"spread","TYPE":"slider","LABEL":"Spread","DEFAULT":0.7,"MIN":0.35,"MAX":1.3,"UI_GROUP":"Composition"},
+    {"NAME":"bloom","TYPE":"slider","LABEL":"Bloom","DEFAULT":0.42,"MIN":0,"MAX":1,"UI_GROUP":"Glass"},
+    {"NAME":"tint","TYPE":"color","LABEL":"Glass tint","DEF_COLOR":[0.82,0.47,0.96],"UI_GROUP":"Glass"},
+    {"NAME":"refraction","TYPE":"slider","LABEL":"Refraction","DEFAULT":0.38,"MIN":0,"MAX":1,"UI_GROUP":"Glass"},
+    {"NAME":"trail","TYPE":"slider","LABEL":"Afterimage","DEFAULT":0.38,"MIN":0,"MAX":0.85,"UI_GROUP":"Glass"},
+    {"NAME":"breath","TYPE":"slider","LABEL":"Music response","DEFAULT":0.6,"MIN":0.5,"MAX":6,"UI_GROUP":"Motion"}
+  ]
+}

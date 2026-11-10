@@ -35,6 +35,7 @@ void main(){
 #else
     float r=length(p),a=atan(p.y,p.x);q=.5+vec2(cos(a+t*.15),sin(a+t*.15))*r/(1.+r*.3);
 #endif
+    q.y=.5+(q.y-.5)/(1.15+2.5*bassHit*pulse);q.y+=.26*sin(travelTime*.9+uv.x*3.)*pulse;
     vec3 c=texture(input0,clamp(q,0.,1.)).rgb*shade;
     vec2 shift=vec2(.003+.007*trebleImpulse*.01,0)*warp;
     c.r=texture(input0,clamp(q+shift,0.,1.)).r*shade;c.b=texture(input0,clamp(q-shift,0.,1.)).b*shade;

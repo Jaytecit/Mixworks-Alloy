@@ -62,6 +62,7 @@ float Engine::automationValueIn(const Project& source, const AutomationAddress& 
         {
             if (write.address == address) return write.value;
             if (write.address.target == address.target
+                && write.address.stem == address.stem
                 && write.address.slotId == address.slotId && write.address.parameterId == address.parameterId)
             {
                 const auto* a = source.clipFor(write.address.clipId); const auto* b = source.clipFor(address.clipId);
@@ -73,8 +74,9 @@ float Engine::automationValueIn(const Project& source, const AutomationAddress& 
 }
 void Engine::writeUntil(ActiveWrite& write, double time)
 {
-    auto* curve = project.curve(write.address); if (!curve || time < write.lastTime) return;
     time = std::min(time, 1.0e9);
+    if (write.address.clipId.isNotEmpty()) time = std::min(time, project.automationBounds(write.address).getEnd());
+    auto* curve = project.curve(write.address); if (!curve || time < write.lastTime) return;
     const double curveTime = project.automationTime(write.address, time), last = project.automationTime(write.address, write.lastTime);
     auto begin = std::upper_bound(curve->points.begin(), curve->points.end(), last, [](double t, const auto& p) { return t < p.time; });
     auto end = std::upper_bound(begin, curve->points.end(), curveTime, [](double t, const auto& p) { return t < p.time; });
@@ -87,7 +89,9 @@ void Engine::finishWrite(ActiveWrite& write, double time, bool returnToCurve)
     if (returnToCurve)
     {
         auto* curve = project.curve(write.address); if (!curve) return;
-        const double returnTime = std::min(time + 0.05, 1.0e9);
+        double returnTime = std::min(time + 0.05, 1.0e9);
+        if (write.address.clipId.isNotEmpty()) returnTime = std::min(returnTime, project.automationBounds(write.address).getEnd());
+        if (returnTime <= time) return;
         auto begin = std::upper_bound(curve->points.begin(), curve->points.end(), project.automationTime(write.address, time), [](double t, const auto& p) { return t < p.time; });
         auto end = std::upper_bound(begin, curve->points.end(), project.automationTime(write.address, returnTime), [](double t, const auto& p) { return t < p.time; });
         for (auto point = begin; point != end; ++point) project.automationEdited(write.address, AutomationEdit::removePoint, point->time);
@@ -133,6 +137,7 @@ void Engine::armAutomation(int track, bool armed)
 void Engine::setPlaying(bool running)
 {
     const juce::ScopedLock guard(lock);
+    ++seekRequest; seekPending = false;
     if (running) endTakeAudition();
     libraryPreviewSource = nullptr; ++libraryPreviewGeneration;
     serviceScheduledPause(); cancelScheduledPause(ScheduledPauseReason::transportChanged);
@@ -169,7 +174,8 @@ void Engine::advanceAutomation(double time)
         if (time < it->lastInput) { finishWrite(*it, it->lastTime, true); it = activeWrites.erase(it); continue; }
         const bool released = automationRecordMode == AutomationRecordMode::touch && time >= it->lastInput + 0.5;
         writeUntil(*it, released ? it->lastInput + 0.5 : time);
-        if (released) { finishWrite(*it, it->lastTime, true); it = activeWrites.erase(it); } else ++it;
+        const bool ended = it->address.clipId.isNotEmpty() && time >= project.automationBounds(it->address).getEnd();
+        if (released || ended) { finishWrite(*it, it->lastTime, true); it = activeWrites.erase(it); } else ++it;
     }
 }
 bool Engine::setControlValue(const AutomationAddress& address, float value)
@@ -183,17 +189,29 @@ bool Engine::setControlValueAt(const AutomationAddress& input, float value, doub
     const juce::ScopedLock guard(lock);
     auto address = input;
     if (address.target == AutomationTarget::plugin && address.clipId.isEmpty() && controlClip(address.track)) address.clipId = selectedClip;
-    if (exporting || !std::isfinite(value) || !std::isfinite(time) || project.automationLocked(address)) return false;
+    if (exporting || !std::isfinite(value) || !std::isfinite(time)) return false;
     if (address.target != AutomationTarget::master && (address.track < 0 || address.track >= trackCount)) return false;
     auto* parameter = address.target == AutomationTarget::plugin ? parameterFor(address) : nullptr;
     if (address.target == AutomationTarget::plugin && !parameter) return false;
     if (rehearsalActive()) { endTransitionRehearsal(); time = position.load(); running = false; }
     value = automationRange(address.target).clipValue(value);
     const bool armed = address.target == AutomationTarget::master ? masterAutomationArmed : automationArmed[(size_t) address.track];
+    const bool writing = !capturingPerformance() && running && playing && armed && automationRecordMode != AutomationRecordMode::read && time >= 0 && time <= 1.0e9;
+    if (writing && address.clipId.isEmpty() && (int) address.target < trackAutomationCount)
+    {
+        const Clip* chosen = nullptr;
+        for (const auto& clip : project.clips)
+        {
+            if (clip.track != address.track || time < clip.start || time >= clip.end()) continue;
+            if (clip.id == selectedClip) { chosen = &clip; break; }
+            if (!chosen || clip.start >= chosen->start) chosen = &clip;
+        }
+        if (!chosen) return false;
+        address.clipId = chosen->id;
+    }
+    if (project.automationLocked(address)) return false;
     const auto* owned = project.clipFor(address.clipId);
-    const auto bounds = project.automationBounds(address);
-    const bool inside = !owned || (time >= bounds.getStart() && time < bounds.getEnd());
-    const bool record = !capturingPerformance() && inside && running && playing && armed && automationRecordMode != AutomationRecordMode::read && time >= 0 && time <= 1.0e9;
+    const bool record = writing && (!owned || project.automationBounds(address).contains(time));
     if (capturingPerformance() && armed)
     {
         TakeEvent event; event.lane=address.track; event.control=(int)address.target; event.slot=address.slotId; event.parameter=address.parameterId;

@@ -1,3 +1,5 @@
+> Historical evidence / design record. Its task lists, candidate identities and pending labels describe the dated checkpoint. Outstanding work is consolidated in [the roadmap](../../FINISHING-PLAN.md); this record does not schedule work or authorise old reset/scan/activation instructions.
+
 # ua04: visual composition, review sorting and alignment guide
 
 1 November 2026. Continues the whole user-readiness plan. Jay accepted shared

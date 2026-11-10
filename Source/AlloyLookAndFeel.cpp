@@ -325,6 +325,20 @@ void AlloyLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wid
     if (style == juce::Slider::LinearVertical)
     {
         const float mid = x + width * 0.5f;
+        if ((bool) slider.getProperties()["alloyWheel"])
+        {
+            const juce::Rectangle<float> well(mid - 16, (float) y - 5, 32, (float) height + 10);
+            g.setColour(colour::background); g.fillRoundedRectangle(well, 6);
+            g.setColour(slider.hasKeyboardFocus(true) ? colour::focus : colour::border);
+            g.drawRoundedRectangle(well, 6, 1);
+            g.reduceClipRegion(well.getSmallestIntegerContainer().reduced(2));
+            for (int i = -3; i <= 3; ++i)
+            {
+                g.setColour(i == 0 && slider.isEnabled() ? colour::orange : colour::muted.withAlpha(.40f));
+                g.drawLine(mid - 11, pos + i * 4.f, mid + 11, pos + i * 4.f, i == 0 ? 2.f : 1.f);
+            }
+            return;
+        }
         g.setColour(colour::background); g.fillRoundedRectangle(mid - 3, (float) y, 6, (float) height, 3);
         g.setColour(colour::border);
         for (int i = 0; i <= 8; ++i)
@@ -508,6 +522,9 @@ juce::String AlloyHints::textFor(juce::Component& component)
 {
     for (auto* p = &component; p; p = p->getParentComponent())
         if ((bool) p->getProperties()["mixworksExternalEditor"]) return {};
+    for (auto* p = &component; p; p = p->getParentComponent())
+        if(!p->isEnabled())
+            if(const auto reason=p->getProperties()["mixworksHintDisabled"].toString();reason.isNotEmpty())return shortUiMessage(reason);
     juce::String text;
     for (auto* p = &component; p; p = p->getParentComponent())
     {

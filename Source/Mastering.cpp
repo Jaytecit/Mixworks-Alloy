@@ -58,20 +58,28 @@ void Engine::processMaster(const Project& source, juce::AudioBuffer<float>& outp
     const auto peak = output.getMagnitude(0, frames); masterPeak = peak;
     if (peak > 1) masterClipped = true;
 }
-SpectrumFeed::SpectrumFeed() : data(2, capacity), sampleRates(capacity), fifo(capacity) {}
-int SpectrumFeed::push(const juce::AudioBuffer<float>& input, int frames, double rate)
+SpectrumFeed::SpectrumFeed(bool timestamped)
+    : data(2, capacity), sampleRates(capacity), clocks(timestamped ? capacity : 0), fifo(capacity) {}
+int SpectrumFeed::push(const juce::AudioBuffer<float>& input, int frames, double rate,
+                       const Clock* programme, int programmeFrames)
 {
     if (!enabled.load(std::memory_order_relaxed) || frames <= 0 || frames > input.getNumSamples() || input.getNumChannels() < 1 || !std::isfinite(rate) || rate <= 0) return 0;
     int start1, size1, start2, size2; fifo.prepareToWrite(frames, start1, size1, start2, size2);
+    const double secondsPerSample = 1. / rate;
     auto copy = [&](int start, int count, int offset)
     {
         for (int ch = 0; ch < 2; ++ch) juce::FloatVectorOperations::copy(data.getWritePointer(ch, start), input.getReadPointer(std::min(ch, input.getNumChannels() - 1), offset), count);
         std::fill_n(sampleRates.data() + start, count, rate);
+        if (!clocks.empty())
+            for (int i = 0; i < count; ++i)
+                clocks[(size_t)(start + i)] = programme && offset + i < programmeFrames
+                    ? Clock{programme->position + (offset + i) * secondsPerSample, programme->revision}
+                    : Clock{};
     };
     copy(start1, size1, 0); copy(start2, size2, size1); const int written = size1 + size2;
     fifo.finishedWrite(written); dropped.fetch_add((juce::uint64) (frames - written), std::memory_order_relaxed); return written;
 }
-int SpectrumFeed::read(float* left, float* right, double* rates, int wanted)
+int SpectrumFeed::read(float* left, float* right, double* rates, int wanted, Clock* timing)
 {
     if (wanted <= 0) return 0;
     int start1, size1, start2, size2; fifo.prepareToRead(wanted, start1, size1, start2, size2);
@@ -80,6 +88,7 @@ int SpectrumFeed::read(float* left, float* right, double* rates, int wanted)
         juce::FloatVectorOperations::copy(left + offset, data.getReadPointer(0, start), count);
         juce::FloatVectorOperations::copy(right + offset, data.getReadPointer(1, start), count);
         std::copy_n(sampleRates.data() + start, count, rates + offset);
+        if (timing && !clocks.empty()) std::copy_n(clocks.data() + start, count, timing + offset);
     };
     copy(start1, size1, 0); copy(start2, size2, size1); fifo.finishedRead(size1 + size2); return size1 + size2;
 }

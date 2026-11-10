@@ -281,20 +281,19 @@ void runTransitionBandTests(const std::function<void(bool, const juce::String&)>
             ui.timeline.selectedCutAmount.reset(); check(ui.keyPressed(juce::KeyPress('D')) && ui.timeline.selectedCutAmount.has_value(), prefix + " D reaches amount selection without a mouse");
         }
         for (const auto target : {AutomationTarget::volume, AutomationTarget::bass, AutomationTarget::mid, AutomationTarget::treble, AutomationTarget::cutoff, AutomationTarget::pan, AutomationTarget::master})
-            for (int scope = 0; scope < (target == AutomationTarget::master ? 1 : 2); ++scope)
             {
                 reset(); ui.selectedTransition.clear(); ui.viewport.setViewPosition(0, 0);
-                if (scope == 0 && target != AutomationTarget::master)
+                if (target != AutomationTarget::master)
                 {
                     ui.engine.project.transitionLinks.clear();
                     auto& clip = ui.engine.project.clips[0]; clip.start = 3; clip.offset = 2; clip.rate = 1.25; clip.length = 32;
                 }
-                const AutomationAddress address {target == AutomationTarget::master ? -1 : 0, target, {}, {}, scope == 0 && target != AutomationTarget::master ? base.clips[0].id : juce::String()};
+                const AutomationAddress address {target == AutomationTarget::master ? -1 : 0, target, {}, {}, target != AutomationTarget::master ? base.clips[0].id : juce::String()};
                 auto* curve = ui.engine.project.curve(address); curve->enabled = true;
                 const bool gain = ui.timeline.automationUsesGain(target);
                 curve->setPoint(8, gain ? 0 : -.5f); curve->setPoint(12, gain ? -60 : .5f); curve->points[0].bend = 1;
                 ui.timeline.selectAutomationCurve(address); ui.refresh();
-                const auto handles = ui.timeline.cutAmountHandles(); const auto prefix = "P50 manual " + juce::String((int) target) + "/" + juce::String(scope);
+                const auto handles = ui.timeline.cutAmountHandles(); const auto prefix = "P50 manual " + juce::String((int) target);
                 check(handles.size() == 2, prefix + " exposes both fixed step endpoints"); if (handles.size() != 2) continue;
                 const auto h = handles.back(); const auto before = *ui.engine.project.curve(address);
                 const auto down = h.bounds.getCentre(); const auto destination = down.translated(100, -30);
@@ -526,13 +525,11 @@ void runTransitionBandTests(const std::function<void(bool, const juce::String&)>
         check(fade.timeline.automationY(0, 12, 0) > fade.timeline.transitionBounds(fade.engine.project.transitionLinks[0]).getY() + 24,
             "P06 top volume node clears title and transition header");
         const AutomationAddress lane {1, AutomationTarget::volume};
-        fade.engine.project.curve(lane)->enabled = true; fade.engine.project.curve(lane)->setPoint(0, -4);
-        fade.timeline.selectAutomationCurve(lane);
         const auto sourceNodes = fade.engine.project.curve(address)->points.size();
-        fade.performTimelineAction(TimelineAction::volume, time, 1);
-        check(fade.engine.project.curve(lane)->points.size() == 2 && fade.engine.project.curve(address)->points.size() == sourceNodes,
-            "P06 marker insertion retains the explicitly selected mixer curve owner");
-        check(fade.timeline.automationNodesVisible(lane), "P06 inserted marker remains selected and visible");
+        fade.performTimelineAction(TimelineAction::volume, time + .5, 1);
+        check(!fade.engine.project.curve(lane) && fade.engine.project.curve(address)->points.size() == sourceNodes + 1,
+            "P06 marker insertion uses the same track curve as the preset");
+        check(fade.timeline.automationNodesVisible(address), "P06 inserted marker remains selected and visible");
         for (int width : {1000, 1920})
         {
             fade.engine.project = base; fade.engine.project.applyTransitionPreset(id, TransitionPreset::crossfade);

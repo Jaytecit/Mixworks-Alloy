@@ -14,6 +14,120 @@ namespace mixworks
 {
 void runUiClarityTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--beat-menu-only"))
+    {
+        // One representative metadata-only menu operation at the user's observed
+        // catalogue count. No audio loading, detector, device or capacity loop.
+        Workstation ui(false); ui.stopTimer();
+        for (int i = 0; i < 5527; ++i)
+        {
+            auto media = std::make_shared<Media>(); media->name = "Menu track " + juce::String(i);
+            media->file = report.getSiblingFile("menu-metadata").getChildFile("track-" + juce::String(i) + ".wav");
+            ui.engine.library.push_back(media); ui.visibleMedia.push_back(i);
+        }
+        ui.libraryTable.table.updateContent();
+        const auto enabled = [](const juce::PopupMenu& menu, const juce::String& name)
+        {
+            for (juce::PopupMenu::MenuItemIterator item(menu,true); item.next();)
+                if (item.getItem().text == name) return item.getItem().isEnabled;
+            return false;
+        };
+        const auto before = juce::Time::getMillisecondCounterHiRes();
+        auto menu = ui.getMenuForIndex(3,{});
+        const auto elapsed = juce::Time::getMillisecondCounterHiRes() - before;
+        check(elapsed < 1000., "Beat grids menu avoids the reproduced multi-second catalogue stall: " + juce::String(elapsed,3) + " ms");
+        check(!enabled(menu,"Selected tracks") && !enabled(menu,"Retry weak BPM / key")
+            && enabled(menu,"Tracks needing analysis") && enabled(menu,"All library songs"),"no selection keeps correct analysis choices in a 5527-entry catalogue");
+        ui.libraryTable.table.selectRow(0,false,false);
+        menu = ui.getMenuForIndex(3,{});
+        check(enabled(menu,"Selected tracks") && enabled(menu,"Retry weak BPM / key"),"one weak selected track enables its existing analysis actions");
+        juce::SparseSet<int> rows; rows.addRange({0,5527}); ui.libraryTable.table.setSelectedRows(rows,juce::dontSendNotification);
+        menu = ui.getMenuForIndex(3,{});
+        check(enabled(menu,"Selected tracks") && enabled(menu,"Retry weak BPM / key"),"selecting the whole library keeps analysis choices without building target lists");
+        for (auto& media : ui.engine.library) { media->manualBpm = 120; media->manualBeatOrigin = 0; media->manualKey = 0; }
+        menu = ui.getMenuForIndex(3,{});
+        check(enabled(menu,"Selected tracks") && !enabled(menu,"Retry weak BPM / key") && !enabled(menu,"Tracks needing analysis"),"fully reviewed tracks retain the correct disabled review actions");
+        ui.engine.library.back()->manualKey = -1;
+        menu = ui.getMenuForIndex(3,{});
+        check(enabled(menu,"Retry weak BPM / key") && enabled(menu,"Tracks needing analysis"),"a weak track at the end of the catalogue is still found");
+        for (int unavailable = 0; unavailable < 3; ++unavailable)
+        {
+            ui.busy = unavailable == 0; ui.engine.playing = unavailable == 1; ui.engine.exporting = unavailable == 2;
+            menu = ui.getMenuForIndex(3,{});
+            check(!enabled(menu,"Selected tracks") && !enabled(menu,"Retry weak BPM / key") && !enabled(menu,"Tracks needing analysis")
+                && !enabled(menu,"All library songs"),"menu keeps busy/playback/export analysis guards / " + juce::String(unavailable));
+        }
+        ui.busy = false; ui.engine.playing = false; ui.engine.exporting = false;
+        check(ui.engine.library.size()==5527 && ui.engine.project.clips.empty() && ui.undoHistory.empty(),"opening the menu leaves tracks, arrangement and history unchanged");
+        auto* facts = new juce::DynamicObject(); facts->setProperty("libraryCount",5527); facts->setProperty("constructionMs",elapsed);
+        check(report.getSiblingFile("beat-menu.json").replaceWithText(juce::JSON::toString(juce::var(facts))),"retain bounded menu responsiveness evidence");
+        return;
+    }
+    if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--controller-wheels-only"))
+    {
+        Workstation ui(false); ui.stopTimer(); ui.setSize(1400, 850); ui.showToolPage(0);
+        auto& desk = *ui.performance;
+        auto& pitch = desk.wheels[0]; auto& mod = desk.wheels[1];
+        check(pitch.isVisible() && mod.isVisible() && pitch.getWidth() > 40 && mod.getX() < desk.pots[0].getX(),
+              "Controller shows the two wheels beside the pot and pad rows");
+        pitch.onDragStart();
+        pitch.setValue(.6, juce::sendNotificationSync);
+        check(std::abs(ui.engine.project.manualValue({0, AutomationTarget::cutoff}) - .6f) < .001f,
+              "Pitch wheel sweeps lane 1 cutoff");
+        pitch.onDragEnd();
+        check(ui.engine.project.manualValue({0, AutomationTarget::cutoff}) == 0,
+              "Pitch wheel returns the cutoff to neutral on release");
+        desk.wheelTargets[1].setSelectedId(7, juce::dontSendNotification);
+        desk.wheelTargets[1].onChange();
+        mod.onDragStart(); mod.setValue(-.4, juce::sendNotificationSync); mod.onDragEnd();
+        check(std::abs(ui.engine.project.manualValue({1, AutomationTarget::pan}) + .4f) < .001f
+              && ui.engine.project.manualValue({0, AutomationTarget::pan}) == 0,
+              "Mod wheel holds its value on the reassigned lane and effect");
+        ui.engine.setMidiLearnEnabled(true); desk.refresh(true);
+        check(!pitch.isEnabled() && !mod.isEnabled(), "Controller wheels yield to MIDI Learn");
+        ui.engine.setMidiLearnEnabled(false); desk.refresh(true);
+        const auto capture = [&](juce::Component& component, const juce::Rectangle<int>& area, const juce::String& name)
+        {
+            auto output = report.getSiblingFile(name + ".png").createOutputStream();
+            check(output && juce::PNGImageFormat().writeImageToStream(component.createComponentSnapshot(area), *output),
+                  "Capture " + name);
+        };
+        capture(desk, desk.getLocalBounds(), "alloy-controller");
+        capture(ui, {0, 0, 1200, 85}, "alloy-version");
+        return;
+    }
+    if(juce::JUCEApplicationBase::getCommandLineParameters().contains("--tutorial-only"))
+    {
+        Workstation ui(false); ui.stopTimer(); ui.workspacePreference=report.getSiblingFile("tutorial-preferences.json");
+        const auto original=juce::JSON::toString(projectToJson(ui.engine.project));
+        auto find=[](juce::Component& root,const juce::String& id)
+        {
+            std::function<juce::Component*(juce::Component&)> walk=[&](juce::Component& c)->juce::Component*
+            { if(c.getComponentID()==id)return &c; for(auto* child:c.getChildren())if(auto* match=walk(*child))return match; return nullptr; };
+            return walk(root);
+        };
+        ui.menuItemSelected(98,6);
+        check(ui.tutorialWindow && ui.tutorialWindow->isVisible() && !ui.tutorialWindow->isUsingNativeTitleBar(),"Help opens a nonmodal tutorial with app-owned dark chrome");
+        if(!ui.tutorialWindow)return;
+        auto* next=dynamic_cast<juce::Button*>(find(*ui.tutorialWindow,"tutorial-next"));
+        auto* skip=dynamic_cast<juce::Button*>(find(*ui.tutorialWindow,"tutorial-skip"));
+        check(next && !next->isEnabled() && skip,"first tutorial step waits for real music and offers Skip");
+        if(skip)skip->onClick();
+        const auto progress=ui.workspacePreference.getSiblingFile("getting-started.json"); const auto saved=juce::JSON::parse(progress);
+        check(!ui.tutorialWindow->isVisible() && (int)saved["step"]==0 && !(bool)saved["complete"],"Skip saves its place without claiming the tutorial complete");
+        check(progress.replaceWithText("{\"format\":\"mixworks-getting-started\",\"step\":2,\"complete\":false}"),"set an owned intermediate tutorial progress fixture");
+        ui.showTutorial(); auto* heading=dynamic_cast<juce::Label*>(find(*ui.tutorialWindow,"tutorial-step"));
+        check(heading && heading->getText().startsWith("3."),"Help resumes the persisted editing step");
+        auto* tips=dynamic_cast<juce::ToggleButton*>(find(*ui.tutorialWindow,"tutorial-tips"));
+        check(tips && tips->getToggleState(),"popup helpers default on in the tutorial");
+        if(tips) { tips->setToggleState(false,juce::dontSendNotification); tips->onClick(); }
+        WorkspaceLayout reopened; const auto read=readWorkspacePreferences(ui.workspacePreference,reopened);
+        check(read.wasOk() && !reopened.popupHints && !ui.hints.hintsEnabled(),"tutorial helper switch updates actual hints and durable workspace preference");
+        check(original==juce::JSON::toString(projectToJson(ui.engine.project)) && ui.undoHistory.empty(),"tutorial navigation and preferences do not edit the music");
+        auto image=report.getSiblingFile("getting-started-window.png").createOutputStream();
+        check(image && juce::PNGImageFormat().writeImageToStream(ui.tutorialWindow->createComponentSnapshot(ui.tutorialWindow->getLocalBounds()),*image),"capture actual tutorial window and its custom chrome");
+        ui.tutorialWindow->closeButtonPressed(); return;
+    }
     const auto pump = []
     {
        #if JUCE_WINDOWS

@@ -9,7 +9,8 @@
       "energy": 0.55,
       "imageReady": true,
       "family": "hand-authored",
-      "study": null
+      "study": null,
+      "cutoutReady": true
     },
     {
       "key": "original/neon-run",
@@ -18,7 +19,8 @@
       "energy": 0.55,
       "imageReady": true,
       "family": "hand-authored",
-      "study": null
+      "study": null,
+      "cutoutReady": true
     },
     {
       "key": "original/ember-mosaic",
@@ -27,7 +29,8 @@
       "energy": 0.55,
       "imageReady": true,
       "family": "hand-authored",
-      "study": "voronoi_geode"
+      "study": "voronoi_geode",
+      "cutoutReady": true
     },
     {
       "key": "original/light-loom",
@@ -57,7 +60,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "advected-pigment",
       "study": "canvas"
@@ -68,7 +71,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "folded-mandala",
       "study": "compound_iris"
@@ -79,7 +82,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "material",
       "family": "cavern",
       "study": "deeper"
@@ -101,7 +104,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "advected-pigment",
       "study": "dispersion"
@@ -112,7 +115,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "advected-pigment",
       "study": "dynamical_flame"
@@ -123,7 +126,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "image-optics",
       "study": "equirectangular"
@@ -134,7 +137,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "material",
       "family": "cavern",
       "study": "fire_tunnel"
@@ -145,7 +148,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "liquid-relief",
       "study": "fluid_body"
@@ -156,7 +159,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "folded-mandala",
       "study": "fractilian_foundation"
@@ -167,7 +170,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "reaction-field",
       "study": "glassier"
@@ -178,7 +181,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "material",
       "family": "lattice",
       "study": "hex_array"
@@ -189,7 +192,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "image-optics",
       "study": "hue_review"
@@ -200,7 +203,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "cellular-relief",
       "study": "inkshot"
@@ -211,7 +214,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "folded-mandala",
       "study": "kaleidowhoa_man"
@@ -222,7 +225,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "material",
       "family": "isosurface",
       "study": "kifs_flythrough"
@@ -244,7 +247,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "graphic-tiles",
       "study": "meta_experiment_3"
@@ -255,7 +258,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "advected-pigment",
       "study": "milk_honey_smoke_bile"
@@ -266,7 +269,7 @@
       "style": "Fluid",
       "energy": 0.35,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "liquid-relief",
       "study": "molten"
@@ -277,7 +280,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "material",
       "family": "city",
       "study": "neon_city"
@@ -288,7 +291,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "graphic-tiles",
       "study": "PLUS"
@@ -299,7 +302,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "graphic-tiles",
       "study": "pop"
@@ -321,7 +324,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "folded-mandala",
       "study": "replik8"
@@ -332,7 +335,7 @@
       "style": "Prismatic",
       "energy": 0.55,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "cellular-relief",
       "study": "stained_glass"
@@ -354,7 +357,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "background",
       "family": "portal",
       "study": "traced_tunnel"
@@ -365,7 +368,7 @@
       "style": "Electric",
       "energy": 0.75,
       "imageReady": true,
-      "cutoutReady": false,
+      "cutoutReady": true,
       "mediaRole": "material",
       "family": "city",
       "study": null
@@ -2003,6 +2006,25 @@
       "imageReady": true,
       "cutoutReady": true,
       "family": "optical-memories"
+    },
+    {
+      "key": "original/jumping-techno-tunnel",
+      "title": "Jumping Techno Tunnel",
+      "style": "Cyan / pink",
+      "energy": 0.85,
+      "imageReady": false,
+      "family": "hand-authored",
+      "cutoutReady": true
+    },
+    {
+      "key": "original/inkstone",
+      "title": "Inkstone",
+      "style": "Fluid",
+      "energy": 0.55,
+      "imageReady": true,
+      "cutoutReady": true,
+      "mediaRole": "stencilled-pigment",
+      "family": "hand-authored"
     }
   ]
 }

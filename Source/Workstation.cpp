@@ -1,4 +1,5 @@
 #include "Workstation.h"
+#include "StudioWorkspace.h"
 #include "UiMessages.h"
 #include "RetryReview.h"
 #include "DownbeatReferences.h"
@@ -17,6 +18,14 @@ namespace mixworks
 {
 namespace
 {
+Project editHistorySnapshot(Engine& engine)
+{
+    const juce::ScopedLock guard(engine.lock);
+    // Take chronology can be large. Never duplicate it for live structural Undo.
+    std::vector<PerformanceTake> takes; takes.swap(engine.project.performanceTakes);
+    struct Restore { Project& project; std::vector<PerformanceTake>& takes; ~Restore(){project.performanceTakes.swap(takes);} } restore{engine.project,takes};
+    return engine.project;
+}
 int gridReviewRank(const Media& media)
 {
     const auto grid=media.grid();
@@ -47,10 +56,81 @@ void slider(juce::Slider& s, double low, double high, double step, const juce::S
     s.setRange(low, high, step); s.setSliderStyle(juce::Slider::LinearHorizontal); s.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 22); s.setTextValueSuffix(suffix);
 }
 juce::String trackLabel(int i) { return juce::String(i + 1).paddedLeft('0', 2); }
+class LibrarySeek final : public juce::Slider
+{
+public:
+    LibrarySeek()
+    {
+        setSliderStyle(juce::Slider::LinearBar); setTextBoxStyle(juce::Slider::NoTextBox,false,0,0); setRange(0,1,0);
+        setWantsKeyboardFocus(true); setSliderSnapsToMousePosition(true);
+        onValueChange=[this] {if(!cancelled)if(const auto action=audition)if(const auto target=gesture ? gesture:media)action(target,getValue());};
+    }
+    void source(std::shared_ptr<Media> next)
+    {
+        if(media && next && media->id==next->id) {media=std::move(next);return;}
+        if(gesture) {cancelled=true;gesture.reset();}
+        media=std::move(next);setValue(0,juce::dontSendNotification);
+    }
+    void updatePosition()
+    {if(!gesture && progress)if(const auto fraction=progress();fraction>=0)setValue(fraction,juce::dontSendNotification);repaint();}
+    juce::String getTextFromValue(double fraction) override
+    {const double seconds=length ? length():0;return seconds>0 ? timeText(seconds*fraction)+" of "+timeText(seconds) : juce::String(fraction*100,0)+"% of track";}
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        if(e.mods.isPopupMenu()) {if(context)context(e);return;}
+        cancelled=false;gesture=media;grabKeyboardFocus();juce::Slider::mouseDown(e);
+    }
+    void mouseUp(const juce::MouseEvent& e) override {juce::Slider::mouseUp(e);gesture.reset();cancelled=false;}
+    void focusLost(FocusChangeType cause) override
+    {if(gesture) {gesture.reset();cancelled=true;}juce::Slider::focusLost(cause);}
+    void mouseDoubleClick(const juce::MouseEvent&) override {} // Seeking cannot double-click a song onto the timeline.
+    bool keyPressed(const juce::KeyPress& key) override
+    {
+        cancelled=false;gesture.reset();if(!media)return false;
+        if(key.getKeyCode()==juce::KeyPress::escapeKey)
+        {if(progress && progress()>=0 && audition)audition(media,{});return true;}
+        if(key.getKeyCode()==juce::KeyPress::spaceKey || key.getKeyCode()==juce::KeyPress::returnKey)
+        {if(audition)audition(media,{});return true;}
+        const double duration=length ? length():0,step=duration>0 ? (key.getModifiers().isShiftDown()?30.:5.)/duration : .05;
+        double value=progress && progress()>=0 ? progress():getValue();
+        if(key.getKeyCode()==juce::KeyPress::leftKey)value-=step;
+        else if(key.getKeyCode()==juce::KeyPress::rightKey)value+=step;
+        else if(key.getKeyCode()==juce::KeyPress::homeKey)value=0;
+        else if(key.getKeyCode()==juce::KeyPress::endKey)value=1;
+        else return juce::Slider::keyPressed(key);
+        value=juce::jlimit(0.,1.,value);
+        if(value==getValue()) {if(audition)audition(media,value);} else setValue(value,juce::sendNotificationSync);
+        return true;
+    }
+    void paint(juce::Graphics& g) override
+    {
+        const auto area=getLocalBounds().toFloat().reduced(1);g.setColour(colour::background);g.fillRoundedRectangle(area,2);
+        g.setColour(colour::muted.withAlpha(.65f));
+        if(media && !media->peaks.empty())
+        {
+            float maximum=.001f;for(float peak:media->peaks)maximum=std::max(maximum,peak);
+            for(int x=1;x<getWidth()-1;++x)
+            {const auto at=std::min(media->peaks.size()-1,(size_t)((double)(x-1)*media->peaks.size()/std::max(1,getWidth()-2)));
+                const float height=std::max(1.f,media->peaks[at]/maximum*(area.getHeight()-2));g.drawVerticalLine(x,area.getCentreY()-height*.5f,area.getCentreY()+height*.5f);}
+        }
+        else g.drawHorizontalLine((int)area.getCentreY(),area.getX(),area.getRight());
+        const double fraction=gesture ? getValue():progress && progress()>=0 ? progress():getValue();
+        const float x=area.getX()+(float)fraction*area.getWidth();g.setColour(colour::orange);g.drawVerticalLine((int)x,area.getY(),area.getBottom());
+        if(hasKeyboardFocus(true)) {g.setColour(colour::focus);g.drawRoundedRectangle(area,2,1);}
+    }
+    std::shared_ptr<Media> media,gesture;
+    std::function<void(const std::shared_ptr<Media>&,std::optional<double>)> audition;
+    std::function<double()> progress,length;
+    std::function<void(const juce::MouseEvent&)> context;
+private:
+    bool cancelled=false;
+};
 class LibraryCell final : public juce::Component, public juce::TooltipClient
 {
 public:
-    explicit LibraryCell(LibraryTable& t) : model(t) { setInterceptsMouseClicks(false, false); }
+    explicit LibraryCell(LibraryTable& t) : model(t)
+    { setInterceptsMouseClicks(false,true);addChildComponent(seek);seek.context=[this](const juce::MouseEvent& e) {model.cellClicked(row,column,e);}; }
+    void resized() override {seek.setBounds(4,25,std::max(0,getWidth()-8),std::max(0,getHeight()-28));}
     void paint(juce::Graphics& g) override { model.paintCell(g, row, column, getWidth(), getHeight(), selected); }
     juce::String getTooltip() override { return model.getCellTooltip(row, column); }
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
@@ -77,6 +157,7 @@ public:
     LibraryTable& model;
     int row = 0, column = 0;
     bool selected = false;
+    LibrarySeek seek;
 };
 class MidiSettings final : public juce::Component, private juce::Timer
 {
@@ -397,7 +478,31 @@ void ImportProgressView::requestStop()
     stopping = true; cancel.setEnabled(false);
     stage.setText(stopMessage, juce::dontSendNotification);
 }
-Timeline::Timeline(Workstation& w) : owner(w) { setWantsKeyboardFocus(true); setFocusContainerType(FocusContainerType::focusContainer); setTitle("Timeline segments, transitions and automation"); initialiseCurveTools(); }
+Timeline::Timeline(Workstation& w) : owner(w)
+{
+    setWantsKeyboardFocus(true);
+    setFocusContainerType(FocusContainerType::focusContainer);
+    setTitle("Timeline segments, transitions and automation");
+   #if JUCE_WINDOWS
+    // JUCE reports the Windows Menu key as a key-state change.
+    struct ContextKeyListener final : juce::KeyListener
+    {
+        bool keyPressed(const juce::KeyPress&, juce::Component*) override { return false; }
+        bool keyStateChanged(bool down, juce::Component* canvas) override
+        {
+            constexpr int menuKey = 0x10000 | 0x5d; // Extended VK_APPS.
+            if (!down || !juce::KeyPress::isKeyCurrentlyDown(menuKey)) return false;
+            const juce::KeyPress key(menuKey, juce::ModifierKeys::getCurrentModifiers(), 0);
+            if (auto* item = dynamic_cast<TimelineAccessItem*>(juce::Component::getCurrentlyFocusedComponent()))
+                if (item->keyPressed(key)) return true;
+            return canvas->keyPressed(key);
+        }
+    };
+    static ContextKeyListener contextKey;
+    addKeyListener(&contextKey);
+   #endif
+    initialiseCurveTools();
+}
 int Timeline::laneTop(int track) const { int top = 0; for (int i = 0; i < track; ++i) top += laneSize(i); return top; }
 int Timeline::laneSize(int track) const
 {
@@ -593,7 +698,7 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
     if (event.y >= 0 && dividerAt(event.position.y) >= 0)
     { setTooltip("Drag to resize this lane. Double-click restores its default height."); setMouseCursor(juce::MouseCursor::UpDownResizeCursor); return; }
     if (audioSlipAt(event.position))
-    { setTooltip("Move this track and following playlist segments; earlier segments and the incoming transition stay fixed. Alt bypasses beat snap. Shift-drag slips audio only; double-click resets that slip. Unlock protected tracks first."); setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
+    { setTooltip("Move this track and its locked partners. Snap uses the timeline grid; Alt moves freely. Shift-drag slips audio only; double-click resets that slip."); setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
     if (event.y < 0) { setMouseCursor(juce::MouseCursor::NormalCursor); return; }
     if (const auto swap = swapHandleAt(event.position))
     { setTooltip("Drag to move both sides of this swap together. Hold Alt to move without snapping."); setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
@@ -604,14 +709,16 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
             + ": drag left/right to move this song inside its fixed transition window. Alt bypasses snap. Unlock protected tracks first.");
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return;
     }
-    setTooltip(transition ? "Drag the frame header to move this transition or a corner to resize it. I/O handles move the songs inside it." : juce::String("Drag a segment to move it; drag its edge to trim. Right-click for segment and automation actions. Wheel zooms; Alt bypasses beat snap. Drop audio or library songs here."));
+    setTooltip(transition ? "Drag the header to move both sides of the preset. Drag its right edge to change duration. Right-click to apply or remove a preset." : juce::String("Drag the waveform to highlight audio; right-click for tools. Drag its title to move it, or an outer edge to trim. Wheel zooms; Alt bypasses beat snap. Drop audio or library songs here."));
     auto pointer = juce::MouseCursor::NormalCursor;
     if (!owner.busy)
     {
-        if (anchorAt(event.position)) { pointer = juce::MouseCursor::LeftRightResizeCursor; setTooltip("Drag the IN/OUT anchor to align this source inside its transition. Arrow tabs keep off-screen anchors reachable; dragging adjusts from the real anchor without jumping. Alt bypasses snapping; unlock protected transitions first."); }
+        if (edgeTrimAt(event.position)) { pointer=juce::MouseCursor::LeftRightResizeCursor; setTooltip("Drag this outer edge to trim audible audio and waveform. Extend it to restore the untouched source. Alt ignores snap; transition markers stay fixed."); }
+        else if (anchorAt(event.position)) { pointer = juce::MouseCursor::LeftRightResizeCursor; setTooltip("OUT adjusts this stationary track's join and moves the next IN into alignment. IN shifts incoming audio beneath the fixed previous OUT. Snap uses the timeline beat grid; Alt moves freely."); }
         else if (labelAt(event.position) >= 0) { pointer = juce::MouseCursor::LeftRightResizeCursor; setTooltip("Drag this label to move it. Double-click to edit its text; right-click for marker actions."); }
         else if (automationPointAt(event.position)) { pointer = juce::MouseCursor::DraggingHandCursor; setTooltip("Drag this node to change time and value. Left/Right selects adjacent nodes; Enter opens precise entry; Delete removes the node. Unlock protected tracks first."); }
-        else if (transition) pointer = juce::MouseCursor::DraggingHandCursor;
+        else if (transition) pointer = transition->second == Project::TransitionEdit::moveWindow
+            ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::LeftRightResizeCursor;
         else if (automationCurveAt(event.position))
         { pointer = juce::MouseCursor::UpDownResizeCursor; setTooltip("Drag up or down to change the curve shape. Click a node to edit its time or value."); }
         else for (const auto& clip : owner.engine.project.clips)
@@ -620,8 +727,8 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
                 pointer = juce::MouseCursor::DraggingHandCursor;
                 const bool linked = std::any_of(owner.engine.project.transitionLinks.begin(), owner.engine.project.transitionLinks.end(),
                     [&](const auto& link) { return link.incoming == clip.id || link.outgoing == clip.id; });
-                setTooltip(linked ? "Pieces with the same LINK number move together. Right-click and choose Unlink to move one separately."
-                    : "Drag to move this piece. Ctrl-click selects several pieces to move together.");
+                setTooltip(linked ? "Drag the title to move this track and its locked partners. Each pair's Locked/Unlocked button controls movement; IN/OUT adjusts alignment."
+                    : "Drag the waveform to highlight audio, then right-click for tools. Drag the title to move this piece. Ctrl-click selects several pieces.");
                 break;
             }
     }
@@ -638,7 +745,6 @@ void Timeline::updateSize()
     if (owner.layout.followPlayhead) end = std::max(end, owner.engine.position.load());
     if (!owner.engine.project.tempo.points.empty()) end = std::max(end, owner.engine.project.tempo.points.back().time);
     if (!owner.engine.project.labels.empty()) end = std::max(end, owner.engine.project.labels.back().time);
-    for (const auto& track : owner.engine.project.tracks) for (const auto& curve : track.automation) if (!curve.points.empty()) end = std::max(end, curve.points.back().time);
     if (!owner.engine.project.masterAutomation.points.empty()) end = std::max(end, owner.engine.project.masterAutomation.points.back().time);
     for (const auto& track : owner.engine.project.tracks) for (const auto& lane : track.pluginAutomation) if (!lane.curve.points.empty()) end = std::max(end, lane.curve.points.back().time);
     for (const auto& scene : owner.engine.project.visualScenes) end = std::max(end, scene.end());
@@ -648,6 +754,7 @@ void Timeline::updateSize()
     setSize(std::max(owner.viewport.getWidth(), (int) width), contentHeight);
     owner.layoutTrackHeaders();
     refreshCurveTools();
+    refreshMovementLocks();
     refreshAccessibleItems();
     owner.timelineRuler.refreshAccessibleMarkers();
     owner.tempoStrip.refreshAccessibleMarkers();
@@ -761,13 +868,13 @@ void Timeline::paint(juce::Graphics& g)
         juce::Graphics::ScopedSaveState save(g); g.reduceClipRegion(r.toNearestInt());
         const int left = std::max(visible.getX(), (int) r.getX()), right = std::min(visible.getRight(), (int) r.getRight());
         const bool linkedPiece = std::any_of(owner.engine.project.transitionLinks.begin(), owner.engine.project.transitionLinks.end(),
-            [&](const auto& link) { return link.incoming == c.id || link.outgoing == c.id; });
+            [&](const auto& link) { return link.incoming == c.id; });
         g.setFont(juce::FontOptions(12).withStyle("Bold")); g.setColour(colour::text); g.drawText(c.media->name
             + (c.pitchSemitones != 0 ? "  [pitch " + juce::String(c.pitchSemitones > 0 ? "+" : "") + juce::String(c.pitchSemitones, 2) + " steps]" : juce::String())
             + (!c.media->playbackError.isEmpty() ? " [audio unavailable]" : !c.media->hasPlayback() ? (c.media->sourceDetailsPending ? " [reading duration / preparing audio]" : " [preparing audio]") : "")
             + (c.pendingPlacement == PendingPlacement::failed ? " [tempo failed; retry Beatmatch]" : c.pendingPlacement != PendingPlacement::none ? " [matching tempo]" : "")
             + (c.reversed ? " [reverse]" : "") + (c.loopSpan > 0 ? " [loop]" : "") + "  " + owner.keyText(*c.media)
-            + (c.media->bpm() > 0 ? "  / " + juce::String(c.media->bpm(), 2) + " BPM / " + (c.media->manualBpm <= 0 && (c.media->analysis.variableTempo || c.media->analysis.tempoConfidence < 0.2) ? "beat grid needs review" : c.firstDownbeatTime() >= 0 ? (c.media->manualBeatOrigin >= 0 ? "4/4" : c.media->analysis.downbeatOrigin < 0 ? "4/4 best guess" : "4/4 inferred") : "downbeat unknown") : ""), r.withLeft((float) left + (c.stems ? 120.f : 0.f) + (linkedPiece ? 58.f : 0.f)).withRight((float) right).withTrimmedRight(28).reduced(8, 3).removeFromTop(18), juce::Justification::left);
+            + (c.media->bpm() > 0 ? "  / " + wholeBpmText(c.media->bpm()) + " BPM / " + (c.media->manualBpm <= 0 && (c.media->analysis.variableTempo || c.media->analysis.tempoConfidence < 0.2) ? "beat grid needs review" : c.firstDownbeatTime() >= 0 ? (c.media->manualBeatOrigin >= 0 ? "4/4" : c.media->analysis.downbeatOrigin < 0 ? "4/4 best guess" : "4/4 inferred") : "downbeat unknown") : ""), r.withLeft((float) left + (c.stems ? 120.f : 0.f) + (linkedPiece ? 76.f : 0.f)).withRight((float) right).withTrimmedRight(28).reduced(8, 3).removeFromTop(18), juce::Justification::left);
         const float baseline = r.getBottom() - 5, height = std::max(1.f, r.getHeight() - 32);
         std::vector<WaveformRange> levels; levels.reserve((size_t) std::max(0, right - left));
         bool waveformPending = false;
@@ -972,12 +1079,12 @@ juce::Rectangle<float> Timeline::transitionBounds(const Project::TransitionLink&
     const float x = (float) (range.getStart() * pixelsPerSecond), right = (float) (range.getEnd() * pixelsPerSecond);
     const float top = laneY(std::min(out->track, in->track), 26);
     const int lastTrack = std::max(out->track, in->track);
-    return {x, top, std::max(24.f, right - x), (float) laneTop(lastTrack + 1) - curveToolsReserve(lastTrack) - top - 8};
+    return {x, top, std::max(link.presetOwner.isEmpty() ? 24.f : 1.f, right - x), (float) laneTop(lastTrack + 1) - curveToolsReserve(lastTrack) - top - 8};
 }
 juce::Rectangle<float> Timeline::transitionSongBounds(const Project::TransitionLink& link, bool outgoing) const
 {
     const auto& p = owner.engine.project; const auto* clip = p.clipFor(outgoing ? link.outgoing : link.incoming);
-    if (!clip || transitionBounds(link).isEmpty()) return {};
+    if (!clip || link.presetOwner.isNotEmpty() || transitionBounds(link).isEmpty()) return {};
     const auto footer = clipFooterBounds(*clip); if (footer.isEmpty()) return {};
     return footer.toFloat().withTrimmedLeft(outgoing ? 26.f : 0.f).withWidth(22).reduced(0, 2);
 }
@@ -999,8 +1106,8 @@ std::optional<std::pair<juce::String, Project::TransitionEdit>> Timeline::transi
         if (transitionSongBounds(*it, true).contains(point)) return {{it->incoming, Project::TransitionEdit::moveOutgoing}};
         if (transitionSongBounds(*it, false).contains(point)) return {{it->incoming, Project::TransitionEdit::moveIncoming}};
         if (point.y < box.getY() || point.y > box.getY() + 18) continue;
-        if (std::abs(point.x - box.getX()) < 5) return {{it->incoming, Project::TransitionEdit::resizeStart}};
         if (std::abs(point.x - box.getRight()) < 5) return {{it->incoming, Project::TransitionEdit::resizeEnd}};
+        if (it->presetOwner.isEmpty() && std::abs(point.x - box.getX()) < 5) return {{it->incoming, Project::TransitionEdit::resizeStart}};
         if (box.withHeight(18).contains(point)) return {{it->incoming, Project::TransitionEdit::moveWindow}};
     }
     return {};
@@ -1015,6 +1122,15 @@ void Timeline::paintTransitions(juce::Graphics& g)
     {
         const auto box = transitionBounds(link); if (box.isEmpty() || !box.expanded(4).intersects(visible.toFloat())) continue;
         const bool selected = owner.selectedTransition == link.incoming;
+        if (link.alignmentOnly)
+        {
+            const auto header = box.withHeight(18);
+            g.setColour(colour::panel); g.fillRect(header);
+            g.setColour(selected ? colour::focus : colour::muted); g.drawRect(header,1);
+            g.setFont(juce::FontOptions(10));
+            g.drawText("OUT/IN  |  No preset",header.getIntersection(visible.toFloat()).reduced(5,0),juce::Justification::centredLeft,true);
+            continue;
+        }
         const auto accent = colour::moltenOrange.interpolatedWith(colour::moltenCore, .1f + pulse.heat * .2f);
         g.setColour(colour::moltenOrange.withAlpha(.025f + pulse.heat * .035f)); g.fillRect(box);
         for (int layer = 3; layer > 0; --layer)
@@ -1027,12 +1143,15 @@ void Timeline::paintTransitions(juce::Graphics& g)
         g.setGradientFill(juce::ColourGradient(colour::moltenEdge.darker(.45f), header.getTopLeft(), colour::panel, header.getBottomLeft(), false));
         g.fillRect(header);
         AlloyLookAndFeel::drawMoltenMetal(g, header.withHeight(1.6f), false, pulse.heat);
-        g.setColour(colour::text); g.fillRect(box.getX(), box.getY() + 4, 3.f, 10.f); g.fillRect(box.getRight() - 3, box.getY() + 4, 3.f, 10.f);
+        g.setColour(colour::text);
+        if (link.presetOwner.isEmpty()) g.fillRect(box.getX(), box.getY() + 4, 3.f, 10.f);
+        const float handleWidth = std::min(box.getWidth(),link.presetOwner.isEmpty() ? 3.f : 5.f);
+        g.fillRect(box.getRight()-handleWidth,box.getY()+4,handleWidth,10.f);
         const auto range = p.transitionRange(link);
         const double beats = clock.beatsAt(range.getEnd()) - clock.beatsAt(range.getStart());
         auto title = header.getIntersection(visible.toFloat()).reduced(6, 0);
         g.setFont(juce::FontOptions(10).withStyle("Bold"));
-        if (title.getWidth() >= 110)
+        if (link.presetName.isEmpty() && title.getWidth() >= 110)
         {
             auto count = title.removeFromLeft(48);
             for (int beat = 0; beat < 4; ++beat)
@@ -1053,7 +1172,9 @@ void Timeline::paintTransitions(juce::Graphics& g)
             g.setColour(juce::Colours::mediumseagreen); g.fillRoundedRectangle(badge, 2);
         }
         g.setColour(colour::text);
-        g.drawText(juce::String(juce::roundToInt(beats / 4)), title, juce::Justification::centredLeft);
+        const auto length = juce::String(beats/4,1) + " bars";
+        g.drawText(link.presetName.isEmpty() ? juce::String(juce::roundToInt(beats / 4))
+            : link.presetName + (title.getWidth() >= 130 ? "  |  " + length : juce::String()),title,juce::Justification::centredLeft,true);
         for (bool outgoing : {true, false})
         {
             const auto handle = transitionSongBounds(link, outgoing);
@@ -1085,11 +1206,12 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
     if (e.y >= 0 && !e.mods.isPopupMenu() && (resizingLane = dividerAt(e.position.y)) >= 0)
     { resizeStartHeight = laneSize(resizingLane); origin = e.getPosition(); return; }
     if (owner.busy || owner.engine.exporting) return;
-    dragging.clear(); dragClip.reset(); clipDrag.reset(); anchorDrag.reset(); transitionDrag.reset(); swapDrag.reset(); audioSlipDrag.reset(); draggingLabel.clear(); groupMove.reset(); moved = false;
+    dragging.clear(); dragClip.reset(); clipDrag.reset(); anchorDrag.reset(); transitionDrag.reset(); swapDrag.reset(); audioSlipDrag.reset(); edgeTrimDrag.reset(); draggingLabel.clear(); groupMove.reset(); moved = false;
     editingAutomationPoint.reset();
     curveBendDrag.reset();
     cutAmountDrag.reset();
     selectedSection.reset(); hotcueGesture.reset(); selectedHotcue.reset();
+    if (beginEdgeTrim(e)) return;
     if (beginEditSelection(e)) return;
     if (beginCutAmount(e)) return;
     if (beginHotcue(e)) return;
@@ -1121,6 +1243,7 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
         transitionDrag = hit; dragStart = transitionReference(owner.engine.project, *hit); origin = e.getPosition();
         // Canvas edits select their owner without invoking seek/scroll navigation.
         owner.selectTransition(hit->first, false);
+        grabKeyboardFocus();
         if (hit->second == Project::TransitionEdit::moveIncoming || hit->second == Project::TransitionEdit::moveOutgoing)
         {
             if (const auto* link = owner.engine.project.transitionFor(hit->first))
@@ -1130,7 +1253,7 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
                 owner.refresh();
             }
         }
-        owner.setStatus("Transition: drag the frame, either top corner, or the lower I / O song handles. Alt bypasses snapping."); return;
+        owner.setStatus("Transition selected. Right-click its header for tools. Drag the frame, corners or I/O handles to adjust."); return;
     }
     if (!e.mods.isPopupMenu() && !automationPointAt(e.position)) if (const auto anchor = anchorAt(e.position))
     {
@@ -1140,6 +1263,20 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
         anchorDrag = owner.engine.project; origin = e.getPosition();
         dragStart = clip->start + clip->transitionTime(draggingIntro); owner.refresh();
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return;
+    }
+    if (e.mods.isPopupMenu() && !automationPointAt(e.position))
+    {
+        const auto anchor = juce::Rectangle<int>(1, 1).withPosition(e.getScreenPosition());
+        if (const auto frame = transitionAt(e.position))
+        { owner.showTransitionMenu(frame->first, anchor); return; }
+        if (const auto swap = swapHandleAt(e.position))
+        { owner.showTransitionMenu(swap->incoming, anchor); return; }
+        if (const auto curve = automationCurveAt(e.position))
+        {
+            selectAutomationCurve(*curve);
+            owner.showAutomationNodeMenu(*curve, -1, e.x / pixelsPerSecond, anchor);
+            return;
+        }
     }
     if (const auto hit = automationPointAt(e.position))
     {
@@ -1176,15 +1313,15 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
         {
             if (e.mods.isPopupMenu())
             {
-                const bool keepCurve = owner.automationLane() >= 0 && owner.engine.selectedTrack == it->track
-                    && automationCurveAt(e.position) == std::optional<AutomationAddress>(owner.displayedAddress(it->track));
-                if (!keepCurve)
-                {
-                    if (owner.editSelection.contains(it->id)) owner.editSelection.primary = it->id;
-                    owner.selectedClip = it->id;
-                }
-                owner.selectTrack(it->track); owner.refresh();
-                owner.showTimelineMenu(e.x / pixelsPerSecond, it->track);
+                const double time = e.x / pixelsPerSecond;
+                const auto& scope = owner.editSelection;
+                if (scope.contains(it->id) && (!scope.range || scope.range->contains(time)))
+                    owner.editSelection.primary = it->id;
+                else
+                    owner.clearEditSelection();
+                owner.selectedClip = it->id;
+                owner.selectTrack(it->track);
+                owner.showTimelineMenu(time, it->track);
                 return;
             }
             owner.selectedAutomationTarget = -1;
@@ -1194,12 +1331,13 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
             owner.selectedClip = it->id; owner.selectTrack(it->track); dragging = it->id; dragStart = it->start; dragClip = *it; clipDrag = owner.engine.project; origin = e.getPosition(); owner.refresh(); return;
         }
     if (e.mods.isPopupMenu() && e.y >= 0)
-    { owner.selectedClip.clear(); owner.showTimelineMenu(e.x / pixelsPerSecond, trackAt((float) e.y)); return; }
+    { owner.clearEditSelection(); owner.selectedClip.clear(); owner.refresh(); owner.showTimelineMenu(e.x / pixelsPerSecond, trackAt((float) e.y)); return; }
     owner.selectedAutomationTarget = -1;
     owner.engine.seek(std::max(0.0, e.x / pixelsPerSecond)); owner.refresh();
 }
 void Timeline::mouseDrag(const juce::MouseEvent& e)
 {
+    if (continueEdgeTrim(e)) return;
     if (continueGroupMove(e)) return;
     if (continueEditSelection(e)) return;
     if (resizingLane >= 0) { owner.resizeLane(resizingLane, resizeStartHeight + e.y - origin.y); return; }
@@ -1238,7 +1376,8 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         { const juce::ScopedLock guard(owner.engine.lock); const auto applied = owner.engine.project.applyPlacements(candidate);
           if (applied.failed()) { owner.setStatus(applied.getErrorMessage()); return; } }
         updateSize(); owner.tempoStrip.repaint();
-        owner.setStatus(juce::String(draggingIntro ? "Intro" : "Outro") + " aligned / following tracks repositioned"); return;
+        owner.setStatus(draggingIntro ? "IN source adjusted beneath the fixed OUT join. Previous track kept in place."
+            : "OUT adjusted in this track. The next IN and its locked followers remain aligned; this track stays put."); return;
     }
     if (draggingLabel.isNotEmpty() && !owner.busy)
     {
@@ -1259,19 +1398,18 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         const auto address = editingAutomationPoint->first; const int draggingPoint = editingAutomationPoint->second;
         const int automationTrack = address.target == AutomationTarget::master ? 0 : address.track;
         if (!e.mouseWasDraggedSinceMouseDown()) return;
-        const juce::ScopedLock guard(owner.engine.lock);
-        auto* displayed = owner.engine.project.curve(address);
+        AutomationCurve* displayed=nullptr;
         const auto viewCurve = automationViewCurve(address);
         if (draggingPoint >= (int) viewCurve.points.size() || !owner.automationEditable(address)) return;
         double time = owner.engine.project.snappedTime(e.position.x / pixelsPerSecond, owner.engine.project.snap && !e.mods.isAltDown());
         // Keep exact clip-edge handles inside their audio clock. Integer mouse
         // coordinates (or float rounding just beyond the end) otherwise sample
         // the silent exterior and turn a vertical drag into a spurious boost.
-        if (const auto* clip = owner.engine.project.clipFor(address.clipId))
+        if (!owner.engine.project.snap || e.mods.isAltDown()) if (const auto* clip = owner.engine.project.clipFor(address.clipId))
             for (const double edge : {clip->start, clip->end()})
                 if (std::abs(e.position.x - edge * pixelsPerSecond) <= .5) { time = edge; break; }
         if (owner.engine.exporting || owner.engine.project.automationLocked(address)) return;
-        auto candidate = owner.engine.project;
+        auto candidate = owner.automationEditSnapshot();
         auto* envelope = owner.materialiseAutomation(candidate, address); if (!envelope) return;
         if (envelope->points.empty()) *envelope = viewCurve;
         float value = automationDb(automationTrack, e.position.y, address.target);
@@ -1280,11 +1418,14 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         const auto result = candidate.moveAutomationPoint(address, draggingPoint, time, value);
         if (result.failed()) { owner.setStatus(result.getErrorMessage()); return; }
         const auto& changed = candidate.curve(address)->points[(size_t) draggingPoint];
+        if(owner.engine.project.snap && !e.mods.isAltDown()
+            && std::abs(candidate.automationSessionTime(address,changed.time)-time)>1.e-7)
+        { owner.setStatus("No timeline beat fits between these neighbouring nodes. Hold Alt for a free edit."); return; }
         const auto& existing = viewCurve.points[(size_t) draggingPoint];
         if (changed.time == existing.time && changed.value == existing.value) return;
         candidate.curve(address)->enabled = true;
-        if (!moved) { owner.engine.setAutomationRecordMode(AutomationRecordMode::read); owner.remember(); moved = true; }
-        owner.engine.project = std::move(candidate);
+        if (!owner.publishAutomationEdit(std::move(candidate),address,!moved)) return;
+        moved=true;
         displayed = owner.engine.project.curve(address); if (!displayed || draggingPoint >= (int) displayed->points.size()) return;
         const auto& point = displayed->points[(size_t) draggingPoint]; owner.setStatus(timeText(point.time) + " / " + owner.automationText(address.target, automationDisplayValue(address, owner.engine.project.automationSessionTime(address, point.time), point.value))); repaint(); return;
     }
@@ -1301,16 +1442,16 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         const int track = trackAt((float) e.y);
         if (e.x == origin.x && c->start == dragStart && c->track == track) return;
         auto candidate = clipDrag.value_or(owner.engine.project);
-        if (e.x != origin.x)
+        if (e.x != origin.x || track != c->track)
         {
-            const auto result = candidate.moveClip(dragging, start, candidate.snap && !e.mods.isAltDown(), 6 / pixelsPerSecond);
+            const auto result = candidate.moveClipGroup({dragging},dragging,start,track,candidate.snap && !e.mods.isAltDown() && e.x!=origin.x);
             if (result.failed()) { owner.setStatus(result.getErrorMessage()); return; }
         }
-        candidate.clipFor(dragging)->track = track;
         if (!moved) { owner.remember(); moved = true; }
         const auto applied = owner.engine.project.applyPlacements(candidate);
         if (applied.failed()) { owner.setStatus(applied.getErrorMessage()); return; }
-        owner.engine.project.clipFor(dragging)->track = track; owner.engine.selectedTrack = track;
+        owner.engine.selectedTrack = track;
+        owner.setStatus("Tracks moved.");
     }
     repaint();
 }
@@ -1323,7 +1464,7 @@ void Timeline::mouseUp(const juce::MouseEvent& event)
     if (moved) owner.refresh();
     curveBendDrag.reset();
     cutAmountDrag.reset();
-    dragging.clear(); dragClip.reset(); clipDrag.reset(); anchorDrag.reset(); transitionDrag.reset(); swapDrag.reset(); audioSlipDrag.reset(); draggingLabel.clear();
+    dragging.clear(); dragClip.reset(); clipDrag.reset(); anchorDrag.reset(); transitionDrag.reset(); swapDrag.reset(); audioSlipDrag.reset(); edgeTrimDrag.reset(); draggingLabel.clear();
     mouseMove(event);
 }
 void Timeline::mouseDoubleClick(const juce::MouseEvent& e)
@@ -1364,7 +1505,7 @@ LibraryTable::LibraryTable(Workstation& w, bool playlist) : owner(w), isPlaylist
         const auto& media = isPlaylist ? clip->media : owner.engine.library[(size_t) owner.visibleMedia[(size_t) row]];
         auto title = media->libraryTitle();
         if (media->assets.artist.isNotEmpty()) title += ", artist " + media->assets.artist;
-        title += ", BPM " + (media->bpm() > 0 ? juce::String(media->bpm(), 2) : juce::String("unknown"));
+        title += ", BPM " + (media->bpm() > 0 ? wholeBpmText(media->bpm()) : juce::String("unknown"));
         title += ", key " + owner.keyText(*media) + " / " + keyNoteName(media->key());
         if (isPlaylist)
             title = "Segment " + juce::String((int) (clip - owner.engine.project.clips.data()) + 1) + ", " + title
@@ -1372,7 +1513,7 @@ LibraryTable::LibraryTable(Workstation& w, bool playlist) : owner(w), isPlaylist
                 + ", length " + (clip->awaitingSourceLength ? juce::String("pending") : timeText(clip->length));
         else
         {
-            title += ", duration " + timeText(media->duration()) + ", key check " + Workstation::keyEvidenceText(*media) + ", grid check " + gridReviewText(*media);
+            title += ", duration " + timeText(media->duration()) + ". " + Workstation::libraryReviewHint(*media);
             if (media->assets.genre.isNotEmpty()) title += ", genre " + media->assets.genre;
         }
         if (media->playbackError.isNotEmpty()) title += ", unavailable: " + media->playbackError;
@@ -1384,7 +1525,7 @@ LibraryTable::LibraryTable(Workstation& w, bool playlist) : owner(w), isPlaylist
     h.addColumn(playlist ? "LANE" : "TIME", 2, playlist ? 50 : 62, 50, 160, playlist ? juce::TableHeaderComponent::defaultFlags : juce::TableHeaderComponent::notSortable);
     h.addColumn(playlist ? "START" : "KEY", 3, playlist ? 82 : 60, 60, 220, juce::TableHeaderComponent::defaultFlags);
     h.addColumn(playlist ? "LENGTH" : "BPM", 4, playlist ? 84 : 62, 60, 180, juce::TableHeaderComponent::defaultFlags);
-    if (!playlist) { h.addColumn("KEY CHECK", 7, 90, 70, 120, juce::TableHeaderComponent::defaultFlags); h.addColumn("GRID CHECK", 9, 100, 90, 150, juce::TableHeaderComponent::defaultFlags); h.addColumn("GENRE", 8, 100, 80, 240, juce::TableHeaderComponent::defaultFlags); }
+    if (!playlist) h.addColumn("GENRE", 8, 100, 80, 240, juce::TableHeaderComponent::defaultFlags);
     h.addColumn("ART", 5, playlist ? 36 : 32, 32, 120);
     if (playlist) h.addColumn("TRANSITION IN", 6, 130, 130, 300, juce::TableHeaderComponent::notSortable);
     if (!playlist) { h.moveColumn(5, 0); h.moveColumn(2, 4); }
@@ -1415,13 +1556,32 @@ juce::Component* LibraryTable::accessibleCell(int row, int column, bool selected
     {
         if (column == 2) text = "Duration " + timeText(media->duration());
         else if (column == 3) text = "Key " + owner.keyText(*media) + " / " + keyNoteName(media->key());
-        else if (column == 4) text = "BPM " + (media->bpm() > 0 ? juce::String(media->bpm(), 2) : juce::String("unknown"))
+        else if (column == 4) text = "BPM " + (media->bpm() > 0 ? wholeBpmText(media->bpm()) : juce::String("unknown"))
             + (media->analysis.variableTempo && media->manualBpm == 0 ? ", variable tempo" : media->manualBpm == 0 && media->analysis.tempoConfidence < .2 ? ", uncertain" : "");
-        else if (column == 7) text = "key check " + Workstation::keyEvidenceText(*media);
-        else if (column == 9) text = "grid check " + gridReviewText(*media);
         else if (column == 8) text = "Genre " + (media->assets.genre.isEmpty() ? juce::String("not tagged") : media->assets.genre);
     }
     cell->setTitle(text); cell->setDescription(table.rowName(row));
+    if(!isPlaylist && column==1)
+    {
+        cell->seek.source(media);cell->seek.setVisible(true);cell->resized();
+        cell->seek.setComponentID("library-seek-"+media->id);cell->seek.setTitle("Preview position / "+media->libraryTitle());
+        const auto route=owner.libraryPreview.usesPrivateOutput() ? juce::String("Uses the configured headphones output; programme playback continues.")
+            : juce::String("Uses master output and pauses the arrangement without moving its cursor.");
+        cell->seek.setTooltip("Click or drag to preview this part of the track. "+route);
+        cell->seek.setDescription("Seek through this source without adding it to the mix. Left/Right seeks five seconds; Shift seeks thirty; Home/End seeks its edges; Space toggles preview; Escape stops. "+route);
+        cell->seek.audition=[this](const std::shared_ptr<Media>& target,std::optional<double> fraction)
+        {
+            owner.correctionFromLibrary=true;
+            for(size_t i=0;i<owner.visibleMedia.size();++i)if(owner.engine.library[(size_t)owner.visibleMedia[i]]->id==target->id)
+            {if(!table.isRowSelected((int)i))table.selectRow((int)i);break;}
+            owner.previewLibraryTrack(target->id,fraction);
+        };
+        cell->seek.progress=[this,cell] {const auto m=cell->seek.media;return m && owner.libraryPreview.active(m->id) ? owner.libraryPreview.positionFraction():-1.;};
+        cell->seek.length=[this,cell] {const auto m=cell->seek.media;return m ? owner.libraryPreview.active(m->id) && owner.libraryPreview.lengthSeconds()>0 ? owner.libraryPreview.lengthSeconds():m->duration():0.;};
+        cell->seek.updatePosition();
+    }
+    else
+    {cell->seek.setVisible(false);cell->seek.source({});cell->seek.audition={};cell->seek.progress={};cell->seek.length={};}
     return cell;
 }
 Clip* LibraryTable::clipAtRow(int row) const
@@ -1469,6 +1629,10 @@ void LibraryTable::paintRowBackground(juce::Graphics& g, int row, int w, int h, 
 void LibraryTable::paintCell(juce::Graphics& g, int row, int col, int w, int h, bool)
 {
     if (row < 0 || row >= getNumRows()) return;
+    const juce::Graphics::ScopedSaveState paintState(g);
+    const bool review = !isPlaylist && Workstation::libraryNeedsReview(*owner.engine.library[(size_t) owner.visibleMedia[(size_t) row]]);
+    // Keep selection, preview and hit targets fully active; only subdue the ink.
+    const auto reviewInk = [review](juce::Colour value) { return review ? value.interpolatedWith(colour::muted, .6f) : value; };
     juce::String text;
     if (col == 5)
     {
@@ -1499,30 +1663,21 @@ void LibraryTable::paintCell(juce::Graphics& g, int row, int col, int w, int h, 
         if (col == 1)
         {
             const int x = 10;
-            g.setColour(colour::text); g.setFont(juce::FontOptions(12));
+            g.setColour(reviewInk(colour::text)); g.setFont(juce::FontOptions(12));
             g.drawText(m->libraryTitle() + (m->playbackError.isNotEmpty() ? " [unavailable]" : m->sessionMetadataPending ? " [checking source]" : ""), x, 4, std::max(0, w - x - 5), 18, juce::Justification::centredLeft, true);
-            g.setColour(colour::muted); g.setFont(juce::FontOptions(11));
-            const auto detail = m->playbackError.isNotEmpty() ? "Unavailable / " + m->file.getFileName()
-                : m->sessionMetadataPending ? "Checking source / " + m->file.getFileName() : m->assets.artist.isNotEmpty() ? m->assets.artist : m->file.getFileName();
-            g.drawText(detail, x, 23, std::max(0, w - x - 5), 15, juce::Justification::centredLeft, true); return;
+            // The title cell's lower line is the seekable source preview.
+            // Filename, artist and review detail remain in hover/accessibility.
+            return;
         }
-        else if (col == 7)
-        {
-            const auto state = Workstation::keyEvidenceText(*m);
-            const juce::Colour ink = state == "Manual" ? juce::Colour(0xff9acbfa) : state == "Review" ? juce::Colour(0xffffbb78) : colour::muted;
-            g.setColour(ink); g.setFont(juce::FontOptions(12));
-            g.drawText(state, 10, 0, w - 15, h, juce::Justification::centredLeft, true); return;
-        }
-        else if (col == 9) text = gridReviewText(*m);
         else if (col == 8) text = m->assets.genre;
-        else if (col == 2) text = timeText(m->duration()).dropLastCharacters(4); else if (col == 3) text = owner.keyText(*m); else text = m->bpm() > 0 ? juce::String(m->bpm(), 2) + (m->analysis.variableTempo && m->manualBpm == 0 ? " ~" : m->manualBpm == 0 && m->analysis.tempoConfidence < 0.2 ? " ?" : "") : "Unknown";
+        else if (col == 2) text = timeText(m->duration()).dropLastCharacters(4); else if (col == 3) text = owner.keyText(*m); else text = m->bpm() > 0 ? wholeBpmText(m->bpm()) + (m->analysis.variableTempo && m->manualBpm == 0 ? " ~" : m->manualBpm == 0 && m->analysis.tempoConfidence < 0.2 ? " ?" : "") : "Unknown";
         if (col == 3 && m->key() >= 0)
         {
             auto* selected = owner.currentClip();
             if (selected && harmonicallyCompatible(selected->media->key(), m->key())) { g.setColour(colour::orange.withAlpha(0.12f)); g.fillRoundedRectangle(3, 3, (float) w - 6, (float) h - 6, 3); }
         }
     }
-    g.setColour(col == 1 ? colour::text : colour::muted); g.setFont(juce::FontOptions(12)); g.drawText(text, 10, 0, w - 15, h, juce::Justification::centredLeft, true);
+    g.setColour(reviewInk(col == 1 ? colour::text : colour::muted)); g.setFont(juce::FontOptions(12)); g.drawText(text, 10, 0, w - 15, h, juce::Justification::centredLeft, true);
 }
 void LibraryTable::cellDoubleClicked(int row, int column, const juce::MouseEvent&)
 {
@@ -1540,8 +1695,10 @@ juce::String LibraryTable::getCellTooltip(int row, int column)
         : "Play / stop preview through master output. Arrangement playback pauses; its position is kept.";
     const auto retryHint = a.focusedRevision > 0 && (a.focusedTempo > 0 || a.focusedKey > 0)
         ? juce::String(" Open Source corrections to review the retry result.") : juce::String();
-    if (!isPlaylist && column == 7) return Workstation::keyEvidenceHint(*media);
-    if (!isPlaylist && column == 9) return gridReviewHint(*media);
+    if (!isPlaylist && column == 1) return media->libraryTitle()
+        + (media->assets.artist.isNotEmpty() ? " / "+media->assets.artist : juce::String())
+        + "\n"+media->file.getFileName()+"\n"+Workstation::libraryReviewHint(*media);
+    if (!isPlaylist && column == 4) return Workstation::libraryReviewHint(*media);
     if (!isPlaylist && column == 8) return media->assets.genre.isEmpty() ? "No genre tag found in this file." : "File genre tag: " + media->assets.genre;
     if (!isPlaylist && column == 3)
         return Workstation::keyEvidenceHint(*media);
@@ -1791,6 +1948,7 @@ bool TrackStrip::keyPressed(const juce::KeyPress& key)
 
 Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this), timelineRuler(*this, false), timelineOverview(*this, true), tempoStrip(*this), libraryTable(*this, false), playlistTable(*this, true), pluginList(*this), piano(engine.keyboard, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
+    bool firstWorkspace=false;
     statusAccess.setInterceptsMouseClicks(false, false);
     statusAccess.read = [this]
     {
@@ -1857,7 +2015,7 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     removeButton.setTooltip("Remove the selected block from this arrangement.");
     libraryTab.setTooltip("Browse and search analysed audio. Drag a row to a lane, or double-click to add it to the mix.");
     playlistTab.setTooltip("View the current mix track list. Select a row to select its timeline segment.");
-    editingTab.setTooltip("Show segment timing, trims, fades, gain, reverse and loop in the lower Editing console. Its hexagon detaches the same controls.");
+    editingTab.setTooltip("Close or focus the open details inspector. Use its dock button to move it to a separate window.");
     keyboardButton.setTooltip("Show or hide the on-screen piano below the VST3 chain for the selected lane instrument.");
     instrumentSetupButton.setTooltip("Open audio devices, MIDI inputs and controller mapping setup.");
     controllerTab.setTooltip("Show the live desk with faders, paired pots and optional MIDI Learn.");
@@ -1895,9 +2053,17 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     waveformMode.setTooltip("Choose how much waveform detail to show. This changes the view, not the sound.");
     waveformMode.onChange = [this] { timeline.repaint(); };
     for (int i = 0; i < trackCount; ++i) { strips[(size_t) i] = std::make_unique<TrackStrip>(*this, i); trackHeaders.addAndMakeVisible(*strips[(size_t) i]); }
-    sceneLane = std::make_unique<SceneLane>(*this); addAndMakeVisible(*sceneLane); addAndMakeVisible(sceneLane->browserButton);
+    sceneLane = std::make_unique<SceneLane>(*this);
+    studioWorkspace = std::make_unique<StudioWorkspace>(*sceneLane);
+    studioPanel = std::make_unique<ToolPanel>(*studioWorkspace, "Visual Studio");
+    addChildComponent(*studioPanel);
+    addAndMakeVisible(studioTab);
+    studioTab.getProperties().set("alloyTab", true);
+    studioTab.onClick = [this] { toggleConsole(3); };
+    studioPanel->dock.onClick = [this] { detachToolPanel(3, !studioWindow); };
     label(inspectorLabel, "SEGMENT INSPECTOR"); label(pluginLabel, "VST3 INSERTS / AUDIO 1"); label(masterLabel, "MASTER"); label(timeLabel, "00:00.000", 21); timeLabel.setColour(juce::Label::textColourId, colour::orange);
     slider(tempoSlider, 20, 400, 0.01, " BPM"); tempoSlider.setSliderStyle(juce::Slider::LinearBarVertical); tempoSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 96, 28);
+    tempoSlider.textFromValueFunction = [](double value) { return wholeBpmText(value); };
     tempoSlider.setVelocityBasedMode(false); tempoSlider.setSliderSnapsToMousePosition(false); tempoSlider.setMouseDragSensitivity(3800); tempoSlider.setValue(120, juce::dontSendNotification);
     tempoSlider.setTooltip("Live BPM at the playhead during playback. When stopped, edits the selected marker. Drag up/down or double-click to type; during playback, adds a tempo target at the playhead.");
     keyDisplay.addItem("Note", 1); keyDisplay.addItem("Camelot", 2); keyDisplay.addItem("Note + Camelot", 3); keyDisplay.setSelectedId(3, juce::dontSendNotification);
@@ -1913,7 +2079,6 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     transitionPreset.addItem("None", 1); transitionPreset.addItem("Bass swap", 2); transitionPreset.addItem("Crossfade", 3);
     transitionPreset.setSelectedId(3, juce::dontSendNotification); transitionPreset.setTitle("New transition preset");
     transitionPreset.setTooltip("Preset for Add Transition and Auto Arrange. None creates an editable frame without changing audio. Bass swap and Crossfade place editable nodes.");
-    transitionBody.addAndMakeVisible(transitionPreset); transitionBody.addAndMakeVisible(transitionLength);
     beatmatchButton.setButtonText("Auto Arrange"); beatmatchButton.setTitle("Auto Arrange timeline");
     beatmatchButton.setTooltip("Auto Arrange the songs already on the timeline in their current time order. Try section blends; use a crossfade when no suitable section transition fits. Undo restores the arrangement.");
     beatmatchButton.onClick = [this] { if (canAutoArrange()) prepareTempo(engine.project, true, true, 0, true); else setStatus("Pause playback, unlock transitions and wait for preparation before mixing the timeline."); };
@@ -1990,6 +2155,7 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
         engine.removePlugin(engine.selectedTrack, i); dirty = true; refresh();
     };
     engine.onControl = [this](bool changed) { dirty = dirty || changed; if (!busy) refresh(); };
+    engine.onSeekStatus = [this](const juce::String& text) { setStatus(text); };
     refreshControllerConnection();
     engine.onProjectSwitchBegin = [this] { if (!engine.capturingPerformance()) remember(); };
     engine.onAutomationWriteBegin = [this] { remember(); };
@@ -2016,10 +2182,22 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     loopButton.onClick = [this] { configureLoop(); };
     libraryTable.table.getHeader().setSortColumnId(1, true);
     libraryPreview.onChange = [this](const juce::String& message) { setStatus(message); libraryTable.table.repaint(); };
+    libraryPreview.onProgress=[this]
+    {
+        const auto* view=libraryTable.table.getViewport();const int height=std::max(1,libraryTable.table.getRowHeight());
+        const int first=view ? view->getViewPositionY()/height:0;
+        const int end=std::min(libraryTable.getNumRows(),first+libraryTable.table.getHeight()/height+2);
+        for(int row=first;row<end;++row)if(auto* cell=dynamic_cast<LibraryCell*>(libraryTable.table.getCellComponent(1,row)))cell->seek.updatePosition();
+    };
     if (openAudioDevice)
     {
-        const auto preference = readScanPreference(musicPreference); musicScanEnabled = preference.enabled; if (preference.error.isNotEmpty()) status = preference.error; catalogueFile = libraryCatalogueFile(); catalogueRestorePending = true;
+        const auto preference = readScanPreference(musicPreference);
+        musicScanEnabled = preference.enabled; musicFolderPreference = preference.folder;
+        if (musicFolderPreference != juce::File()) musicFolder = musicFolderPreference;
+        if (preference.error.isNotEmpty()) status = preference.error;
+        catalogueFile = libraryCatalogueFile(); catalogueRestorePending = true;
         workspacePreference = PcmStore::defaultRoot().getParentDirectory().getChildFile("workspace.json");
+        firstWorkspace=!workspacePreference.existsAsFile();
         const auto loaded = readWorkspacePreferences(workspacePreference, layout); if (loaded.failed()) status = loaded.getErrorMessage();
         recoveryRoot = workspacePreference.getParentDirectory().getChildFile("recovery");
         juce::String recoveryError; recoveryStore = RecoveryStore::create(recoveryRoot, recoveryError);
@@ -2043,11 +2221,15 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     initialiseAttract();
     initialiseEditing();
     setSize(1440, 940); showBrowserPage(0); showInspectorPage(1); restoreEditingWorkspace(); consoleCollapsed = true; layout.timeline = {}; resized(); refresh(); tickLibraryCatalogue(); startTimerHz(25);
+    if(firstWorkspace) juce::MessageManager::callAsync([safe=juce::Component::SafePointer<Workstation>(this)] { if(safe)safe->showTutorial(); });
 }
 Workstation::~Workstation()
 {
+    tutorialWindow.reset();
+    if (studioWindow) { studioWindow->clearContentComponent(); studioWindow->setLookAndFeel(nullptr); }
+    studioWindow.reset(); studioPanel.reset(); studioWorkspace.reset();
     sceneLane.reset();
-    libraryPreview.onChange = {}; libraryPreview.stop();
+    libraryPreview.onChange = {}; libraryPreview.onProgress={}; libraryPreview.stop();
     hints.setHintsEnabled(false); hints.setLookAndFeel(nullptr);
     trackEditingWorkspace(); saveWorkspacePreferences();
     if (editingWindow) editingWindow->clearContentComponent();
@@ -2058,7 +2240,7 @@ Workstation::~Workstation()
     transitionWindow.reset(); transitionViewport.setViewedComponent(nullptr, false);
     performanceWindow.reset(); performanceViewport.setViewedComponent(nullptr, false);
     earWindow.reset(); gridWindow.reset();
-    stopTimer(); engine.onControl = {}; engine.onMidiChanged = {}; engine.onAutomationWriteBegin = {}; engine.onPerformanceAction = {};
+    stopTimer(); engine.onControl = {}; engine.onMidiChanged = {}; engine.onSeekStatus = {}; engine.onAutomationWriteBegin = {}; engine.onPerformanceAction = {};
     if (stemJob) stemJob->finish();
     saveWorkspacePreferences();
     if (importCancellation) *importCancellation = true;
@@ -2071,11 +2253,7 @@ Workstation::~Workstation()
     workers.removeAllJobs(true, -1);
     recoveryWorkers.removeAllJobs(true, -1);
     if (recoveryStore) { const auto result = recoveryStore->discard(); if (result.failed()) juce::Logger::writeToLog(result.getErrorMessage()); }
-    if (catalogueFile != juce::File())
-    {
-        juce::Array<juce::File> sources; for (const auto& media : engine.library) sources.add(media->file);
-        const auto error = rememberLibraryCatalogue(catalogueFile, sources, engine.library); if (error.isNotEmpty()) juce::Logger::writeToLog(error);
-    }
+    flushLibraryCatalogue();
     settingsWindow.reset();  editors.clear(); viewport.setViewedComponent(nullptr, false); setLookAndFeel(nullptr);
 }
 void Workstation::timerCallback()
@@ -2176,7 +2354,13 @@ void Workstation::fail(const juce::String& error)
 }
 void Workstation::remember()
 {
-    if (engine.capturingPerformance()) { engine.performanceProjectPending=true; dirty=true; return; }
+    if (engine.capturingPerformance())
+    {
+        const auto base=(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0));
+        undoHistory.push_back(editHistorySnapshot(engine));
+        if(undoHistory.size()>base+100)undoHistory.erase(undoHistory.begin()+(ptrdiff_t)base);
+        redoHistory.clear(); engine.performanceProjectPending=true; dirty=true; return;
+    }
     engine.cancelPreparedLaunch();
     clearEditSelection();
     engine.endTransitionRehearsal();
@@ -2185,6 +2369,29 @@ void Workstation::remember()
 void Workstation::undo(bool redo)
 {
     if (busy) return;
+    if(engine.capturingPerformance())
+    {
+        const auto base=(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0));
+        auto& source=redo ? redoHistory : undoHistory; auto& destination=redo ? undoHistory : redoHistory;
+        if(source.empty() || (!redo && source.size()<=base))
+        { setStatus(redo ? "No live edit to redo in this take." : "No live structural edit to undo. Stop the take before undoing arrangement history."); return; }
+        engine.flushMidiControls(); engine.finishAutomation();
+        auto previous=editHistorySnapshot(engine); auto candidate=std::move(source.back()); source.pop_back();
+        // Keep continuous controls performed since the structural edit. Their
+        // heard chronology is independent of this curve/placement checkpoint.
+        const auto keepManual=[](TrackSettings& target,const TrackSettings& current)
+        { target.gainDb=current.gainDb; target.pan=current.pan; target.eqDb=current.eqDb; target.filterCutoff=current.filterCutoff; target.pluginControls=current.pluginControls; };
+        for(int lane=0;lane<trackCount;++lane)keepManual(candidate.tracks[(size_t)lane],previous.tracks[(size_t)lane]);
+        for(auto& clip:candidate.clips)
+            if(const auto* current=previous.clipFor(clip.id))keepManual(candidate.effectSettings(clip),previous.effectSettings(*current));
+        { const juce::ScopedLock guard(engine.lock); candidate.performanceTakes.swap(engine.project.performanceTakes); std::swap(engine.project,candidate);
+          engine.performanceProjectPending=true; }
+        destination.push_back(std::move(previous)); dirty=true; refresh();
+        setStatus(redo ? "Live edit redone at the current time. Earlier heard events are kept in the take."
+            : "Live edit undone at the current time. Earlier heard events and subsequent continuous controls are kept.");
+        return;
+    }
+
     clearEditSelection();
     timeline.finishSectionGesture(true);
     engine.endTransitionRehearsal();
@@ -2194,6 +2401,7 @@ void Workstation::undo(bool redo)
     auto& source = redo ? redoHistory : undoHistory; auto& dest = redo ? undoHistory : redoHistory; if (source.empty()) return;
     if (!persistSourceSectionHistory(source.back())) return;
     timeline.selectAutomationPoint({}, -1);
+    {
     const juce::ScopedLock guard(engine.lock);
     // Plugin insert edits are outside arrangement undo; keep their current control ownership too.
     auto currentTracks = engine.project.tracks;
@@ -2201,7 +2409,8 @@ void Workstation::undo(bool redo)
     for (const auto& clip : engine.project.clips) currentClipControls[effectsIdentity(clip.effects)] = engine.project.effectSettings(clip).pluginControls;
     const double previousOrigin = engine.project.tempo.origin;
     dest.push_back(engine.project); engine.project = std::move(source.back()); source.pop_back();
-    if (previousOrigin != engine.project.tempo.origin) engine.seek(std::max(0., engine.position.load() + engine.project.tempo.origin - previousOrigin));
+    if (previousOrigin != engine.project.tempo.origin)
+        engine.commitSeek(engine.prepareSeek(std::max(0., engine.position.load() + engine.project.tempo.origin - previousOrigin)));
     for (int i = 0; i < trackCount; ++i)
     {
         auto& settings = engine.project.tracks[(size_t) i]; settings.pluginControls = currentTracks[(size_t) i].pluginControls;
@@ -2215,7 +2424,9 @@ void Workstation::undo(bool redo)
         settings.pluginAutomation.erase(std::remove_if(settings.pluginAutomation.begin(), settings.pluginAutomation.end(), [&](const auto& lane)
         { return std::none_of(clip.effects->plugins.begin(), clip.effects->plugins.end(), [&](const auto& slot) { return slot->id == lane.slotId; }); }), settings.pluginAutomation.end());
     }
-    engine.restoreManualPluginValues(); engine.tempo = engine.project.bpm; dirty = true; refresh();
+    engine.restoreManualPluginValues(); engine.tempo = engine.project.bpm;
+    }
+    dirty = true; refresh();
     if (engine.project.hasPendingPlacement()) finishTimelineAudio();
 }
 void Workstation::filterLibrary()
@@ -2232,7 +2443,7 @@ void Workstation::filterLibrary()
     for (int i = 0; i < (int) engine.library.size(); ++i)
     {
         const auto& m = *engine.library[(size_t) i];
-        if (m.name.containsIgnoreCase(search.getText()) || m.assets.artist.containsIgnoreCase(search.getText()) || m.assets.album.containsIgnoreCase(search.getText()) || m.assets.genre.containsIgnoreCase(search.getText()) || m.file.getFileName().containsIgnoreCase(search.getText()) || keyNoteName(m.key()).containsIgnoreCase(search.getText()) || keyCompactName(m.key()).containsIgnoreCase(search.getText()) || keyCamelot(m.key()).containsIgnoreCase(search.getText()) || (m.bpm() > 0 && juce::String(m.bpm(), 2).containsIgnoreCase(search.getText()))) visibleMedia.push_back(i);
+        if (m.name.containsIgnoreCase(search.getText()) || m.assets.artist.containsIgnoreCase(search.getText()) || m.assets.album.containsIgnoreCase(search.getText()) || m.assets.genre.containsIgnoreCase(search.getText()) || m.file.getFileName().containsIgnoreCase(search.getText()) || keyNoteName(m.key()).containsIgnoreCase(search.getText()) || keyCompactName(m.key()).containsIgnoreCase(search.getText()) || keyCamelot(m.key()).containsIgnoreCase(search.getText()) || (m.bpm() > 0 && (wholeBpmText(m.bpm()).containsIgnoreCase(search.getText()) || juce::String(m.bpm(), 2).containsIgnoreCase(search.getText())))) visibleMedia.push_back(i);
     }
     const auto reference = std::find_if(engine.library.begin(),engine.library.end(),[&](const auto& media) { return media->id == librarySortReferenceId; });
     const Media* baseline = reference == engine.library.end() ? nullptr : reference->get();
@@ -2271,19 +2482,6 @@ void Workstation::filterLibrary()
                 const int order = x.compareNatural(y);
                 return librarySortForward ? order < 0 : order > 0;
             }
-            if (librarySortColumn == 7)
-            {
-                const auto rank=[](const Media& m) { return m.key()<0 || m.key()>23 ? 0 : m.manualKey>=0 ? 3 : keyEvidenceText(m)=="Review" ? 1 : 2; };
-                const int x = rank(first), y = rank(second);
-                if (x != y) return librarySortForward ? x < y : x > y;
-                return first.libraryTitle().compareNatural(second.libraryTitle())<0;
-            }
-            if (librarySortColumn == 9)
-            {
-                const int x=gridReviewRank(first), y=gridReviewRank(second);
-                if (x!=y) return librarySortForward ? x<y : x>y;
-                return first.libraryTitle().compareNatural(second.libraryTitle())<0;
-            }
             if (librarySortColumn == 1) { const int order = first.libraryTitle().compareNatural(second.libraryTitle()); return librarySortForward ? order < 0 : order > 0; }
             if (librarySortColumn == 2) return librarySortForward ? first.duration() < second.duration() : first.duration() > second.duration();
             double x = librarySortColumn == 4 ? first.bpm() : first.key() < 0 || first.key() > 23 ? -1 : engine.project.keyDisplay == 0 ? first.key() : keyWheelNumber(first.key()) * 2 + (first.key() < 12 ? 1 : 0);
@@ -2303,29 +2501,43 @@ void Workstation::filterLibrary()
 void Workstation::refreshMusicScanStatus()
 {
     juce::String text, detail;
+    int checked = musicChecked, unchanged = musicUnchanged;
+    const auto counts = juce::String(musicAdded) + " added / " + juce::String(musicRefreshed) + " refreshed / " + juce::String(musicSaved) + " saved";
     if (musicScan)
     {
         const auto progress = musicScan->progress();
-        const char* stage = progress.stage == MediaReadStage::analyse ? "Analysing" : progress.stage == MediaReadStage::decode ? "Reading" : "Checking";
-        text = "Scanning Music / " + juce::String(progress.checked) + " checked\n" + juce::String(musicAdded) + " added / " + juce::String(musicRefreshed) + " refreshed / " + juce::String(musicFailures) + " failed / " + juce::String(musicProblems) + " cache warnings";
+        checked = progress.checked; unchanged = progress.unchanged;
+        const char* stage = (progress.stage == MediaReadStage::analyse || progress.stage == MediaReadStage::energy) ? "Analysing"
+            : progress.stage == MediaReadStage::decode ? "Reading audio" : progress.stage == MediaReadStage::savedAnalysis ? "Reusing analysis" : "Checking";
+        text = "Scanning Music / " + juce::String(checked) + " checked\n" + counts;
         detail = juce::String(stage) + ": " + progress.file.getFileName();
-        if (engine.playing || engine.exporting || busy) text = "Scan waiting / programme or preparation busy\n" + juce::String(progress.checked) + " audio files checked";
+        if (engine.playing || engine.exporting || busy) text = "Scan paused / " + juce::String(checked) + " checked\n" + counts;
     }
+    else if (catalogueOpening) text = "Opening saved Library...";
     else if (musicScanJobPending) text = "Music scan / checking folders...";
     else if (musicScanManual) text = "Scan waiting / stop playback and finish preparation";
-    else if (musicScanSummary.isNotEmpty()) text = musicScanSummary.replace(" / " + juce::String(musicAdded) + " added", "\n" + juce::String(musicAdded) + " added");
-    else text = musicScanEnabled ? (engine.playing ? "Music scan / waiting for playback to stop" : "Music scan / automatic when idle") : "Music scan / automatic scanning off";
+    else if (musicScanSummary.isNotEmpty())
+    {
+        text = musicScanSummary + " / " + juce::String(checked) + " checked";
+        if (musicFailures || musicProblems) text += " / " + juce::String(musicFailures + musicProblems) + " issues";
+        text += "\n" + counts;
+    }
+    else if (!catalogueRefreshQueue.empty()) text = "Checking saved tracks / " + juce::String(catalogueRefreshQueue.size()) + " remaining";
+    else text = musicScanEnabled ? (engine.playing ? "Music scan / waiting for playback to stop" : "Music scan / watching folder") : "Music scan / automatic scanning off";
+    if (catalogueSaveError.isNotEmpty()) text = "Library save pending / will retry\n" + counts;
     musicScanNotice.setText(text, juce::dontSendNotification);
-    musicScanNotice.setColour(juce::Label::textColourId, musicScan || musicScanJobPending || musicScanManual ? colour::orange : colour::muted);
+    musicScanNotice.setColour(juce::Label::textColourId, musicScan || musicScanJobPending || musicScanManual || catalogueSaveError.isNotEmpty() ? colour::orange : colour::muted);
     const auto description = text + (detail.isNotEmpty() ? "\n" + detail : juce::String()) + "\nFolder: " + musicFolder.getFullPathName()
-        + "\nIncludes subfolders. Checked counts supported audio files, including unchanged files. Tools / Scan Music folder now retries failed files; Stop current Music scan cancels it. Playback suspends scanning."
-        + "\nTools / Music scan reports lists each failed file and cache warning."
+        + "\n" + juce::String(unchanged) + " unchanged / " + juce::String(musicReused) + " reused analysis / " + juce::String(musicAnalysed) + " processed audio"
+        + "\n" + juce::String(musicFailures) + " failed imports / " + juce::String(musicProblems) + " cache warnings"
+        + "\n" + juce::String(catalogueRefreshQueue.size()) + " saved tracks awaiting a source check."
+        + "\nSaved counts committed Library rows. Tools / Scan Music folder now retries failures. Music scan reports lists each failed file and cache warning."
+        + (catalogueSaveError.isNotEmpty() ? "\nSave issue: " + catalogueSaveError : juce::String())
         + (musicLastIssue.isNotEmpty() ? "\nLast issue: " + musicLastIssue : juce::String());
     musicScanNotice.setTooltip(description); musicScanNotice.setTitle(description);
 }
 void Workstation::refresh()
 {
-    { const juce::ScopedLock guard(engine.lock); engine.project.updateLaneHandles(); }
     if (automationClip != selectedClip) automationClip.clear();
     engine.recordProjectCommit();
     refreshEditSelection();
@@ -2334,7 +2546,7 @@ void Workstation::refresh()
     saveButton.setTooltip((sessionFile == juce::File() ? "Save this untitled mix; choose a file first." : "Save current mix to " + sessionFile.getFullPathName()) + juce::String(" Ctrl+S saves; Ctrl+Shift+S chooses Save As."));
     engine.prepareClipProcessing();
     if (std::none_of(engine.project.labels.begin(), engine.project.labels.end(), [&](const auto& item) { return item.id == timeline.selectedLabel; })) timeline.selectedLabel.clear();
-    refreshing = true; refreshTransitionUI(); refreshAutomationEditor(); filterLibrary(); playlistTable.rebuildPlaylist(); libraryTable.table.updateContent(); pluginList.list.updateContent();
+    refreshing = true; refreshTransitionUI(); timelineRuler.refreshEditTools(); refreshAutomationEditor(); filterLibrary(); playlistTable.rebuildPlaylist(); libraryTable.table.updateContent(); pluginList.list.updateContent();
     libraryTable.table.repaint(); playlistTable.table.repaint(); pluginList.list.repaint();
     tempoSlider.setValue(pendingTempo > 0 ? pendingTempo : displayedTempo(), juce::dontSendNotification); masterSlider.setValue(engine.project.masterDb, juce::dontSendNotification); snapButton.setToggleState(engine.project.snap, juce::dontSendNotification);
     snapButton.setButtonText(engine.project.snapDivision == 4 ? "Snap 1/4" : engine.project.snapDivision == 2 ? "Snap 1/2" : "Snap 1");
@@ -2388,7 +2600,30 @@ void Workstation::refresh()
         splitButton.setEnabled(false); duplicateButton.setEnabled(false); reverseButton.setEnabled(false); loopButton.setEnabled(false);
         for (auto& slider : clipSliders) slider.setEnabled(false);
     }
-    undoButton.setEnabled(!undoHistory.empty()); redoButton.setEnabled(!redoHistory.empty());
+    const auto explainEdit=[&](juce::Component& control,TimelineAction action,const juce::String& fallback)
+    {
+        auto reason=timelineActionUnavailable(action,engine.position,engine.selectedTrack);
+        if(reason.isNotEmpty())control.setEnabled(false);
+        if(!control.isEnabled() && reason.isEmpty())reason=fallback;
+        control.getProperties().set("mixworksHintDisabled",reason);
+        control.setDescription(reason);
+    };
+    explainEdit(editingCopy,TimelineAction::copy,"Select ready audio before copying.");
+    explainEdit(editingCut,TimelineAction::cut,"Select unlocked, ready audio before cutting.");
+    explainEdit(editingPaste,TimelineAction::paste,"Choose a compatible destination before pasting the copied audio.");
+    explainEdit(editingDelete,TimelineAction::remove,"Stop playback and finish automation in Read before deleting selected audio.");
+    explainEdit(editingSplit,TimelineAction::split,"Stop playback and finish automation in Read before splitting selected audio.");
+    explainEdit(editingCrop,TimelineAction::cropSelection,"Drag over the waveform to select an audio range before cropping.");
+    explainEdit(editingRepeat,TimelineAction::repeatSelection,"Unlock the selected transitions before repeating audio.");
+    explainEdit(editingReplace,TimelineAction::replaceSelection,"Unlock transitions before replacing selected audio.");
+    explainEdit(splitButton,TimelineAction::split,"Select an unlocked segment and place the cursor inside it.");
+    if(!visualSelected)explainEdit(removeButton,TimelineAction::remove,"Select unlocked audio before deleting it.");
+    const bool canUndo=!undoHistory.empty() && (!engine.capturingPerformance()
+        || undoHistory.size()>(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0)));
+    undoButton.setEnabled(canUndo); redoButton.setEnabled(!redoHistory.empty());
+    undoButton.getProperties().set("mixworksHintDisabled",engine.capturingPerformance()
+        ? "No live structural edit to undo. Stop the take before undoing arrangement history." : "There is no earlier edit to undo.");
+    if(performance) { performance->getProperties().set("historyUndoReady",canUndo); performance->getProperties().set("historyRedoReady",!redoHistory.empty()); }
     playButton.setButtonText(engine.playing ? "Pause" : "Play"); playButton.setEnabled(!busy && (engine.playing || engine.playbackReady()));
     playButton.getProperties().set("alloyActive", engine.playing.load()); refreshing = false;
     if (performance) performance->refresh(!busy && !engine.exporting);
@@ -2481,9 +2716,8 @@ void Workstation::importFiles(const juce::Array<juce::File>& files)
                 if (media)
                 {
                     const auto existing = std::find_if(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& m) { return m->file == media->file; });
-                    if (existing == safe->engine.library.end()) safe->engine.library.push_back(std::move(media));
-                    else if (!(*existing)->playbackError.isEmpty()) *existing = std::move(media); // Explicit reimport; existing clips retain their original source identity.
-                    safe->dirty = true; safe->markCatalogueChanged();
+                    if (existing == safe->engine.library.end()) { safe->engine.library.push_back(media); safe->markCatalogueChanged(media); }
+                    else if (!(*existing)->playbackError.isEmpty()) { *existing = media; safe->markCatalogueChanged(media); } // Existing clips retain their original source identity.
                 }
                 safe->filterLibrary(); safe->libraryTable.table.updateContent(); safe->libraryTable.table.repaint();
                 safe->importProgress.finishFile();
@@ -2522,6 +2756,8 @@ void Workstation::editClip(int field, double value)
 }
 void Workstation::splitClip()
 {
+    if(const auto reason=timelineActionUnavailable(TimelineAction::split,engine.position,engine.selectedTrack);reason.isNotEmpty())
+    { setStatus(reason); return; }
     if (editSelection.multiple()) { setStatus("Clear the range/group to split one segment."); return; }
     auto* c = currentClip(); const double at = engine.position; if (!c || c->media->sourceDetailsPending || at <= c->start || at >= c->end() || busy) return;
     if (engine.project.clipTransitionLocked(c->id)) { setStatus("Unlock the transition before splitting its segment."); return; }
@@ -2590,20 +2826,24 @@ bool removeMissingAutomaticTempo(Project& project, const Project& before)
 void Workstation::removeClip()
 {
     if (sceneLane && sceneLane->hasSelectedScene()) { sceneLane->removeSelected(); return; }
+    if(const auto reason=timelineActionUnavailable(TimelineAction::remove,engine.position,engine.selectedTrack);reason.isNotEmpty())
+    { setStatus(reason); return; }
     if (performSelectionAction(TimelineAction::remove, engine.position, engine.selectedTrack)) return;
     if (!currentClip() || busy || engine.exporting) return;
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement())
     { setStatus("Wait for track and tempo preparation before removing a segment."); return; }
     if (engine.project.clipTransitionLocked(selectedClip)) { setStatus("Unlock the transition before removing its segment."); return; }
-    auto candidate = engine.project; candidate.detachTransitionLinks(selectedClip);
+    auto candidate = engine.project; candidate.clearDeletedTrackTransitions({selectedClip});
     auto& clips = candidate.clips; clips.erase(std::remove_if(clips.begin(),clips.end(),[this](const auto& c) { return c.id == selectedClip; }),clips.end());
+    const auto links = candidate.validateTransitionLinks();
+    if (links.failed()) { setStatus(links.getErrorMessage()); return; }
     const bool changedTempo = removeMissingAutomaticTempo(candidate, engine.project);
+    const auto protectedResult = engine.project.validateTransitionLocks(candidate);
+    if (protectedResult.failed()) { setStatus(protectedResult.getErrorMessage()); return; }
     if (changedTempo && !candidate.clips.empty() && candidate.followTrackTempo)
     {
         prepareTempo(std::move(candidate),false,true); return;
     }
-    const auto protectedResult = engine.project.validateTransitionLocks(candidate);
-    if (protectedResult.failed()) { setStatus(protectedResult.getErrorMessage()); return; }
     remember(); const juce::ScopedLock guard(engine.lock);
     engine.project = std::move(candidate); selectedClip.clear(); tempoStrip.selectedTempoPoint = -1; refresh();
 }
@@ -2681,6 +2921,15 @@ juce::String Workstation::keyEvidenceHint(const Media& media)
     if (keyEvidenceText(media) == "Detected")
         return "Detected key: " + keyNoteName(media.key()) + ". Found by the analyser; you can check or change it in Key by ear.";
     return "Suggested key: " + keyNoteName(media.key()) + ". The result is tentative or its evidence is unavailable; check it in Key by ear.";
+}
+bool Workstation::libraryNeedsReview(const Media& media)
+{
+    return gridReviewRank(media) < 4 || (keyEvidenceText(media) != "Manual" && keyEvidenceText(media) != "Detected");
+}
+juce::String Workstation::libraryReviewHint(const Media& media)
+{
+    return juce::String(libraryNeedsReview(media) ? "Subdued: grid or key needs review. This track is still available to select, preview and add. " : "Grid and key available. ")
+        + gridReviewHint(media) + " " + keyEvidenceHint(media);
 }
 void Workstation::syncMix(bool align)
 {
@@ -2803,7 +3052,14 @@ juce::Result Workstation::applySourceCorrection(const std::shared_ptr<Media>& me
             + (previous.downbeat != correction.downbeat ? " The reviewed choice remains in the comparison archive." : juce::String()));
     }
     clearRetryError(*media, false, this);
-    markCatalogueChanged(); dirty = true; refresh();
+    const auto stamp = musicFileStamp(media->file);
+    for (const auto& row : engine.library)
+        if (row->file == media->file && row->analysisSource == media->analysisSource)
+        {
+            row->analysisFileBytes = stamp.analysisBytes; row->analysisFileModified = stamp.analysisModified;
+            row->analysisCacheWarning.clear(); markCatalogueChanged(row);
+        }
+    dirty = true; refresh();
     if (rebuildTimeline) syncMix(true);
     else setStatus("Track timing saved.");
     return juce::Result::ok();
@@ -2851,12 +3107,12 @@ void Workstation::editAnalysis(std::optional<juce::String> sourceId)
             });
         };
         gridWindow = std::make_unique<FailureWindow>();
-        gridWindow->setUsingNativeTitleBar(true); gridWindow->setContentOwned(panel, true); gridWindow->setLookAndFeel(&look);
+        gridWindow->setUsingNativeTitleBar(false); gridWindow->setContentOwned(panel, true); gridWindow->setLookAndFeel(&look);
         gridWindow->centreWithSize(panel->getWidth(), panel->getHeight()); gridWindow->setVisible(true); gridWindow->enterModalState(true, nullptr, false); return;
     }
     if (!media) { setStatus("Select a track to correct its BPM, beat one or key."); return; }
     const auto& a = media->analysis;
-    juce::String details = media->name + "\nDetected " + juce::String(a.bpm, 2) + " BPM (evidence score " + juce::String(a.tempoConfidence * 100, 0) + "/100). Beat phase " + juce::String(a.beatOrigin, 3) + " s.";
+    juce::String details = media->name + "\nDetected " + preciseBpmText(a.bpm) + " BPM (evidence score " + juce::String(a.tempoConfidence * 100, 0) + "/100). Beat phase " + juce::String(a.beatOrigin, 3) + " s.";
     details += media->manualBeatOrigin >= 0 ? "\nManual downbeat anchor: " + juce::String(media->manualBeatOrigin, 4) + " s (4/4; may be anywhere in the source)."
         : media->downbeatOrigin() >= 0 ? "\nInferred downbeat anchor: " + juce::String(a.downbeatOrigin, 4) + " s (4/4; review its bar phase)."
         : "\nDownbeat unknown. Right-click a waveform at beat one to set it; automatic sync aligns pulses only.";
@@ -2946,14 +3202,55 @@ void Workstation::confirmChangedDestination(const juce::File& chosen, const juce
     dialog->enterModalState(true, juce::ModalCallbackFunction::create(
         [safe = juce::Component::SafePointer<Workstation>(this), after](int answer) { if (safe) after(answer == 1); }), true);
 }
+juce::File Workstation::defaultSaveFolder() const
+{
+    return layout.saveFolder.isEmpty()
+        ? juce::File::getSpecialLocation(juce::File::userDesktopDirectory).getChildFile("Mixworks")
+        : juce::File(layout.saveFolder);
+}
+juce::File Workstation::defaultSaveLocation(const juce::String& filename)
+{
+    const auto folder = defaultSaveFolder();
+    const auto result = folder.createDirectory();
+    if (result.failed())
+    {
+        setStatus("Cannot use default save folder: " + folder.getFullPathName()
+            + ". Choose another in File / Default save folder. " + result.getErrorMessage());
+        return {};
+    }
+    return folder.getChildFile(filename);
+}
+bool Workstation::setDefaultSaveFolder(const juce::File& folder)
+{
+    if (folder != juce::File() && !folder.isDirectory())
+    { setStatus("Choose an existing folder for the default save location."); return false; }
+    auto updated = layout; updated.saveFolder = folder == juce::File() ? juce::String() : folder.getFullPathName();
+    if (workspacePreference == juce::File())
+    { setStatus("Cannot save the default folder: workspace preferences are unavailable."); return false; }
+    const auto result = writeWorkspacePreferences(workspacePreference, updated);
+    if (result.failed()) { setStatus("Default save folder was not changed. " + result.getErrorMessage()); return false; }
+    layout.saveFolder = updated.saveFolder;
+    setStatus("Default save folder: " + defaultSaveFolder().getFullPathName());
+    return true;
+}
+void Workstation::chooseDefaultSaveFolder()
+{
+    if (choosingSave) { setStatus("Finish choosing the current save file before changing its default folder."); return; }
+    chooser = std::make_unique<juce::FileChooser>("Choose default save folder", defaultSaveFolder(), "", false);
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+        [safe = juce::Component::SafePointer<Workstation>(this)](const auto& f)
+        { if (safe && f.getResult() != juce::File()) safe->setDefaultSaveFolder(f.getResult()); });
+}
 void Workstation::chooseSave(std::function<void()> onSaved, bool useSessionFile)
 {
     if (choosingSave) return;
     if (busy || engine.exporting) { setStatus("Wait for the current task or export to finish, then save or close again. Your mix is still open."); return; }
     if (!ensureTempoReady([safe = juce::Component::SafePointer<Workstation>(this), onSaved, useSessionFile] { if (safe) safe->chooseSave(onSaved, useSessionFile); })) return;
     if (useSessionFile && sessionFile != juce::File()) { if (saveSessionFile(sessionFile) && onSaved) onSaved(); return; }
+    const auto initial = defaultSaveLocation(sessionFile == juce::File() ? "Session.mixworks" : sessionFile.getFileName());
+    if (initial == juce::File()) return;
     choosingSave = true;
-    chooser = std::make_unique<juce::FileChooser>(useSessionFile ? "Save mix" : "Save mix as", sessionFile.existsAsFile() ? sessionFile : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Session.mixworks"), "*.mixworks", false);
+    chooser = std::make_unique<juce::FileChooser>(useSessionFile ? "Save mix" : "Save mix as", initial, "*.mixworks", false);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting, [safe = juce::Component::SafePointer<Workstation>(this), onSaved](const auto& f)
     {
         if (!safe) return;
@@ -2972,7 +3269,7 @@ void Workstation::chooseSave(std::function<void()> onSaved, bool useSessionFile)
 }
 void Workstation::chooseOpen()
 {
-    chooser = std::make_unique<juce::FileChooser>("Open mix", sessionFile, "*.mixworks", false);
+    chooser = std::make_unique<juce::FileChooser>("Open mix", sessionFile == juce::File() ? defaultSaveFolder() : sessionFile, "*.mixworks", false);
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe = juce::Component::SafePointer<Workstation>(this)](const auto& f)
     {
         if (!safe || f.getResult() == juce::File()) return;
@@ -3058,7 +3355,9 @@ void Workstation::openProjectDocument(juce::String document, const juce::File& f
                         if (std::any_of(safe->engine.library.begin(), safe->engine.library.end(), [&](const auto& source) { return source->id == copy->id; })) copy->id = juce::Uuid().toString();
                         safe->engine.library.push_back(copy); safe->catalogueRefreshQueue.push_back(copy);
                     }
-                safe->markCatalogueChanged();
+                for (const auto& media : safe->engine.library)
+                    if (std::none_of(previousLibrary.begin(), previousLibrary.end(), [&](const auto& old) { return old->file == media->file; }))
+                        safe->markCatalogueChanged(media);
                 safe->timeline.selectAutomationPoint({}, -1);
                 safe->sessionFile = file; safe->musicAttempts.clear(); safe->undoHistory.clear(); safe->redoHistory.clear(); safe->selectedClip.clear(); safe->tempoStrip.selectedTempoPoint = -1; safe->pendingTempo = 0; safe->tempoPreparationPending = false; safe->dirty = recovered || relinked; safe->refresh();
                 int reused = 0, decoded = 0, prepared = 0, unsaved = 0;
@@ -3104,7 +3403,8 @@ void Workstation::chooseExport(int take)
         if (!safe || safe->busy || safe->exportTask || safe->engine.exporting || safe->engine.capturingPerformance()) return;
         const int current = target(); if (current >= -1) safe->chooseExport(current);
     })) return;
-    chooser = std::make_unique<juce::FileChooser>("Export stereo 24-bit WAV", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Mix.wav"), "*.wav", false);
+    const auto initial = defaultSaveLocation("Mix.wav"); if (initial == juce::File()) return;
+    chooser = std::make_unique<juce::FileChooser>("Export stereo 24-bit WAV", initial, "*.wav", false);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting, [safe, target](const auto& f)
     {
         if (!safe || safe->busy || safe->exportTask || safe->engine.exporting || safe->engine.capturingPerformance() || f.getResult() == juce::File()) return;
@@ -3220,22 +3520,23 @@ void Workstation::settings()
     libraryPreview.stop();
     if (settingsWindow) { settingsWindow->setVisible(true); settingsWindow->toFront(true); return; }
     auto* window = new AlloyPopupWindow<juce::DialogWindow>("Audio, MIDI and FLkey 49", colour::panel, true);
-    settingsWindow.reset(window); window->setUsingNativeTitleBar(true);
+    settingsWindow.reset(window); window->setUsingNativeTitleBar(false);
     window->setContentOwned(new MidiSettings(engine), true); window->setResizable(false, false);
     window->centreAroundComponent(this, window->getWidth(), window->getHeight());
     window->setVisible(true); window->toFront(true);
     AlloyLookAndFeel::styleNativeTitleBar(*settingsWindow);
 }
-void Workstation::previewLibraryTrack(const juce::String& id)
+void Workstation::previewLibraryTrack(const juce::String& id,std::optional<double> fraction)
 {
     const auto found = std::find_if(engine.library.begin(),engine.library.end(),[&](const auto& media) { return media && media->id == id; });
-    if (found == engine.library.end()) return;
+    if (found == engine.library.end()) {setStatus("This source is no longer in the library. Choose a current track to preview.");return;}
     if (libraryPreview.usesPrivateOutput() && !libraryPreview.configured())
     {
-        libraryPreview.chooseOutput(*this,[safe = juce::Component::SafePointer<Workstation>(this),id] { if (safe) safe->previewLibraryTrack(id); });
+        libraryPreview.chooseOutput(*this,[safe = juce::Component::SafePointer<Workstation>(this),id,fraction] { if (safe) safe->previewLibraryTrack(id,fraction); });
         return;
     }
-    libraryPreview.toggle((*found)->file,id);
+    if(fraction)libraryPreview.seekToFraction((*found)->file,id,*fraction);
+    else libraryPreview.toggle((*found)->file,id);
 }
 bool Workstation::keyPressed(const juce::KeyPress& k)
 {
@@ -3254,8 +3555,12 @@ bool Workstation::keyPressed(const juce::KeyPress& k)
         else clearEditSelection();
         refresh(); return true;
     }
+    if(k.getModifiers().isAltDown() && !k.getModifiers().isCtrlDown() && k.getKeyCode()>='1' && k.getKeyCode()<='9')
+    { locateHotcue(k.getKeyCode()-'1'); return true; }
     if (k.getKeyCode() == 'A' && k.getModifiers().isCtrlDown() && !k.getModifiers().isShiftDown())
     { if (timeline.editingAutomationPoint) return false; selectAllSegments(); return true; }
+    if (isTimelineContextKey(k) && (timeline.hasKeyboardFocus(true) || timelineRuler.hasKeyboardFocus(true))
+        && timeline.keyPressed(k)) return true;
     if (transitionKeyPressed(k)) return true;
     if (k.getKeyCode() == juce::KeyPress::escapeKey && loopStartClip.isNotEmpty()) { loopStartClip.clear(); timeline.repaint(); setStatus("Loop start cancelled."); return true; }
     if (k.getKeyCode() == juce::KeyPress::spaceKey) { playButton.triggerClick(); return true; }

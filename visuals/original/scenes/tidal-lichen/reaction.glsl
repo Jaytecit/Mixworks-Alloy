@@ -13,7 +13,7 @@ vec4 media(vec2 uv) {
     vec4 c=hasImage!=0?sampleFittedMedia(uv):vec4(0);
     vec4 s=sampleCutout(materialDomain(uv));return vec4(mix(c.rgb,s.rgb,s.a),max(c.a,s.a));
 }
-float food(vec2 uv) {vec4 c=media(uv);return smoothstep(.13,.8,dot(c.rgb,vec3(.2126,.7152,.0722)))*c.a;}
+float food(vec2 uv) {vec4 c=media(uv);return max(smoothstep(.13,.8,dot(c.rgb,vec3(.2126,.7152,.0722)))*c.a,.78*structureCoverage(uv));}
 float hash(vec2 p) {return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main() {
     vec2 uv=gl_FragCoord.xy/resolution,px=1./resolution;
@@ -26,6 +26,8 @@ void main() {
     imageUV.x=fract(uv.x+floor(uv.y*5.)*.17);
 #endif
     float imageFood=food(imageUV)*(.35+.65*imageMix);
+    // Counter-moving image-fed beds keep the tide alive outside its first island.
+    imageFood=max(imageFood,food(fract(uv*vec2(2,2)+vec2(.13,.27)))*imageMix*.72);
     vec2 sampleUV=uv;
 #if COMPOSITION == 1
     sampleUV-=vec2(-(uv.y-.5),uv.x-.5)*stepDelta*.018;
@@ -58,6 +60,9 @@ void main() {
     // Sparse replenishment lets existing contours split and erode between attacks.
     float injection=imageFood*feedback*(.00008+.0025*trebleHit*pulse);
     change+=vec2(-injection*.6,injection);
+    float bed=smoothstep(.12,.52,imageFood)*(.4+.6*step(.35,hash(floor(uv*vec2(10,6)))));
+    float recruit=max(0.,.25-c.y)*bed*.09;
+    change+=vec2(-recruit*.6,recruit);
     float pores=smoothstep(.4,.8,hash(floor(gl_FragCoord.xy/7.)));
     change+=vec2(1.,-1.)*c.y*pores*bassHit*pulse*.013;
     fragColor=vec4(clamp(c+rate*change,0.,1.),imageFood,1.);

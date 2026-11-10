@@ -18,13 +18,13 @@ vec4 pigmentArt(vec2 uv){
 }
 vec2 jetOrigin(){return vec2(.12,.5+.12*sin(travelTime*.68+midImpulse*.14*pulse));}
 float pressCentre(vec2 uv,float side){
-    float squeeze=.04*sin(travelTime*.72)+bassHit*pulse*.035;
+    float squeeze=.12*sin(travelTime*1.1)+bassHit*pulse*.11;
     return .5+side*(.25-squeeze)+.024*sin(uv.y*(6.+detail*6.)+midImpulse*.25*pulse);
 }
-float pressWidth(){return .075+.020*warp+.018*bassHit*pulse;}
+float pressWidth(){return .105+.035*warp+.085*bassHit*pulse;}
 float pressMask(vec2 uv,float side){
     float dx=(uv.x-pressCentre(uv,side))/pressWidth();
-    float vertical=smoothstep(.04,.16,uv.y)*smoothstep(.04,.16,1.-uv.y);
+    float vertical=smoothstep(0.,.065,uv.y)*smoothstep(0.,.065,1.-uv.y);
     float square=dx*dx;
     return exp(-square*square)*vertical;
 }
@@ -63,6 +63,10 @@ void main(){
     float ridge=pow(mask,.35)*(1.-mask);
     c+=ridge*(.10+1.1*trebleHit*pulse)*vec3(.15,.65,1.)*max(pigment.a,direct.a);
     c*=smoothstep(.06,.095,abs(uv.x-.5));
+    float cloud=.5+.5*sin(uv.y*13.+sin(uv.x*9.+travelTime*.55)*2.-travelTime*.9);
+    vec2 nebula=vec2(fract(uv.x+.07*sin(travelTime*.3)),.5+(uv.y-.5)*.32+.05*sin(travelTime*.27));
+    c+=(pigmentArt(nebula).rgb*.72+vec3(.025,.045,.08))
+        *pow(cloud,3.)*(.22+.28*bassHit*pulse)*(1.-mask);
 #else
     // Two broad pigment banks slip across one open jagged fault.
     float distance=abs(uv.y-faultBoundary(uv));

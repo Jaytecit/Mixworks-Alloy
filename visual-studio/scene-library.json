@@ -1,0 +1,1218 @@
+{
+  "Studio originals": [
+    {
+      "title": "Signal Loom",
+      "folder": "aurora"
+    },
+    {
+      "title": "Vector Tunnel",
+      "folder": "tunnel"
+    },
+    {
+      "title": "Glass Garden",
+      "folder": "garden"
+    },
+    {
+      "title": "Shrouded",
+      "folder": "shrouded"
+    },
+    {
+      "title": "Contour Bloom",
+      "folder": "contour-bloom"
+    },
+    {
+      "title": "Waxfall",
+      "folder": "waxfall"
+    },
+    {
+      "title": "Tidal Culture",
+      "folder": "tidal-culture"
+    }
+  ],
+  "Fault Ledger": [
+    {
+      "title": "Ridge Unzip",
+      "folder": "fault-ledger"
+    },
+    {
+      "title": "Basin Collapse",
+      "folder": "fault-ledger-basin-collapse"
+    },
+    {
+      "title": "Paired Fault Slip",
+      "folder": "fault-ledger-paired-slip"
+    },
+    {
+      "title": "Terrace Ratchet",
+      "folder": "fault-ledger-terrace-ratchet"
+    },
+    {
+      "title": "Diagonal Shear",
+      "folder": "fault-ledger-diagonal-shear"
+    },
+    {
+      "title": "Island Breakaway",
+      "folder": "fault-ledger-island-breakaway"
+    },
+    {
+      "title": "Crosscut Relay",
+      "folder": "fault-ledger-crosscut-relay"
+    },
+    {
+      "title": "Shelf Rejoin",
+      "folder": "fault-ledger-shelf-rejoin"
+    }
+  ],
+  "Lantern Arcade": [
+    {
+      "title": "Long Arcade Sweep",
+      "folder": "lantern-arcade"
+    },
+    {
+      "title": "T Junction Relay",
+      "folder": "lantern-arcade-t-junction-relay",
+      "treatment": "Beat relay",
+      "description": "Bright signs stagger the light relays at the junction."
+    },
+    {
+      "title": "Courtyard Flood",
+      "folder": "lantern-arcade-courtyard-flood",
+      "treatment": "Colour transfer",
+      "description": "Sprite colours wash across the courtyard masonry."
+    },
+    {
+      "title": "Elevated Walk Flicker",
+      "folder": "lantern-arcade-elevated-walk-flicker",
+      "treatment": "Repeated impressions",
+      "description": "Repeated artwork becomes a row of engraved walkway plates."
+    },
+    {
+      "title": "Underpass Slit",
+      "folder": "lantern-arcade-underpass-slit",
+      "treatment": "Drawn fibres",
+      "description": "The artwork is drawn into separate bars of light running under the passage."
+    },
+    {
+      "title": "Corner Spill",
+      "folder": "lantern-arcade-corner-spill",
+      "treatment": "Colour separation",
+      "description": "Separated colour beams spill around the corner."
+    },
+    {
+      "title": "Paired Alley Chase",
+      "folder": "lantern-arcade-paired-alley-chase",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels steer the two passages in different directions."
+    },
+    {
+      "title": "Roofwell Descent",
+      "folder": "lantern-arcade-roofwell-descent",
+      "treatment": "Brightness relief",
+      "description": "Light and dark give the roofwell different relief and shadow."
+    }
+  ],
+  "Paper Mechanics": [
+    {
+      "title": "Fan Unfurl",
+      "folder": "paper-mechanics"
+    },
+    {
+      "title": "Box Inversion",
+      "folder": "paper-mechanics-box-inversion",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette becomes a cutout through the inverted box panels."
+    },
+    {
+      "title": "Map Gatefold",
+      "folder": "paper-mechanics-map-gatefold",
+      "treatment": "Repeated impressions",
+      "description": "Staggered impressions repeat across the folded map."
+    },
+    {
+      "title": "Corner Peel",
+      "folder": "paper-mechanics-corner-peel",
+      "treatment": "Brightness relief",
+      "description": "Bright marks lift the peeling paper and change its lighting."
+    },
+    {
+      "title": "Accordion Advance",
+      "folder": "paper-mechanics-accordion-advance",
+      "treatment": "Beat relay",
+      "description": "The sprite holds selected accordion creases back after each hit."
+    },
+    {
+      "title": "Pocket Turn",
+      "folder": "paper-mechanics-pocket-turn",
+      "treatment": "Colour transfer",
+      "description": "Colour bleeds into the turning pockets."
+    },
+    {
+      "title": "Pleat Collapse",
+      "folder": "paper-mechanics-pleat-collapse",
+      "treatment": "Moving fragments",
+      "description": "Artwork fractures into chips that ride away on collapsing pleats."
+    },
+    {
+      "title": "Saddle Twist",
+      "folder": "paper-mechanics-saddle-twist",
+      "treatment": "Drawn fibres",
+      "description": "The artwork is drawn into tight fibres following the twisted paper."
+    }
+  ],
+  "Sediment Clock": [
+    {
+      "title": "Delta Prograde",
+      "folder": "sediment-clock"
+    },
+    {
+      "title": "Shelf Slump",
+      "folder": "sediment-clock-shelf-slump",
+      "treatment": "Brightness relief",
+      "description": "Brightness raises ridges and carves hollows in the slumping shelf."
+    },
+    {
+      "title": "Core Stack",
+      "folder": "sediment-clock-core-stack",
+      "treatment": "Repeated impressions",
+      "description": "Copies of the image are pressed into successive bands."
+    },
+    {
+      "title": "Fan Bury",
+      "folder": "sediment-clock-fan-bury",
+      "treatment": "Colour transfer",
+      "description": "Sprite colour is sorted into bands as the sediment fan buries them."
+    },
+    {
+      "title": "Canyon Refill",
+      "folder": "sediment-clock-canyon-refill",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels redirect the movement along the canyon walls."
+    },
+    {
+      "title": "Bar Migration",
+      "folder": "sediment-clock-bar-migration",
+      "treatment": "Moving fragments",
+      "description": "Artwork breaks into drifting clasts on migrating sandbars."
+    },
+    {
+      "title": "Levee Breach",
+      "folder": "sediment-clock-levee-breach",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette breaches the levee and exposes a dark cross-section."
+    },
+    {
+      "title": "Bed Scour",
+      "folder": "sediment-clock-bed-scour",
+      "treatment": "Drawn fibres",
+      "description": "The image draws thin streaks into the scoured beds."
+    }
+  ],
+  "Dune Telegraph": [
+    {
+      "title": "Crescent March",
+      "folder": "dune-telegraph"
+    },
+    {
+      "title": "Forked Slipface",
+      "folder": "dune-telegraph-forked-slipface",
+      "treatment": "Brightness relief",
+      "description": "Bright parts of the artwork raise the branching slipfaces and move their highlights."
+    },
+    {
+      "title": "Corridor Scour",
+      "folder": "dune-telegraph-corridor-scour",
+      "treatment": "Drawn fibres",
+      "description": "The image is pulled into thin wind-driven scour lines."
+    },
+    {
+      "title": "Lee Wake",
+      "folder": "dune-telegraph-lee-wake",
+      "treatment": "Persistent trace",
+      "description": "Artwork leaves a drifting sand wake that survives a swap."
+    },
+    {
+      "title": "Double Dune Collision",
+      "folder": "dune-telegraph-double-dune-collision",
+      "treatment": "Moving fragments",
+      "description": "Image fragments move across the opposing dunes on beats."
+    },
+    {
+      "title": "Edge Drift",
+      "folder": "dune-telegraph-edge-drift",
+      "treatment": "Colour transfer",
+      "description": "Sprite colours migrate along the leeward sand."
+    },
+    {
+      "title": "Star Dune Feed",
+      "folder": "dune-telegraph-star-dune-feed",
+      "treatment": "Repeated impressions",
+      "description": "Repeated impressions spiral through the star dunes."
+    },
+    {
+      "title": "Ridge Overtake",
+      "folder": "dune-telegraph-ridge-overtake",
+      "treatment": "Beat relay",
+      "description": "Bright sprite patches hold ridges back as the others advance."
+    }
+  ],
+  "Rain Reedbed": [
+    {
+      "title": "Bank Gust",
+      "folder": "rain-reedbed"
+    },
+    {
+      "title": "Split Channel Bend",
+      "folder": "rain-reedbed-split-channel-bend",
+      "treatment": "Colour transfer",
+      "description": "Sprite colour washes through the two channels and stains the reed banks."
+    },
+    {
+      "title": "Island Shelter",
+      "folder": "rain-reedbed-island-shelter",
+      "treatment": "Projected shadow",
+      "description": "Artwork casts a moving shelter shadow over the reeds."
+    },
+    {
+      "title": "Diagonal Comb",
+      "folder": "rain-reedbed-diagonal-comb",
+      "treatment": "Drawn fibres",
+      "description": "The image stretches into individual diagonal reed fibres."
+    },
+    {
+      "title": "Floodplain Flatten",
+      "folder": "rain-reedbed-floodplain-flatten",
+      "treatment": "Brightness relief",
+      "description": "Bright parts lift the flooded beds and alter their grazing light."
+    },
+    {
+      "title": "Crossing Squalls",
+      "folder": "rain-reedbed-crossing-squalls",
+      "treatment": "Colour separation",
+      "description": "Two rain fronts catch separated bands of colour from the artwork."
+    },
+    {
+      "title": "Furrow Ripple",
+      "folder": "rain-reedbed-furrow-ripple",
+      "treatment": "Persistent trace",
+      "description": "Old sprite traces keep drifting down the furrows."
+    },
+    {
+      "title": "Perimeter Sweep",
+      "folder": "rain-reedbed-perimeter-sweep",
+      "treatment": "Beat relay",
+      "description": "Bright media delays the gusts around the perimeter."
+    }
+  ],
+  "Salt Weather": [
+    {
+      "title": "Shoreline Freeze",
+      "folder": "salt-weather"
+    },
+    {
+      "title": "Needle Fan Advance",
+      "folder": "salt-weather-needle-fan-advance",
+      "treatment": "Drawn fibres",
+      "description": "Sprite edges stretch into long crystal needles."
+    },
+    {
+      "title": "Branch Confluence",
+      "folder": "salt-weather-branch-confluence",
+      "treatment": "Colour separation",
+      "description": "The converging branches split the sprite into colour fringes."
+    },
+    {
+      "title": "Salt Pan Drydown",
+      "folder": "salt-weather-salt-pan-drydown",
+      "treatment": "Persistent trace",
+      "description": "Image residue dries into a crust and keeps migrating."
+    },
+    {
+      "title": "Bridging Crust",
+      "folder": "salt-weather-bridging-crust",
+      "treatment": "Brightness relief",
+      "description": "Sprite brightness raises the bridge ridges and deepens pits."
+    },
+    {
+      "title": "Facet Collision",
+      "folder": "salt-weather-facet-collision",
+      "treatment": "Moving fragments",
+      "description": "Sprite chips are carried away as large facets collide."
+    },
+    {
+      "title": "Pinhole Bloom",
+      "folder": "salt-weather-pinhole-bloom",
+      "treatment": "Projected shadow",
+      "description": "The artwork casts moving shadows across the fine crystal pores."
+    },
+    {
+      "title": "Frost Retraction",
+      "folder": "salt-weather-frost-retraction",
+      "treatment": "Beat relay",
+      "description": "Bright areas hold the frost at individual junctions before it retracts."
+    }
+  ],
+  "Plankton Census": [
+    {
+      "title": "Estuary Sorting",
+      "folder": "plankton-census"
+    },
+    {
+      "title": "Reef Bypass",
+      "folder": "plankton-census-reef-bypass",
+      "treatment": "Projected shadow",
+      "description": "Sprite shadows sweep the reef and its schools."
+    },
+    {
+      "title": "Baitball Escape",
+      "folder": "plankton-census-baitball-escape",
+      "treatment": "Moving fragments",
+      "description": "Artwork breaks into small schools that scatter from the baitball."
+    },
+    {
+      "title": "Layer Migration",
+      "folder": "plankton-census-layer-migration",
+      "treatment": "Brightness relief",
+      "description": "Brightness raises the apparent water layers and moves the fish between them."
+    },
+    {
+      "title": "Counterstream Crossing",
+      "folder": "plankton-census-counterstream-crossing",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels steer opposing streams across one another."
+    },
+    {
+      "title": "Shelter Handoff",
+      "folder": "plankton-census-shelter-handoff",
+      "treatment": "Persistent trace",
+      "description": "An old sprite leaves a drifting trail between refuges."
+    },
+    {
+      "title": "Channel Split",
+      "folder": "plankton-census-channel-split",
+      "treatment": "Beat relay",
+      "description": "Bright parts hold back sections of the schools before they cross into the other channel."
+    },
+    {
+      "title": "Eddy Reunion",
+      "folder": "plankton-census-eddy-reunion",
+      "treatment": "Colour transfer",
+      "description": "Sprite colours curl into the returning schools."
+    }
+  ],
+  "Fumarole Field": [
+    {
+      "title": "Ridge Jets",
+      "folder": "fumarole-field"
+    },
+    {
+      "title": "Basin Chimneys",
+      "folder": "fumarole-field-basin-chimneys",
+      "treatment": "Brightness relief",
+      "description": "Bright parts raise the ground and light the chimney faces."
+    },
+    {
+      "title": "Crack Vent Crawl",
+      "folder": "fumarole-field-crack-vent-crawl",
+      "treatment": "Drawn fibres",
+      "description": "The image becomes fine jets that crawl along the vent crack."
+    },
+    {
+      "title": "Geyser Pair",
+      "folder": "fumarole-field-geyser-pair",
+      "treatment": "Beat relay",
+      "description": "Brightness delays the eruption on one side of each geyser pair."
+    },
+    {
+      "title": "Hollow Backdraft",
+      "folder": "fumarole-field-hollow-backdraft",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels steer the reversed plume motion."
+    },
+    {
+      "title": "Shelf Plume Merge",
+      "folder": "fumarole-field-shelf-plume-merge",
+      "treatment": "Colour transfer",
+      "description": "The merging plumes carry colours drawn from the artwork."
+    },
+    {
+      "title": "Offset Vent Chase",
+      "folder": "fumarole-field-offset-vent-chase",
+      "treatment": "Repeated impressions",
+      "description": "Repeated sprite impressions mark the staggered vent faces."
+    },
+    {
+      "title": "Crosswind Smear",
+      "folder": "fumarole-field-crosswind-smear",
+      "treatment": "Persistent trace",
+      "description": "A previous sprite remains as drifting material in the crosswind."
+    }
+  ],
+  "Storm Isobars": [
+    {
+      "title": "Squall Bow",
+      "folder": "storm-isobars"
+    },
+    {
+      "title": "Triple Point Merge",
+      "folder": "storm-isobars-triple-point-merge",
+      "treatment": "Colour separation",
+      "description": "The triple point separates the sprite into colour fronts."
+    },
+    {
+      "title": "Dryline Intrusion",
+      "folder": "storm-isobars-dryline-intrusion",
+      "treatment": "Silhouette cutout",
+      "description": "The alpha silhouette cuts a dry intrusion through the rain field."
+    },
+    {
+      "title": "Polar Wrap",
+      "folder": "storm-isobars-polar-wrap",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels wind the isobars around the pole."
+    },
+    {
+      "title": "Occluded Front",
+      "folder": "storm-isobars-occluded-front",
+      "treatment": "Projected shadow",
+      "description": "A projected silhouette darkens and lengthens the occluded front."
+    },
+    {
+      "title": "Gust Ring Escape",
+      "folder": "storm-isobars-gust-ring-escape",
+      "treatment": "Beat relay",
+      "description": "Bright regions delay the local expansion of gust rings."
+    },
+    {
+      "title": "Jet Streak Split",
+      "folder": "storm-isobars-jet-streak-split",
+      "treatment": "Drawn fibres",
+      "description": "Sprite detail is drawn out into long jet streaks."
+    },
+    {
+      "title": "Convergence Sweep",
+      "folder": "storm-isobars-convergence-sweep",
+      "treatment": "Persistent trace",
+      "description": "Old artwork stays in the weather field and drifts toward the convergence line."
+    }
+  ],
+  "Caustic Basin": [
+    {
+      "title": "Shoal Focus",
+      "folder": "caustic-basin"
+    },
+    {
+      "title": "Trench Split",
+      "folder": "caustic-basin-trench-split",
+      "treatment": "Colour separation",
+      "description": "The trench splits the sprite into separated wavelength bands."
+    },
+    {
+      "title": "Step Refocus",
+      "folder": "caustic-basin-step-refocus",
+      "treatment": "Brightness relief",
+      "description": "Bright detail becomes small changes in basin depth with lit edges."
+    },
+    {
+      "title": "Pebble Scatter",
+      "folder": "caustic-basin-pebble-scatter",
+      "treatment": "Moving fragments",
+      "description": "Artwork breaks into moving chips among the pebble reflections."
+    },
+    {
+      "title": "Channel Crosslight",
+      "folder": "caustic-basin-channel-crosslight",
+      "treatment": "Projected shadow",
+      "description": "The sprite blocks angled rays and throws moving shadows."
+    },
+    {
+      "title": "Sandbar Bend",
+      "folder": "caustic-basin-sandbar-bend",
+      "treatment": "Colour transfer",
+      "description": "The sandbar takes on colours streamed from the sprite."
+    },
+    {
+      "title": "Pool Convergence",
+      "folder": "caustic-basin-pool-convergence",
+      "treatment": "Persistent trace",
+      "description": "A sprite leaves a pool of light that drifts and fades."
+    },
+    {
+      "title": "Rim Reflection",
+      "folder": "caustic-basin-rim-reflection",
+      "treatment": "Repeated impressions",
+      "description": "Repeated reflections emboss the rim with copies of the artwork."
+    }
+  ],
+  "Shadow Telegraph": [
+    {
+      "title": "Raking Wall",
+      "folder": "shadow-telegraph"
+    },
+    {
+      "title": "Stair Shadow Climb",
+      "folder": "shadow-telegraph-stair-shadow-climb",
+      "treatment": "Brightness relief",
+      "description": "Brightness raises treads and reshapes the shadows climbing them."
+    },
+    {
+      "title": "Parapet Sundial",
+      "folder": "shadow-telegraph-parapet-sundial",
+      "treatment": "Repeated impressions",
+      "description": "Repeated artwork is etched on a series of sundial faces."
+    },
+    {
+      "title": "Opposed Lamps",
+      "folder": "shadow-telegraph-opposed-lamps",
+      "treatment": "Colour separation",
+      "description": "Opposed lamps send separate colour images across the brick."
+    },
+    {
+      "title": "Slat Crossover",
+      "folder": "shadow-telegraph-slat-crossover",
+      "treatment": "Drawn fibres",
+      "description": "Slats pull the sprite into alternating narrow light threads."
+    },
+    {
+      "title": "Corner Wrap",
+      "folder": "shadow-telegraph-corner-wrap",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels push the wall pattern around the corner."
+    },
+    {
+      "title": "Beam Eclipse",
+      "folder": "shadow-telegraph-beam-eclipse",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette cuts a gap through the beam."
+    },
+    {
+      "title": "Screen Handoff",
+      "folder": "shadow-telegraph-screen-handoff",
+      "treatment": "Persistent trace",
+      "description": "Sprite residue moves across successive screens after the handoff."
+    }
+  ],
+  "Foil Register": [
+    {
+      "title": "Ribbon Corrugation",
+      "folder": "foil-register"
+    },
+    {
+      "title": "Offset Stamp Relay",
+      "folder": "foil-register-offset-stamp-relay",
+      "treatment": "Repeated impressions",
+      "description": "Small mirrored artwork stamps are pressed into alternate strips."
+    },
+    {
+      "title": "Diagonal Brush Reversal",
+      "folder": "foil-register-diagonal-brush-reversal",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels switch the direction of the brushing."
+    },
+    {
+      "title": "Fluted Panel Sweep",
+      "folder": "foil-register-fluted-panel-sweep",
+      "treatment": "Colour transfer",
+      "description": "Pigment from the image stains the moving fluted panels."
+    },
+    {
+      "title": "Raised Seal Flash",
+      "folder": "foil-register-raised-seal-flash",
+      "treatment": "Beat relay",
+      "description": "Bright image regions flash after adjacent foil has already caught the beat."
+    },
+    {
+      "title": "Woven Foil Glide",
+      "folder": "foil-register-woven-foil-glide",
+      "treatment": "Drawn fibres",
+      "description": "Fine threads from the artwork interleave with the woven foil."
+    },
+    {
+      "title": "Tension Wrinkle",
+      "folder": "foil-register-tension-wrinkle",
+      "treatment": "Silhouette cutout",
+      "description": "The sprite opens a dark tear in the wrinkling surface."
+    },
+    {
+      "title": "Creased Edge Spark",
+      "folder": "foil-register-creased-edge-spark",
+      "treatment": "Colour separation",
+      "description": "Different colour channels strike different edges of the crease."
+    }
+  ],
+  "Serrated Shutters": [
+    {
+      "title": "Concertina Chase",
+      "folder": "serrated-shutters"
+    },
+    {
+      "title": "Checkerboard Flip",
+      "folder": "serrated-shutters-checkerboard-flip",
+      "treatment": "Repeated impressions",
+      "description": "Copies are carved into alternating shutter blades."
+    },
+    {
+      "title": "Diagonal Unzip",
+      "folder": "serrated-shutters-diagonal-unzip",
+      "treatment": "Drawn fibres",
+      "description": "Threads from the artwork unzip the slats along the diagonal."
+    },
+    {
+      "title": "Slot Crossover",
+      "folder": "serrated-shutters-slot-crossover",
+      "treatment": "Colour separation",
+      "description": "The slot separates the sprite into crossing beams."
+    },
+    {
+      "title": "Corner Aperture",
+      "folder": "serrated-shutters-corner-aperture",
+      "treatment": "Brightness relief",
+      "description": "Bright artwork rises on the corners and changes the aperture relief."
+    },
+    {
+      "title": "Opposed Banks",
+      "folder": "serrated-shutters-opposed-banks",
+      "treatment": "Beat relay",
+      "description": "Artwork holds selected shutters shut for part of each beat."
+    },
+    {
+      "title": "Floor to Ceiling Roll",
+      "folder": "serrated-shutters-floor-to-ceiling-roll",
+      "treatment": "Colour transfer",
+      "description": "Sprite colour flows up the rolling shutters."
+    },
+    {
+      "title": "Interlocking Iris",
+      "folder": "serrated-shutters-interlocking-iris",
+      "treatment": "Moving fragments",
+      "description": "Sprite fragments travel separately across the interlocking leaves."
+    }
+  ],
+  "Ceramic Resonator": [
+    {
+      "title": "Honeycomb Buckle",
+      "folder": "ceramic-resonator"
+    },
+    {
+      "title": "Keystone Ringdown",
+      "folder": "ceramic-resonator-keystone-ringdown",
+      "treatment": "Beat relay",
+      "description": "Bright pixels delay individual keystones before their ringdown."
+    },
+    {
+      "title": "Brick Bond Slip",
+      "folder": "ceramic-resonator-brick-bond-slip",
+      "treatment": "Repeated impressions",
+      "description": "The sprite repeats in relief along the offset brick courses."
+    },
+    {
+      "title": "Mosaic Fan Flex",
+      "folder": "ceramic-resonator-mosaic-fan-flex",
+      "treatment": "Colour transfer",
+      "description": "The image becomes coloured glaze across the mosaic fan."
+    },
+    {
+      "title": "Travelling Ridge",
+      "folder": "ceramic-resonator-travelling-ridge",
+      "treatment": "Artwork-driven movement",
+      "description": "The image steers the slab ripple along the ridge."
+    },
+    {
+      "title": "Scallop Snap",
+      "folder": "ceramic-resonator-scallop-snap",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette opens a dark fissure through the scalloped tiles."
+    },
+    {
+      "title": "Split Panel Rebound",
+      "folder": "ceramic-resonator-split-panel-rebound",
+      "treatment": "Moving fragments",
+      "description": "Sprite pieces move as separate chips on the split panel."
+    },
+    {
+      "title": "Corner Load",
+      "folder": "ceramic-resonator-corner-load",
+      "treatment": "Projected shadow",
+      "description": "Sprite-shaped shadows rake over the corner load."
+    }
+  ],
+  "Kinetic Typesetter": [
+    {
+      "title": "Column Set",
+      "folder": "kinetic-typesetter"
+    },
+    {
+      "title": "Headline Slam",
+      "folder": "kinetic-typesetter-headline-slam",
+      "treatment": "Brightness relief",
+      "description": "Bright image areas raise headline type and cast bevel light."
+    },
+    {
+      "title": "Diagonal Proof",
+      "folder": "kinetic-typesetter-diagonal-proof",
+      "treatment": "Colour transfer",
+      "description": "The sprite inks the diagonal proof in its own colours."
+    },
+    {
+      "title": "Corner Index",
+      "folder": "kinetic-typesetter-corner-index",
+      "treatment": "Repeated impressions",
+      "description": "Small repeated images are impressed into the index blocks."
+    },
+    {
+      "title": "Loose Type Cascade",
+      "folder": "kinetic-typesetter-loose-type-cascade",
+      "treatment": "Moving fragments",
+      "description": "The sprite breaks into loose type that slips out of position."
+    },
+    {
+      "title": "Margin Chase",
+      "folder": "kinetic-typesetter-margin-chase",
+      "treatment": "Drawn fibres",
+      "description": "Threads from the image run down the moving margins."
+    },
+    {
+      "title": "Reversed Forme",
+      "folder": "kinetic-typesetter-reversed-forme",
+      "treatment": "Silhouette cutout",
+      "description": "The sprite cuts letter-shaped voids through the reversed forme."
+    },
+    {
+      "title": "Overprint Collision",
+      "folder": "kinetic-typesetter-overprint-collision",
+      "treatment": "Colour separation",
+      "description": "Colour separations overlap out of register on the overprint."
+    }
+  ],
+  "Cable Exchange": [
+    {
+      "title": "Bus Arbitration",
+      "folder": "cable-exchange"
+    },
+    {
+      "title": "Switchyard Detour",
+      "folder": "cable-exchange-switchyard-detour",
+      "treatment": "Repeated impressions",
+      "description": "Repeated sprite impressions mark the detours and their switching plates."
+    },
+    {
+      "title": "Ring Bypass",
+      "folder": "cable-exchange-ring-bypass",
+      "treatment": "Persistent trace",
+      "description": "Old artwork circulates as a decaying packet trail in the bypass."
+    },
+    {
+      "title": "Crossbar Handoff",
+      "folder": "cable-exchange-crossbar-handoff",
+      "treatment": "Colour separation",
+      "description": "Colour channels hand off to separate crossbar routes."
+    },
+    {
+      "title": "Branch Fanout",
+      "folder": "cable-exchange-branch-fanout",
+      "treatment": "Drawn fibres",
+      "description": "The sprite fans into narrow signal threads."
+    },
+    {
+      "title": "Loopback Queue",
+      "folder": "cable-exchange-loopback-queue",
+      "treatment": "Beat relay",
+      "description": "Brightness keeps packets queued for different lengths after each beat."
+    },
+    {
+      "title": "Merge Priority",
+      "folder": "cable-exchange-merge-priority",
+      "treatment": "Colour transfer",
+      "description": "Sprite colour spreads into the converging traces."
+    },
+    {
+      "title": "Bridge Failover",
+      "folder": "cable-exchange-bridge-failover",
+      "treatment": "Projected shadow",
+      "description": "The sprite projects a moving blackout across the bridge and its traces."
+    }
+  ],
+  "Barograph": [
+    {
+      "title": "Stacked Seismograms",
+      "folder": "barograph"
+    },
+    {
+      "title": "Radial Drum Record",
+      "folder": "barograph-radial-drum-record",
+      "treatment": "Repeated impressions",
+      "description": "Copies of the sprite stamp into the cylindrical paper."
+    },
+    {
+      "title": "Opposed Paper Feeds",
+      "folder": "barograph-opposed-paper-feeds",
+      "treatment": "Colour separation",
+      "description": "Different sprite channels travel in opposite directions on the paper."
+    },
+    {
+      "title": "Spiral Trace Spool",
+      "folder": "barograph-spiral-trace-spool",
+      "treatment": "Artwork-driven movement",
+      "description": "The sprite steers the pen positions as the record spools."
+    },
+    {
+      "title": "Crossfeed Pens",
+      "folder": "barograph-crossfeed-pens",
+      "treatment": "Colour transfer",
+      "description": "Image colours feed into the separate pen marks."
+    },
+    {
+      "title": "Lane Skips",
+      "folder": "barograph-lane-skips",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette cuts gaps through the selected record lanes."
+    },
+    {
+      "title": "Foldout Record",
+      "folder": "barograph-foldout-record",
+      "treatment": "Brightness relief",
+      "description": "The folded chart rises and catches a bevel wherever the image is bright."
+    },
+    {
+      "title": "Alternating Drum Banks",
+      "folder": "barograph-alternating-drum-banks",
+      "treatment": "Beat relay",
+      "description": "Bright parts delay each drum bank after the hit."
+    }
+  ],
+  "Raster Excavation": [
+    {
+      "title": "Rolling Sweep",
+      "folder": "raster-excavation"
+    },
+    {
+      "title": "Interlaced Quarry",
+      "folder": "raster-excavation-interlaced-quarry",
+      "treatment": "Colour separation",
+      "description": "The interlaced rows separate the sprite into colour channels."
+    },
+    {
+      "title": "Opposed Scan Faces",
+      "folder": "raster-excavation-opposed-scan-faces",
+      "treatment": "Projected shadow",
+      "description": "The sprite casts a moving shadow between the opposing scan faces."
+    },
+    {
+      "title": "Zigzag Bench Cut",
+      "folder": "raster-excavation-zigzag-bench-cut",
+      "treatment": "Repeated impressions",
+      "description": "Repeated sprite impressions are cut into the zigzag bench."
+    },
+    {
+      "title": "Diagonal Stripping",
+      "folder": "raster-excavation-diagonal-stripping",
+      "treatment": "Drawn fibres",
+      "description": "The artwork is pulled into individual diagonal strips."
+    },
+    {
+      "title": "Patch Excavation",
+      "folder": "raster-excavation-patch-excavation",
+      "treatment": "Moving fragments",
+      "description": "Image pieces break away as moving excavation patches."
+    },
+    {
+      "title": "Corner Traverse",
+      "folder": "raster-excavation-corner-traverse",
+      "treatment": "Persistent trace",
+      "description": "Stored image marks follow the corner and fade through several sweeps."
+    },
+    {
+      "title": "Depth Relay",
+      "folder": "raster-excavation-depth-relay",
+      "treatment": "Beat relay",
+      "description": "Bright zones wait longer before triggering the next depth response."
+    }
+  ],
+  "Sonar Curtain": [
+    {
+      "title": "Lateral Ping Sweep",
+      "folder": "sonar-curtain"
+    },
+    {
+      "title": "Twin Baseline",
+      "folder": "sonar-curtain-twin-baseline",
+      "treatment": "Colour separation",
+      "description": "The twin scan separates the sprite into individual spectral returns."
+    },
+    {
+      "title": "Bottom Sounding",
+      "folder": "sonar-curtain-bottom-sounding",
+      "treatment": "Brightness relief",
+      "description": "Sprite brightness raises the apparent seabed."
+    },
+    {
+      "title": "Side Scan Handoff",
+      "folder": "sonar-curtain-side-scan-handoff",
+      "treatment": "Persistent trace",
+      "description": "Previous artwork stays in the wake of the side scan."
+    },
+    {
+      "title": "Fan Beam Search",
+      "folder": "sonar-curtain-fan-beam-search",
+      "treatment": "Drawn fibres",
+      "description": "The artwork is drawn into narrow rays from the beam fan."
+    },
+    {
+      "title": "Staggered Transects",
+      "folder": "sonar-curtain-staggered-transects",
+      "treatment": "Repeated impressions",
+      "description": "Repeated sprite marks appear on successive transects."
+    },
+    {
+      "title": "Cross Echo",
+      "folder": "sonar-curtain-cross-echo",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette cuts holes where the echoes cross."
+    },
+    {
+      "title": "Range Fold",
+      "folder": "sonar-curtain-range-fold",
+      "treatment": "Artwork-driven movement",
+      "description": "The sprite channels shift the direction and phase of the range folds."
+    }
+  ],
+  "Pendulum Fleet": [
+    {
+      "title": "Crossed Arms",
+      "folder": "pendulum-fleet"
+    },
+    {
+      "title": "Ceiling Cascade",
+      "folder": "pendulum-fleet-ceiling-cascade",
+      "treatment": "Beat relay",
+      "description": "Bright areas keep some weights back before they swing."
+    },
+    {
+      "title": "Sidewall Escapement",
+      "folder": "pendulum-fleet-sidewall-escapement",
+      "treatment": "Projected shadow",
+      "description": "The sprite casts swinging shadows across the sideways pendulum bank."
+    },
+    {
+      "title": "Counterphase Banks",
+      "folder": "pendulum-fleet-counterphase-banks",
+      "treatment": "Colour separation",
+      "description": "Opposing banks catch separated colours from the sprite."
+    },
+    {
+      "title": "Double Link Transfer",
+      "folder": "pendulum-fleet-double-link-transfer",
+      "treatment": "Moving fragments",
+      "description": "Sprite pieces move like separately released counterweights."
+    },
+    {
+      "title": "Suspended Bridge",
+      "folder": "pendulum-fleet-suspended-bridge",
+      "treatment": "Drawn fibres",
+      "description": "Artwork runs as strands through the hanging cables."
+    },
+    {
+      "title": "Staggered Row Catch",
+      "folder": "pendulum-fleet-staggered-row-catch",
+      "treatment": "Persistent trace",
+      "description": "The last sprite hangs on as a moving trace behind the staggered rows."
+    },
+    {
+      "title": "Floor Pivot Rebound",
+      "folder": "pendulum-fleet-floor-pivot-rebound",
+      "treatment": "Brightness relief",
+      "description": "Brightness changes the apparent raised height and lighting of the floor-mounted weights."
+    }
+  ],
+  "Clockwork Conveyor": [
+    {
+      "title": "Corner Transfer",
+      "folder": "clockwork-conveyor"
+    },
+    {
+      "title": "Return Belt",
+      "folder": "clockwork-conveyor-return-belt",
+      "treatment": "Colour transfer",
+      "description": "The returning cargo carries pigment drawn from the sprite."
+    },
+    {
+      "title": "Sorting Gate",
+      "folder": "clockwork-conveyor-sorting-gate",
+      "treatment": "Beat relay",
+      "description": "Bright zones hold their gates before releasing the next loads."
+    },
+    {
+      "title": "Belt Weave",
+      "folder": "clockwork-conveyor-belt-weave",
+      "treatment": "Drawn fibres",
+      "description": "The image is drawn out into strands that interleave with the belt weave."
+    },
+    {
+      "title": "Ramp Exchange",
+      "folder": "clockwork-conveyor-ramp-exchange",
+      "treatment": "Brightness relief",
+      "description": "Brightness raises cargo and exposes the edges of the ramp."
+    },
+    {
+      "title": "Gravity Chute",
+      "folder": "clockwork-conveyor-gravity-chute",
+      "treatment": "Moving fragments",
+      "description": "The sprite splits into chunks that drop independently."
+    },
+    {
+      "title": "Turntable Merge",
+      "folder": "clockwork-conveyor-turntable-merge",
+      "treatment": "Repeated impressions",
+      "description": "Repeated impressions mark the turntable and its transfer plates."
+    },
+    {
+      "title": "Recirculation Loop",
+      "folder": "clockwork-conveyor-recirculation-loop",
+      "treatment": "Persistent trace",
+      "description": "Older artwork keeps circulating as a fading cargo trace."
+    }
+  ],
+  "Gravity Foundry": [
+    {
+      "title": "Binary Capture",
+      "folder": "gravity-foundry"
+    },
+    {
+      "title": "Tidal Slingshot",
+      "folder": "gravity-foundry-tidal-slingshot",
+      "treatment": "Drawn fibres",
+      "description": "Sprite detail draws long particle wakes through the slingshot."
+    },
+    {
+      "title": "Edge Well Transit",
+      "folder": "gravity-foundry-edge-well-transit",
+      "treatment": "Projected shadow",
+      "description": "The sprite eclipses the travelling wells and their orbit lines."
+    },
+    {
+      "title": "Trojans Scatter",
+      "folder": "gravity-foundry-trojans-scatter",
+      "treatment": "Moving fragments",
+      "description": "Pieces of the sprite scatter as separate orbital debris."
+    },
+    {
+      "title": "Flyby Exchange",
+      "folder": "gravity-foundry-flyby-exchange",
+      "treatment": "Colour separation",
+      "description": "The flyby separates colour channels into offset passes."
+    },
+    {
+      "title": "Ring Shepherd",
+      "folder": "gravity-foundry-ring-shepherd",
+      "treatment": "Repeated impressions",
+      "description": "The sprite repeats at staggered positions among the rings."
+    },
+    {
+      "title": "Three Body Ejection",
+      "folder": "gravity-foundry-three-body-ejection",
+      "treatment": "Beat relay",
+      "description": "Bright areas hold part of the ejection back until later in the beat."
+    },
+    {
+      "title": "Counterorbit Capture",
+      "folder": "gravity-foundry-counterorbit-capture",
+      "treatment": "Persistent trace",
+      "description": "Older images trail away while new material joins the opposite orbit."
+    }
+  ],
+  "Granular Hopper": [
+    {
+      "title": "Funnel Arch Break",
+      "folder": "granular-hopper"
+    },
+    {
+      "title": "Offset Sieve",
+      "folder": "granular-hopper-offset-sieve",
+      "treatment": "Repeated impressions",
+      "description": "Repeated sprite perforations mark the sieve beds."
+    },
+    {
+      "title": "Split Hopper",
+      "folder": "granular-hopper-split-hopper",
+      "treatment": "Projected shadow",
+      "description": "The split hopper casts sprite-shaped shadows across the falling grains."
+    },
+    {
+      "title": "Incline Slide",
+      "folder": "granular-hopper-incline-slide",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels turn the path of grains along the incline."
+    },
+    {
+      "title": "Pocket Fill",
+      "folder": "granular-hopper-pocket-fill",
+      "treatment": "Persistent trace",
+      "description": "Artwork keeps building a deposit as the pockets fill."
+    },
+    {
+      "title": "Talus Spill",
+      "folder": "granular-hopper-talus-spill",
+      "treatment": "Moving fragments",
+      "description": "The image breaks into chips that travel with the spilling talus."
+    },
+    {
+      "title": "Layer Inversion",
+      "folder": "granular-hopper-layer-inversion",
+      "treatment": "Colour transfer",
+      "description": "Sprite pigments are mixed into the inverted layers."
+    },
+    {
+      "title": "Bridge Collapse",
+      "folder": "granular-hopper-bridge-collapse",
+      "treatment": "Beat relay",
+      "description": "Bright image zones delay sections of the bridge before collapse."
+    }
+  ],
+  "Pneumatic Quilt": [
+    {
+      "title": "Diamond Inflation",
+      "folder": "pneumatic-quilt"
+    },
+    {
+      "title": "Channel Vent",
+      "folder": "pneumatic-quilt-channel-vent",
+      "treatment": "Drawn fibres",
+      "description": "The image draws taut threads between the venting pockets."
+    },
+    {
+      "title": "Checkerboard Breathing",
+      "folder": "pneumatic-quilt-checkerboard-breathing",
+      "treatment": "Repeated impressions",
+      "description": "The sprite repeats as pressed marks on alternating cells."
+    },
+    {
+      "title": "Corner Squeeze",
+      "folder": "pneumatic-quilt-corner-squeeze",
+      "treatment": "Brightness relief",
+      "description": "Brightness raises fabric near the corner and changes its lighting."
+    },
+    {
+      "title": "Spiral Bladder Fill",
+      "folder": "pneumatic-quilt-spiral-bladder-fill",
+      "treatment": "Artwork-driven movement",
+      "description": "Sprite channels twist the moving fabric around the filling spiral."
+    },
+    {
+      "title": "Baffle Handoff",
+      "folder": "pneumatic-quilt-baffle-handoff",
+      "treatment": "Beat relay",
+      "description": "Bright areas hold back a pocket before its pressure wave passes on."
+    },
+    {
+      "title": "Foldback Deflation",
+      "folder": "pneumatic-quilt-foldback-deflation",
+      "treatment": "Silhouette cutout",
+      "description": "The silhouette cuts through the folded fabric as it deflates."
+    },
+    {
+      "title": "Crossfeed Surge",
+      "folder": "pneumatic-quilt-crossfeed-surge",
+      "treatment": "Persistent trace",
+      "description": "Fading sprite traces travel from pocket to pocket."
+    }
+  ]
+}

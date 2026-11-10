@@ -214,6 +214,27 @@
       "default": 1.0,
       "type": "continuous",
       "label": "Palette amount"
+    },
+    "reliefDepth": {
+      "min": 0,
+      "max": 1,
+      "default": 0.65,
+      "type": "continuous",
+      "label": "Relief depth"
+    },
+    "meltWarp": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous",
+      "label": "Domain warping"
+    },
+    "displacementColour": {
+      "min": 0,
+      "max": 1,
+      "default": 0.0,
+      "type": "continuous",
+      "label": "Displacement colour"
     }
   },
   "passSchema": 1,
@@ -296,7 +317,10 @@
         "viewPattern": 0.0,
         "finishGlow": 0.2,
         "paletteStyle": 0.0,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.65,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0
       }
     },
     {
@@ -333,7 +357,10 @@
         "viewPattern": 0.0,
         "finishGlow": 0.24,
         "paletteStyle": 0.0,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.65,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0
       }
     },
     {
@@ -370,7 +397,10 @@
         "viewPattern": 0.0,
         "finishGlow": 0.32,
         "paletteStyle": 0.0,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.65,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0
       }
     },
     {
@@ -407,7 +437,10 @@
         "viewPattern": 0.0,
         "finishGlow": 0.18,
         "paletteStyle": 0.0,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.65,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0
       }
     },
     {
@@ -444,7 +477,10 @@
         "viewPattern": 0.0,
         "finishGlow": 0.27,
         "paletteStyle": 0.0,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.65,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0
       }
     },
     {
@@ -481,9 +517,213 @@
         "viewPattern": 0.75,
         "finishGlow": 0.38,
         "paletteStyle": 0.0,
-        "paletteAmount": 1.0
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.65,
+        "meltWarp": 0.0,
+        "displacementColour": 0.0
+      }
+    },
+    {
+      "id": "relief-only",
+      "title": "Relief only",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.54,
+        "warp": 0.43,
+        "detail": 0.75,
+        "hue": 0.713,
+        "symmetry": 0.0,
+        "orbit": 0.56,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.6667,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.8,
+        "meltWarp": 0,
+        "displacementColour": 0
+      }
+    },
+    {
+      "id": "warp-only",
+      "title": "Domain warp only",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.54,
+        "warp": 0.43,
+        "detail": 0.75,
+        "hue": 0.713,
+        "symmetry": 0.0,
+        "orbit": 0.56,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.6667,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0,
+        "reliefDepth": 0,
+        "meltWarp": 0.85,
+        "displacementColour": 0
+      }
+    },
+    {
+      "id": "colour-only",
+      "title": "Displacement colour only",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.54,
+        "warp": 0.43,
+        "detail": 0.75,
+        "hue": 0.713,
+        "symmetry": 0.0,
+        "orbit": 0.56,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.6667,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0,
+        "reliefDepth": 0,
+        "meltWarp": 0,
+        "displacementColour": 0.9
+      }
+    },
+    {
+      "id": "relief-melt",
+      "title": "Relief and melt",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.54,
+        "warp": 0.43,
+        "detail": 0.75,
+        "hue": 0.713,
+        "symmetry": 0.0,
+        "orbit": 0.56,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.6667,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.8,
+        "meltWarp": 0.8,
+        "displacementColour": 0
+      }
+    },
+    {
+      "id": "all-methods",
+      "title": "Relief, melt and colour",
+      "controls": {
+        "intensity": 0.7,
+        "motion": 0.5,
+        "imageMix": 0.5,
+        "scale": 0.54,
+        "warp": 0.43,
+        "detail": 0.75,
+        "hue": 0.713,
+        "symmetry": 0.0,
+        "orbit": 0.56,
+        "focusX": 0.5,
+        "focusY": 0.5,
+        "colourR": 0.7,
+        "colourG": 0.7,
+        "colourB": 0.68,
+        "pulse": 0.5,
+        "mode": 0.6667,
+        "mirror": 0.0,
+        "imageZoom": 0.35,
+        "imageRotation": 0.5,
+        "imageIndex": 0.0,
+        "feedback": 0.65,
+        "bassDrive": 0.62,
+        "midDrive": 0.6,
+        "trebleDrive": 0.62,
+        "momentum": 0.62,
+        "materialMotion": 0.35,
+        "materialMode": 0.0,
+        "viewPattern": 0.0,
+        "finishGlow": 0.2,
+        "paletteStyle": 0.0,
+        "paletteAmount": 1.0,
+        "reliefDepth": 0.8,
+        "meltWarp": 0.8,
+        "displacementColour": 0.9
       }
     }
   ],
-  "sharedLookVersion": 1
+  "sharedLookVersion": 1,
+  "spriteGeometry": "relief"
 }

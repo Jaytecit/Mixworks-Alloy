@@ -1,0 +1,840 @@
+[
+  {
+    "id": 1,
+    "title": "Fault Ledger",
+    "anchor": {
+      "title": "Ridge Unzip",
+      "folder": "fault-ledger"
+    },
+    "existing": [
+      {
+        "title": "Basin Collapse",
+        "folder": "fault-ledger-basin-collapse"
+      },
+      {
+        "title": "Paired Fault Slip",
+        "folder": "fault-ledger-paired-slip"
+      },
+      {
+        "title": "Terrace Ratchet",
+        "folder": "fault-ledger-terrace-ratchet"
+      },
+      {
+        "title": "Diagonal Shear",
+        "folder": "fault-ledger-diagonal-shear"
+      },
+      {
+        "title": "Island Breakaway",
+        "folder": "fault-ledger-island-breakaway"
+      },
+      {
+        "title": "Crosscut Relay",
+        "folder": "fault-ledger-crosscut-relay"
+      },
+      {
+        "title": "Shelf Rejoin",
+        "folder": "fault-ledger-shelf-rejoin"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Lantern Arcade",
+    "anchor": {
+      "title": "Long Arcade Sweep",
+      "folder": "lantern-arcade"
+    },
+    "ink": [
+      1,
+      0.64,
+      0.33
+    ],
+    "edits": [
+      [
+        "float travel = wallDepth + motion * .77;",
+        "float travel = wallDepth * LIB_A + motion * LIB_B;"
+      ],
+      [
+        "float live = .34 + .66 * pow",
+        "float live = .25 + .75 * pow"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "T Junction Relay", "treatment": "relay", "profile": [1.18,0.65], "layout": "vec2(.5 + q.x * (1.2 - .65 * abs(q.y)), u.y + .20 * abs(q.x))", "description": "Bright signs stagger the light relays at the junction."},
+      {"title": "Courtyard Flood", "treatment": "pigment", "profile": [0.7,-0.32], "layout": "vec2(.5 + sign(q.x) * r * .94, .5 + q.y * .72 + .11 * sin(6.0 * q.x - t))", "description": "Sprite colours wash across the courtyard masonry."},
+      {"title": "Elevated Walk Flicker", "treatment": "stamps", "profile": [1.56,0.94], "layout": "vec2(u.x * 1.15, u.y * .67 + .25 + .072 * sin(9.0 * u.x))", "description": "Repeated artwork becomes a row of engraved walkway plates."},
+      {"title": "Underpass Slit", "treatment": "filaments", "profile": [1.7,0.54], "layout": "vec2(u.x, .5 + q.y * 1.6 + .09 * sin(u.x * 6.0 - t))", "description": "The artwork is drawn into separate bars of light running under the passage."},
+      {"title": "Corner Spill", "treatment": "prism", "profile": [0.84,-0.48], "layout": "vec2(.5 + abs(q.x) * 1.44 - .25, u.y + q.x * .58)", "description": "Separated colour beams spill around the corner."},
+      {"title": "Paired Alley Chase", "treatment": "flow", "profile": [1.05,1.04], "layout": "vec2(.5 + (mod(u.x * 2.0, 1.0) - .5) * .82, u.y + .11 * sign(q.x) * sin(t))", "description": "Sprite channels steer the two passages in different directions."},
+      {"title": "Roofwell Descent", "treatment": "relief", "profile": [1.33,-0.87], "layout": "vec2(.5 + (a - .5) * 1.24, r * 1.42)", "description": "Light and dark give the roofwell different relief and shadow."}
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Paper Mechanics",
+    "anchor": {
+      "title": "Fan Unfurl",
+      "folder": "paper-mechanics"
+    },
+    "ink": [
+      0.98,
+      0.66,
+      0.37
+    ],
+    "edits": [
+      [
+        "8.0 + 2.1 * sin(motion * .9)",
+        "LIB_A + 2.1 * sin(motion * LIB_B)"
+      ],
+      [
+        "vec2(-.67, -.44)",
+        "vec2(LIB_B > 0.0 ? -.44 : .37, -.42)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Box Inversion", "treatment": "cut", "profile": [5.1,-0.77], "layout": "vec2(.5 + sign(q.x) * abs(q.y), .5 + sign(q.y) * abs(q.x))", "description": "The silhouette becomes a cutout through the inverted box panels."},
+      {"title": "Map Gatefold", "treatment": "stamps", "profile": [4.7,0.71], "layout": "vec2(.5 + abs(q.x) * 1.70, .5 + q.y * .88)", "description": "Staggered impressions repeat across the folded map."},
+      {"title": "Corner Peel", "treatment": "relief", "profile": [7.8,0.85], "layout": "u + vec2(.23 * q.y * q.y, -.22 * q.x)", "description": "Bright marks lift the peeling paper and change its lighting."},
+      {"title": "Accordion Advance", "treatment": "relay", "profile": [12,1.12], "layout": "vec2(u.x + .10 * sin(11.0 * u.y - t), u.y * .8 + .10)", "description": "The sprite holds selected accordion creases back after each hit."},
+      {"title": "Pocket Turn", "treatment": "pigment", "profile": [7.4,-0.82], "layout": "vec2(u.x * .71 + .10, .5 + abs(q.y) * 1.15 + .18 * q.x)", "description": "Colour bleeds into the turning pockets."},
+      {"title": "Pleat Collapse", "treatment": "fragments", "profile": [14,1.33], "layout": "vec2(.5 + q.x * (.74 + .67 * abs(q.y)), .5 + q.y * 1.13)", "description": "Artwork fractures into chips that ride away on collapsing pleats."},
+      {"title": "Saddle Twist", "treatment": "filaments", "profile": [7,-0.96], "layout": "vec2(.5 + q.x * 1.05, .5 + q.y + 1.24 * q.x * q.y)", "description": "The artwork is drawn into tight fibres following the twisted paper."}
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Sediment Clock",
+    "anchor": {
+      "title": "Delta Prograde",
+      "folder": "sediment-clock"
+    },
+    "ink": [
+      0.89,
+      0.57,
+      0.25
+    ],
+    "edits": [
+      [
+        "19.0 + 12.0 * low",
+        "LIB_A + 12.0 * low"
+      ],
+      [
+        ".76 - .36 * smoothstep",
+        "LIB_B - .36 * smoothstep"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Shelf Slump", "treatment": "relief", "profile": [13,0.68], "layout": "vec2(u.x + .16 * q.y, u.y + .20 * sin(u.x * 3.8 + t * .52))", "description": "Brightness raises ridges and carves hollows in the slumping shelf."},
+      {"title": "Core Stack", "treatment": "stamps", "profile": [27,0.83], "layout": "vec2(.5 + q.x * .79 + .13 * sin(u.y * 7.0), .5 + q.y * 1.17)", "description": "Copies of the image are pressed into successive bands."},
+      {"title": "Fan Bury", "treatment": "pigment", "profile": [16,0.71], "layout": "vec2(.5 + q.x * (.55 + .82 * u.y), u.y + .16 * r)", "description": "Sprite colour is sorted into bands as the sediment fan buries them."},
+      {"title": "Canyon Refill", "treatment": "flow", "profile": [22,0.81], "layout": "vec2(.5 + q.x * 1.20, u.y - .24 * exp(-12.0 * abs(q.x)))", "description": "Sprite channels redirect the movement along the canyon walls."},
+      {"title": "Bar Migration", "treatment": "fragments", "profile": [10,0.63], "layout": "vec2(u.x + .19 * sin(5.0 * u.y - t * .72), u.y + .11 * q.x)", "description": "Artwork breaks into drifting clasts on migrating sandbars."},
+      {"title": "Levee Breach", "treatment": "cut", "profile": [18,0.79], "layout": "vec2(u.x, u.y + .23 * exp(-18.0 * abs(q.x - .13)))", "description": "The silhouette breaches the levee and exposes a dark cross-section."},
+      {"title": "Bed Scour", "treatment": "filaments", "profile": [34,0.59], "layout": "vec2(u.x + .09 * sin(14.0 * u.y + t), .5 + q.y * .76 + .13 * q.x)", "description": "The image draws thin streaks into the scoured beds."}
+    ]
+  },
+  {
+    "id": 5,
+    "title": "Dune Telegraph",
+    "anchor": {
+      "title": "Crescent March",
+      "folder": "dune-telegraph"
+    },
+    "ink": [
+      0.88,
+      0.64,
+      0.34
+    ],
+    "edits": [
+      [
+        "4.3 - motion * (.62 + .35 * mid)",
+        "LIB_A - motion * (.62 + .35 * mid)"
+      ],
+      [
+        "1.50 * cell.y * cell.y",
+        "LIB_B * cell.y * cell.y"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Forked Slipface", "treatment": "relief", "profile": [5.5,2.3], "layout": "vec2(.5 + q.x, u.y + .22 * abs(q.x))", "description": "Bright parts of the artwork raise the branching slipfaces and move their highlights."},
+      {"title": "Corridor Scour", "treatment": "filaments", "profile": [3.6,0.73], "layout": "vec2(u.x, .5 + q.y * (.65 + .80 * abs(q.x)))", "description": "The image is pulled into thin wind-driven scour lines."},
+      {"title": "Lee Wake", "treatment": "memory", "profile": [4.9,1.1], "layout": "vec2(u.x + .11 * sin(9.0 * u.y - t), u.y)", "description": "Artwork leaves a drifting sand wake that survives a swap."},
+      {"title": "Double Dune Collision", "treatment": "fragments", "profile": [5.7,2.15], "layout": "vec2(.5 + abs(q.x) * 1.37 + .06 * sin(t), u.y - .17 * sign(q.x) * q.x)", "description": "Image fragments move across the opposing dunes on beats."},
+      {"title": "Edge Drift", "treatment": "pigment", "profile": [7.6,1.65], "layout": "vec2(u.x + .20 * q.y * abs(q.y), u.y * .78 + .13)", "description": "Sprite colours migrate along the leeward sand."},
+      {"title": "Star Dune Feed", "treatment": "stamps", "profile": [4.3,2.65], "layout": "vec2(.50 + (a - .5), r * 1.62)", "description": "Repeated impressions spiral through the star dunes."},
+      {"title": "Ridge Overtake", "treatment": "relay", "profile": [4,0.95], "layout": "vec2(u.x + .12 * cos(u.y * 17.0 - t), u.y + .18 * q.x)", "description": "Bright sprite patches hold ridges back as the others advance."}
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Rain Reedbed",
+    "anchor": {
+      "title": "Bank Gust",
+      "folder": "rain-reedbed"
+    },
+    "ink": [
+      0.64,
+      0.87,
+      0.49
+    ],
+    "edits": [
+      [
+        ".71 - .22 * k",
+        "LIB_A - .22 * k"
+      ],
+      [
+        "39.0 - 4.0 * k",
+        "LIB_B - 4.0 * k"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Split Channel Bend", "treatment": "pigment", "profile": [0.73,46], "layout": "vec2(u.x + .18 * sign(q.x) * sin(4.0 * u.y), u.y)", "description": "Sprite colour washes through the two channels and stains the reed banks."},
+      {"title": "Island Shelter", "treatment": "shadow", "profile": [0.77,35], "layout": "vec2(.5 + sign(q.x) * r * 1.10, u.y + .08 * cos(10.0 * u.x))", "description": "Artwork casts a moving shelter shadow over the reeds."},
+      {"title": "Diagonal Comb", "treatment": "filaments", "profile": [0.69,51], "layout": "vec2(u.x + .38 * q.y, u.y + .08 * q.x)", "description": "The image stretches into individual diagonal reed fibres."},
+      {"title": "Floodplain Flatten", "treatment": "relief", "profile": [0.63,30], "layout": "vec2(u.x, .5 + q.y * .89 + .17 * q.x * q.x)", "description": "Bright parts lift the flooded beds and alter their grazing light."},
+      {"title": "Crossing Squalls", "treatment": "prism", "profile": [0.81,48], "layout": "vec2(u.x + .13 * sin(u.y * 13.0 - t), u.y + .22 * abs(q.x))", "description": "Two rain fronts catch separated bands of colour from the artwork."},
+      {"title": "Furrow Ripple", "treatment": "memory", "profile": [0.72,44], "layout": "vec2(u.x + .09 * sin(15.0 * u.y + t), .5 + q.y * 1.11)", "description": "Old sprite traces keep drifting down the furrows."},
+      {"title": "Perimeter Sweep", "treatment": "relay", "profile": [0.66,35], "layout": "vec2(a, r * 1.51)", "description": "Bright media delays the gusts around the perimeter."}
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Salt Weather",
+    "anchor": {
+      "title": "Shoreline Freeze",
+      "folder": "salt-weather"
+    },
+    "ink": [
+      0.72,
+      0.89,
+      1
+    ],
+    "edits": [
+      [
+        "vec2(17.0, 12.0)",
+        "vec2(LIB_A, LIB_B)"
+      ],
+      [
+        ".17 * sin(motion * .65)",
+        " .21 * sin(motion * (LIB_A * .048))"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Needle Fan Advance", "treatment": "filaments", "profile": [11,19], "layout": "vec2(.5 + (a - .5) * .91, r * 1.61)", "description": "Sprite edges stretch into long crystal needles."},
+      {"title": "Branch Confluence", "treatment": "prism", "profile": [15,11], "layout": "vec2(.5 + abs(q.x) * 1.65 - .35, u.y + .21 * q.x)", "description": "The converging branches split the sprite into colour fringes."},
+      {"title": "Salt Pan Drydown", "treatment": "memory", "profile": [23,14], "layout": "vec2(u.x * .83 + .10, u.y + .12 * sin(7.0 * u.x))", "description": "Image residue dries into a crust and keeps migrating."},
+      {"title": "Bridging Crust", "treatment": "relief", "profile": [13,13], "layout": "vec2(u.x + .32 * q.y, u.y - .09 * cos(15.0 * u.x - t))", "description": "Sprite brightness raises the bridge ridges and deepens pits."},
+      {"title": "Facet Collision", "treatment": "fragments", "profile": [9,9], "layout": "vec2(u.x + .16 * sin(12.0 * u.y + t), .5 + q.y * 1.12)", "description": "Sprite chips are carried away as large facets collide."},
+      {"title": "Pinhole Bloom", "treatment": "shadow", "profile": [26,19], "layout": "vec2(.5 + q.x * (.76 + .75 * abs(q.y)), u.y)", "description": "The artwork casts moving shadows across the fine crystal pores."},
+      {"title": "Frost Retraction", "treatment": "relay", "profile": [18,15], "layout": "vec2(1.0 - u.x, 1.0 - u.y + .21 * r)", "description": "Bright areas hold the frost at individual junctions before it retracts."}
+    ]
+  },
+  {
+    "id": 8,
+    "title": "Plankton Census",
+    "anchor": {
+      "title": "Estuary Sorting",
+      "folder": "plankton-census"
+    },
+    "ink": [
+      0.44,
+      0.93,
+      0.83
+    ],
+    "edits": [
+      [
+        ".16 - .033 * mid",
+        "LIB_A - .033 * mid"
+      ],
+      [
+        ".079 - .024 * mid",
+        "LIB_B - .024 * mid"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Reef Bypass", "treatment": "shadow", "profile": [0.15,0.078], "layout": "vec2(u.x, u.y + .20 * exp(-16.0 * abs(q.x)))", "description": "Sprite shadows sweep the reef and its schools."},
+      {"title": "Baitball Escape", "treatment": "fragments", "profile": [0.085,0.052], "layout": "vec2(a, r * 1.56)", "description": "Artwork breaks into small schools that scatter from the baitball."},
+      {"title": "Layer Migration", "treatment": "relief", "profile": [0.205,0.061], "layout": "vec2(u.x + .19 * q.y, u.y * .82 + .12)", "description": "Brightness raises the apparent water layers and moves the fish between them."},
+      {"title": "Counterstream Crossing", "treatment": "flow", "profile": [0.126,0.088], "layout": "vec2(.5 + sign(q.x) * r * .98, u.y + .13 * q.x)", "description": "Sprite channels steer opposing streams across one another."},
+      {"title": "Shelter Handoff", "treatment": "memory", "profile": [0.155,0.106], "layout": "vec2(u.x + .15 * sin(11.0 * u.y - t), u.y)", "description": "An old sprite leaves a drifting trail between refuges."},
+      {"title": "Channel Split", "treatment": "relay", "profile": [0.18,0.072], "layout": "vec2(u.x, .5 + q.y + sign(q.y) * .17 * exp(-14.0 * abs(q.x)))", "description": "Bright parts hold back sections of the schools before they cross into the other channel."},
+      {"title": "Eddy Reunion", "treatment": "pigment", "profile": [0.119,0.085], "layout": "vec2(.5 + (a - .5) * .95, r * 1.38 + .10 * sin(t))", "description": "Sprite colours curl into the returning schools."}
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Fumarole Field",
+    "anchor": {
+      "title": "Ridge Jets",
+      "folder": "fumarole-field"
+    },
+    "ink": [
+      0.91,
+      0.63,
+      0.39
+    ],
+    "edits": [
+      [
+        ".13 + .25 * valve",
+        "LIB_A + .25 * valve"
+      ],
+      [
+        ".11 + .12 * valve",
+        "LIB_B + .12 * valve"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Basin Chimneys", "treatment": "relief", "profile": [0.15,0.083], "layout": "vec2(u.x, u.y + .17 * sin(u.x * 5.0))", "description": "Bright parts raise the ground and light the chimney faces."},
+      {"title": "Crack Vent Crawl", "treatment": "filaments", "profile": [0.29,0.079], "layout": "vec2(u.x + .19 * sin(5.0 * u.y), u.y + .19 * q.x)", "description": "The image becomes fine jets that crawl along the vent crack."},
+      {"title": "Geyser Pair", "treatment": "relay", "profile": [0.092,0.104], "layout": "vec2(.5 + abs(q.x) * 1.63, u.y * .9 + .04)", "description": "Brightness delays the eruption on one side of each geyser pair."},
+      {"title": "Hollow Backdraft", "treatment": "flow", "profile": [0.23,0.14], "layout": "vec2(u.x + .24 * q.y * abs(q.y), 1.0 - u.y)", "description": "Sprite channels steer the reversed plume motion."},
+      {"title": "Shelf Plume Merge", "treatment": "pigment", "profile": [0.21,0.17], "layout": "vec2(u.x, u.y * .83 + .08 + .16 * sin(4.0 * u.x - t))", "description": "The merging plumes carry colours drawn from the artwork."},
+      {"title": "Offset Vent Chase", "treatment": "stamps", "profile": [0.15,0.07], "layout": "vec2(u.x + .12 * sin(7.0 * u.y + t), u.y + .15 * sign(q.x) * q.x)", "description": "Repeated sprite impressions mark the staggered vent faces."},
+      {"title": "Crosswind Smear", "treatment": "memory", "profile": [0.46,0.13], "layout": "vec2(u.x + .44 * q.y, .5 + q.y * .89)", "description": "A previous sprite remains as drifting material in the crosswind."}
+    ]
+  },
+  {
+    "id": 10,
+    "title": "Storm Isobars",
+    "anchor": {
+      "title": "Squall Bow",
+      "folder": "storm-isobars"
+    },
+    "ink": [
+      0.51,
+      0.79,
+      0.94
+    ],
+    "edits": [
+      [
+        "8.5 * bow",
+        "LIB_A * bow"
+      ],
+      [
+        ".30 * sin(10.0 * p.y + motion)",
+        ".30 * sin(LIB_B * p.y + motion)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Triple Point Merge", "treatment": "prism", "profile": [11.5,9], "layout": "vec2(.5 + sign(q.x) * r, u.y + .21 * q.x)", "description": "The triple point separates the sprite into colour fronts."},
+      {"title": "Dryline Intrusion", "treatment": "cut", "profile": [9,15], "layout": "vec2(u.x + .23 * sin(4.0 * u.y - t), u.y)", "description": "The alpha silhouette cuts a dry intrusion through the rain field."},
+      {"title": "Polar Wrap", "treatment": "flow", "profile": [10,12], "layout": "vec2(a, r * 1.43)", "description": "Sprite channels wind the isobars around the pole."},
+      {"title": "Occluded Front", "treatment": "shadow", "profile": [13,13], "layout": "vec2(.5 + abs(q.x) * 1.7 - .29, u.y + .11 * q.y)", "description": "A projected silhouette darkens and lengthens the occluded front."},
+      {"title": "Gust Ring Escape", "treatment": "relay", "profile": [8.2,20], "layout": "vec2(.5 + r * 1.16, .5 + (a - .5) * 1.29)", "description": "Bright regions delay the local expansion of gust rings."},
+      {"title": "Jet Streak Split", "treatment": "filaments", "profile": [10.7,17], "layout": "vec2(u.x + .28 * q.y, u.y + .13 * sin(u.x * 11.0))", "description": "Sprite detail is drawn out into long jet streaks."},
+      {"title": "Convergence Sweep", "treatment": "memory", "profile": [7.7,9], "layout": "vec2(u.x, .5 + q.y * (.65 + .92 * abs(q.x)))", "description": "Old artwork stays in the weather field and drifts toward the convergence line."}
+    ]
+  },
+  {
+    "id": 11,
+    "title": "Caustic Basin",
+    "anchor": {
+      "title": "Shoal Focus",
+      "folder": "caustic-basin"
+    },
+    "ink": [
+      0.61,
+      0.98,
+      0.81
+    ],
+    "edits": [
+      [
+        "12.3 * ray.x + 2.1 * ray.y",
+        "LIB_A * ray.x + 2.1 * ray.y"
+      ],
+      [
+        "13.0 * ray.y - 4.0 * ray.x",
+        "LIB_B * ray.y - 4.0 * ray.x"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Trench Split", "treatment": "prism", "profile": [14,17], "layout": "vec2(u.x + .16 * abs(q.y), u.y - .13 * exp(-12.0 * abs(q.x)))", "description": "The trench splits the sprite into separated wavelength bands."},
+      {"title": "Step Refocus", "treatment": "relief", "profile": [18,11], "layout": "vec2(u.x, u.y + .16 * floor(q.x * 5.0) / 3.0)", "description": "Bright detail becomes small changes in basin depth with lit edges."},
+      {"title": "Pebble Scatter", "treatment": "fragments", "profile": [21,21], "layout": "vec2(u.x + .10 * sin(16.0 * u.y - t), u.y)", "description": "Artwork breaks into moving chips among the pebble reflections."},
+      {"title": "Channel Crosslight", "treatment": "shadow", "profile": [10,17], "layout": "vec2(u.x + .29 * q.y, u.y + .12 * sin(7.0 * u.x))", "description": "The sprite blocks angled rays and throws moving shadows."},
+      {"title": "Sandbar Bend", "treatment": "pigment", "profile": [15,9], "layout": "vec2(u.x, u.y + .16 * exp(-6.0 * abs(q.x)) * sin(t + 6.0 * q.x))", "description": "The sandbar takes on colours streamed from the sprite."},
+      {"title": "Pool Convergence", "treatment": "memory", "profile": [11,14], "layout": "vec2(.5 + sign(q.x) * r, .5 + q.y * (.67 + .61 * abs(q.x)))", "description": "A sprite leaves a pool of light that drifts and fades."},
+      {"title": "Rim Reflection", "treatment": "stamps", "profile": [17,15], "layout": "vec2(.5 + (a - .5) * .92, r * 1.47)", "description": "Repeated reflections emboss the rim with copies of the artwork."}
+    ]
+  },
+  {
+    "id": 12,
+    "title": "Shadow Telegraph",
+    "anchor": {
+      "title": "Raking Wall",
+      "folder": "shadow-telegraph"
+    },
+    "ink": [
+      1,
+      0.8,
+      0.58
+    ],
+    "edits": [
+      [
+        "vec2(8.0, 10.0)",
+        "vec2(LIB_A, LIB_B)"
+      ],
+      [
+        "5.8 * q.x - .85 * q.y",
+        "(LIB_A * .73) * q.x - .85 * q.y"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Stair Shadow Climb", "treatment": "relief", "profile": [6,13], "layout": "vec2(u.x, u.y + .06 * floor(q.x * 7.0))", "description": "Brightness raises treads and reshapes the shadows climbing them."},
+      {"title": "Parapet Sundial", "treatment": "stamps", "profile": [7,8], "layout": "vec2(.5 + (a - .5) * .89, r * 1.48)", "description": "Repeated artwork is etched on a series of sundial faces."},
+      {"title": "Opposed Lamps", "treatment": "prism", "profile": [11,12], "layout": "vec2(.5 + abs(q.x) * 1.73 - .3, u.y + .13 * q.x)", "description": "Opposed lamps send separate colour images across the brick."},
+      {"title": "Slat Crossover", "treatment": "filaments", "profile": [13,8], "layout": "vec2(u.x + .31 * q.y, u.y + .08 * sin(12.0 * u.x))", "description": "Slats pull the sprite into alternating narrow light threads."},
+      {"title": "Corner Wrap", "treatment": "flow", "profile": [9,11], "layout": "vec2(u.x + .19 * sin(4.0 * u.y - t), u.y + .18 * abs(q.x))", "description": "Sprite channels push the wall pattern around the corner."},
+      {"title": "Beam Eclipse", "treatment": "cut", "profile": [5,13], "layout": "vec2(u.x, .5 + q.y * (1.19 - .57 * abs(q.x)))", "description": "The silhouette cuts a gap through the beam."},
+      {"title": "Screen Handoff", "treatment": "memory", "profile": [8,15], "layout": "vec2(u.x + .12 * sin(u.y * 11.0 + t), u.y)", "description": "Sprite residue moves across successive screens after the handoff."}
+    ]
+  },
+  {
+    "id": 13,
+    "title": "Foil Register",
+    "anchor": {
+      "title": "Ribbon Corrugation",
+      "folder": "foil-register"
+    },
+    "ink": [
+      1,
+      0.74,
+      0.59
+    ],
+    "edits": [
+      [
+        "p.y * 46.0 + 2.5 * sin(p.x * 6.0",
+        "p.y * LIB_A + 2.5 * sin(p.x * LIB_B"
+      ],
+      [
+        "p.y * 293.0",
+        "p.y * (LIB_A * 6.3)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Offset Stamp Relay", "treatment": "stamps", "profile": [38,9], "layout": "vec2(u.x, u.y + .076 * sin(u.x * 15.0 - t))", "description": "Small mirrored artwork stamps are pressed into alternate strips."},
+      {"title": "Diagonal Brush Reversal", "treatment": "flow", "profile": [55,9.6], "layout": "vec2(u.x + .34 * q.y, .5 + q.y * 1.13)", "description": "Sprite channels switch the direction of the brushing."},
+      {"title": "Fluted Panel Sweep", "treatment": "pigment", "profile": [31,5], "layout": "vec2(.5 + q.x * (1.18 - .39 * abs(q.y)), u.y)", "description": "Pigment from the image stains the moving fluted panels."},
+      {"title": "Raised Seal Flash", "treatment": "relay", "profile": [67,7.6], "layout": "vec2(.5 + sign(q.x) * r, u.y - .15 * abs(q.x))", "description": "Bright image regions flash after adjacent foil has already caught the beat."},
+      {"title": "Woven Foil Glide", "treatment": "filaments", "profile": [45,17], "layout": "vec2(u.x + .11 * sin(u.y * 15.0 - t), u.y + .11 * sin(16.0 * u.x))", "description": "Fine threads from the artwork interleave with the woven foil."},
+      {"title": "Tension Wrinkle", "treatment": "cut", "profile": [34,10.3], "layout": "vec2(u.x, u.y + .22 * sin(4.0 * u.x) * sin(t + 6.0 * q.x))", "description": "The sprite opens a dark tear in the wrinkling surface."},
+      {"title": "Creased Edge Spark", "treatment": "prism", "profile": [49,12], "layout": "vec2(1.0 - u.y, .5 + q.x + .18 * q.y * abs(q.y))", "description": "Different colour channels strike different edges of the crease."}
+    ]
+  },
+  {
+    "id": 14,
+    "title": "Serrated Shutters",
+    "anchor": {
+      "title": "Concertina Chase",
+      "folder": "serrated-shutters"
+    },
+    "ink": [
+      0.98,
+      0.57,
+      0.4
+    ],
+    "edits": [
+      [
+        "p.x * 13.0 + .68 * p.y",
+        "p.x * LIB_A + LIB_B * p.y"
+      ],
+      [
+        "(blade + .5 - .68 * p.y) / 13.0",
+        "(blade + .5 - LIB_B * p.y) / LIB_A"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Checkerboard Flip", "treatment": "stamps", "profile": [11,0.41], "layout": "vec2(.5 + q.x + .05 * mod(floor(u.y * 8.0), 2.0), u.y)", "description": "Copies are carved into alternating shutter blades."},
+      {"title": "Diagonal Unzip", "treatment": "filaments", "profile": [14,1.65], "layout": "vec2(u.x + .39 * q.y, u.y)", "description": "Threads from the artwork unzip the slats along the diagonal."},
+      {"title": "Slot Crossover", "treatment": "prism", "profile": [16,-0.84], "layout": "vec2(.5 + abs(q.x) * 1.44, u.y + .12 * q.x)", "description": "The slot separates the sprite into crossing beams."},
+      {"title": "Corner Aperture", "treatment": "relief", "profile": [12,0.71], "layout": "vec2(a, r * 1.45)", "description": "Bright artwork rises on the corners and changes the aperture relief."},
+      {"title": "Opposed Banks", "treatment": "relay", "profile": [10,-0.62], "layout": "vec2(.5 + sign(q.x) * abs(q.x) * 1.18, u.y + .20 * abs(q.x))", "description": "Artwork holds selected shutters shut for part of each beat."},
+      {"title": "Floor to Ceiling Roll", "treatment": "pigment", "profile": [17,1.1], "layout": "vec2(u.y, .5 - q.x + .12 * sin(u.y * 7.0))", "description": "Sprite colour flows up the rolling shutters."},
+      {"title": "Interlocking Iris", "treatment": "fragments", "profile": [18,0.55], "layout": "vec2(.5 + (a - .5), r * 1.67)", "description": "Sprite fragments travel separately across the interlocking leaves."}
+    ]
+  },
+  {
+    "id": 15,
+    "title": "Ceramic Resonator",
+    "anchor": {
+      "title": "Honeycomb Buckle",
+      "folder": "ceramic-resonator"
+    },
+    "ink": [
+      0.61,
+      0.89,
+      0.95
+    ],
+    "edits": [
+      [
+        "11.6",
+        "LIB_A"
+      ],
+      [
+        "tile.x * .89 - tile.y * .63",
+        "tile.x * LIB_B - tile.y * .63"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Keystone Ringdown", "treatment": "relay", "profile": [9,1.05], "layout": "vec2(.5 + sign(q.x) * r * 1.04, u.y)", "description": "Bright pixels delay individual keystones before their ringdown."},
+      {"title": "Brick Bond Slip", "treatment": "stamps", "profile": [13.5,-0.6], "layout": "vec2(u.x + .077 * mod(floor(u.y * 9.0), 2.0), u.y)", "description": "The sprite repeats in relief along the offset brick courses."},
+      {"title": "Mosaic Fan Flex", "treatment": "pigment", "profile": [14.6,0.94], "layout": "vec2(a, r * 1.43)", "description": "The image becomes coloured glaze across the mosaic fan."},
+      {"title": "Travelling Ridge", "treatment": "flow", "profile": [11.1,1.2], "layout": "vec2(u.x + .21 * q.y, u.y + .11 * sin(8.0 * u.x - t))", "description": "The image steers the slab ripple along the ridge."},
+      {"title": "Scallop Snap", "treatment": "cut", "profile": [8.7,-0.72], "layout": "vec2(u.x + .15 * sin(u.y * 11.0), u.y + .13 * sin(14.0 * u.x - t))", "description": "The silhouette opens a dark fissure through the scalloped tiles."},
+      {"title": "Split Panel Rebound", "treatment": "fragments", "profile": [10,0.8], "layout": "vec2(.5 + abs(q.x) * 1.6 - .27, u.y + .08 * q.x)", "description": "Sprite pieces move as separate chips on the split panel."},
+      {"title": "Corner Load", "treatment": "shadow", "profile": [12.5,1.34], "layout": "vec2(u.x, .5 + q.y * 1.08 + .23 * q.x)", "description": "Sprite-shaped shadows rake over the corner load."}
+    ]
+  },
+  {
+    "id": 16,
+    "title": "Kinetic Typesetter",
+    "anchor": {
+      "title": "Column Set",
+      "folder": "kinetic-typesetter"
+    },
+    "ink": [
+      0.9,
+      0.7,
+      0.44
+    ],
+    "edits": [
+      [
+        "p.x * 4.0",
+        "p.x * LIB_A"
+      ],
+      [
+        "p.y * 13.0",
+        "p.y * LIB_B"
+      ],
+      [
+        "vec2(4.0 * spacing, 13.0)",
+        "vec2(LIB_A * spacing, LIB_B)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Headline Slam", "treatment": "relief", "profile": [3,7.5], "layout": "vec2(u.x, .5 + q.y * (.67 + .58 * abs(q.x)))", "description": "Bright image areas raise headline type and cast bevel light."},
+      {"title": "Diagonal Proof", "treatment": "pigment", "profile": [3,11], "layout": "vec2(u.x + .32 * q.y, u.y - .17 * q.x)", "description": "The sprite inks the diagonal proof in its own colours."},
+      {"title": "Corner Index", "treatment": "stamps", "profile": [5,14], "layout": "vec2(u.x + .11 * abs(q.y), u.y + .10 * abs(q.x))", "description": "Small repeated images are impressed into the index blocks."},
+      {"title": "Loose Type Cascade", "treatment": "fragments", "profile": [3,8.2], "layout": "vec2(u.x + .13 * sin(u.y * 11.0 + t), 1.0 - u.y)", "description": "The sprite breaks into loose type that slips out of position."},
+      {"title": "Margin Chase", "treatment": "filaments", "profile": [6,16], "layout": "vec2(.5 + q.x * (.79 + .60 * abs(q.y)), u.y)", "description": "Threads from the image run down the moving margins."},
+      {"title": "Reversed Forme", "treatment": "cut", "profile": [4,9.5], "layout": "vec2(1.0 - u.x, .5 + q.y * 1.20)", "description": "The sprite cuts letter-shaped voids through the reversed forme."},
+      {"title": "Overprint Collision", "treatment": "prism", "profile": [5,12.5], "layout": "vec2(.5 + abs(q.x) * 1.70 - .28, u.y + .10 * q.x)", "description": "Colour separations overlap out of register on the overprint."}
+    ]
+  },
+  {
+    "id": 17,
+    "title": "Cable Exchange",
+    "anchor": {
+      "title": "Bus Arbitration",
+      "folder": "cable-exchange"
+    },
+    "ink": [
+      0.45,
+      0.86,
+      0.82
+    ],
+    "edits": [
+      [
+        "vec2(13.0, 9.0)",
+        "vec2(LIB_A, LIB_B)"
+      ],
+      [
+        "mix(.26, .71, mod(id.y, 2.0))",
+        "mix(.22, .76, mod(id.y + floor(id.x * .32), 2.0))"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Switchyard Detour", "treatment": "stamps", "profile": [11,10], "layout": "vec2(u.x + .13 * sin(7.0 * u.y - t), u.y + .12 * q.x)", "description": "Repeated sprite impressions mark the detours and their switching plates."},
+      {"title": "Ring Bypass", "treatment": "memory", "profile": [13,8], "layout": "vec2(a, r * 1.55)", "description": "Old artwork circulates as a decaying packet trail in the bypass."},
+      {"title": "Crossbar Handoff", "treatment": "prism", "profile": [16,11], "layout": "vec2(u.x + .16 * q.y, u.y + .16 * q.x)", "description": "Colour channels hand off to separate crossbar routes."},
+      {"title": "Branch Fanout", "treatment": "filaments", "profile": [11,14], "layout": "vec2(.5 + q.x * (.69 + .82 * abs(q.y)), u.y)", "description": "The sprite fans into narrow signal threads."},
+      {"title": "Loopback Queue", "treatment": "relay", "profile": [15,9], "layout": "vec2(.5 + (a - .5) * .91, .5 + r * 1.35)", "description": "Brightness keeps packets queued for different lengths after each beat."},
+      {"title": "Merge Priority", "treatment": "pigment", "profile": [12,10], "layout": "vec2(.5 + abs(q.x) * 1.66 - .3, u.y + .12 * sin(12.0 * u.x))", "description": "Sprite colour spreads into the converging traces."},
+      {"title": "Bridge Failover", "treatment": "shadow", "profile": [14,13], "layout": "vec2(u.x + .29 * q.y, u.y + .12 * abs(q.x))", "description": "The sprite projects a moving blackout across the bridge and its traces."}
+    ]
+  },
+  {
+    "id": 18,
+    "title": "Barograph",
+    "anchor": {
+      "title": "Stacked Seismograms",
+      "folder": "barograph"
+    },
+    "ink": [
+      0.77,
+      0.45,
+      0.3
+    ],
+    "edits": [
+      [
+        "vec2(48.0, 56.0)",
+        "vec2(LIB_A, LIB_B)"
+      ],
+      [
+        "p.x * 28.0",
+        "p.x * (LIB_A * .58)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Radial Drum Record", "treatment": "stamps", "profile": [42,52], "layout": "vec2(a, r * 1.45)", "description": "Copies of the sprite stamp into the cylindrical paper."},
+      {"title": "Opposed Paper Feeds", "treatment": "prism", "profile": [51,42], "layout": "vec2(u.x * (q.y < 0.0 ? -1.0 : 1.0), u.y + .13 * q.x)", "description": "Different sprite channels travel in opposite directions on the paper."},
+      {"title": "Spiral Trace Spool", "treatment": "flow", "profile": [43,62], "layout": "vec2(a + r * .78, r * 1.43)", "description": "The sprite steers the pen positions as the record spools."},
+      {"title": "Crossfeed Pens", "treatment": "pigment", "profile": [32,52], "layout": "vec2(u.x + .28 * q.y, u.y + .13 * sin(u.x * 8.0))", "description": "Image colours feed into the separate pen marks."},
+      {"title": "Lane Skips", "treatment": "cut", "profile": [42,64], "layout": "vec2(u.x + .12 * mod(floor(u.y * 7.0), 2.0), u.y)", "description": "The silhouette cuts gaps through the selected record lanes."},
+      {"title": "Foldout Record", "treatment": "relief", "profile": [50,45], "layout": "vec2(.5 + abs(q.x) * 1.65 - .28, u.y + .17 * q.x)", "description": "The folded chart rises and catches a bevel wherever the image is bright."},
+      {"title": "Alternating Drum Banks", "treatment": "relay", "profile": [39,49], "layout": "vec2(.5 + (a - .5) * .86, r * 1.58 + .14 * sin(t))", "description": "Bright parts delay each drum bank after the hit."}
+    ]
+  },
+  {
+    "id": 19,
+    "title": "Raster Excavation",
+    "anchor": {
+      "title": "Rolling Sweep",
+      "folder": "raster-excavation"
+    },
+    "ink": [
+      0.65,
+      0.95,
+      0.57
+    ],
+    "edits": [
+      [
+        "p.x * 48.0",
+        "p.x * LIB_A"
+      ],
+      [
+        "p.y * 29.0",
+        "p.y * LIB_B"
+      ],
+      [
+        "vec2(48.0, 29.0)",
+        "vec2(LIB_A, LIB_B)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Interlaced Quarry", "treatment": "prism", "profile": [48,32], "layout": "vec2(u.x + .045 * mod(floor(u.y * 39.0), 2.0), u.y)", "description": "The interlaced rows separate the sprite into colour channels."},
+      {"title": "Opposed Scan Faces", "treatment": "shadow", "profile": [39,24], "layout": "vec2(.5 + abs(q.x) * 1.73 - .31, .5 + sign(q.x) * q.y)", "description": "The sprite casts a moving shadow between the opposing scan faces."},
+      {"title": "Zigzag Bench Cut", "treatment": "stamps", "profile": [44,27], "layout": "vec2(u.x + .17 * abs(fract(u.y * 3.0) - .5), u.y)", "description": "Repeated sprite impressions are cut into the zigzag bench."},
+      {"title": "Diagonal Stripping", "treatment": "filaments", "profile": [52,33], "layout": "vec2(u.x + .38 * q.y, u.y - .15 * q.x)", "description": "The artwork is pulled into individual diagonal strips."},
+      {"title": "Patch Excavation", "treatment": "fragments", "profile": [30,23], "layout": "vec2(u.x + .10 * mod(floor(u.y * 4.0), 2.0), u.y + .11 * mod(floor(u.x * 5.0), 2.0))", "description": "Image pieces break away as moving excavation patches."},
+      {"title": "Corner Traverse", "treatment": "memory", "profile": [40,30], "layout": "vec2(.5 + q.x * (.65 + .76 * abs(q.y)), u.y + .16 * q.x)", "description": "Stored image marks follow the corner and fade through several sweeps."},
+      {"title": "Depth Relay", "treatment": "relay", "profile": [36,31], "layout": "vec2(u.y, u.x + .13 * sin(u.y * 8.0))", "description": "Bright zones wait longer before triggering the next depth response."}
+    ]
+  },
+  {
+    "id": 20,
+    "title": "Sonar Curtain",
+    "anchor": {
+      "title": "Lateral Ping Sweep",
+      "folder": "sonar-curtain"
+    },
+    "ink": [
+      0.45,
+      0.86,
+      1
+    ],
+    "edits": [
+      [
+        ".045 * sin(p.x * 9.0 + k * 2.7)",
+        "LIB_A * sin(p.x * LIB_B + k * 2.7)"
+      ],
+      [
+        ".13 + .72 * fract(.34 * motion)",
+        ".09 + .84 * fract((.28 + LIB_A) * motion)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Twin Baseline", "treatment": "prism", "profile": [0.063,11], "layout": "vec2(.5 + abs(q.x) * 1.60 - .25, u.y)", "description": "The twin scan separates the sprite into individual spectral returns."},
+      {"title": "Bottom Sounding", "treatment": "relief", "profile": [0.078,8], "layout": "vec2(u.x, u.y + .14 * sin(6.0 * u.x))", "description": "Sprite brightness raises the apparent seabed."},
+      {"title": "Side Scan Handoff", "treatment": "memory", "profile": [0.055,12], "layout": "vec2(u.x + .19 * sign(q.y) * abs(q.y), u.y)", "description": "Previous artwork stays in the wake of the side scan."},
+      {"title": "Fan Beam Search", "treatment": "filaments", "profile": [0.085,14], "layout": "vec2(a, r * 1.52)", "description": "The artwork is drawn into narrow rays from the beam fan."},
+      {"title": "Staggered Transects", "treatment": "stamps", "profile": [0.044,10], "layout": "vec2(u.x + .11 * mod(floor(u.y * 7.0), 2.0), u.y)", "description": "Repeated sprite marks appear on successive transects."},
+      {"title": "Cross Echo", "treatment": "cut", "profile": [0.071,13], "layout": "vec2(u.x + .20 * q.y, u.y + .19 * q.x)", "description": "The silhouette cuts holes where the echoes cross."},
+      {"title": "Range Fold", "treatment": "flow", "profile": [0.094,7], "layout": "vec2(.5 + sign(q.x) * r * .96, .5 + q.y * 1.04)", "description": "The sprite channels shift the direction and phase of the range folds."}
+    ]
+  },
+  {
+    "id": 21,
+    "title": "Pendulum Fleet",
+    "anchor": {
+      "title": "Crossed Arms",
+      "folder": "pendulum-fleet"
+    },
+    "ink": [
+      0.96,
+      0.73,
+      0.42
+    ],
+    "edits": [
+      [
+        ".29 + .025 * sin(1.8 * j + k)",
+        "LIB_A + .025 * sin(1.8 * j + k)"
+      ],
+      [
+        "2.1 - .22 * k",
+        "LIB_B - .22 * k"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Ceiling Cascade", "treatment": "relay", "profile": [0.25,2.3], "layout": "vec2(u.x + .08 * sin(13.0 * u.y), .5 + q.y * 1.12)", "description": "Bright areas keep some weights back before they swing."},
+      {"title": "Sidewall Escapement", "treatment": "shadow", "profile": [0.31,1.7], "layout": "vec2(1.0 - u.y, u.x + .08 * sin(u.y * 10.0))", "description": "The sprite casts swinging shadows across the sideways pendulum bank."},
+      {"title": "Counterphase Banks", "treatment": "prism", "profile": [0.29,2.6], "layout": "vec2(.5 + abs(q.x) * 1.74 - .30, u.y + .09 * q.x)", "description": "Opposing banks catch separated colours from the sprite."},
+      {"title": "Double Link Transfer", "treatment": "fragments", "profile": [0.27,2.1], "layout": "vec2(u.x + .13 * sin(u.y * 11.0 - t), u.y)", "description": "Sprite pieces move like separately released counterweights."},
+      {"title": "Suspended Bridge", "treatment": "filaments", "profile": [0.33,1.4], "layout": "vec2(u.x, u.y + .19 * q.x * q.x)", "description": "Artwork runs as strands through the hanging cables."},
+      {"title": "Staggered Row Catch", "treatment": "memory", "profile": [0.24,2.7], "layout": "vec2(u.x + .10 * mod(floor(u.y * 3.0), 2.0), u.y + .12 * q.x)", "description": "The last sprite hangs on as a moving trace behind the staggered rows."},
+      {"title": "Floor Pivot Rebound", "treatment": "relief", "profile": [0.33,1.8], "layout": "vec2(u.x + .12 * q.y, 1.0 - u.y)", "description": "Brightness changes the apparent raised height and lighting of the floor-mounted weights."}
+    ]
+  },
+  {
+    "id": 22,
+    "title": "Clockwork Conveyor",
+    "anchor": {
+      "title": "Corner Transfer",
+      "folder": "clockwork-conveyor"
+    },
+    "ink": [
+      0.87,
+      0.82,
+      0.48
+    ],
+    "edits": [
+      [
+        ".91 - .195 * k",
+        "LIB_A - .195 * k"
+      ],
+      [
+        "motion * 1.31",
+        "motion * LIB_B"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Return Belt", "treatment": "pigment", "profile": [0.86,-1.1], "layout": "vec2(u.x, .5 + q.y * .83 + .14 * abs(q.x))", "description": "The returning cargo carries pigment drawn from the sprite."},
+      {"title": "Sorting Gate", "treatment": "relay", "profile": [0.97,1.46], "layout": "vec2(u.x + .11 * sin(u.y * 9.0), u.y)", "description": "Bright zones hold their gates before releasing the next loads."},
+      {"title": "Belt Weave", "treatment": "filaments", "profile": [0.92,1.29], "layout": "vec2(u.x + .13 * sin(u.y * 16.0 - t), u.y + .13 * sin(u.x * 11.0))", "description": "The image is drawn out into strands that interleave with the belt weave."},
+      {"title": "Ramp Exchange", "treatment": "relief", "profile": [0.82,1.17], "layout": "vec2(u.x + .29 * q.y, u.y - .14 * q.x)", "description": "Brightness raises cargo and exposes the edges of the ramp."},
+      {"title": "Gravity Chute", "treatment": "fragments", "profile": [0.91,1.55], "layout": "vec2(u.y, 1.0 - u.x + .10 * sin(10.0 * u.y))", "description": "The sprite splits into chunks that drop independently."},
+      {"title": "Turntable Merge", "treatment": "stamps", "profile": [0.9,0.95], "layout": "vec2(.5 + (a - .5), r * 1.48)", "description": "Repeated impressions mark the turntable and its transfer plates."},
+      {"title": "Recirculation Loop", "treatment": "memory", "profile": [0.98,-1.32], "layout": "vec2(a + .13 * r, r * 1.48)", "description": "Older artwork keeps circulating as a fading cargo trace."}
+    ]
+  },
+  {
+    "id": 23,
+    "title": "Gravity Foundry",
+    "anchor": {
+      "title": "Binary Capture",
+      "folder": "gravity-foundry"
+    },
+    "ink": [
+      0.87,
+      0.67,
+      1
+    ],
+    "edits": [
+      [
+        ".176 + .048 * sin(angle * 2.0",
+        "LIB_A + .048 * sin(angle * 2.0"
+      ],
+      [
+        "motion * (2.4 + .12 * k)",
+        "motion * (LIB_B + .12 * k)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Tidal Slingshot", "treatment": "filaments", "profile": [0.195,2.8], "layout": "vec2(u.x + .22 * q.y, u.y + .15 * sin(7.0 * u.x - t))", "description": "Sprite detail draws long particle wakes through the slingshot."},
+      {"title": "Edge Well Transit", "treatment": "shadow", "profile": [0.148,2.5], "layout": "vec2(.5 + q.x * .88 + .11 * sin(t), .5 + q.y * 1.05)", "description": "The sprite eclipses the travelling wells and their orbit lines."},
+      {"title": "Trojans Scatter", "treatment": "fragments", "profile": [0.173,2.7], "layout": "vec2(u.x + .14 * sin(12.0 * u.y - t), u.y)", "description": "Pieces of the sprite scatter as separate orbital debris."},
+      {"title": "Flyby Exchange", "treatment": "prism", "profile": [0.206,2.9], "layout": "vec2(.5 + abs(q.x) * 1.72 - .30, u.y + .19 * q.x)", "description": "The flyby separates colour channels into offset passes."},
+      {"title": "Ring Shepherd", "treatment": "stamps", "profile": [0.202,1.8], "layout": "vec2(a, r * 1.46)", "description": "The sprite repeats at staggered positions among the rings."},
+      {"title": "Three Body Ejection", "treatment": "relay", "profile": [0.155,3.1], "layout": "vec2(u.x + .21 * sin(u.y * 6.0), u.y + .13 * abs(q.x))", "description": "Bright areas hold part of the ejection back until later in the beat."},
+      {"title": "Counterorbit Capture", "treatment": "memory", "profile": [0.185,-2.5], "layout": "vec2(.5 + sign(q.x) * r, .5 + q.y * .95)", "description": "Older images trail away while new material joins the opposite orbit."}
+    ]
+  },
+  {
+    "id": 24,
+    "title": "Granular Hopper",
+    "anchor": {
+      "title": "Funnel Arch Break",
+      "folder": "granular-hopper"
+    },
+    "ink": [
+      0.99,
+      0.69,
+      0.34
+    ],
+    "edits": [
+      [
+        "p.x * 3.0",
+        "p.x * LIB_A"
+      ],
+      [
+        ".72 * (p.y - .31)",
+        "LIB_B * (p.y - .31)"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Offset Sieve", "treatment": "stamps", "profile": [4,0.88], "layout": "vec2(u.x + .096 * mod(floor(u.y * 4.0), 2.0), u.y)", "description": "Repeated sprite perforations mark the sieve beds."},
+      {"title": "Split Hopper", "treatment": "shadow", "profile": [2,0.69], "layout": "vec2(.5 + abs(q.x) * 1.72 - .33, u.y + .15 * q.x)", "description": "The split hopper casts sprite-shaped shadows across the falling grains."},
+      {"title": "Incline Slide", "treatment": "flow", "profile": [3,0.82], "layout": "vec2(u.x + .32 * q.y, u.y - .20 * q.x)", "description": "Sprite channels turn the path of grains along the incline."},
+      {"title": "Pocket Fill", "treatment": "memory", "profile": [4,0.62], "layout": "vec2(.5 + q.x * (.78 + .67 * abs(q.y)), u.y + .09 * sin(u.x * 12.0))", "description": "Artwork keeps building a deposit as the pockets fill."},
+      {"title": "Talus Spill", "treatment": "fragments", "profile": [3,0.71], "layout": "vec2(u.x, u.y + .18 * sin(u.x * 5.0 - t))", "description": "The image breaks into chips that travel with the spilling talus."},
+      {"title": "Layer Inversion", "treatment": "pigment", "profile": [4,0.88], "layout": "vec2(u.x + .11 * sin(12.0 * u.y), 1.0 - u.y)", "description": "Sprite pigments are mixed into the inverted layers."},
+      {"title": "Bridge Collapse", "treatment": "relay", "profile": [3,0.56], "layout": "vec2(.5 + (a - .5) * .94, r * 1.50)", "description": "Bright image zones delay sections of the bridge before collapse."}
+    ]
+  },
+  {
+    "id": 25,
+    "title": "Pneumatic Quilt",
+    "anchor": {
+      "title": "Diamond Inflation",
+      "folder": "pneumatic-quilt"
+    },
+    "ink": [
+      0.87,
+      0.67,
+      0.93
+    ],
+    "edits": [
+      [
+        "turn(.785398) * p * 9.8",
+        "turn(LIB_B) * p * LIB_A"
+      ],
+      [
+        "turn(-.785398) * (id + .5) / 9.8",
+        "turn(-LIB_B) * (id + .5) / LIB_A"
+      ]
+    ]
+,
+    "siblings": [
+      {"title": "Channel Vent", "treatment": "filaments", "profile": [9.4,0.12], "layout": "vec2(u.x + .13 * sin(7.0 * u.y - t), u.y)", "description": "The image draws taut threads between the venting pockets."},
+      {"title": "Checkerboard Breathing", "treatment": "stamps", "profile": [10,0.05], "layout": "vec2(u.x + .043 * mod(floor(u.y * 9.0), 2.0), u.y)", "description": "The sprite repeats as pressed marks on alternating cells."},
+      {"title": "Corner Squeeze", "treatment": "relief", "profile": [7.8,0.51], "layout": "vec2(u.x + .16 * abs(q.y), u.y + .13 * q.x)", "description": "Brightness raises fabric near the corner and changes its lighting."},
+      {"title": "Spiral Bladder Fill", "treatment": "flow", "profile": [9.8,0.79], "layout": "vec2(a + .29 * r, r * 1.43)", "description": "Sprite channels twist the moving fabric around the filling spiral."},
+      {"title": "Baffle Handoff", "treatment": "relay", "profile": [11.3,0.29], "layout": "vec2(u.x, u.y + .16 * sin(6.0 * u.x - t))", "description": "Bright areas hold back a pocket before its pressure wave passes on."},
+      {"title": "Foldback Deflation", "treatment": "cut", "profile": [9,-0.49], "layout": "vec2(.5 + abs(q.x) * 1.66 - .29, u.y + .16 * q.x)", "description": "The silhouette cuts through the folded fabric as it deflates."},
+      {"title": "Crossfeed Surge", "treatment": "memory", "profile": [10.9,0.61], "layout": "vec2(u.x + .26 * q.y, u.y + .13 * q.x)", "description": "Fading sprite traces travel from pocket to pocket."}
+    ]
+  }
+]
