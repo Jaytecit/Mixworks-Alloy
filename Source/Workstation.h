@@ -637,7 +637,8 @@ private:
     juce::AudioProcessorParameter* automationPluginParameter(const AutomationAddress&) const;
     Project projectEditSnapshot();
     juce::String structuralEditUnavailable() const;
-    bool publishStructuralEdit(Project);
+    static juce::String structuralEditDocument(const Project&);
+    bool publishStructuralEdit(Project, const juce::String& expectedDocument = {});
     bool publishAutomationEdit(Project, const AutomationAddress&, bool addUndo);
     AutomationCurve* materialiseAutomation(Project&, const AutomationAddress&);
     bool insertAutomationNode(const AutomationAddress&, double time, bool snap = true);

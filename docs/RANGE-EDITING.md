@@ -1,12 +1,23 @@
 # Range editing and multiple segment selection
 
+The current structural-edit implementation prepares range/group Copy, Paste,
+removal, Crop, Repeat, Replace and group-move commits on private model snapshots.
+Native effect state capture/creation, model planning, dialogs, history retirement
+and UI refresh run outside caller-wide render locks. Publication uses a short
+project swap and rejects a changed document before adding history. These commands
+still require stopped programme playback and Read mode; this does not enable live
+range surgery. Single-segment Duplicate remains available during playback when
+its usual source/preparation/automation/lock checks pass. Source/effect ownership,
+clipboard, Undo and cursor rules below are retained. Candidate results and limits
+are recorded in [HANDOVER](../HANDOVER.md).
+
 From 0.55.59, ordinary additions and splits do not create transitions. Use **Add Transition** to connect overlapping tracks, or Auto Arrange. Unlink retains current automation and preserves hard cutoffs only when the removed transition's outside-bounds mute was enabled. See [timeline controls](TIMELINE-EDITING.md).
 
 From 0.55.62, split pieces of one placed track share their VST effects and effect-parameter automation. Select any piece to add, remove or adjust an effect for that original track. Its effect curve spans the surviving pieces, deleted gaps and the effect ending. Separately added tracks, including another placement of the same source, have independent effects. Per-piece volume, EQ, source fades and source edits remain available.
 
 Effects receive the combined audio of the pieces once per audio block, then continue processing silence through gaps and their reported tail duration. Cutting or deleting source audio therefore does not cut off an echo. The **Effect ending** setting supplies a minimum duration for effects that do not report a usable tail; 0 uses automatic reported endings. Export can include that tail or deliberately stop at the last segment. If pieces move between lanes, the shared effect return follows the latest started piece's lane.
 
-A plain click on one member of a selected group selects just that piece; dragging still moves the group. **Delete segment** applies to a single segment. Right-click within a highlight or group for **Delete selected audio**. Deletion leaves gaps and retains other pieces and their shared effects. Undo restores the edit. Session format40 stores shared effect ownership and the original track automation clock.
+A plain waveform click on one member of a selected group selects just that piece and places the cursor; a waveform drag highlights a range. Drag a title to move the group. **Delete segment** applies to a single segment. Right-click within a highlight or group for **Delete selected audio**. Deletion leaves gaps and retains other pieces and their shared effects. Undo restores the edit. Session format40 stores shared effect ownership and the original track automation clock.
 
 The0.55.43 editing increment adds direct audio ranges and segment groups to the existing timeline. This guide describes the implemented scope; current acceptance and exact candidate identity remain in [HANDOVER](../HANDOVER.md).
 

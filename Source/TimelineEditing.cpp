@@ -24,7 +24,7 @@ juce::String Workstation::timelineActionUnavailable(TimelineAction action,double
         || action==TimelineAction::split || action==TimelineAction::reverse || action==TimelineAction::rippleDelete
         || action==TimelineAction::closeGap || action==TimelineAction::loopStart || action==TimelineAction::loopEnd || action==TimelineAction::configureLoop;
     if(!structural)return {};
-    if (action==TimelineAction::split || action==TimelineAction::remove || action==TimelineAction::removePiece)
+    if (range || paste || copy || action==TimelineAction::split || action==TimelineAction::remove || action==TimelineAction::removePiece)
         if (const auto why=structuralEditUnavailable();why.isNotEmpty()) return why;
     if(pendingTempo>0 || tempoPreparationPending || !timelineLoads.empty() || engine.project.hasPendingPlacement())
         return "Wait for track and tempo preparation to finish, then try this edit again.";
@@ -283,13 +283,14 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (!clip || editSelection.range || engine.playing || engine.rehearsalActive() || pendingTempo > 0 || tempoPreparationPending
                 || engine.recordingAutomation() || engine.automationRecordMode != AutomationRecordMode::read)
             { setStatus("Stop playback, finish preparation and clear the audio range before unlinking whole segments in Read mode."); return; }
-            const juce::ScopedLock guard(engine.lock);
             const auto ids = editSelection.clips.empty() ? std::vector<juce::String>{selectedClip} : editSelection.clips;
-            auto candidate = engine.project;
+            auto candidate = projectEditSnapshot(); const auto document=structuralEditDocument(candidate);
+            const auto previousLinks = candidate.transitionLinks;
             const auto result = candidate.unlinkClips(ids);
             if (result.failed()) { setStatus(result.getErrorMessage()); return; }
-            if (candidate.transitionLinks == engine.project.transitionLinks) { setStatus("These segments already move independently."); return; }
-            remember(); engine.project = std::move(candidate); clearEditSelection(); selectedTransition.clear(); refresh();
+            if (candidate.transitionLinks == previousLinks) { setStatus("These segments already move independently."); return; }
+            if (!publishStructuralEdit(std::move(candidate),document)) return;
+            clearEditSelection(); selectedTransition.clear(); refresh();
             setStatus("Unlinked. Drag a waveform to move it independently; Ctrl-click pieces to move them together. Fades and automation kept. Undo restores links.");
             return;
         }
@@ -408,18 +409,21 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
             if (engine.project.hasLockedTransitions()) { setStatus("Unlock transitions before pasting segments with new tempo markers."); return; }
             if (!engine.project.followTrackTempo && clipClipboard->tempoMap)
             { setStatus("Beatmatch this legacy fixed-tempo session before pasting a segment with a changing tempo map."); return; }
+            auto candidate = projectEditSnapshot(); const auto document=structuralEditDocument(candidate);
             Clip pasted = *clipClipboard; pasted.id = juce::Uuid().toString(); pasted.track = track;
             if (auto error = engine.cloneClipEffects(pasted); error.isNotEmpty()) { fail(error); return; }
             pasted.pendingPlacement = PendingPlacement::none; pasted.pendingPredecessor.clear();
-            const auto map = engine.project.followTrackTempo ? std::make_shared<const TempoMap>(engine.project.tempo) : std::shared_ptr<const TempoMap>();
+            const auto map = candidate.followTrackTempo ? std::make_shared<const TempoMap>(candidate.tempo) : std::shared_ptr<const TempoMap>();
             const bool continuing = time == pasteEnd && engine.position == pasteEnd;
-            pasted.retime(engine.project.snappedClipStart(pasted, time, engine.project.snap && !continuing), map);
-            remember(); { const juce::ScopedLock guard(engine.lock); selectedClip = pasted.id;
-                if (engine.project.followTrackTempo && !engine.project.tempo.points.empty())
-                { const double at = pasted.start + pasted.transitionTime(true);
-                  const auto next = std::upper_bound(engine.project.tempo.points.begin(), engine.project.tempo.points.end(), at, [](double t, const auto& p) { return t < p.time; });
-                  engine.project.tempo.setTrackPoint(pasted.id, at, engine.project.tempo.bpmAt(at), next == engine.project.tempo.points.end() || next->ramp); }
-                engine.project.clips.push_back(std::move(pasted)); }
+            pasted.retime(candidate.snappedClipStart(pasted, time, candidate.snap && !continuing), map);
+            const auto pastedId=pasted.id;
+            if (candidate.followTrackTempo && !candidate.tempo.points.empty())
+            { const double at = pasted.start + pasted.transitionTime(true);
+              const auto next = std::upper_bound(candidate.tempo.points.begin(), candidate.tempo.points.end(), at, [](double t, const auto& p) { return t < p.time; });
+              candidate.tempo.setTrackPoint(pasted.id, at, candidate.tempo.bpmAt(at), next == candidate.tempo.points.end() || next->ramp); }
+            candidate.clips.push_back(std::move(pasted));
+            if (!publishStructuralEdit(std::move(candidate),document)) return;
+            selectedClip=pastedId;
             pasteEnd = engine.project.clipFor(selectedClip)->end(); engine.seek(pasteEnd);
             refresh(); break;
         }

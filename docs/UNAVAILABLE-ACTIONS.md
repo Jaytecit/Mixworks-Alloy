@@ -34,6 +34,12 @@ idle Record/Perform takes remain editable in their default Latch mode. Finish/wa
 preflight failure asks to check the source; the project, history and running clock
 are retained. These direct guards run before publication and do not add a popup.
 
+Duplicate, range/group, Replace, group-move commit, unlink and single paste now
+use the common pending-seek/launch/preparation and automation guards. A document
+changed during preparation refuses publication before history changes. Duplicate
+also checks that its source selection is still current. Range/group edits still
+require stopped playback; the change does not silently admit live range surgery.
+
 Transition preset replacement separately names the pair, affected parameter and
 time range, preserves exterior nodes and mixer-lane curves, and offers Cancel.
 Confirmation checks for a changed target/document and a newly unavailable state.

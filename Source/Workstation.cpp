@@ -2389,7 +2389,13 @@ juce::String Workstation::structuralEditUnavailable() const
         return "Finish automation recording and choose Read before changing segment structure.";
     return {};
 }
-bool Workstation::publishStructuralEdit(Project candidate)
+juce::String Workstation::structuralEditDocument(const Project& project)
+{
+    auto value = projectToJson(project);
+    if (auto* object = value.getDynamicObject()) object->removeProperty("performanceTakes");
+    return juce::JSON::toString(value, juce::JSON::FormatOptions().withMaxDecimalPlaces(17));
+}
+bool Workstation::publishStructuralEdit(Project candidate, const juce::String& expectedDocument)
 {
     if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return false; }
     const auto links = candidate.validateTransitionLinks();
@@ -2415,6 +2421,8 @@ bool Workstation::publishStructuralEdit(Project candidate)
         { setStatus("Playback advanced while preparing the edit. Try again. Mix kept."); return false; }
     }
     if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return false; }
+    if (expectedDocument.isNotEmpty() && expectedDocument != structuralEditDocument(projectEditSnapshot()))
+    { setStatus("Mix changed while preparing this edit. Try again. Current mix kept."); return false; }
     remember(true);
     {
         const juce::ScopedLock guard(engine.lock);
@@ -2854,14 +2862,17 @@ void Workstation::duplicateClip()
 {
     if (sceneLane && sceneLane->hasSelectedScene()) { sceneLane->duplicateSelected(); return; }
     if (editSelection.multiple()) { setStatus("Use Copy and Paste for a selected range/group."); return; }
-    const auto* selected = currentClip(); if (!selected || busy) return;
+    const auto* selected = currentClip(); if (!selected) { setStatus("Select a segment before duplicating it."); return; }
     if (engine.project.hasLockedTransitions()) { setStatus("Unlock transitions before duplicating segments with new tempo markers."); return; }
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement() || selected->media->sourceDetailsPending)
     { setStatus("Wait for preparation before duplicating this segment."); return; }
-    const juce::ScopedLock guard(engine.lock); const Clip original = *selected;
+    if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return; }
+    const auto id = selectedClip;
+    auto candidate = projectEditSnapshot();
+    const auto document = structuralEditDocument(candidate);
+    const Clip original = *candidate.clipFor(id);
     Clip copy = original; copy.id = juce::Uuid().toString();
     if (const auto error = engine.cloneClipEffects(copy); error.isNotEmpty()) { setStatus("Duplicate kept the current mix: " + error); return; }
-    auto candidate = engine.project;
     copy.moveTo(candidate.snappedClipStart(copy, original.end(), candidate.snap));
     if (candidate.followTrackTempo && !candidate.tempo.points.empty())
     {
@@ -2871,7 +2882,9 @@ void Workstation::duplicateClip()
     }
     candidate.clips.push_back(copy);
     const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) { setStatus(valid.getErrorMessage()); return; }
-    remember(); engine.project = std::move(candidate); selectedClip = copy.id; refresh();
+    if (selectedClip != id) { setStatus("Selection changed while preparing Duplicate. Select the segment again. Mix kept."); return; }
+    if (!publishStructuralEdit(std::move(candidate), document)) return;
+    selectedClip = copy.id; refresh();
 }
 
 bool removeMissingAutomaticTempo(Project& project, const Project& before)

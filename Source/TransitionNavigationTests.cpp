@@ -10,6 +10,33 @@
 
 namespace mixworks
 {
+namespace
+{
+// A state-capture boundary probe, not a substitute for native-provider coverage.
+class StateCaptureProbe final : public juce::AudioPluginInstance
+{
+public:
+    std::function<void()> onState;
+    const juce::String getName() const override { return "State capture probe"; }
+    void fillInPluginDescription(juce::PluginDescription&) const override {}
+    void prepareToPlay(double,int) override {}
+    void releaseResources() override {}
+    void processBlock(juce::AudioBuffer<float>&,juce::MidiBuffer&) override {}
+    double getTailLengthSeconds() const override { return 0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    bool hasEditor() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram(int) override {}
+    const juce::String getProgramName(int) override { return {}; }
+    void changeProgramName(int,const juce::String&) override {}
+    void getStateInformation(juce::MemoryBlock& state) override
+    { if(onState)onState(); const int value=1;state.replaceWith(&value,sizeof(value)); }
+    void setStateInformation(const void*,int) override {}
+};
+}
 void runZoomHandleTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
 {
     Workstation ui(false); ui.stopTimer(); ui.setSize(1250,900);
@@ -558,7 +585,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
             if(unavailable==4)ui.engine.seekPending=true; if(unavailable==5)ui.engine.automationRecordMode=AutomationRecordMode::write;
             if(unavailable==6)check(ui.engine.queueProgrammeProject(base,projectToJson(base),12).wasOk(),"prepare an owned queued programme for structural admission");
             const auto kept=json(ui.engine.project); const auto cursor=ui.engine.position.load(); const auto selection=ui.selectedClip;
-            ui.moveTrackBars(4,1);ui.splitClip();ui.removeClip();
+            ui.moveTrackBars(4,1);ui.splitClip();ui.removeClip();ui.duplicateClip();
             check(json(ui.engine.project)==kept && ui.engine.position==cursor && ui.engine.playing
                   && ui.selectedClip==selection && ui.undoHistory.empty() && !ui.dirty && ui.status.isNotEmpty(),
                   "structural commands explain and preserve session/clock/history under admission guard / "+juce::String(unavailable));
@@ -584,12 +611,12 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         check(ui.engine.setWorkMode(WorkMode::recordPerform).wasOk() && ui.engine.beginPerformance().wasOk()
               && ui.engine.automationRecordMode==AutomationRecordMode::write,
               "start editable take for structural chronology preservation");
-        auto duringTake=ui.projectEditSnapshot();
+        auto duringTake=ui.projectEditSnapshot(); const auto takeDocument=ui.structuralEditDocument(duringTake);
         check(duringTake.moveClip(b,16,false,0,false).wasOk(),"prepare structural take candidate away from live publication");
         TakeEvent laterEvent;laterEvent.kind=TakeEventKind::control;laterEvent.lane=2;laterEvent.control=(int)AutomationTarget::volume;
         laterEvent.value=-2;laterEvent.sourcePosition=ui.engine.position;ui.engine.appendTakeEvent(std::move(laterEvent));
         const auto takeEvents=ui.engine.project.performanceTakes[0].events.size();
-        check(ui.publishStructuralEdit(std::move(duringTake)) && ui.engine.capturingPerformance()
+        check(ui.publishStructuralEdit(std::move(duringTake),takeDocument) && ui.engine.capturingPerformance()
               && ui.engine.project.performanceTakes[0].events.size()==takeEvents && ui.engine.performanceProjectPending,
               "publication preserves take events appended after the candidate snapshot and schedules the new structural checkpoint: "+ui.status);
         ui.refresh();
@@ -601,6 +628,43 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         check(structuralUndone && ui.engine.project.clipFor(b)->start==16 && ui.engine.capturingPerformance()
               && ui.engine.position==takeAt && ui.engine.project.performanceTakes[0].events.size()>=takeEvents,
               "active-take structural Undo/Redo retains chronology and programme cursor");
+        reset(true,1);ui.clearEditSelection();
+        const auto duplicateAt=ui.engine.position.load();const auto duplicateEffects=ui.currentClip()->effects;
+        const int duplicateProbeBase=refreshCallbacks;
+        ui.undoButton.addComponentListener(&refreshCallback);ui.undoButton.setEnabled(false);callbackKind="duplicate-refresh";
+        ui.duplicateClip();
+        const auto duplicateId=ui.selectedClip; const auto duplicated=json(ui.engine.project);
+        check(refreshCallbacks==duplicateProbeBase+1 && refreshAudio && ui.engine.project.clips.size()==4
+              && ui.currentClip() && ui.currentClip()->effects!=duplicateEffects && ui.currentClip()->start==24
+              && ui.undoHistory.size()==1 && ui.engine.playing && std::abs(ui.engine.position-(duplicateAt+128./8000))<1.e-8,
+              "live Duplicate publishes an independent future owner with matching PCM and clock during UI refresh");
+        ui.undoButton.removeComponentListener(&refreshCallback);
+        ui.undo(false);const bool duplicateUndone=ui.engine.project.clips.size()==3 && !ui.engine.project.clipFor(duplicateId);
+        ui.undo(true);
+        check(duplicateUndone && json(ui.engine.project)==duplicated && ui.engine.playing,
+              "live duplicate Undo/Redo restores the exact independent placement without seeking");
+        reset(true,1);ui.clearEditSelection();
+        auto* sourceClip=ui.engine.project.clipFor(b);sourceClip->effects=makeClipEffects();
+        auto stateProbe=std::make_unique<StateCaptureProbe>();auto* probe=stateProbe.get();
+        auto slot=std::make_unique<PluginSlot>();slot->processor=std::move(stateProbe);
+        slot->description.pluginFormatName="VST3";slot->description.name="Owned unavailable state probe";
+        slot->description.fileOrIdentifier=report.getSiblingFile("unavailable-state-probe.vst3").getFullPathName();
+        sourceClip->effects->plugins.push_back(std::move(slot));
+        const auto beforeClone=json(ui.engine.project);const auto cloneSelection=ui.selectedClip;
+        const auto stateProbeBase=refreshCallbacks;
+        probe->onState=[&] { callbackKind="duplicate-state-capture";refreshCallback.call(); };
+        ui.duplicateClip();probe->onState={};
+        check(refreshCallbacks==stateProbeBase+1 && refreshAudio && ui.engine.playing,
+              "processor state capture during Duplicate permits matching callback PCM instead of holding the render lock");
+        check(json(ui.engine.project)==beforeClone && ui.selectedClip==cloneSelection && ui.undoHistory.empty() && !ui.dirty
+              && ui.status.contains("Duplicate kept the current mix"),
+              "provider creation failure after state capture keeps source ownership, document, selection and history");
+        reset(true,1);ui.clearEditSelection();
+        auto staleCandidate=ui.projectEditSnapshot();const auto staleDocument=ui.structuralEditDocument(staleCandidate);
+        ui.engine.project.masterDb=-1;const auto newer=json(ui.engine.project);
+        check(!ui.publishStructuralEdit(std::move(staleCandidate),staleDocument) && json(ui.engine.project)==newer
+              && ui.undoHistory.empty() && !ui.dirty && ui.status.contains("Mix changed"),
+              "structural publication refuses a stale document before touching current history or controls");
         check(report.getSiblingFile("automation-refresh-callbacks.json").replaceWithText(juce::JSON::toString(juce::var(callbackFacts),true,17)),
             "retain independent callback PCM error, peak, clock and contention observations");
         ui.engine.finalisePerformance(); ui.engine.setPlaying(false); return;

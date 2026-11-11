@@ -3,6 +3,7 @@
 #include "Beatmatch.h"
 #include "AutoArrangement.h"
 #include <cmath>
+#include <thread>
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -279,8 +280,14 @@ void runUnlinkTests(const std::function<void(bool, const juce::String&)>& check,
     base.clips.push_back(voice);
     w.engine.project = base; w.selectedClip = voice.id; w.engine.position = 8; w.refresh(); w.splitClip();
     w.engine.position = 12; w.splitClip();
-    check(w.engine.project.clips.size() == 4 && w.engine.project.transitionLinks.size() == 2, "actual Split creates the three linked spoken pieces");
-    const auto split = w.engine.project; const auto middle = split.clips[2].id; const auto last = split.clips[3].id;
+    check(w.engine.project.clips.size()==4 && w.engine.project.transitionLinks.empty(),"actual Split creates three spoken pieces without inventing transitions");
+    if(w.engine.project.clips.size()!=4)return;
+    const auto middle=w.engine.project.clips[2].id,last=w.engine.project.clips[3].id;
+    const bool linked=w.engine.project.linkClips(voice.id,middle).wasOk() && w.engine.project.linkClips(middle,last).wasOk()
+        && w.engine.project.setTransitionMovementLocked(middle,true).wasOk() && w.engine.project.setTransitionMovementLocked(last,true).wasOk();
+    check(linked && w.engine.project.transitionLinks.size()==2,"explicitly link the split pieces and enable their movement group for Unlink");
+    if(!linked || w.engine.project.transitionLinks.size()!=2)return;
+    const auto split = w.engine.project;
     w.selectedClip = middle; w.clearEditSelection(); w.undoHistory.clear(); w.redoHistory.clear(); w.refresh();
     check(w.editingUnlink.isEnabled(), "Unlink control is enabled for the linked middle piece");
     w.editingUnlink.onClick();
@@ -580,7 +587,7 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
     auto reset = [&]
     {
         w.clearEditSelection(); w.editClipboard.reset(); w.clipClipboard.reset(); w.engine.project = base;
-        w.engine.playing = false; w.engine.position = 3.125; w.engine.setAutomationRecordMode(AutomationRecordMode::read);
+        w.engine.playing = false; w.engine.position = 3.125; w.engine.seekPending=false; w.busy=false; w.engine.setAutomationRecordMode(AutomationRecordMode::read);
         w.selectedClip = base.clips.front().id; w.engine.selectedTrack = 0; w.undoHistory.clear(); w.redoHistory.clear(); w.dirty = false;
         w.editingRange.setToggleState(false, juce::dontSendNotification); w.refresh();
     };
@@ -736,9 +743,10 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
     groupProject.clips[1].loopSpan = .73; groupProject.clips[1].loopPhase = .13;
     groupProject.clips[0].controls.automation[0].points = {{0, -12, 0}, {3, 0, 0}};
     groupProject.linkClips(group[0], group[1]);
+    check(std::abs(groupProject.clips[0].firstBeatTime()-.17)<1.e-9,"slipped reversed source has its first pulse .17 seconds after the clip edge");
     auto translated = groupProject;
     check(translated.moveClipGroup(group, group[0], 3.39, 1, true).wasOk()
-        && std::abs(translated.clips[0].start - 3.63) < 1.e-9 && std::abs(translated.clips[1].start - 4.87) < 1.e-9
+        && std::abs(translated.clips[0].start - 3.33) < 1.e-9 && std::abs(translated.clips[1].start - 4.57) < 1.e-9
         && translated.clips[0].track == 1 && translated.clips[1].track == 2,
         "group move snaps one displacement, preserving manual phase and relative start/lane offsets");
     bool mappings = true;
@@ -759,12 +767,12 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         if (mode == 1) { p.clips[1].start = 0; target = 0; }
         if (mode == 2) p.transitionLinks.front().locked = true;
         if (mode == 3) ids[1] = "missing";
-        if (mode == 4) { Clip c = p.clips[0]; c.id = juce::Uuid().toString(); c.track = 2; p.clips.push_back(c); p.linkClips(group[1], c.id); }
+        if (mode == 4) { Clip c = p.clips[0]; c.id = juce::Uuid().toString(); c.track = 2; p.clips.push_back(c); const auto linked=p.linkClips(group[1], c.id);check(linked.wasOk(),"create a valid protected external relationship");p.transitionLinks.back().locked=true; }
         if (mode == 5) { Clip c = p.clips[0]; c.id = juce::Uuid().toString(); c.start = 22; p.clips.push_back(c); }
         if (mode == 6) p.clips[1].pendingPlacement = PendingPlacement::move;
         const auto before = json(p);
         check(p.moveClipGroup(ids, group[0], target, lane, false).failed() && json(p) == before,
-            "group refusal is atomic: lane overflow/start/lock/stale/external link/collision/pending " + juce::String(mode));
+            "group refusal is atomic: lane overflow/start/lock/stale/protected external link/collision/pending " + juce::String(mode));
     }
     auto clocked = base; clocked.followTrackTempo = true; clocked.tempo.points = {{0, 120, false}};
     for (auto& c : clocked.clips)
@@ -806,11 +814,32 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         check(result.wasOk() && maximum < 1.e-5f, "group move production PCM matches local passage / elastic "
             + juce::String((int) source.clips[0].elasticPlayback) + " / maximum " + juce::String(maximum, 8));
     }
+    {
+        auto original=std::make_unique<Engine>(),moved=std::make_unique<Engine>();original->sampleRate=moved->sampleRate=8000;
+        Clip edge=base.clips[1];edge.track=0;edge.start=2.37;edge.length=.5;edge.loopSpan=.73;edge.loopPhase=.13;
+        original->project=base;original->project.clips={edge};moved->project=original->project;moved->project.clips[0].moveTo(edge.start+2);
+        const double blockAt=groupProject.clips[0].start+1+11*173./8000;
+        juce::AudioBuffer<float> a(2,173),b(2,173);juce::MidiBuffer midi;
+        original->render(a,173,blockAt,midi);moved->render(b,173,blockAt+2,midi);
+        const float first=edge.media->sample(0,1040);
+        check(std::abs(a.getSample(0,17)-first)<1.e-6f && std::abs(b.getSample(0,17)-first)<1.e-6f,
+              "equivalent moved sample-grid starts admit the exact first loop sample despite floating-point expression order");
+        const double endAt=edge.end()-17./8000;
+        original->render(a,173,endAt,midi);moved->render(b,173,endAt+2,midi);
+        check(a.getSample(0,17)==0 && b.getSample(0,17)==0 && a.getMagnitude(0,17)>.001f,
+              "equivalent moved sample-grid ends exclude the ending sample and retain earlier audible samples");
+        edge.start=2.3700625;original->project.clips={edge};moved->project.clips={edge};moved->project.clips[0].moveTo(edge.start+2);
+        original->render(a,173,blockAt,midi);moved->render(b,173,blockAt+2,midi);
+        const float half=.5f*(edge.media->sample(0,1040)+edge.media->sample(0,1041));
+        check(a.getSample(0,17)==0 && b.getSample(0,17)==0 && std::abs(a.getSample(0,18)-half)<1.e-6f
+              && std::abs(b.getSample(0,18)-half)<1.e-6f,
+              "genuine half-sample placement still excludes the earlier sample and retains interpolated source phase");
+    }
     auto beginMove = [&]
     {
         reset(); w.selectAllSegments(); w.timeline.pixelsPerSecond = 20; w.timeline.updateSize();
-        w.timeline.mouseDown(event({100, first.getY() + 25}, 0));
-        w.timeline.mouseDrag(event({140, first.getY() + 25}, 0, true));
+        w.timeline.mouseDown(event({100, first.getY() + 10}, 0));
+        w.timeline.mouseDrag(event({140, first.getY() + 10}, 0, true));
     };
     beginMove();
     check(w.timeline.groupMove && w.timeline.groupMove->preview && json(w.engine.project) == initial
@@ -822,20 +851,20 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         juce::PNGImageFormat png; auto output = report.getSiblingFile("group-move-preview-" + juce::String(width) + ".png").createOutputStream();
         check(output && png.writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()), *output), "capture group move preview at " + juce::String(width));
     }
-    w.timeline.mouseUp(event({140, first.getY() + 25}, 0));
+    w.timeline.mouseUp(event({140, first.getY() + 10}, 0));
     check(w.engine.project.clips[0].start == 2 && w.engine.project.clips[1].start == 2 && w.undoHistory.size() == 1
         && w.editSelection.clips == group && w.engine.position == 3.125, "group mouse release commits once, retaining selection and playhead");
     const auto movedGroup = json(w.engine.project);
     w.undo(false); check(json(w.engine.project) == initial, "group move Undo restores exact document");
     w.undo(true); check(json(w.engine.project) == movedGroup, "group move Redo restores exact moved document");
-    beginMove(); w.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)); w.timeline.mouseUp(event({140, first.getY() + 25}, 0));
+    beginMove(); w.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)); w.timeline.mouseUp(event({140, first.getY() + 10}, 0));
     check(!w.timeline.groupMove && w.editSelection.clips == group && json(w.engine.project) == initial && w.undoHistory.empty(),
         "Escape cancels a group preview and retains selection without creating Undo");
-    beginMove(); w.engine.project.masterDb = -2; w.timeline.mouseUp(event({140, first.getY() + 25}, 0));
+    beginMove(); w.engine.project.masterDb = -2; w.timeline.mouseUp(event({140, first.getY() + 10}, 0));
     check(w.engine.project.masterDb == -2 && w.engine.project.clips[0].start == 0 && w.undoHistory.empty(), "stale group preview preserves intervening control edit");
-    beginMove(); w.engine.playing = true; w.timeline.mouseUp(event({140, first.getY() + 25}, 0));
+    beginMove(); w.engine.playing = true; w.timeline.mouseUp(event({140, first.getY() + 10}, 0));
     check(json(w.engine.project) == initial && w.undoHistory.empty(), "playback starting before release refuses group commit");
-    beginMove(); w.timeline.mouseDrag(event({100, first.getY() + 25}, 0, true)); w.timeline.mouseUp(event({100, first.getY() + 25}, 0));
+    beginMove(); w.timeline.mouseDrag(event({100, first.getY() + 10}, 0, true)); w.timeline.mouseUp(event({100, first.getY() + 10}, 0));
     check(json(w.engine.project) == initial && w.undoHistory.empty(), "returning group preview to origin is a no-op");
     reset(); w.timeline.pixelsPerSecond = 20; w.timeline.updateSize();
     first = w.timeline.clipBounds(base.clips[0]); second = w.timeline.clipBounds(base.clips[1]);
@@ -895,7 +924,7 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
     {
         reset(); w.setEditRange(2, 6);
         if (mode == 0) w.engine.playing = true;
-        if (mode == 1) { w.engine.project.linkClips(base.clips[0].id, otherId); }
+        if (mode == 1) w.engine.seekPending=true;
         if (mode == 2) { w.engine.project.linkClips(base.clips[0].id, otherId); w.engine.project.transitionLinks[0].locked = true; }
         if (mode == 3) w.setEditRange(25, 30);
         if (mode == 4) w.engine.project.clips[0].pendingPlacement = PendingPlacement::move;
@@ -903,7 +932,7 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         const auto before = json(w.engine.project);
         w.performTimelineAction(TimelineAction::cropSelection, 0, 0);
         check(json(w.engine.project) == before && w.undoHistory.empty() && !w.dirty,
-            "Crop refusal keeps document/history: playing/linked/locked/empty/pending/record mode " + juce::String(mode));
+            "Crop refusal keeps document/history: playing/seeking/locked/empty/pending/record mode " + juce::String(mode));
     }
     reset(); w.engine.project.clips[0].length = 2; w.engine.project.clips[1].start = 4; w.engine.project.clips[1].length = 10;
     w.selectAllSegments(); w.setEditRange(5, 6); w.performTimelineAction(TimelineAction::cropSelection, 0, 0);
@@ -935,8 +964,8 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
     w.engine.project.clips.push_back(lateObstacle); const auto lateBefore = json(w.engine.project);
     w.performSelectionAction(TimelineAction::repeatSelection, 0, 0, 2);
     check(json(w.engine.project) == lateBefore && w.undoHistory.empty(), "collision in a later repeat rolls back the entire candidate, including earlier clear copies");
-    reset(); w.engine.project.clips[0].controls.pluginAutomation.push_back({});
-    w.engine.project.clips[0].controls.pluginAutomation.back().slotId = "missing-plugin";
+    reset(); auto& missingControls=w.engine.project.effectSettings(w.engine.project.clips[0]);missingControls.pluginAutomation.push_back({});
+    missingControls.pluginAutomation.back().slotId = "missing-plugin";
     const auto missingPlugin = json(w.engine.project);
     w.performSelectionAction(TimelineAction::repeatSelection, 0, 0, 2);
     check(json(w.engine.project) == missingPlugin && w.undoHistory.empty(), "Repeat plugin-clone failure rejects atomically");
@@ -1035,9 +1064,11 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         && w.undoHistory.size() == 1 && w.engine.position == 3.125, "Replace swaps the selected interval from clipboard with one Undo and no seek");
     std::set<const ClipEffects*> replacedEffects;
     for (const auto& c : w.engine.project.clips) if (c.track == 0) replacedEffects.insert(c.effects.get());
-    check(replacedEffects.size() == 3 && w.currentClip()->effects != replaceEffects && w.editClipboardRevision == replaceClipboard
+    check(replacedEffects.size() == 2 && w.currentClip()->effects != replaceEffects
+        && w.engine.project.clips[0].effects==base.clips[0].effects
+        && w.engine.project.clips[1].effects==base.clips[0].effects && w.editClipboardRevision == replaceClipboard
         && w.editClipboard->clips[0].effects == replaceEffects && w.engine.project.clipFor(otherId)->length == 20,
-        "Replace splits destination with independent effects, keeps source lane and clipboard ownership");
+        "Replace retains one shared exterior owner and an independent inserted owner, keeping source lane and clipboard ownership");
     const auto replaced = json(w.engine.project);
     auto replacedFile = report.getSiblingFile("replace-selection.mixworks");
     check(replacedFile.replaceWithText(replaced) && parseProject(replacedFile.loadFileAsString()).error.isEmpty(), "Replace writes and reopens a valid arrangement");
@@ -1062,18 +1093,19 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         if (mode == 2) w.engine.playing = true;
         if (mode == 3) w.engine.setAutomationRecordMode(AutomationRecordMode::touch);
         if (mode == 4) w.engine.project.clips[0].pendingPlacement = PendingPlacement::move;
-        if (mode == 5 || mode == 6) { w.engine.project.linkClips(base.clips[0].id, otherId); w.engine.project.transitionLinks[0].locked = mode == 6; }
+        if (mode == 5) w.engine.seekPending=true;
+        if (mode == 6) { w.engine.project.linkClips(base.clips[0].id, otherId); w.engine.project.transitionLinks[0].locked = true; }
         if (mode == 7) { auto obstacle = base.clips[0]; obstacle.id = juce::Uuid().toString(); obstacle.start = 9; obstacle.length = 1; w.engine.project.clips.push_back(obstacle); }
         if (mode == 8) { w.editClipboard->clips[0].controls.pluginAutomation.push_back({}); w.editClipboard->clips[0].controls.pluginAutomation.back().slotId = "missing-plugin"; }
         if (mode == 9) { auto extra = w.editClipboard->clips[0]; extra.id = juce::Uuid().toString(); ++extra.track; w.editClipboard->clips.push_back(extra); }
         if (mode == 10) w.editClipboard->clips[0].media.reset();
-        if (mode == 11) { w.engine.project.clips[0].controls.pluginAutomation.push_back({}); w.engine.project.clips[0].controls.pluginAutomation.back().slotId = "missing-plugin"; }
+        if (mode == 11) w.busy=true;
         if (mode == 12) w.editClipboard.reset();
         const auto before = json(w.engine.project); const auto scope = w.editSelection; const auto revision = w.editClipboardRevision;
         w.replaceSelectedAudio(true);
         check(json(w.engine.project) == before && w.undoHistory.empty() && !w.dirty && w.editSelection.clips == scope.clips
             && w.editSelection.range == scope.range && w.editClipboardRevision == revision && w.engine.position == 3.125,
-            "Replace refuses atomically: short/empty/playing/Read/preparing/linked/locked/collision/plugin/lanes/source/split/clipboard " + juce::String(mode));
+            "Replace refuses atomically: short/empty/playing/Read/preparing/seeking/locked/collision/plugin/lanes/source/busy/clipboard " + juce::String(mode));
     }
     reset(); w.engine.project.clips[1].start = 12; w.engine.project.linkClips(base.clips[0].id, otherId);
     w.selectAllSegments(); w.performTimelineAction(TimelineAction::copy, 0, 0);
@@ -1170,5 +1202,54 @@ void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&
         check(w.editingPanel.isVisible() && w.editingReplace.isEnabled() && output
             && png.writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()), *output), "capture Replace controls at " + juce::String(width));
     }
+    // Range/group commands intentionally require stopped programme transport.
+    // A source-grid audition can still be audible; prove its actual PCM survives
+    // the edit's real UI notification, rather than checking only a lock counter.
+    struct EditRefreshProbe final : juce::ComponentListener
+    {
+        std::function<void()> call;
+        void componentEnablementChanged(juce::Component& c) override { if(c.isEnabled() && call)call(); }
+    } editProbe;
+    juce::Array<juce::var> editFacts;
+    auto observeEdit=[&](const juce::String& name,const std::function<void()>& prepare,const std::function<void()>& edit)
+    {
+        w.engine.gridAudition.stop();reset();prepare();
+        const auto source=base.clips[0].media;
+        const bool ready=w.engine.gridAudition.start(source,source->grid(),1,true,false,0).wasOk();
+        int callbacks=0;bool delivered=true;
+        editProbe.call=[&]
+        {
+            ++callbacks;const double at=w.engine.gridAudition.position(),programmeAt=w.engine.position.load();
+            const auto misses=w.engine.callbackDiagnostics.snapshot().lockMisses;
+            std::thread callback([&]
+            {
+                GridAudition oracle;oracle.start(source,source->grid(),at,true,false,0);
+                juce::AudioBuffer<float> expected(2,128),actual(2,128);oracle.render(expected,128,8000);
+                w.engine.audioDeviceIOCallbackWithContext(nullptr,0,actual.getArrayOfWritePointers(),2,128,{});
+                float error=0;for(int ch=0;ch<2;++ch)for(int i=0;i<128;++i)error=std::max(error,std::abs(expected.getSample(ch,i)-actual.getSample(ch,i)));
+                delivered &= actual.getMagnitude(0,128)>.001f && error<1.e-6f && w.engine.position==programmeAt
+                    && std::abs(w.engine.gridAudition.position()-(at+128./8000))<1.e-8
+                    && w.engine.callbackDiagnostics.snapshot().lockMisses==misses;
+                auto* fact=new juce::DynamicObject();fact->setProperty("kind",name);fact->setProperty("peak",actual.getMagnitude(0,128));
+                fact->setProperty("maxPcmError",error);fact->setProperty("sourceBefore",at);fact->setProperty("sourceAfter",w.engine.gridAudition.position());
+                fact->setProperty("programmePosition",programmeAt);editFacts.add(juce::var(fact));
+            });callback.join();
+        };
+        w.undoButton.setEnabled(false);w.undoButton.addComponentListener(&editProbe);edit();
+        w.undoButton.removeComponentListener(&editProbe);w.engine.gridAudition.stop();
+        check(ready && callbacks==1 && delivered,"source audition retains matching nonzero callback PCM and source clock during "+name+" refresh");
+    };
+    observeEdit("range-crop",[&]{w.setEditRange(2,6);},[&]{w.performSelectionAction(TimelineAction::cropSelection,0,0);});
+    observeEdit("range-remove",[&]{w.setEditRange(2,6);},[&]{w.performSelectionAction(TimelineAction::remove,0,0);});
+    observeEdit("range-repeat",[]{},[&]{w.performSelectionAction(TimelineAction::repeatSelection,0,0,1);});
+    observeEdit("range-paste",[&]{w.setEditRange(2,6);w.performTimelineAction(TimelineAction::copy,0,0);},
+        [&]{w.performSelectionAction(TimelineAction::paste,25,2);});
+    observeEdit("range-replace",[&]
+        { w.selectedClip=base.clips[1].id;w.setEditRange(2,6);w.performTimelineAction(TimelineAction::copy,0,1);
+          w.clearEditSelection();w.selectedClip=base.clips[0].id;w.setEditRange(8,12); },[&]{w.replaceSelectedAudio(true);});
+    observeEdit("group-move",[&]{beginMove();},[&]{w.timeline.mouseUp(event({140,first.getY()+10},0));});
+    check(report.getSiblingFile("structural-edit-refresh-callbacks.json").replaceWithText(juce::JSON::toString(juce::var(editFacts),true,17)),
+          "retain source-audition PCM and clock observations for structural edit refresh boundaries");
+
 }
 }

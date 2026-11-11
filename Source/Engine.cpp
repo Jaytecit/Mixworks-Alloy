@@ -193,26 +193,56 @@ std::vector<std::unique_ptr<PluginSlot>>& Engine::pluginChain(int track)
     auto* c = controlClip(track); return c ? c->effects->plugins : plugins[(size_t) track];
 }
 const std::vector<std::unique_ptr<PluginSlot>>& Engine::pluginChain(int track) const { return const_cast<Engine*>(this)->pluginChain(track); }
+namespace
+{
+struct CapturedPlugin
+{
+    juce::PluginDescription description;
+    juce::MemoryBlock state;
+    juce::String sourceId;
+    bool bypass=false;
+};
+juce::String capturePlugin(const PluginSlot& old,CapturedPlugin& captured)
+{
+    captured.description=old.description;captured.sourceId=old.id;captured.bypass=old.bypass;
+    // VST3 getState is a UI-thread operation permitted while Processing.
+    old.processor->getStateInformation(captured.state);
+    return captured.state.getSize()>(size_t)std::numeric_limits<int>::max() ? "Plugin state is too large." : juce::String();
+}
+juce::String createCapturedPlugin(Engine& engine,const CapturedPlugin& captured,std::unique_ptr<PluginSlot>& slot)
+{
+    const auto error=engine.instantiate(captured.description,slot);if(error.isNotEmpty())return error;
+    slot->processor->setStateInformation(captured.state.getData(),(int)captured.state.getSize());slot->bypass=captured.bypass;return {};
+}
+}
 juce::String Engine::clonePlugin(const PluginSlot& old, std::unique_ptr<PluginSlot>& slot)
 {
-    const auto error = instantiate(old.description, slot); if (error.isNotEmpty()) return error;
-    juce::MemoryBlock state; old.processor->getStateInformation(state);
-    if (state.getSize() > (size_t) std::numeric_limits<int>::max()) return "Plugin state is too large.";
-    slot->processor->setStateInformation(state.getData(), (int) state.getSize()); slot->bypass = old.bypass; return {};
+    CapturedPlugin captured;const auto error=capturePlugin(old,captured);if(error.isNotEmpty())return error;
+    return createCapturedPlugin(*this,captured,slot);
 }
 juce::String Engine::cloneClipEffects(Clip& clip)
 {
-    const auto settings = std::as_const(project).effectSettings(clip);
-    clip.controls = settings;
-    auto copy = makeClipEffects(); std::map<juce::String, juce::String> ids;
-    for (const auto& old : clip.effects->plugins)
+    TrackSettings controls;
+    { const juce::ScopedLock guard(lock); controls=std::as_const(project).effectSettings(clip); }
+    // Capture the entire source chain before any provider factory/state restore
+    // can re-enter the UI. Creation iterates private values, never live slots.
+    std::vector<CapturedPlugin> captured;captured.reserve(clip.effects->plugins.size());
+    for(const auto& old:clip.effects->plugins)
     {
-        std::unique_ptr<PluginSlot> slot; const auto error = clonePlugin(*old, slot); if (error.isNotEmpty()) return error;
-        ids[old->id] = slot->id; copy->plugins.push_back(std::move(slot));
+        CapturedPlugin state;const auto error=capturePlugin(*old,state);if(error.isNotEmpty())return error;
+        captured.push_back(std::move(state));
     }
-    for (const auto& lane : clip.controls.pluginAutomation) if (!ids.count(lane.slotId)) return "An automated VST effect is unavailable.";
-    for (auto& lane : clip.controls.pluginAutomation) lane.slotId = ids.at(lane.slotId);
-    clip.effects = std::move(copy); return {};
+    for(const auto& lane:controls.pluginAutomation)
+        if(std::none_of(captured.begin(),captured.end(),[&](const auto& state){return state.sourceId==lane.slotId;}))
+            return "An automated VST effect is unavailable.";
+    auto copy=makeClipEffects();std::map<juce::String,juce::String> ids;
+    for(const auto& state:captured)
+    {
+        std::unique_ptr<PluginSlot> slot;const auto error=createCapturedPlugin(*this,state,slot);if(error.isNotEmpty())return error;
+        ids[state.sourceId]=slot->id;copy->plugins.push_back(std::move(slot));
+    }
+    for(auto& lane:controls.pluginAutomation)lane.slotId=ids.at(lane.slotId);
+    clip.controls=std::move(controls);clip.effects=std::move(copy);return {};
 }
 void ToneEq::reset() { for (auto& band : bands) { band.z1.fill(0); band.z2.fill(0); } }
 void ToneEq::process(juce::AudioBuffer<float>& audio, int start, int frames, double sampleRate, const std::array<float, 3>& values)
@@ -610,7 +640,7 @@ bool Engine::processClipEffects(const Project& source, const Clip& clip, int fra
         // The ordinary node editor represents zero percent at its -60dB
         // floor. A full Volume cut must mute, as the preset envelope did.
         const float gain = (db <= -60 ? 0.f : juce::Decibels::decibelsToGain(db)) * transition.gainAt(0,time), pan = value(AutomationTarget::pan,time);
-        const bool inside = audition || (time >= clip.start && time < effectEnd && transition.audibleAt(time));
+        const bool inside = audition || (i>=audioFirst && i<audioLast);
         clipBuffer.getWritePointer(0)[i] *= inside ? gain * std::min(1.0f, 1 - pan) : 0;
         clipBuffer.getWritePointer(1)[i] *= inside ? gain * std::min(1.0f, 1 + pan) : 0;
     }
@@ -639,10 +669,14 @@ bool Engine::renderClipAudio(const Project& source, const Clip& clip, int frames
     const int sourceChannels = clip.prepared ? clip.prepared->channels() : clip.media->channels();
     const float clipGain = juce::Decibels::decibelsToGain(clip.gainDb);
     const auto envelope = clip.envelope();
-    for (int i = 0; i < frames; ++i)
+    // Use the same half-open sample interval as the source/return effect gates.
+    // Repeating a floating-point time comparison here can drop the first sample
+    // before a move but admit it afterwards, despite identical source phase.
+    const auto boundary=[&](double time) { return (int)juce::jlimit(0.,(double)frames,std::ceil((time-at)*sampleRate.load()-1.e-6)); };
+    const int first=boundary(clip.start),last=boundary(clip.end());
+    for (int i = first; i < last; ++i)
     {
-        const double time = at + i / sampleRate.load(), local = time - clip.start;
-        if (time < clip.start || time >= clip.end()) continue;
+        const double time = at + i / sampleRate.load(), local = std::max(0.,time - clip.start);
         double sourcePos = clip.prepared && clip.prepared->clipLocal ? (clip.preparedOffset + local - clip.audioSlip) * clip.media->sampleRate
             : clip.sourceTimeAt(local) / clip.rate * clip.media->sampleRate - (clip.reversed ? 1.0 : 0.0);
         if (sourcePos < 0 && sourcePos > -64*std::numeric_limits<double>::epsilon()*std::max(1.,std::abs(local)*clip.media->sampleRate)) sourcePos = 0;

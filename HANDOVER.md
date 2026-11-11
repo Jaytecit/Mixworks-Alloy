@@ -2,6 +2,86 @@
 
 ## Current outcome
 
+**11 November duplication/range checkpoint verified in 0.55.96.** Complete
+local bundle: `out/releases/0.55.96-e055fd1224e5`; `out/Launch.cmd` selects it after the
+retained activation checks. Previous .92 launcher rollback:
+`out/Launch.cmd.bak.version-0.55.96-20261111`. Studio remains 0.1.18.
+Executable SHA-256: `e055fd1224e51194361752daa9c1d20ae62814161bcb638be2d770046ff9b7b5`.
+Visible title and Windows FileVersion/ProductVersion match 0.55.96.
+
+Duplicate now snapshots the project and captures the complete VST source chain
+before constructing private processors, outside its caller's render lock. IDs,
+state, bypass and automation mappings are copied into independent ownership.
+Provider failure retains the current document/selection/history. Publication
+rechecks the expected document and source selection; appended take events do not
+falsely invalidate the document. Range/group Copy/Paste/removal/Crop/Repeat,
+Replace, group-move commit, Unlink and single paste also prepare outside broad
+caller locks and publish by short swap. History, dialogs, displaced resources
+and UI refresh retire/run outside those publication scopes. Range/group edits
+still require stopped programme playback and Read mode.
+
+A preexisting source-sample edge defect was reproduced on .92 and .93. Equivalent
+block calculations produced times 2.3699999999999997 versus 4.37 at a moved clip
+start, dropping exactly its first .24557164-amplitude loop sample. Source and
+output admission now share the existing half-open sample-boundary policy.
+The unchanged group PCM comparison passes (plain error 0; elastic about 1e-8),
+plus exact first/ending-sample and genuine half-sample placement checks.
+A waveform click also now clears the old transient group while retaining the
+hit piece and clicked cursor; dragging retains range scope. The original native
+plain-click and subsequent Delete assertions pass without being relaxed.
+No saved-format, analysis revision or detector change; no cache reset.
+
+Final candidate passed **587 focused native checks**: live103, bars34,
+ranges184, direct-range69, Unlink19, native-effects31, export57 and seek90.
+Runs were serial and below normal priority through `verification.run_checks`,
+stress off, with clean retention. Duplicate's refresh and processor-state capture
+permit independent matching nonzero callback PCM/advancing programme clock.
+Stopped Crop/removal/Repeat/Paste/Replace/group-move refresh preserves source-grid
+audition PCM (error 0) and its advancing source clock while programme time stays
+stopped. The frozen real native echo fixture verifies distinct cloned processors,
+state, Undo ownership and its existing shared-effect/reopen/export PCM/tails.
+The held-lock negative control remains. Large shared native-test owners use heap
+lifetimes; no stack-reserve workaround or stress run was introduced.
+
+The exact-bundle actual Duplicate/Undo/Redo ran during muted device playback
+with visibly moving Studio: **32.00 seconds, 3,200 callbacks,
+865 painted frames**, zero added lock misses, source waits/missing
+samples, callback overruns, oversized blocks or export-silence callbacks.
+An actual waveform drag, contextual Crop and Undo/Redo preserved the expected
+2–6-second source geometry. Source-backed save/reopen reproduced the exact
+1,024-frame PCM probe. Version/pixels were inspected. The owned app was saved
+and closed gracefully; its exact-hash generated WAV was removed afterwards.
+
+Diagnostic provenance is retained independently of Git. .93 passed live103,
+bars34, direct-range69 and export57; range179/11 prompted unchanged .92 comparison
+(172/10). Obsolete group-drag/snap/ownership/link and raw-controls assumptions were
+corrected with explicit setup, preserving atomicity/PCM tolerances. Split no
+longer invents transitions; the old Unlink fixture dereferenced an empty list and
+crashed. It now creates/checks its movement-locked links before access. The real
+waveform selection and sample-edge defects were fixed as described above.
+.94's owned build tree was stopped before linking to include the selection fix;
+no .94 executable was produced. .95 passed 586 of 587 checks; an intended test
+edit had not applied, leaving obsolete snap values 3.63/4.87. .96 explicitly uses
+3.33/4.57 for the independently verified .17-second slipped pulse. Product code
+is unchanged after .95. Original failures/source/bundles remain at
+`.local/phase1-duplication-1111`; interrupted source/log:
+`.local/phase1-duplication-final-1111`; .95 evidence:
+`.local/phase1-duplication-release-1111`; final evidence:
+`.local/phase1-duplication-verified-1111` (source/bundle manifests, frozen native
+fixture, reports, screenshots, desktop states, PCM, retention and activation).
+
+Production apps, original music, sessions, analysis/corrections/caches and
+protected references were untouched. This is focused local acceptance, not a
+complete regression/stress gate, broad third-party-provider/hardware testing,
+elastic preparation or sustained real-track listening qualification. No public
+release. **Phase 1 remains open.** Next address normal Undo internal locks and
+ripple/gap cursor-model transactions, then inspector/reverse/loop transaction
+scopes and wider W04/acute W14 refusal/recovery. Model snapshot-copy cost and new
+elastic-window preparation remain limits. Keep phase 2 deferred; catalogue-scale
+startup/reopen remains phase 3.
+
+## Prior .92 focused checkpoint (superseded above)
+
 **11 November structural-edit checkpoint verified in 0.55.92.** The complete
 local bundle is `out/releases/0.55.92-b6fa768ccdbb`; `out/Launch.cmd` selects it
 after retained activation checks. Previous .90 launcher rollback:

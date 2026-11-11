@@ -10,8 +10,10 @@ after the snapshot are retained and the structural checkpoint follows publicatio
 A failed source preflight retains the original project, selection and history.
 These synchronous edits reject pending seek/launch/tempo/source preparation,
 rehearsal and active automation writing with a recovery message. Idle Record/Perform
-takes remain editable in their default Latch mode; ordinary Arrange edits require Read. Duplication/plugin
-cloning and range/group paths retain their separate implementation scopes.
+takes remain editable in their default Latch mode; ordinary Arrange edits require
+Read. Duplication and range/group publication now use the same short-swap pattern;
+range/group edits retain their stopped-playback requirement. VST source-chain
+state capture precedes private provider creation, outside the caller render lock.
 Only pairs with their movement lock enabled form a move-together group; an
 ordinary transition link alone does not imply that grouping. The malformed-clone
 fixture writes canonical Project.effectSettings, matching the actual clone owner.

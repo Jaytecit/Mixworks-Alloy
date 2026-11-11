@@ -20,7 +20,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
             auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions().withSampleRate(sr).withNumChannels(2).withBitsPerSample(24));
             check(writer && writer->writeFromAudioSampleBuffer(media->samples, 0, frames), "create a small isolated source for shared-effects checks");
         }
-        Workstation ui(false); ui.stopTimer(); ui.setSize(1600, 900); ui.engine.sampleRate = sr;
+        auto uiOwner=std::make_unique<Workstation>(false); auto& ui=*uiOwner; ui.stopTimer(); ui.setSize(1600, 900); ui.engine.sampleRate = sr;
         ui.engine.project.masterDb = 0; ui.engine.project.snap = false; ui.engine.library = {media};
         Clip clip; clip.media = media; clip.length = .5; ui.engine.project.clips = {clip}; ui.selectedClip = clip.id; ui.selectTrack(0);
         const auto loaded = ui.engine.addPlugin(0, plugin);
@@ -36,6 +36,26 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
             }
             return result;
         };
+        const auto beforeDuplicate=ui.engine.project;
+        const auto originalEffects=ui.engine.project.clips[0].effects;
+        ui.duplicateClip();
+        const auto duplicateId=ui.selectedClip;const auto* duplicate=ui.engine.project.clipFor(duplicateId);
+        bool copiedState=duplicate && duplicate->effects!=originalEffects && duplicate->effects->plugins.size()==1;
+        if(copiedState)
+        {
+            const auto& a=*originalEffects->plugins[0];const auto& b=*duplicate->effects->plugins[0];
+            copiedState=a.id!=b.id && a.processor.get()!=b.processor.get()
+                && a.processor->getParameters().size()==b.processor->getParameters().size();
+            for(int i=0;copiedState && i<a.processor->getParameters().size();++i)
+                copiedState=std::abs(a.processor->getParameters()[i]->getValue()-b.processor->getParameters()[i]->getValue())<1.e-6f;
+        }
+        check(copiedState && ui.undoHistory.size()==1 && duplicate->start==.5,
+              "actual Duplicate clones the real native echo state into a distinct processor and slot with one Undo");
+        ui.undo(false);const bool duplicateUndone=ui.engine.project.clips.size()==1 && ui.engine.project.clips[0].effects==originalEffects;
+        ui.undo(true);
+        check(duplicateUndone && ui.engine.project.clipFor(duplicateId) && ui.engine.project.clipFor(duplicateId)->effects!=originalEffects,
+              "native-effect Duplicate Undo/Redo preserves independent processor ownership");
+        ui.engine.project=beforeDuplicate;ui.selectedClip=clip.id;ui.undoHistory.clear();ui.redoHistory.clear();ui.engine.position=0;
         const auto intact = render(ui.engine);
         check(std::abs(ui.engine.project.audibleEnd() - .875) < 1.e-8 && std::abs(intact.getSample(0, 6360) - .05f) < 1.e-6f,
               "reported echo duration extends playback automatically and retains the last echo after source end");
@@ -80,7 +100,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
         ui.engine.project = automated; ui.selectedClip = group.clips[1].id; ui.selectedAutomationTarget = -1;
         ui.editSelection.clips = {group.clips[0].id, group.clips[1].id, group.clips[2].id}; ui.editSelection.primary = ui.selectedClip;
         ui.timeline.pixelsPerSecond = 1200; ui.refresh();
-        const auto mouse = juce::Desktop::getInstance().getMainMouseSource(); const juce::Point<float> point {300, ui.timeline.laneY(0, 40)};
+        const auto mouse = juce::Desktop::getInstance().getMainMouseSource(); const juce::Point<float> point {300, ui.timeline.laneY(0,40)};
         const auto event = juce::MouseEvent(mouse, point, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1, 0, 0, 0, 0,
             &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), point, juce::Time::getCurrentTime(), 1, false);
         ui.timeline.mouseDown(event); ui.timeline.mouseUp(event);
@@ -98,7 +118,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
         const auto saved = report.getSiblingFile("shared-effects.mixworks"); const auto saveError = ui.engine.saveProject(saved);
         PreparedProject prepared; prepared.parsed = parseProject(saved.loadFileAsString()); prepared.library = {media};
         for (auto reference : prepared.parsed.clips) { reference.clip.media = media; prepared.parsed.project.clips.push_back(std::move(reference.clip)); }
-        Engine reopened; reopened.sampleRate = sr;
+        auto reopenedOwner=std::make_unique<Engine>(); auto& reopened=*reopenedOwner; reopened.sampleRate = sr;
         const auto reopenedError = prepared.parsed.error.isNotEmpty() ? prepared.parsed.error : reopened.commitProject(std::move(prepared));
         check(saveError.isEmpty() && reopenedError.isEmpty() && reopened.project.clips.size() == 4
               && reopened.project.clips[0].effects == reopened.project.clips[2].effects && reopened.project.clips[3].effects != reopened.project.clips[0].effects
@@ -117,7 +137,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
         WavExportPlan plan; const auto planned = ui.engine.planWavExport(report.getSiblingFile("tail-plan.wav"), {true}, plan);
         check(planned.wasOk() && std::abs(plan.tailSeconds - .375) < 1.e-8, "WAV export includes the natural echo tail without a manual tail setting");
         {
-            Engine lane; lane.sampleRate = sr; Clip dry; dry.media = media; dry.length = .5; lane.project.clips = {dry};
+            auto laneOwner=std::make_unique<Engine>(); auto& lane=*laneOwner; lane.sampleRate = sr; Clip dry; dry.media = media; dry.length = .5; lane.project.clips = {dry};
             const auto laneError = lane.addPlugin(0, plugin); WavExportPlan lanePlan;
             check(laneError.isEmpty() && lane.planWavExport(report.getSiblingFile("lane-tail-plan.wav"), {true}, lanePlan).wasOk()
                   && std::abs(lanePlan.tailSeconds - .375) < 1.e-8, "whole-lane effects also receive their reported natural ending");
@@ -214,7 +234,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     }
     check(pixels, "track and background beats rasterize to identical pixels across seven fractional zoom scales");
 
-    Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940); ui.engine.project.masterDb = 0;
+    auto uiOwner=std::make_unique<Workstation>(false); auto& ui=*uiOwner; ui.stopTimer(); ui.setSize(1440, 940); ui.engine.project.masterDb = 0;
     a.pendingPlacement = PendingPlacement::none; a.start = 2; a.length = 12; a.effects = makeClipEffects(); a.controls = {};
     ui.engine.project.followTrackTempo = false; ui.engine.project.clips = {a}; ui.engine.library = {media}; ui.selectedClip = a.id;
     ui.engine.project.snap = false; ui.refresh();
@@ -243,10 +263,10 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     check(near(output.getSample(0, 100), 0.25 * (1 + juce::Decibels::decibelsToGain(-12.0f))),
           "overlapping tracks on one lane retain independent volume automation in actual PCM");
     auto legacy = ui.engine.captureProject(); legacy.getDynamicObject()->setProperty("version", 10); legacy["tracks"].getArray()->removeRange(4, trackCount - 4);
-    Engine migrated; const auto migrationError = migrated.restoreProject(juce::JSON::toString(legacy));
+    auto migratedOwner=std::make_unique<Engine>(); auto& migrated=*migratedOwner; const auto migrationError = migrated.restoreProject(juce::JSON::toString(legacy));
     check(migrationError.isEmpty(), "older sessions still reopen before ownership migration: " + migrationError);
 
-    Engine recorder; recorder.project.clips = {a}; recorder.selectedClip = a.id;
+    auto recorderOwner=std::make_unique<Engine>(); auto& recorder=*recorderOwner; recorder.project.clips = {a}; recorder.selectedClip = a.id;
     recorder.armAutomation(0, true); recorder.setAutomationRecordMode(AutomationRecordMode::touch); recorder.setPlaying(true); recorder.position = 6.5;
     recorder.setControlValue({0, AutomationTarget::volume}, -9); recorder.position = 6.7; recorder.finishAutomation();
     const auto& recorded = recorder.project.clips[0].controls.automation[0];
@@ -295,7 +315,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     check(near(output.getSample(0, 0), 0.125), "a moved track applies its source-zero VST automation from the first audible sample");
     auto stale = *parameter; stale.clipId = "missing";
     check(!ui.engine.ensurePluginAutomation(stale), "a deleted automation owner cannot fall back to a mixer-lane effect");
-    auto saved = juce::JSON::toString(ui.engine.captureProject()); Engine reopened;
+    auto saved = juce::JSON::toString(ui.engine.captureProject()); auto reopenedOwner=std::make_unique<Engine>(); auto& reopened=*reopenedOwner;
     const auto reopenError = reopened.restoreProject(saved);
     reopened.project.masterDb = 0; reopened.render(output, 512, 8.123, midi);
     check(reopenError.isEmpty() && reopened.project.clips.size() == 1 && reopened.project.clips[0].effects->plugins.size() == 1 && near(output.getSample(0, 100), 0.125),
@@ -308,11 +328,11 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     check(near(output.getSample(0, 100), 0.125), "copied VST automation drives its independently hosted effect");
     auto malformed = juce::JSON::parse(saved); malformed["clips"][0]["controls"]["pluginAutomation"][0].getDynamicObject()->setProperty("slotId", "missing");
     check(parseProject(juce::JSON::toString(malformed)).error.isNotEmpty(), "orphaned clip VST automation is rejected before loading plugins");
-    Engine old; old.project.masterDb = 0; old.project.followTrackTempo = false; old.project.clips = {neighbour};
+    auto oldOwner=std::make_unique<Engine>(); auto& old=*oldOwner; old.project.masterDb = 0; old.project.followTrackTempo = false; old.project.clips = {neighbour};
     old.project.tracks[0].automation[0].enabled = true; old.project.tracks[0].automation[0].setPoint(0, -6);
     const auto oldError = old.addPlugin(0, plugin);
     if (oldError.isEmpty()) old.plugins[0][0]->processor->getParameters()[0]->setValue(0.5f);
-    auto oldSave = old.captureProject(); oldSave.getDynamicObject()->setProperty("version", 10); oldSave["tracks"].getArray()->removeRange(4, trackCount - 4); Engine upgraded;
+    auto oldSave = old.captureProject(); oldSave.getDynamicObject()->setProperty("version", 10); oldSave["tracks"].getArray()->removeRange(4, trackCount - 4); auto upgradedOwner=std::make_unique<Engine>(); auto& upgraded=*upgradedOwner;
     const auto upgradeError = upgraded.restoreProject(juce::JSON::toString(oldSave));
     bool migratedOwnership = oldError.isEmpty() && upgradeError.isEmpty() && upgraded.plugins[0].empty() && upgraded.project.clips.size() == 1 && upgraded.project.clips[0].effects->plugins.size() == 1;
     if (migratedOwnership)
@@ -339,7 +359,7 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
     const juce::File instrument("C:/Program Files/Common Files/VST3/Vital.vst3");
     if (instrument.exists())
     {
-        Engine synth; synth.project.clips = {a}; synth.project.clips[0].effects = makeClipEffects(); synth.selectedClip = a.id;
+        auto synthOwner=std::make_unique<Engine>(); auto& synth=*synthOwner; synth.project.clips = {a}; synth.project.clips[0].effects = makeClipEffects(); synth.selectedClip = a.id;
         const auto instrumentError = synth.addPlugin(0, instrument);
         juce::MidiBuffer notes; notes.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 0); float peak = 0;
         if (instrumentError.isEmpty()) for (int block = 0; block < 32; ++block)

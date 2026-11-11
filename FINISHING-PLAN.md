@@ -11,26 +11,23 @@ priority. These are complete outcomes, not permission to implement every item
 at once. A reported problem stays open until its actual workflow is demonstrated;
 earlier focused passes do not overrule Jay's observations.
 
-**Current checkpoint.** Alloy **0.55.92 / Studio 0.1.18** is selected by
-`out/Launch.cmd`. Linked-track bar moves, single split/removal, history retirement
-and UI refresh now use a short publication lock with private model/source
-preparation. Take events and live Undo chronology survive publication; pending
-work and active automation writes refuse before history changes. Idle
-Record/Perform remains editable. [Handover](HANDOVER.md) owns exact identities,
-279 focused native checks, the .91 admission failure/correction and retention.
-The earlier analytical fades, prepared seeks, bar jumps, Studio lookahead,
-Beat grids and export-test stack repair retain their established scope.
+**Current checkpoint.** Alloy **0.55.96 / Studio 0.1.18** is selected by
+`out/Launch.cmd`. Duplicate/VST capture/creation, range/group edits, Replace,
+group-move commits, Unlink and single paste now prepare outside caller-wide
+render locks and publish by short swap, with stale-document checks. A real
+one-sample moved-edge defect and retained group scope after a waveform click are
+fixed. [Handover](HANDOVER.md) owns exact identities, 587 focused native checks,
+diagnostic provenance, retention and the desktop Duplicate/Crop/Undo/Reopen journey.
 
-**Phase 1 remains in acceptance.** Actual move/split/Undo/Redo/removal with muted
-device playback delivered 6,754 callbacks and 1,834 Studio paints over four
-passages totalling 67.56 seconds, without added lock misses, source waits or
-callback overruns. Source-backed reopen PCM matched. This does not close Jay's
-intermittent listening report or sustained delivery. Next inspect duplication/
-native-plugin cloning and other structural transaction scopes, then wider
-W04/acute W14 refusal/recovery journeys before phase 2. Range/group paths, generic
-Undo internal locks, snapshot-copy cost and new elastic-window preparation remain
-separate limits. Large-catalogue startup/reopen remains phase 3.
-Evidence: `.local/phase1-structural-final-1110`.
+**Phase 1 remains in acceptance.** The bounded muted-device passage added no
+callback lock misses, source waits/missing samples or overruns, with moving Studio
+pixels. Native source-grid audition PCM also survives stopped range/group edits.
+These results do not close sustained delivery or Jay's intermittent listening
+report. Next address normal Undo internal locks and ripple/gap cursor-model
+transactions, then inspector/reverse/loop scopes and wider W04/acute W14 recovery.
+Snapshot-copy cost and elastic-window preparation remain separate limits. Keep
+phase 2 deferred; catalogue-scale startup/reopen remains phase 3.
+Evidence: `.local/phase1-duplication-verified-1111`.
 
 ## Delivery rules for every phase
 

@@ -193,15 +193,15 @@ void Workstation::replaceSelectedAudio(bool commit)
     if (engine.playing || engine.rehearsalActive() || engine.recordingAutomation() || engine.automationRecordMode != AutomationRecordMode::read)
     { refuse("Stop playback and finish automation in Read before replacing audio."); return; }
     if (!editClipboard && !clipClipboard) { refuse("Copy source audio first."); return; }
-    const juce::ScopedLock guard(engine.lock);
+    if (const auto why=structuralEditUnavailable();why.isNotEmpty()) { refuse(why); return; }
     auto selection = editSelection;
     if (selection.clips.empty() || selection.primary != selectedClip)
     { selection.clear(); selection.primary = selectedClip; selection.clips.push_back(selectedClip); }
     EditFragment fragment;
     if (editClipboard) fragment = *editClipboard;
     else { fragment.clips.push_back(*clipClipboard); fragment.origin = clipClipboard->start; fragment.lane = clipClipboard->track; }
-    auto source = engine.project; source.ensureTransitionLinks();
-    const auto plan = planReplacement(source, selection, fragment, commit ? &engine : nullptr);
+    auto source = projectEditSnapshot(); const auto document = structuralEditDocument(source); source.ensureTransitionLinks();
+    auto plan = planReplacement(source, selection, fragment, commit ? &engine : nullptr);
     if (!commit)
     {
         const auto before = juce::JSON::toString(projectToJson(engine.project));
@@ -229,7 +229,7 @@ void Workstation::replaceSelectedAudio(bool commit)
         return;
     }
     if (plan.error.isNotEmpty()) { refuse(plan.error); return; }
-    remember(); engine.project = plan.project;
+    if (!publishStructuralEdit(std::move(plan.project),document)) return;
     editSelection.clips = plan.added; selectedClip = plan.added.front(); editSelection.primary = selectedClip;
     engine.selectedTrack = engine.project.clipFor(selectedClip)->track;
     selectedTransition.clear(); timeline.selectAutomationPoint({}, -1); refresh();
@@ -400,7 +400,13 @@ void Timeline::finishEditSelection()
 {
     if (!rangeDragAnchor) return;
     // A click places the cut/paste cursor; an audio-selection drag never seeks.
-    if (!moved && !owner.editSelection.range) owner.engine.seek(*rangeDragAnchor);
+    if (!moved && !owner.editSelection.range)
+    {
+        const double at=*rangeDragAnchor;
+        // A click selects the hit piece; only a drag keeps a range/group scope.
+        // Preserve that piece as selectedClip while clearing the old group.
+        owner.clearEditSelection();owner.engine.seek(at);
+    }
     rangeDragAnchor.reset();
     owner.refresh();
 }
@@ -440,7 +446,8 @@ bool Timeline::groupMoveAllowed() const
 {
     return !owner.busy && !owner.engine.exporting && owner.pendingTempo == 0 && !owner.tempoPreparationPending
         && !owner.engine.project.hasPendingPlacement() && !owner.engine.playing && !owner.engine.rehearsalActive()
-        && !owner.engine.recordingAutomation() && owner.engine.automationRecordMode == AutomationRecordMode::read;
+        && !owner.engine.recordingAutomation() && owner.engine.automationRecordMode == AutomationRecordMode::read
+        && owner.structuralEditUnavailable().isEmpty();
 }
 bool Timeline::beginGroupMove(const juce::MouseEvent& e, const juce::String& id)
 {
@@ -448,16 +455,16 @@ bool Timeline::beginGroupMove(const juce::MouseEvent& e, const juce::String& id)
     { owner.setStatus("An audio range is selected. Clear the range before moving whole segments."); return true; }
     if (!groupMoveAllowed())
     { owner.setStatus("Stop playback and finish preparation/automation in Read before moving a group."); return true; }
-    const juce::ScopedLock guard(owner.engine.lock);
-    const auto* c = owner.engine.project.clipFor(id); if (!c) return true;
-    auto candidate = owner.engine.project;
+    auto baseline = owner.projectEditSnapshot();
+    const auto* c = baseline.clipFor(id); if (!c) return true;
+    auto candidate = baseline;
     const auto valid = candidate.moveClipGroup(owner.editSelection.clips, id, c->start, c->track, false);
     if (valid.failed()) { owner.setStatus(valid.getErrorMessage()); return true; }
     owner.selectedClip = id; owner.editSelection.primary = id;
     owner.selectedTransition.clear();
     GroupMoveGesture gesture;
-    gesture.baseline = owner.engine.project; gesture.selection = owner.editSelection;
-    gesture.anchor = id; gesture.document = juce::JSON::toString(projectToJson(owner.engine.project));
+    gesture.baseline = std::move(baseline); gesture.selection = owner.editSelection;
+    gesture.anchor = id; gesture.document = owner.structuralEditDocument(gesture.baseline);
     gesture.origin = e.position; gesture.target = c->start; gesture.track = c->track;
     groupMove = std::move(gesture);
     grabKeyboardFocus(); owner.selectTrack(c->track);
@@ -497,23 +504,23 @@ void Timeline::finishGroupMove()
         owner.clearEditSelection(); owner.selectedClip = gesture.anchor;
         owner.refresh(); return;
     }
-    const juce::ScopedLock guard(owner.engine.lock);
+    auto currentProject = owner.projectEditSnapshot();
     if (!groupMoveAllowed() || owner.selectedClip != gesture.anchor || owner.editSelection.clips != gesture.selection.clips
-        || owner.editSelection.range || gesture.document != juce::JSON::toString(projectToJson(owner.engine.project)))
+        || owner.editSelection.range || gesture.document != owner.structuralEditDocument(currentProject))
     { owner.setStatus("Document or selection changed during the group preview. Drag again; mix kept."); return; }
     for (const auto& c : gesture.baseline.clips)
     {
-        const auto* current = owner.engine.project.clipFor(c.id);
+        const auto* current = currentProject.clipFor(c.id);
         if (!current || current->media != c.media || current->tempoMap != c.tempoMap || current->prepared != c.prepared
             || current->elasticSource != c.elasticSource)
         { owner.setStatus("Source preparation changed during the group preview. Drag again; mix kept."); return; }
     }
     // Re-admit from current state; never publish an old gesture snapshot.
-    auto candidate = owner.engine.project;
+    auto candidate = std::move(currentProject);
     const auto result = candidate.moveClipGroup(gesture.selection.clips, gesture.anchor, gesture.target, gesture.track, gesture.snapping);
     if (result.failed()) { owner.setStatus(result.getErrorMessage()); return; }
-    if (juce::JSON::toString(projectToJson(candidate)) == gesture.document) return;
-    owner.remember(); owner.engine.project = std::move(candidate);
+    if (owner.structuralEditDocument(candidate) == gesture.document) return;
+    if (!owner.publishStructuralEdit(std::move(candidate),gesture.document)) return;
     owner.editSelection = gesture.selection; // remember() clears transient selection.
     owner.engine.selectedTrack = owner.engine.project.clipFor(gesture.anchor)->track;
     owner.refresh(); owner.setStatus("Group moved. Source timing and internal links kept; one Undo restores it.");
@@ -534,8 +541,8 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
         return refuse("Wait for preparation/export before editing a range or group.");
     if (engine.playing || engine.rehearsalActive() || engine.recordingAutomation() || engine.automationRecordMode != AutomationRecordMode::read)
         return refuse("Stop playback and finish automation in Read before range/group edits.");
-    const juce::ScopedLock guard(engine.lock);
-    auto candidate = engine.project; candidate.ensureTransitionLinks();
+    if (const auto why=structuralEditUnavailable();why.isNotEmpty()) return refuse(why);
+    auto candidate = projectEditSnapshot(); const auto document=structuralEditDocument(candidate); candidate.ensureTransitionLinks();
     if (pasting)
     {
         if (track < 0 || track >= trackCount || !std::isfinite(time) || time < 0) return refuse("Choose a valid paste time and lane.");
@@ -566,7 +573,8 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
         for (auto link : fragment.links)
         { link.outgoing = ids.at(link.outgoing); link.incoming = ids.at(link.incoming); link.locked = false; candidate.transitionLinks.push_back(std::move(link)); }
         const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) return refuse(valid.getErrorMessage());
-        remember(); engine.project = std::move(candidate); clearEditSelection();
+        if (!publishStructuralEdit(std::move(candidate),document)) return true;
+        clearEditSelection();
         editSelection.clips = added; selectedClip = added.front(); editSelection.primary = selectedClip;
         selectedTransition.clear(); timeline.selectAutomationPoint({}, -1); pasteEnd = pastedEnd; engine.seek(pasteEnd); refresh();
         setStatus("Pasted " + juce::String((int) added.size()) + " range/group segments. Existing positions and project tempo kept; one Undo restores the mix.");
@@ -678,9 +686,9 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
             }), true);
             return true;
         }
-        const auto repeated = planRepeats(candidate, fragment, end, repeatCopies, &engine);
+        auto repeated = planRepeats(candidate, fragment, end, repeatCopies, &engine);
         if (repeated.error.isNotEmpty()) return refuse(repeated.error);
-        remember(); engine.project = repeated.project;
+        if (!publishStructuralEdit(std::move(repeated.project),document)) return true;
         editSelection.clips = repeated.added; selectedClip = repeated.added.front(); editSelection.primary = selectedClip;
         engine.selectedTrack = engine.project.clipFor(selectedClip)->track;
         selectedTransition.clear(); timeline.selectAutomationPoint({}, -1); refresh();
@@ -743,7 +751,8 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
         const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) return refuse(valid.getErrorMessage());
         const auto locks = engine.project.validateTransitionLocks(candidate); if (locks.failed()) return refuse(locks.getErrorMessage());
         if (juce::JSON::toString(projectToJson(candidate)) == juce::JSON::toString(projectToJson(engine.project))) return refuse("No selected audio intersects the range.");
-        remember(); engine.project = std::move(candidate); clearEditSelection();
+        if (!publishStructuralEdit(std::move(candidate),document)) return true;
+        clearEditSelection();
         if (cropping)
         {
             editSelection = selection; editSelection.clips = retained;

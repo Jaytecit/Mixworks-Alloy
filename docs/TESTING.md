@@ -1,5 +1,36 @@
 # Proportionate testing
 
+11 November .96 passes **587 focused checks**: live103, bars34, ranges184,
+direct-range69, Unlink19, native-effects31, export57 and seek90. Actual live
+Duplicate and stopped range Crop/Undo/Redo/save/reopen also pass. Diagnostic .93,
+interrupted .94 and the .95 stale expected-value failure remain separately
+retained; final identities, counts and limits are in [Handover](../HANDOVER.md).
+
+The original native waveform-click/Delete assertions also exposed retained group
+scope after a click. The fix clears only transient selection on click; those
+assertions remain unchanged. Group-drag fixtures use the actual title gesture.
+The interrupted .94 compile produced no new executable; its source/log evidence
+is retained separately from the .93 failures and final .95 candidate.
+
+The group PCM comparison exposed a preexisting one-sample start-boundary defect
+on both .92 and diagnostic .93. Source admission/output now share the existing
+half-open sample-boundary policy. Exact first/ending samples and a real half-
+sample placement are checked without relaxing the original PCM tolerance.
+Diagnostic range failures, unchanged .92 provenance and obsolete gesture/link/
+canonical-control fixture corrections are recorded in [Handover](../HANDOVER.md).
+The Unlink fixture now explicitly creates links after Split, checks setup before
+access and retains its PCM/Undo assertions; Split does not invent transitions.
+
+Duplication/range extensions add independent callback PCM/clock observations at
+Duplicate refresh and its processor-state capture boundary, plus stale-document
+refusal. `--edit-selection-only` checks source-grid audition PCM during stopped
+Crop, removal, Repeat, Paste, Replace and group-move refresh. The programme clock
+correctly stays stopped while the audition source advances. `--split-effects-only`
+uses the real native echo fixture for independent Duplicate processor/state and
+Undo ownership, alongside its existing shared-effect PCM/tail/reopen coverage.
+The fixture module and hash are frozen independently of the build cache. Current
+candidate results and limits remain in [Handover](../HANDOVER.md).
+
 11 November .92 passes live98, bars34, seek90 and export57: **279 focused native
 checks**, serial retained runs, stress off. The exact bundle's actual move, split,
 Undo/Redo, removal and save/reopen journey passed with muted device playback and
