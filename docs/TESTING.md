@@ -1,5 +1,24 @@
 # Proportionate testing
 
+11 November .92 passes live98, bars34, seek90 and export57: **279 focused native
+checks**, serial retained runs, stress off. The exact bundle's actual move, split,
+Undo/Redo, removal and save/reopen journey passed with muted device playback and
+moving Studio pixels (6,754 callbacks, no added misses/waits/overruns). .91's three
+take assertions failed because admission blocked default Latch in idle
+Record/Perform; .92 corrects that product conflict and preserves the assertions.
+See [Handover](../HANDOVER.md) for identities, evidence and remaining limits.
+
+The structural-edit extension to `--live-transition-only` probes independent,
+nonzero callback PCM and exact clock advancement at track-move, split, removal,
+Undo/Redo refresh and redo-resource retirement. It also checks source-backed
+save/reopen, failed source preflight, atomic admission (including queued launches)
+and take events appended after a candidate snapshot. The held-lock negative
+control remains. Large Workstation/Engine owners in this shared dispatcher use
+heap allocation to avoid repeating the native export-test stack failure.
+This bounded selector does not qualify all structural paths or elastic-window
+preparation, physical devices or sustained listening. Current candidate results
+and desktop evidence are recorded in [Handover](../HANDOVER.md).
+
 10 November .90 repairs the shared native export-test stack frame using heap
 owners (121,424 bytes, previously 876,416; the 1 MiB process stack is unchanged).
 Final export57, destination111, export-target75, bars34, live74 and seek90 pass

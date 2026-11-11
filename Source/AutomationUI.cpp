@@ -51,10 +51,6 @@ bool Workstation::automationEditable(const AutomationAddress& address) const
     return automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr).isEmpty();
 }
 
-Project Workstation::automationEditSnapshot()
-{
-    const juce::ScopedLock guard(engine.lock); return engine.project;
-}
 bool Workstation::publishAutomationEdit(Project candidate,const AutomationAddress& address,bool addUndo)
 {
     if (const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
@@ -84,7 +80,7 @@ bool Workstation::insertAutomationNode(const AutomationAddress& address,double t
     if (const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
     { setStatus(why); return false; }
     if (!std::isfinite(time)) { setStatus("Choose a valid timeline position before adding a node."); return false; }
-    engine.finishAutomation(); auto candidate=automationEditSnapshot();
+    engine.finishAutomation(); auto candidate=projectEditSnapshot();
     time=candidate.snappedTime(time,snap && candidate.snap);
     const auto* clip=candidate.clipFor(address.clipId); const auto bounds=candidate.automationBounds(address);
     if (time<0 || time>1.e9 || (clip && (time<bounds.getStart() || time>bounds.getEnd())))
@@ -101,7 +97,7 @@ bool Workstation::deleteAutomationNode(const AutomationAddress& address,int inde
 {
     if (const auto why=automationEditReason(engine,address,busy,pendingTempo>0 || tempoPreparationPending,automationPluginParameter(address)!=nullptr);why.isNotEmpty())
     { setStatus(why); return false; }
-    auto candidate=automationEditSnapshot(); auto* curve=materialiseAutomation(candidate,address);
+    auto candidate=projectEditSnapshot(); auto* curve=materialiseAutomation(candidate,address);
     if (!curve || index<0 || index>=(int)curve->points.size()) { setStatus("Select an available automation node to delete."); return false; }
     candidate.automationEdited(address,AutomationEdit::removePoint,curve->points[(size_t)index].time);
     curve->points.erase(curve->points.begin()+index);
@@ -531,7 +527,7 @@ void Workstation::editAutomationPoint(int track, int point, std::optional<double
         timeValue = safe->engine.project.automationTime(address, timeValue);
         if (timeValue < 0) { safe->fail("Place the marker inside its audio track."); return; }
         {
-        auto candidate = safe->automationEditSnapshot();
+        auto candidate = safe->projectEditSnapshot();
         auto* envelope = safe->materialiseAutomation(candidate, address); if (!envelope) return;
         const auto editing = envelope->points.empty() && point >= 0 ? viewCurve : *envelope;
         if (point >= 0 && (point >= (int) editing.points.size() || (point > 0 && timeValue <= editing.points[(size_t) point - 1].time)

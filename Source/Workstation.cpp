@@ -1409,7 +1409,7 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
             for (const double edge : {clip->start, clip->end()})
                 if (std::abs(e.position.x - edge * pixelsPerSecond) <= .5) { time = edge; break; }
         if (owner.engine.exporting || owner.engine.project.automationLocked(address)) return;
-        auto candidate = owner.automationEditSnapshot();
+        auto candidate = owner.projectEditSnapshot();
         auto* envelope = owner.materialiseAutomation(candidate, address); if (!envelope) return;
         if (envelope->points.empty()) *envelope = viewCurve;
         float value = automationDb(automationTrack, e.position.y, address.target);
@@ -2352,19 +2352,78 @@ void Workstation::fail(const juce::String& error)
     const bool technical = error.containsIgnoreCase("onnx") || error.contains("std::") || error.containsIgnoreCase("tensor") || error.containsIgnoreCase("sha256");
     setStatus(technical ? "Could not finish this action. Open Tools > Last message details." : shortUiMessage(error, 30, 200));
 }
-void Workstation::remember()
+void Workstation::remember(bool deferTakePublication)
 {
     if (engine.capturingPerformance())
     {
         const auto base=(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0));
         undoHistory.push_back(editHistorySnapshot(engine));
         if(undoHistory.size()>base+100)undoHistory.erase(undoHistory.begin()+(ptrdiff_t)base);
-        redoHistory.clear(); engine.performanceProjectPending=true; dirty=true; return;
+        redoHistory.clear(); if (!deferTakePublication) engine.performanceProjectPending=true; dirty=true; return;
     }
     engine.cancelPreparedLaunch();
     clearEditSelection();
     engine.endTransitionRehearsal();
-    const juce::ScopedLock guard(engine.lock); undoHistory.push_back(engine.project); if (undoHistory.size() > 100) undoHistory.erase(undoHistory.begin()); redoHistory.clear(); dirty = true;
+    auto snapshot = projectEditSnapshot();
+    // Grow/prune history and retire redo resources after releasing the render lock.
+    undoHistory.push_back(std::move(snapshot));
+    if (undoHistory.size() > 100) undoHistory.erase(undoHistory.begin());
+    redoHistory.clear(); dirty = true;
+}
+Project Workstation::projectEditSnapshot()
+{
+    const juce::ScopedLock guard(engine.lock); return engine.project;
+}
+juce::String Workstation::structuralEditUnavailable() const
+{
+    const juce::ScopedLock guard(engine.lock);
+    if (engine.exporting) return "Finish or cancel export before changing segment structure.";
+    if (busy || pendingTempo > 0 || tempoPreparationPending || !timelineLoads.empty() || engine.project.hasPendingPlacement())
+        return "Wait for source and tempo preparation before changing segment structure.";
+    if (engine.seekPending) return "Wait for playback-position preparation before changing segment structure.";
+    if (engine.programmeLaunchPending()) return "Wait for the prepared launch to finish before changing segment structure.";
+    if (engine.rehearsalActive()) return "End the transition rehearsal before changing segment structure.";
+    // Record/Perform defaults to Latch. An idle take remains structurally editable;
+    // active writes must finish so their source-owned curves are not overwritten.
+    if (engine.recordingAutomation() || (!engine.capturingPerformance() && engine.automationRecordMode != AutomationRecordMode::read))
+        return "Finish automation recording and choose Read before changing segment structure.";
+    return {};
+}
+bool Workstation::publishStructuralEdit(Project candidate)
+{
+    if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return false; }
+    const auto links = candidate.validateTransitionLinks();
+    if (links.failed()) { setStatus(links.getErrorMessage()); return false; }
+    const auto protectedEdit = engine.project.validateTransitionLocks(candidate);
+    if (protectedEdit.failed()) { setStatus(protectedEdit.getErrorMessage()); return false; }
+    // Model preparation does not dispatch UI messages. Callback take events may
+    // still arrive; retain those at publication instead of copying them back.
+    if (engine.playing)
+    {
+        const double at = engine.position.load(), rate = engine.sampleRate.load();
+        const int frames = engine.preparedBlockSize();
+        if (!std::isfinite(rate) || rate <= 0 || frames <= 0) { setStatus("The audio clock is unavailable. Mix and playback kept."); return false; }
+        try
+        {
+            for (const auto& clip : candidate.clips)
+                if (!clip.media || !requestOriginalClip(clip,at,.25,1.+frames/rate,true))
+                { setStatus("Could not prepare edited audio. Check the source and try again. Mix and playback kept."); return false; }
+        }
+        catch (const std::exception&)
+        { setStatus("Could not prepare edited audio. Check the source and try again. Mix and playback kept."); return false; }
+        if (std::abs(engine.position.load()-at) > .5)
+        { setStatus("Playback advanced while preparing the edit. Try again. Mix kept."); return false; }
+    }
+    if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return false; }
+    remember(true);
+    {
+        const juce::ScopedLock guard(engine.lock);
+        candidate.performanceTakes.swap(engine.project.performanceTakes);
+        std::swap(candidate,engine.project);
+        if (engine.capturingPerformance()) engine.performanceProjectPending = true;
+    }
+    // candidate owns the displaced project until after the publication lock.
+    dirty = true; return true;
 }
 void Workstation::undo(bool redo)
 {
@@ -2759,12 +2818,15 @@ void Workstation::splitClip()
     if(const auto reason=timelineActionUnavailable(TimelineAction::split,engine.position,engine.selectedTrack);reason.isNotEmpty())
     { setStatus(reason); return; }
     if (editSelection.multiple()) { setStatus("Clear the range/group to split one segment."); return; }
-    auto* c = currentClip(); const double at = engine.position; if (!c || c->media->sourceDetailsPending || at <= c->start || at >= c->end() || busy) return;
+    if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return; }
+    const auto id = selectedClip; const double at = engine.position;
+    auto candidate = projectEditSnapshot(); auto* c = candidate.clipFor(id);
+    if (!c || c->media->sourceDetailsPending || at <= c->start || at >= c->end()) return;
     if (engine.project.clipTransitionLocked(c->id)) { setStatus("Unlock the transition before splitting its segment."); return; }
-    const juce::ScopedLock guard(engine.lock); const Clip original = *c;
+    const Clip original = *c;
     const double leftLength = at - c->start; Clip right = original.slice(leftLength, original.length - leftLength); right.id = juce::Uuid().toString();
-    auto candidate = engine.project; candidate.ensureTransitionLinks();
-    const auto index = (size_t) (c - engine.project.clips.data());
+    candidate.ensureTransitionLinks();
+    const auto index = (size_t) (c - candidate.clips.data());
     candidate.clips[index] = original.slice(0, leftLength);
     candidate.clips.insert(candidate.clips.begin() + (ptrdiff_t) index + 1, right);
     for (auto& link : candidate.transitionLinks)
@@ -2784,7 +2846,8 @@ void Workstation::splitClip()
         }
     }
     const auto valid = candidate.validateTransitionLinks(); if (valid.failed()) { setStatus(valid.getErrorMessage()); return; }
-    remember(); engine.project = std::move(candidate); selectedClip = right.id;
+    if (!publishStructuralEdit(std::move(candidate))) return;
+    selectedClip = right.id;
     refresh();
 }
 void Workstation::duplicateClip()
@@ -2833,7 +2896,8 @@ void Workstation::removeClip()
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement())
     { setStatus("Wait for track and tempo preparation before removing a segment."); return; }
     if (engine.project.clipTransitionLocked(selectedClip)) { setStatus("Unlock the transition before removing its segment."); return; }
-    auto candidate = engine.project; candidate.clearDeletedTrackTransitions({selectedClip});
+    if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return; }
+    auto candidate = projectEditSnapshot(); candidate.clearDeletedTrackTransitions({selectedClip});
     auto& clips = candidate.clips; clips.erase(std::remove_if(clips.begin(),clips.end(),[this](const auto& c) { return c.id == selectedClip; }),clips.end());
     const auto links = candidate.validateTransitionLinks();
     if (links.failed()) { setStatus(links.getErrorMessage()); return; }
@@ -2844,8 +2908,8 @@ void Workstation::removeClip()
     {
         prepareTempo(std::move(candidate),false,true); return;
     }
-    remember(); const juce::ScopedLock guard(engine.lock);
-    engine.project = std::move(candidate); selectedClip.clear(); tempoStrip.selectedTempoPoint = -1; refresh();
+    if (!publishStructuralEdit(std::move(candidate))) return;
+    selectedClip.clear(); tempoStrip.selectedTempoPoint = -1; refresh();
 }
 void Workstation::guardUnsaved(std::function<void()> action)
 {

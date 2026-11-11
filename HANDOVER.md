@@ -1,6 +1,71 @@
-# Mixworks current handover - 10 November 2026
+# Mixworks current handover - 11 November 2026
 
 ## Current outcome
+
+**11 November structural-edit checkpoint verified in 0.55.92.** The complete
+local bundle is `out/releases/0.55.92-b6fa768ccdbb`; `out/Launch.cmd` selects it
+after retained activation checks. Previous .90 launcher rollback:
+`out/Launch.cmd.bak.version-0.55.92-20261111`. Studio remains 0.1.18.
+Executable SHA-256: `b6fa768ccdbb440a3019bbdadff17dd8f069ae467040bf26711d3d7c8e98d641`.
+Visible title and Windows FileVersion/ProductVersion match 0.55.92.
+
+Linked-track bar moves, single-segment split and single-segment removal now
+prepare private model candidates outside the audio render lock. While playing,
+they preflight original-source audio near the current cursor and refuse before
+history/musical changes if preparation fails or playback advances too far.
+Publication swaps projects briefly under the lock; displaced project destruction,
+history growth/pruning/redo retirement and UI refresh run outside that scope.
+Ordinary history capture still copies the model under a snapshot lock. Shared
+source/effect ownership and the programme cursor are retained.
+
+Pending export/source/tempo/seek/queued-launch work, rehearsal and active
+application automation writes give a recovery message before publication. Idle
+Record/Perform takes remain editable in their default Latch mode; ordinary
+Arrange edits require Read. Publication retains take events appended after the
+candidate snapshot and schedules its structural checkpoint only after the new
+geometry is live. Live Undo/Redo retains chronology and cursor. No saved-format,
+analysis revision or detector changes were made.
+
+Final candidate passed **279 focused native checks**: live98, bars34, seek90 and
+export57. Runs were serial, below normal priority through `verification.run_checks`,
+stress off, with clean retention. Independent callback probes at bar movement,
+split/removal, Undo/Redo, node/bar-jump refresh and redo-resource retirement
+produced matching nonzero PCM (maximum error 0), exact sample-clock advancement
+and no new lock misses. The held-lock control still produces silence/held clock.
+Source-backed reopen, missing-source preflight refusal, seven admission states
+and active-take publication/Undo were checked. Large Workstation/Engine owners in
+the shared transition dispatcher now use heap lifetimes to avoid repeating the
+export-test stack issue; the export journey still passes all 57 checks.
+
+The exact-bundle actual Edit-menu move, Split button, Undo/Redo buttons and
+Remove-selection menu were exercised during muted device playback with Studio.
+Four passages totalled **67.56 seconds, 6,754 callbacks and 1,834 painted frames**,
+with zero added lock misses, source waits/missing samples, callback overruns,
+oversized blocks or export-silence callbacks. Studio pixels and version were
+inspected. Authored scene coverage ends at 36 seconds, so the last Undo/Redo
+observation beyond that correctly has no active scene. Save/source-backed reopen
+reproduced the exact 1,024-frame PCM probe. The owned app was saved and closed
+normally; its exact-hash generated WAV was removed afterwards.
+
+The unactivated .91 diagnostic completed live98 with three failures: the new
+admission guard incorrectly blocked idle Record/Perform because it defaults to
+Latch. .92 corrects that product conflict without weakening the event preservation,
+checkpoint or Undo assertions. Its original source, bundle and failed reports
+remain at `.local/phase1-structural-1110`; final source/bundle identities, native
+reports, screenshots, desktop states, PCM and activation evidence are under
+`.local/phase1-structural-final-1110` (work started 10 November).
+
+Production apps, original music, sessions, retained analysis/corrections/caches
+and protected references were untouched. No detector reset or public release.
+This is focused local acceptance, not a complete regression/stress gate, physical
+MIDI/ASIO, elastic-renderer, real-track listening or sustained qualification.
+**Phase 1 remains open.** Next inspect duplication/native-plugin cloning and other
+structural transaction scopes, then wider W04/acute W14 refusal/recovery journeys.
+Range/group paths, generic Undo internal locks, snapshot-copy cost and new elastic
+window preparation remain separate limits. Keep phase 2 deferred; catalogue-scale
+startup/reopening remains phase 3.
+
+## Prior .90 focused checkpoint (superseded above)
 
 **10 November native export-test repair and bar-jump continuity verified in 0.55.90.**
 The complete local bundle is `out/releases/0.55.90-2b8fb2bac1ea`; `out/Launch.cmd`

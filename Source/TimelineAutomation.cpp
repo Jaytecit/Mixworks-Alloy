@@ -671,7 +671,7 @@ bool Timeline::continueCurveBend(const juce::MouseEvent& event)
     const auto gesture = *curveBendDrag;
     if (!owner.automationEditable(gesture.address)) return true;
     const double bend = juce::jlimit(-1., 1., gesture.bend + (event.position.y - gesture.y) / (gesture.rising ? 80. : -80.));
-    auto candidate = owner.automationEditSnapshot();
+    auto candidate = owner.projectEditSnapshot();
     if (gesture.segment >= 0)
     {
         auto* curve = owner.materialiseAutomation(candidate,gesture.address);
@@ -1028,7 +1028,7 @@ bool Timeline::setCutAmount(const CutAmountHandle& h, float value, bool newUndo)
     if (found == handles.end()) { owner.setStatus("The cut changed. Select its current amount handle."); return false; }
     const auto range = automationUsesGain(h.address.target) ? juce::Range<float>(0, h.incoming.isEmpty() ? 1.3f : 1.f) : automationRange(h.address.target);
     value = range.clipValue(value); if (std::abs(value - h.value) < 1.e-7f) return false;
-    auto candidate = owner.automationEditSnapshot();
+    auto candidate = owner.projectEditSnapshot();
     const auto plateau = [](AutomationCurve& curve,int node,bool before,float next)
     {
         const float previous = curve.points[(size_t) node].value;

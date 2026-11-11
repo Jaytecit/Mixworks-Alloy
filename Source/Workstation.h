@@ -567,7 +567,7 @@ public:
     void selectTrack(int);
     void refresh();
     void selectTransition(const juce::String& incoming, bool focus = false);
-    void remember();
+    void remember(bool deferTakePublication = false);
     void showEditor(int);
     void fail(const juce::String&);
     Clip* currentClip();
@@ -635,7 +635,9 @@ private:
     void refreshAutomationEditor(bool rebuildChoices = true);
     bool automationEditable(const AutomationAddress&) const;
     juce::AudioProcessorParameter* automationPluginParameter(const AutomationAddress&) const;
-    Project automationEditSnapshot();
+    Project projectEditSnapshot();
+    juce::String structuralEditUnavailable() const;
+    bool publishStructuralEdit(Project);
     bool publishAutomationEdit(Project, const AutomationAddress&, bool addUndo);
     AutomationCurve* materialiseAutomation(Project&, const AutomationAddress&);
     bool insertAutomationNode(const AutomationAddress&, double time, bool snap = true);

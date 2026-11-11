@@ -132,6 +132,7 @@ public:
     void detachPrivatePreview(juce::AudioSource&);
     juce::Result queueProgrammeProject(Project,juce::var snapshot,double boundary,juce::String launchClip = {},double launchShift = 0);
     void cancelPreparedLaunch();
+    bool programmeLaunchPending() const { const juce::ScopedLock guard(lock); return queuedProgramme != nullptr; }
     Project project;
     WorkMode workMode = WorkMode::arrange;
     TakeState takeState() const;

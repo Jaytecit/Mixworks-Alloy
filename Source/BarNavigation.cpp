@@ -16,7 +16,7 @@ void Workstation::addBarMenus(juce::PopupMenu& menu, bool moveTrack)
 {
     const auto* clip = currentClip();
     const bool ready = !busy && !engine.exporting && pendingTempo <= 0 && !tempoPreparationPending && !engine.project.hasPendingPlacement();
-    const bool enabled = ready && (moveTrack ? clip && !clip->media->sourceDetailsPending && !engine.project.clipTransitionLocked(clip->id) : engine.project.audibleEnd() > 0);
+    const bool enabled = ready && (moveTrack ? clip && structuralEditUnavailable().isEmpty() && !clip->media->sourceDetailsPending && !engine.project.clipTransitionLocked(clip->id) : engine.project.audibleEnd() > 0);
     menu.addSeparator();
     for (int direction : {-1, 1})
     {
@@ -63,15 +63,18 @@ void Workstation::moveTrackBars(int bars, int direction)
     if (!currentClip()) { setStatus("Select a track before moving it by bars."); return; }
     if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement() || currentClip()->media->sourceDetailsPending)
     { setStatus("Wait for preparation before moving tracks by bars."); return; }
-    engine.flushMidiControls(); engine.finishAutomation(); const juce::ScopedLock guard(engine.lock);
-    const auto id = selectedClip; const auto* clip = engine.project.clipFor(id); if (!clip) return;
-    const auto clock = engine.project.gridClock();
+    if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return; }
+    engine.flushMidiControls();
+    auto candidate = projectEditSnapshot();
+    const auto id = selectedClip; const auto* clip = candidate.clipFor(id); if (!clip) return;
+    const double previousStart = clip->start;
+    const auto clock = candidate.gridClock();
     const double target = clock.timeAtBeat(clock.beatsAt(clip->start) + direction * bars * 4.);
     if (!std::isfinite(target) || target < 0) { setStatus("That whole bar step would put the track before the mix."); return; }
-    auto candidate = engine.project; const auto result = candidate.moveClip(id, target, false, 0, false);
+    const auto result = candidate.moveClip(id, target, false, 0, false);
     if (result.failed()) { setStatus(result.getErrorMessage()); return; }
-    if (std::abs(candidate.clipFor(id)->start - clip->start) < 1e-9) return;
-    remember(); engine.project = std::move(candidate);
+    if (std::abs(candidate.clipFor(id)->start - previousStart) < 1e-9) return;
+    if (!publishStructuralEdit(std::move(candidate))) return;
     setStatus("Linked track moved " + juce::String(bars) + " mix bars " + (direction < 0 ? "backward." : "forward.")); refresh();
 }
 }

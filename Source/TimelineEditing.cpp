@@ -24,6 +24,8 @@ juce::String Workstation::timelineActionUnavailable(TimelineAction action,double
         || action==TimelineAction::split || action==TimelineAction::reverse || action==TimelineAction::rippleDelete
         || action==TimelineAction::closeGap || action==TimelineAction::loopStart || action==TimelineAction::loopEnd || action==TimelineAction::configureLoop;
     if(!structural)return {};
+    if (action==TimelineAction::split || action==TimelineAction::remove || action==TimelineAction::removePiece)
+        if (const auto why=structuralEditUnavailable();why.isNotEmpty()) return why;
     if(pendingTempo>0 || tempoPreparationPending || !timelineLoads.empty() || engine.project.hasPendingPlacement())
         return "Wait for track and tempo preparation to finish, then try this edit again.";
     if(paste && !editClipboard && !clipClipboard)return "Copy audio first, then choose where to paste it.";

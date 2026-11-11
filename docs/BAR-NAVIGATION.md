@@ -1,10 +1,17 @@
 # Bar jumps and linked-track moves
 
-Current .90 checkpoint: bar jumps retain a short destination-snapshot lock, then
-prepare/seek, scroll and refresh outside the caller's render lock. Focused live
-callback PCM and actual muted-device/Studio delivery pass. Busy/export direct
-commands explain the recovery action; export disables their menu groups. Ordinary
-track movement and duplication retain their separate transaction lock scopes.
+Current structural-edit checkpoint: bar jumps retain a short destination-snapshot
+lock, then prepare/seek, scroll and refresh outside the caller's render lock.
+Linked-track bar moves, single-segment splits and single-segment removal now
+prepare a model candidate outside that lock, preflight the original source at
+the running cursor, and publish by swapping projects briefly under the lock.
+History retirement and UI notification run outside that lock. Take events appended
+after the snapshot are retained and the structural checkpoint follows publication.
+A failed source preflight retains the original project, selection and history.
+These synchronous edits reject pending seek/launch/tempo/source preparation,
+rehearsal and active automation writing with a recovery message. Idle Record/Perform
+takes remain editable in their default Latch mode; ordinary Arrange edits require Read. Duplication/plugin
+cloning and range/group paths retain their separate implementation scopes.
 Only pairs with their movement lock enabled form a move-together group; an
 ordinary transition link alone does not imply that grouping. The malformed-clone
 fixture writes canonical Project.effectSettings, matching the actual clone owner.

@@ -28,6 +28,12 @@ name the operation to finish or the export to finish/cancel, without a popup or
 partial edit; export disables their menu groups. Missing track selection asks for
 a selection. The .90 focused bar suite verifies these status/atomicity paths.
 
+Track bar moves, single splits and single removal also refuse pending playback-
+position preparation, a queued programme launch, rehearsal and active automation writing. Ordinary Arrange edits require Read;
+idle Record/Perform takes remain editable in their default Latch mode. Finish/wait for the named activity, or select Read, then retry. Live source
+preflight failure asks to check the source; the project, history and running clock
+are retained. These direct guards run before publication and do not add a popup.
+
 Transition preset replacement separately names the pair, affected parameter and
 time range, preserves exterior nodes and mixer-lane curves, and offers Cancel.
 Confirmation checks for a changed target/document and a newly unavailable state.

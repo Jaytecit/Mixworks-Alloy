@@ -120,7 +120,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
     }
     if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--alignment-guide-only"))
     {
-        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800);
+        auto ownedUi=std::make_unique<Workstation>(false); auto& ui=*ownedUi; ui.stopTimer(); ui.setSize(1250,800);
         auto media=std::make_shared<Media>(); media->sampleRate=8000; media->samples.setSize(1,8000*32); media->samples.clear();
         media->name="Alignment preview"; media->manualBpm=120;
         Clip clip; clip.media=media; clip.length=32; ui.engine.project.clips={clip};
@@ -158,7 +158,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
     if (juce::JUCEApplicationBase::getCommandLineParameters().contains("--live-transition-only"))
     {
         // Bounded functional fixture: no device, detector, worker, timing or load test.
-        Workstation ui(false); ui.stopTimer(); ui.setSize(1250,800); ui.engine.sampleRate = 8000;
+        auto ownedUi=std::make_unique<Workstation>(false); auto& ui=*ownedUi; ui.stopTimer(); ui.setSize(1250,800); ui.engine.sampleRate = 8000;
         Project base; base.followTrackTempo = false; base.bpm = base.tempo.fallback = 120; base.masterDb = 0; base.transitionLinksKnown = true;
         for (int lane = 0; lane < 3; ++lane)
         {
@@ -179,7 +179,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         auto reset = [&](bool playing, int preset)
         {
             ui.engine.finalisePerformance(); ui.engine.setWorkMode(WorkMode::arrange);
-            ui.engine.setPlaying(false); ui.engine.project = base; ui.undoHistory.clear(); ui.redoHistory.clear();
+            ui.engine.setPlaying(false); ui.engine.project = base; ui.undoHistory.clear(); ui.redoHistory.clear(); ui.dirty=false;
             ui.selectedTransition.clear(); ui.selectedClip = b; ui.editSelection.clips = {a,b}; ui.editSelection.primary = b;
             ui.transitionIndex = 2; ui.transitionPreset.setSelectedId(preset,juce::dontSendNotification);
             ui.engine.seek(9); ui.engine.setPlaying(playing); ui.refresh();
@@ -217,7 +217,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         check(shaped && ui.undoHistory.size() == 2 && ui.engine.position == livePosition && ui.engine.playing,"native Apply Crossfade creates audible ordinary nodes without seeking: " + ui.status);
         auto render = [&](const Project& p, int lane, double at)
         {
-            Engine engine; engine.sampleRate = 8000; engine.project = p;
+            auto engineOwner=std::make_unique<Engine>(); auto& engine=*engineOwner; engine.sampleRate = 8000; engine.project = p;
             for (int i = 0; i < trackCount; ++i) engine.project.tracks[(size_t)i].mute = lane != i;
             juce::AudioBuffer<float> audio(2,128); juce::MidiBuffer midi; engine.render(audio,128,at,midi); return audio;
         };
@@ -228,7 +228,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         check(otherError<1.e-7f,"unrelated lane PCM is unchanged by live preset placement");
         // Six ordinary callback blocks with view changes between them: functional
         // PCM/clock evidence, without a device, stress loop or timing benchmark.
-        Engine oracle; oracle.sampleRate=8000; oracle.project=applied;
+        auto oracleOwner=std::make_unique<Engine>(); auto& oracle=*oracleOwner; oracle.sampleRate=8000; oracle.project=applied;
         const auto beforeView=json(ui.engine.project); const auto diagnostics=ui.engine.callbackDiagnostics.snapshot();
         bool stable=true; double expectedPosition=ui.engine.position.load();
         for(int step=0;step<6;++step)
@@ -253,7 +253,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
         ui.undo(true); ui.undo(true); ui.engine.setPlaying(false);
         ui.selectTransition(b,true); check(ui.engine.position==8,"explicit focused transition navigation still seeks while stopped");
         const auto file=report.getSiblingFile("live-transition.mixworks"); const auto save=ui.engine.saveProject(file);
-        Engine reopened; const auto opened=save.isEmpty()?reopened.restoreProject(file.loadFileAsString()):save;
+        auto reopenedOwner=std::make_unique<Engine>(); auto& reopened=*reopenedOwner; const auto opened=save.isEmpty()?reopened.restoreProject(file.loadFileAsString()):save;
         const auto* reopenedLink = reopened.project.transitionFor(b);
         check(save.isEmpty() && opened.isEmpty() && reopenedLink && reopenedLink->presetName == "Crossfade"
             && reopenedLink->presetOwner == applied.transitionFor(b)->presetOwner,
@@ -379,7 +379,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
                     "live Undo cannot fall through to a pre-take snapshot or erase active chronology");
                 juce::AudioBuffer<float> undone(2,128); float* undoneOutput[]{undone.getWritePointer(0),undone.getWritePointer(1)};
                 ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,undoneOutput,2,128,{});
-                Engine plain; plain.sampleRate=8000; plain.project=base; plain.project.tracks[2].gainDb=-3;
+                auto plainOwner=std::make_unique<Engine>(); auto& plain=*plainOwner; plain.sampleRate=8000; plain.project=base; plain.project.tracks[2].gainDb=-3;
                 juce::AudioBuffer<float> expectedUndo(2,128); juce::MidiBuffer midi; plain.render(expectedUndo,128,undoAt,midi); float undoError=0;
                 for(int ch=0;ch<2;++ch)for(int i=0;i<128;++i)undoError=std::max(undoError,std::abs(undone.getSample(ch,i)-expectedUndo.getSample(ch,i)));
                 check(undoError<1.e-6f,"live Undo produces the independent original-source PCM with the subsequent fader value");
@@ -459,7 +459,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
             const auto position=ui.engine.position.load(); const auto beforeMisses=ui.engine.callbackDiagnostics.snapshot().lockMisses;
             std::thread callback([&]
             {
-                Engine oracle; oracle.sampleRate=8000; oracle.project=ui.engine.project;
+                auto oracleOwner=std::make_unique<Engine>(); auto& oracle=*oracleOwner; oracle.sampleRate=8000; oracle.project=ui.engine.project;
                 juce::AudioBuffer<float> expected(2,128),actual(2,128); juce::MidiBuffer midi;
                 oracle.render(expected,128,position,midi);
                 ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,actual.getArrayOfWritePointers(),2,128,{});
@@ -493,6 +493,114 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
               && json(ui.engine.project)==jumpProject && ui.undoHistory.size()==jumpHistory,
               "mix-bar jump changes only its intended clock, then advances by the observed callback block");
         ui.automationAdd.removeComponentListener(&refreshCallback);
+
+        // Observe ordinary structural edits at the real Undo-button refresh.
+        // Selection may change or disappear, so this boundary works for removal too.
+        reset(true,1); bool redoRetired=false;
+        {
+            auto retired=std::shared_ptr<Media>(new Media,[&](Media* value)
+            { redoRetired=true;callbackKind="redo-history-retirement";refreshCallback.call();delete value; });
+            Project obsolete;Clip clip;clip.media=retired;obsolete.clips.push_back(clip);
+            ui.redoHistory.push_back(std::move(obsolete));
+        }
+        ui.remember();
+        check(redoRetired && refreshCallbacks==4 && refreshAudio && ui.redoHistory.empty(),
+              "redo resource retirement permits actual matching callback PCM instead of retaining the history snapshot lock");
+        ui.redoHistory.clear();
+        reset(true,1); const int structuralProbeBase=refreshCallbacks;
+        ui.undoButton.addComponentListener(&refreshCallback);
+        callbackKind="track-move-refresh";
+        const auto structuralAt=ui.engine.position.load();
+        ui.moveTrackBars(4,1);
+        check(refreshCallbacks==structuralProbeBase+1 && refreshAudio && ui.engine.project.clipFor(b)->start==16
+              && ui.engine.playing && std::abs(ui.engine.position-(structuralAt+128./8000))<1.e-8,
+              "future-track bar move publishes once and its UI refresh retains matching callback PCM and clock");
+        check(ui.undoHistory.size()==1 && ui.dirty,"structural track move creates one musical Undo step");
+        ui.selectedClip=a; ui.engine.selectedTrack=0; ui.clearEditSelection();
+        const auto splitAt=ui.engine.position.load(); const auto splitEffects=ui.engine.project.clipFor(a)->effects;
+        callbackKind="split-refresh"; ui.undoButton.setEnabled(false); ui.splitClip();
+        const auto right=ui.selectedClip; const auto splitProject=json(ui.engine.project);
+        check(refreshCallbacks==structuralProbeBase+2 && refreshAudio && ui.engine.project.clips.size()==4 && right!=a
+              && ui.engine.project.clipFor(right)->effects==splitEffects
+              && std::abs(ui.engine.project.clipFor(right)->start-splitAt)<1.e-8,
+              "live split keeps source/effect ownership and renders matching nonzero PCM during UI notification");
+        callbackKind="structural-undo-refresh"; ui.undoButton.setEnabled(false); ui.undo(false);
+        check(refreshCallbacks==structuralProbeBase+3 && refreshAudio && ui.engine.project.clips.size()==3 && ui.engine.playing,
+              "structural Undo restores the unsplit project while callback PCM and clock continue");
+        callbackKind="structural-redo-refresh"; ui.undoButton.setEnabled(false); ui.undo(true);
+        check(refreshCallbacks==structuralProbeBase+4 && refreshAudio && json(ui.engine.project)==splitProject && ui.engine.playing,
+              "structural Redo restores the exact split with callback delivery at refresh");
+        ui.selectedClip=a; ui.clearEditSelection();
+        callbackKind="remove-refresh"; ui.undoButton.setEnabled(false); ui.removeClip();
+        check(refreshCallbacks==structuralProbeBase+5 && refreshAudio && ui.engine.project.clips.size()==3
+              && !ui.engine.project.clipFor(a) && ui.engine.project.clipFor(right)
+              && ui.engine.project.clipFor(right)->effects==splitEffects,
+              "removing an earlier split piece retains the audible shared owner and callback PCM at refresh");
+        ui.undoButton.removeComponentListener(&refreshCallback);
+        const auto structuralFile=report.getSiblingFile("structural-continuity.mixworks");
+        const auto structuralSaved=ui.engine.saveProject(structuralFile);
+        auto structuralReopened=std::make_unique<Engine>(juce::File{},false);
+        const auto structuralOpened=structuralSaved.isEmpty()?structuralReopened->restoreProject(structuralFile.loadFileAsString()):structuralSaved;
+        check(structuralSaved.isEmpty() && structuralOpened.isEmpty() && structuralReopened->project.clips.size()==3
+              && structuralReopened->project.clipFor(right) && structuralReopened->project.clipFor(b)->start==16,
+              "moved/split/removed source-backed project reopens with its exact surviving geometry: "+structuralOpened);
+        if(structuralOpened.isEmpty())
+        {
+            const auto expected=render(ui.engine.project,0,10.5), actual=render(structuralReopened->project,0,10.5);
+            float error=0;for(int ch=0;ch<2;++ch)for(int i=0;i<128;++i)error=std::max(error,std::abs(expected.getSample(ch,i)-actual.getSample(ch,i)));
+            check(error<2.e-6f && actual.getMagnitude(0,128)>.001f,"reopened structural result reproduces nonzero source PCM");
+        }
+        for(int unavailable=0;unavailable<7;++unavailable)
+        {
+            reset(true,1); ui.clearEditSelection();
+            if(unavailable==0)ui.busy=true; if(unavailable==1)ui.engine.exporting=true;
+            if(unavailable==2)ui.pendingTempo=121; if(unavailable==3)ui.tempoPreparationPending=true;
+            if(unavailable==4)ui.engine.seekPending=true; if(unavailable==5)ui.engine.automationRecordMode=AutomationRecordMode::write;
+            if(unavailable==6)check(ui.engine.queueProgrammeProject(base,projectToJson(base),12).wasOk(),"prepare an owned queued programme for structural admission");
+            const auto kept=json(ui.engine.project); const auto cursor=ui.engine.position.load(); const auto selection=ui.selectedClip;
+            ui.moveTrackBars(4,1);ui.splitClip();ui.removeClip();
+            check(json(ui.engine.project)==kept && ui.engine.position==cursor && ui.engine.playing
+                  && ui.selectedClip==selection && ui.undoHistory.empty() && !ui.dirty && ui.status.isNotEmpty(),
+                  "structural commands explain and preserve session/clock/history under admission guard / "+juce::String(unavailable));
+            ui.busy=false;ui.engine.exporting=false;ui.pendingTempo=0;ui.tempoPreparationPending=false;ui.engine.seekPending=false;
+            ui.engine.automationRecordMode=AutomationRecordMode::read;
+            if(unavailable==6)ui.engine.cancelPreparedLaunch();
+        }
+        reset(true,1);
+        auto unavailableProject=ui.projectEditSnapshot();
+        auto unavailableMedia=base.clips[1].media->catalogueCopy();
+        unavailableMedia->analysisSource.frames=16*8000;unavailableMedia->analysisSource.channels=1;
+        unavailableMedia->original=std::make_shared<OriginalAudio>(report.getSiblingFile("unavailable-structural.wav"),8000,1,16*8000);
+        unavailableProject.clipFor(b)->media=unavailableMedia;
+        const auto beforeUnavailable=json(ui.engine.project); const auto unavailableAt=ui.engine.position.load();
+        check(!ui.publishStructuralEdit(std::move(unavailableProject)) && json(ui.engine.project)==beforeUnavailable
+              && ui.undoHistory.empty() && !ui.dirty && ui.status.contains("Check the source"),
+              "failed destination preparation refuses structural publication before history or musical changes");
+        juce::AudioBuffer<float> retainedAudio(2,128);
+        ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,retainedAudio.getArrayOfWritePointers(),2,128,{});
+        check(retainedAudio.getMagnitude(0,128)>.001f && ui.engine.playing && std::abs(ui.engine.position-(unavailableAt+128./8000))<1.e-8,
+              "unavailable structural destination keeps actual old-position programme output and sample clock");
+        reset(true,1);ui.engine.recordMasterWav=false;
+        check(ui.engine.setWorkMode(WorkMode::recordPerform).wasOk() && ui.engine.beginPerformance().wasOk()
+              && ui.engine.automationRecordMode==AutomationRecordMode::write,
+              "start editable take for structural chronology preservation");
+        auto duringTake=ui.projectEditSnapshot();
+        check(duringTake.moveClip(b,16,false,0,false).wasOk(),"prepare structural take candidate away from live publication");
+        TakeEvent laterEvent;laterEvent.kind=TakeEventKind::control;laterEvent.lane=2;laterEvent.control=(int)AutomationTarget::volume;
+        laterEvent.value=-2;laterEvent.sourcePosition=ui.engine.position;ui.engine.appendTakeEvent(std::move(laterEvent));
+        const auto takeEvents=ui.engine.project.performanceTakes[0].events.size();
+        check(ui.publishStructuralEdit(std::move(duringTake)) && ui.engine.capturingPerformance()
+              && ui.engine.project.performanceTakes[0].events.size()==takeEvents && ui.engine.performanceProjectPending,
+              "publication preserves take events appended after the candidate snapshot and schedules the new structural checkpoint: "+ui.status);
+        ui.refresh();
+        check(std::any_of(ui.engine.project.performanceTakes[0].events.begin(),ui.engine.project.performanceTakes[0].events.end(),[](const auto& event)
+              {return event.kind==TakeEventKind::project && (double)event.payload["clips"][1]["start"]==16;}),
+              "recorded structural checkpoint contains the published geometry rather than the old project");
+        const auto takeAt=ui.engine.position.load();ui.undo(false);const bool structuralUndone=ui.engine.project.clipFor(b)->start==8;
+        ui.undo(true);
+        check(structuralUndone && ui.engine.project.clipFor(b)->start==16 && ui.engine.capturingPerformance()
+              && ui.engine.position==takeAt && ui.engine.project.performanceTakes[0].events.size()>=takeEvents,
+              "active-take structural Undo/Redo retains chronology and programme cursor");
         check(report.getSiblingFile("automation-refresh-callbacks.json").replaceWithText(juce::JSON::toString(juce::var(callbackFacts),true,17)),
             "retain independent callback PCM error, peak, clock and contention observations");
         ui.engine.finalisePerformance(); ui.engine.setPlaying(false); return;
@@ -510,7 +618,7 @@ void runTransitionNavigationTests(const std::function<void(bool, const juce::Str
     }
     base.transitionLinksKnown = true;
     base.transitionLinks = {{base.clips[0].id, base.clips[1].id}, {base.clips[1].id, base.clips[2].id}};
-    Workstation ui(false); ui.stopTimer(); ui.setSize(1440, 940); ui.engine.project = base;
+    auto ownedUi=std::make_unique<Workstation>(false); auto& ui=*ownedUi; ui.stopTimer(); ui.setSize(1440, 940); ui.engine.project = base;
     const int alt = juce::ModifierKeys::altModifier, ctrl = juce::ModifierKeys::ctrlModifier, shift = juce::ModifierKeys::shiftModifier;
     const auto key = [&](int code, int mods) { return ui.keyPressed(juce::KeyPress(code, juce::ModifierKeys(mods), 0)); };
     check(base.validateTransitionLinks().wasOk(), "keyboard transition fixture has interior editable frames");

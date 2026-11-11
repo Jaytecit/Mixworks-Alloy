@@ -1,6 +1,6 @@
 # Mixworks outstanding roadmap
 
-Updated 10 November 2026. This is the single work queue for fixes, feature requests,
+Updated 11 November 2026. This is the single work queue for fixes, feature requests,
 upgrades and remaining acceptance. Completed implementation tasks and superseded
 instructions have been removed. [Handover](HANDOVER.md) owns the current candidate;
 [documentation audit](docs/DOCUMENTATION-AUDIT-20261104.md) records reconciliation
@@ -11,23 +11,26 @@ priority. These are complete outcomes, not permission to implement every item
 at once. A reported problem stays open until its actual workflow is demonstrated;
 earlier focused passes do not overrule Jay's observations.
 
-**Current checkpoint.** Alloy **0.55.90 / Studio 0.1.18** is selected by
-`out/Launch.cmd`. The native export-test stack failure is fixed and the complete
-save/export57, destination111 and stale export-target75 journeys pass. Mix-bar
-jumps release the render lock before preparation and UI notification; callback
-PCM/clock and actual forward/backward jumps with moving Studio frames passed.
-[Handover](HANDOVER.md) owns exact identities, all 441 focused native checks,
-the .89 fixture-failure provenance, retention and scope. The earlier analytical
-fades, prepared seeks, Studio lookahead and Beat grids repair retain their scope.
+**Current checkpoint.** Alloy **0.55.92 / Studio 0.1.18** is selected by
+`out/Launch.cmd`. Linked-track bar moves, single split/removal, history retirement
+and UI refresh now use a short publication lock with private model/source
+preparation. Take events and live Undo chronology survive publication; pending
+work and active automation writes refuse before history changes. Idle
+Record/Perform remains editable. [Handover](HANDOVER.md) owns exact identities,
+279 focused native checks, the .91 admission failure/correction and retention.
+The earlier analytical fades, prepared seeks, bar jumps, Studio lookahead,
+Beat grids and export-test stack repair retain their established scope.
 
-**Phase 1 remains in acceptance.** The bounded 12.19-second actual-device passage
-added no lock misses, source waits or callback overruns. It does not close Jay's
-intermittent listening report or sustained delivery. Next address the remaining
-cursor-dependent structural-edit transaction lock scopes (including track moves),
-then wider W04/acute W14 refusal/recovery journeys, before phase 2. The old native
-export-test blocker is closed; both newly exposed bar fixture errors are corrected
-without weakening their refusal/atomicity assertions. Large-catalogue startup/
-reopen remains phase 3 work. Evidence: `.local/phase1-export-final-1110`.
+**Phase 1 remains in acceptance.** Actual move/split/Undo/Redo/removal with muted
+device playback delivered 6,754 callbacks and 1,834 Studio paints over four
+passages totalling 67.56 seconds, without added lock misses, source waits or
+callback overruns. Source-backed reopen PCM matched. This does not close Jay's
+intermittent listening report or sustained delivery. Next inspect duplication/
+native-plugin cloning and other structural transaction scopes, then wider
+W04/acute W14 refusal/recovery journeys before phase 2. Range/group paths, generic
+Undo internal locks, snapshot-copy cost and new elastic-window preparation remain
+separate limits. Large-catalogue startup/reopen remains phase 3.
+Evidence: `.local/phase1-structural-final-1110`.
 
 ## Delivery rules for every phase
 
