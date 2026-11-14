@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 88,
+    "family_name": "Ringed Gas Giant",
+    "variant_number": 1,
+    "variant_title": "Equatorial Rings",
+    "shader_path": "01-equatorial-rings/main.glsl",
+    "descriptor_path": "01-equatorial-rings/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 88,
+    "family_name": "Ringed Gas Giant",
+    "variant_number": 2,
+    "variant_title": "Polar Vortex",
+    "shader_path": "02-polar-vortex/main.glsl",
+    "descriptor_path": "02-polar-vortex/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 88,
+    "family_name": "Ringed Gas Giant",
+    "variant_number": 3,
+    "variant_title": "Broken Ring",
+    "shader_path": "03-broken-ring/main.glsl",
+    "descriptor_path": "03-broken-ring/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 88,
+    "family_name": "Ringed Gas Giant",
+    "variant_number": 4,
+    "variant_title": "Twin Moons",
+    "shader_path": "04-twin-moons/main.glsl",
+    "descriptor_path": "04-twin-moons/scene.json",
+    "verification": "unverified"
+  }
+]

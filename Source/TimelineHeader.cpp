@@ -5,6 +5,7 @@ namespace mixworks
 {
 TimelineHeader::TimelineHeader(Workstation& w, bool isOverview) : owner(w), overview(isOverview)
 {
+    setOpaque(true);
     setWantsKeyboardFocus(true);
     if (!overview) setFocusContainerType(FocusContainerType::focusContainer);
     setTitle(overview ? "Mix navigator" : "Timeline ruler and labels");

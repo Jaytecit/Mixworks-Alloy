@@ -204,11 +204,41 @@ void runConstantFourFourTests(const std::function<void(bool, const juce::String&
         }
         check(aligned, "late source downbeat maps earlier and later bars onto project bar lines, source trim " + juce::String(offset, 2));
     }
-    media->analysis.downbeatOrigin = -1; media->analysis.downbeatConfidence = 0;
-    Project pulseOnly; Clip clip; clip.media = media; clip.length = 80; clip.pendingPlacement = PendingPlacement::append; pulseOnly.clips = {clip};
-    const auto prepared = prepareTempoMap(pulseOnly, false, 16);
-    check(prepared.error.isEmpty() && prepared.matched == 1 && prepared.project.clips[0].firstDownbeatTime() < 0,
-          "reliable pulse-only alignment remains available without inventing beat one");
+    Project initial;
+    Clip first; first.media = media; first.offset = .213; first.length = 16.875;
+    first.pendingPlacement = PendingPlacement::append; initial.clips = {first};
+    const auto established = planTempoMap(initial, 32, TransitionPreset::crossfade, true);
+    check(established.error.isEmpty() && established.matched == 1, "prepare an established clip ending between project bar lines");
+    for (const auto intent : {PendingPlacement::append, PendingPlacement::drop})
+    {
+        auto project = established.project;
+        Clip next; next.media = media; next.offset = 3.77; next.length = 80 - next.offset;
+        next.track = 1; next.start = 14.5; next.pendingPlacement = intent;
+        project.clips.push_back(next);
+        const auto placed = planTempoMap(project, 32, TransitionPreset::crossfade, true);
+        const auto& incoming = placed.project.clips.back();
+        const auto clock = placed.project.gridClock();
+        const auto projectBeat = [&](double at) { return clock.beatsAt(incoming.start + incoming.audioTimelineTime(at - incoming.offset)); };
+        const double expectedBar = intent == PendingPlacement::append ? 36 : 28;
+        bool aligned = placed.error.isEmpty() && incoming.beatmatched && incoming.offset == next.offset
+            && std::abs(incoming.sourceSpan() - next.length) < 1.0e-7 && placed.project.transitionLinks.empty()
+            && std::abs(projectBeat(4.213) - expectedBar) < 1.0e-7;
+        for (const double anchor : {4.213, 20.213, 60.213, 76.213})
+            aligned &= std::abs(std::remainder(projectBeat(anchor), 4)) < 1.0e-7
+                && std::abs(std::remainder(projectBeat(anchor + .5), 1)) < 1.0e-7;
+        check(aligned, juce::String(intent == PendingPlacement::append ? "ordinary append" : "ordinary drop")
+            + " aligns the trimmed source bar grid before and after its late anchor with Crossfade selected");
+    }
+    auto pulseMedia = std::make_shared<Media>(); pulseMedia->analysis = media->analysis;
+    pulseMedia->analysis.downbeatOrigin = -1; pulseMedia->analysis.downbeatConfidence = 0;
+    auto pulseOnly = established.project;
+    Clip next; next.media = pulseMedia; next.offset = 3.77; next.length = 80 - next.offset;
+    next.pendingPlacement = PendingPlacement::append; pulseOnly.clips.push_back(next);
+    const auto placed = planTempoMap(pulseOnly, 32, TransitionPreset::crossfade, true);
+    const auto& incoming = placed.project.clips.back();
+    check(placed.error.isEmpty() && incoming.beatmatched && incoming.firstDownbeatTime() < 0
+          && std::abs(placed.project.gridClock().beatsAt(incoming.start + incoming.firstBeatTime()) - 35) < 1.0e-7,
+          "an ordinary append with unknown bar phase aligns to the next pulse");
     juce::ignoreUnused(report);
 }
 void runRhythmReliabilityTests(const std::function<void(bool, const juce::String&)>& check, const juce::File& report)
@@ -480,10 +510,12 @@ void runRhythmReliabilityTests(const std::function<void(bool, const juce::String
     }
     auto matched = prepareTempoMap(drops, false, 32);
     const auto& map = matched.project.tempo;
-    check(matched.error.isEmpty() && matched.matched == 2 && map.points.size() == 2 && map.bpmAt(0) == 120
-          && map.points[1].bpm == 128 && map.points[1].clipId == matched.project.clips[1].id
-          && std::abs(map.points[1].time - (matched.project.clips[1].start + matched.project.clips[1].transitionTime(true))) < 1.0e-7,
-          "dropped tracks expose one tempo target each, reaching the incoming native tempo at IN");
+    const auto& incoming = matched.project.clips[1];
+    check(matched.error.isEmpty() && matched.matched == 2 && map.points.size() == 2 && matched.project.transitionLinks.empty()
+          && map.bpmAt(0) == 120 && map.points[0].clipId == matched.project.clips[0].id
+          && map.points[1].bpm == 128 && map.points[1].clipId == incoming.id && !map.points[1].ramp
+          && std::abs(map.points[1].time - (incoming.start + incoming.firstDownbeatTime())) < 1.0e-7,
+          "independent drops expose one tempo marker per source and change to the incoming BPM at its aligned downbeat");
     for (const auto& clip : matched.project.clips)
         check(clip.beatmatched && clip.pendingPlacement == PendingPlacement::none
               && std::abs(std::remainder(map.beatsAt(clip.start + clip.firstDownbeatTime()), 4)) < 1.0e-7,
@@ -498,8 +530,7 @@ void runRhythmReliabilityTests(const std::function<void(bool, const juce::String
               && std::abs(std::remainder(adjusted.project.tempo.beatsAt(adjusted.project.clips[1].start + adjusted.project.clips[1].firstDownbeatTime()), 4)) < 1.0e-7,
               "editing the starting and incoming targets rebuilds PCM while retaining beat alignment and the user's tempo map");
     }
-    for (auto& clip : drops.clips) clip.pendingPlacement = PendingPlacement::append;
-    const auto cut = prepareTempoMap(drops, false, 0);
+    const auto cut = prepareTempoMap(drops, true, 0);
     const double cutGap = cut.project.clips[1].start - cut.project.clips[0].end();
     check(cut.error.isEmpty() && cutGap >= -1.0e-7 && cutGap < 60 / drops.clips[0].media->bpm()
           && cut.project.clips[0].fadeOut == 0 && cut.project.clips[1].fadeIn == 0,

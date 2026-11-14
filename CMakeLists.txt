@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Mixworks VERSION 0.55.96 LANGUAGES C CXX)
+project(Mixworks VERSION 0.55.133 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.local/deps/JUCE" CACHE PATH "JUCE 8 source directory")
@@ -99,7 +99,7 @@ target_sources(Mixworks PRIVATE Source/PlaylistTransitions.cpp Source/EnergySect
 target_sources(Mixworks PRIVATE Source/ArrangementInsertion.cpp Source/ArrangementInsertionUI.cpp Source/ArrangementInsertionTests.cpp)
 target_sources(Mixworks PRIVATE Source/Hotcues.cpp Source/HotcueUI.cpp Source/HotcueTimeline.cpp Source/HotcueTests.cpp)
 target_sources(Mixworks PRIVATE Source/MidiConnection.cpp Source/MidiConnectionUI.cpp Source/MidiConnectionTests.cpp)
-target_sources(Mixworks PRIVATE Source/AutoArrangement.cpp Source/AutoArrangementUI.cpp Source/AutoArrangementTests.cpp)
+target_sources(Mixworks PRIVATE Source/AutoArrangement.cpp Source/AutoArrangementUI.cpp Source/AutoArrangementTests.cpp Source/AutoPairComparison.cpp)
 target_sources(Mixworks PRIVATE Source/LibraryPreview.cpp Source/LibraryPreviewTests.cpp)
 
 # Visual runtime is packaged beside the executable; no reference installation is used.
@@ -123,9 +123,11 @@ target_sources(Mixworks PRIVATE Source/MilkDrop.cpp)
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/visual_media.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/original_visual_gl.py")
   file(GLOB_RECURSE alloy_original_assets CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/*")
+  set(alloy_studio_media ${alloy_original_assets})
+  list(FILTER alloy_studio_media INCLUDE REGEX "/(Sprites|Backgrounds)/")
   file(GLOB_RECURSE alloy_studio_scenes CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/scenes/*")
   set(alloy_studio_sources)
-  foreach(module engine scene media audio audio_sources studio timeline deck midi)
+  foreach(module engine scene media audio audio_sources studio timeline deck midi display)
     list(APPEND alloy_studio_sources "${CMAKE_CURRENT_SOURCE_DIR}/visual-studio/${module}.py")
   endforeach()
   set(alloy_studio_assets
@@ -136,7 +138,7 @@ target_sources(Mixworks PRIVATE Source/MilkDrop.cpp)
   set(alloy_studio_sprite "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Sprites/Copper Martini - Circuit Martini.png")
   set(alloy_studio_flare "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Sprites/Copper Cyan VFX - Horizontal Flare.png")
   list(FILTER alloy_original_assets EXCLUDE REGEX "/(Sprites|Backgrounds|Video)/")
-  set_property(TARGET Mixworks APPEND PROPERTY LINK_DEPENDS ${alloy_original_sources} ${alloy_original_assets} ${alloy_studio_sources} ${alloy_studio_assets} ${alloy_studio_scenes} ${alloy_studio_background} ${alloy_studio_sprite} ${alloy_studio_flare})
+  set_property(TARGET Mixworks APPEND PROPERTY LINK_DEPENDS ${alloy_original_sources} ${alloy_original_assets} ${alloy_studio_sources} ${alloy_studio_assets} ${alloy_studio_scenes} ${alloy_studio_media} ${alloy_studio_background} ${alloy_studio_sprite} ${alloy_studio_flare})
   add_custom_command(TARGET Mixworks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${alloy_original_sources} "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
@@ -150,7 +152,8 @@ target_sources(Mixworks PRIVATE Source/MilkDrop.cpp)
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/scenes" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/scenes"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/previews" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/previews"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/original-scenes.json" "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/media-library.json" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Sprites" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Backgrounds"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Sprites" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Sprites"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/visuals/original/Backgrounds" "$<TARGET_FILE_DIR:Mixworks>/original-visualiser-runtime/Backgrounds"
     VERBATIM)
 
 # Optional shared renderer; no NestDrop binaries or third-party presets are bundled.

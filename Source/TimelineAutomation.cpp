@@ -84,13 +84,14 @@ std::unique_ptr<juce::AccessibilityHandler> Timeline::createAccessibilityHandler
 }
 void Timeline::refreshAccessibleItems()
 {
-    juce::StringArray retained;
+    std::set<juce::String> retained;
+    std::map<juce::String, TimelineAccessItem*> existing;
+    for (const auto& item : accessibleItems) existing.emplace(item->getComponentID(), item.get());
     int order = 1;
     auto itemFor = [&](const juce::String& key, juce::Rectangle<int> bounds, bool valueObject = false) -> TimelineAccessItem&
     {
-        retained.add(key);
-        const auto existing = std::find_if(accessibleItems.begin(), accessibleItems.end(), [&](const auto& c) { return c->getComponentID() == key; });
-        TimelineAccessItem* pointer = existing == accessibleItems.end() ? nullptr : existing->get();
+        retained.insert(key);
+        auto*& pointer = existing[key];
         if (!pointer)
         {
             auto item = std::make_unique<TimelineAccessItem>(valueObject); item->setComponentID(key); addAndMakeVisible(*item);
@@ -115,8 +116,11 @@ void Timeline::refreshAccessibleItems()
             : bounds.getBottom() > view.getBottom() ? bounds.getBottom() - view.getHeight() : view.getY();
         owner.viewport.setViewPosition(std::max(0, x - 4), std::max(0, y - 4));
     };
+    const auto& project = owner.engine.project;
+    std::map<juce::String, const Clip*> clips;
     for (const auto& clip : owner.engine.project.clips)
     {
+        clips.emplace(clip.id, &clip);
         const auto id = clip.id, key = "segment:" + id;
         auto& item = itemFor(key, clipBounds(clip).toNearestInt());
         item.setHelpText("Enter selects this segment without seeking. Shift+F10 opens its menu. Ctrl+T opens segment settings.");
@@ -154,10 +158,13 @@ void Timeline::refreshAccessibleItems()
             owner.showTimelineMenu(owner.engine.position.load(), track, anchor);
         };
     }
-    for (const auto& link : owner.engine.project.transitionLinks)
+    for (const auto& link : project.transitionLinks)
     {
+        const auto out = clips.find(link.outgoing), in = clips.find(link.incoming);
+        if (out == clips.end() || in == clips.end()) continue;
         const auto id = link.incoming, key = "transition:" + id;
-        auto& item = itemFor(key, transitionBounds(link).toNearestInt());
+        const auto range = Project::transitionRange(link, *out->second, *in->second);
+        auto& item = itemFor(key, transitionBounds(link, *out->second, *in->second, range).toNearestInt());
         item.setHelpText("Enter selects this pair without seeking. Shift+F10 opens its transition menu. Alt+Left/Right navigates between pairs.");
         item.read = [this, id]
         {
@@ -188,7 +195,7 @@ void Timeline::refreshAccessibleItems()
     };
     setDescription("Timeline musical objects. Use Editing Previous/Next to navigate every automation node.");
     for (int track = 0; track < trackCount; ++track)
-        for (const auto& address : visibleAutomationAddresses(track)) if (laneSize(track) >= 55 && automationNodesVisible(address))
+        for (const auto& address : displayedAutomationAddresses(track)) if (laneSize(track) >= 55 && automationNodesVisible(address))
         {
             juce::Array<juce::var> identity {address.track, (int) address.target, address.slotId, address.parameterId, address.clipId};
             if (address.stem >= 0) identity.add(address.stem);
@@ -336,8 +343,8 @@ void Timeline::refreshAccessibleItems()
     refreshAccessibleSections(itemFor);
     refreshAccessibleHotcues(itemFor);
     for (const auto& item : accessibleItems)
-        if (!retained.contains(item->getComponentID()) && item->hasKeyboardFocus(true)) grabKeyboardFocus();
-    accessibleItems.erase(std::remove_if(accessibleItems.begin(), accessibleItems.end(), [&](const auto& item) { return !retained.contains(item->getComponentID()); }), accessibleItems.end());
+        if (!retained.count(item->getComponentID()) && item->hasKeyboardFocus(true)) grabKeyboardFocus();
+    accessibleItems.erase(std::remove_if(accessibleItems.begin(), accessibleItems.end(), [&](const auto& item) { return !retained.count(item->getComponentID()); }), accessibleItems.end());
 }
 namespace
 {
@@ -538,34 +545,24 @@ bool Timeline::automationNodesVisible(const AutomationAddress& address) const
         && owner.engine.selectedTrack == track && owner.displayedAddress(track) == address;
 }
 
-std::vector<AutomationAddress> Timeline::visibleAutomationAddresses(int track) const
+std::vector<AutomationAddress> Timeline::displayedAutomationAddresses(int track) const
 {
-    auto addresses = owner.automationAddresses(track);
-    for (const auto& clip : owner.engine.project.clips) if (clip.track == track)
-        for (int band = 0; band < 4; ++band)
-        {
-            const AutomationAddress address {track, (AutomationTarget) band, {}, {}, clip.id};
-            if (hasGeneratedAutomation(address) && std::find(addresses.begin(), addresses.end(), address) == addresses.end()) addresses.push_back(address);
-        }
-    if (owner.automationLane() >= 0 && owner.engine.selectedTrack == track)
-    {
-        const auto selected = owner.displayedAddress(track);
-        if (std::find(addresses.begin(), addresses.end(), selected) == addresses.end()) addresses.push_back(selected);
-    }
-    // One visible line per original track, even when another split piece is selected.
-    for (size_t i = 0; i < addresses.size(); ++i) if (addresses[i].stem<0 && addresses[i].clipId.isNotEmpty() && !hasGeneratedAutomation(addresses[i]))
-        for (size_t j = i + 1; j < addresses.size();)
-        {
-            const auto* a = owner.engine.project.clipFor(addresses[i].clipId);
-            const auto* b = owner.engine.project.clipFor(addresses[j].clipId);
-            if (a && b && a->effects == b->effects && addresses[i].target==addresses[j].target && addresses[j].stem<0
-                && !hasGeneratedAutomation(addresses[j]) && addresses[i].slotId == addresses[j].slotId && addresses[i].parameterId == addresses[j].parameterId)
-            {
-                if (addresses[j] == owner.displayedAddress(track)) addresses[i] = addresses[j];
-                addresses.erase(addresses.begin() + (ptrdiff_t)j);
-            }
-            else ++j;
-        }
+    if (owner.automationLane() < 0) return {};
+    const auto selected = owner.displayedAddress(owner.engine.selectedTrack);
+    const auto& project = owner.engine.project;
+    std::vector<AutomationAddress> addresses;
+    if ((selected.target == AutomationTarget::master ? 0 : selected.track) == track)
+        addresses.push_back(selected);
+    if (selected.clipId.isNotEmpty() && selected.stem < 0 && selected.target != AutomationTarget::plugin)
+        if (const auto* pair = project.transitionFor(owner.selectedTransition))
+            for (const auto& id : {pair->outgoing, pair->incoming})
+                if (id != selected.clipId)
+                    if (const auto* clip = project.clipFor(id); clip && clip->track == track)
+                    {
+                        const AutomationAddress address {track, selected.target, {}, {}, id};
+                        if (const auto* curve = project.curve(address); (curve && !curve->points.empty()) || hasGeneratedAutomation(address))
+                            addresses.push_back(address);
+                    }
     return addresses;
 }
 
@@ -596,7 +593,7 @@ juce::Path Timeline::automationPath(const AutomationAddress& address, double beg
     const auto* parameter = owner.automationPluginParameter(address);
     const float manual = parameter && !p.curve(address) ? parameter->getValue() : p.manualValue(address);
     auto valueAt = [&](double time) { return combined ? curve->valueAt(p.automationTime(address, time), manual) : curve->interpolatedValue(p.automationTime(address, time), manual); };
-    auto y = [&](double time, float value) { return automationY(track, automationDisplayValue(address, time, value, &playback), target); };
+    auto y = [&](double time, float value) { return automationY(track, combined ? automationDisplayValue(address, time, value, &playback) : value, target); };
     line.startNewSubPath((float) (begin * pixelsPerSecond), y(begin, valueAt(begin)));
     if (combined || automationUsesGain(address.target) || std::any_of(curve->points.begin(), curve->points.end(), [](const auto& point) { return point.bend != 0; }))
     {
@@ -696,9 +693,9 @@ bool Timeline::continueCurveBend(const juce::MouseEvent& event)
 
 std::optional<AutomationAddress> Timeline::automationCurveAt(juce::Point<float> point) const
 {
-    if (point.y < 0 || point.y >= laneTop(contentLaneCount()) || transitionAt(point)) return {};
+    if (owner.automationLane() < 0 || point.y < 0 || point.y >= laneTop(contentLaneCount()) || transitionAt(point)) return {};
     const int track = trackAt(point.y); if (laneSize(track) < 30) return {};
-    auto addresses = visibleAutomationAddresses(track);
+    auto addresses = displayedAutomationAddresses(track);
     const auto& p = owner.engine.project;
     float nearest = 6; std::optional<AutomationAddress> result;
     for (const auto& address : addresses)
@@ -752,7 +749,7 @@ juce::Rectangle<float> Timeline::automationCaptionBounds() const
     if (area.getWidth() < 47 || area.getHeight() < 26) return {};
     // One late-painted opaque caption, offset from all editable dots and handles.
     std::vector<juce::Rectangle<float>> obstacles;
-    for (const auto& other : visibleAutomationAddresses(track)) if (automationNodesVisible(other))
+    for (const auto& other : displayedAutomationAddresses(track)) if (automationNodesVisible(other))
         for (const auto& p : automationViewCurve(other).points)
         {
             const auto t = owner.engine.project.automationSessionTime(other, p.time);
@@ -799,7 +796,7 @@ void Timeline::paintAutomationNodes(juce::Graphics& g)
     const auto& project = owner.engine.project;
     const std::array<juce::Colour, 4> colours {juce::Colour(0xffffad70), juce::Colour(0xffe4d15b), juce::Colour(0xff76c7ef), juce::Colour(0xffd3a3ef)};
     for (int track = 0; track < trackCount; ++track)
-        for (const auto& address : visibleAutomationAddresses(track)) if (laneSize(track) >= 55 && automationNodesVisible(address))
+        for (const auto& address : displayedAutomationAddresses(track)) if (laneSize(track) >= 55 && automationNodesVisible(address))
         {
             const auto curve = automationViewCurve(address);
             const auto type = (int) address.target;
@@ -914,7 +911,8 @@ std::vector<Timeline::CutAmountHandle> Timeline::cutAmountHandles(bool includeOf
         }
         result.push_back(h);
     };
-    if (const auto* link = p.transitionFor(owner.selectedTransition))
+    const auto* selectedPair = p.transitionFor(owner.selectedTransition);
+    if (const auto* link = selectedPair)
         for (int band = 0; band < 4; ++band) if (owner.transitionCurveVisible(band))
             for (int side = 0; side < 2; ++side)
             {
@@ -943,9 +941,20 @@ std::vector<Timeline::CutAmountHandle> Timeline::cutAmountHandles(bool includeOf
                 add(h, laneY(clip->track, 54.f + band * 16));
             }
     for (int track = 0; track < trackCount; ++track)
-        for (const auto& address : visibleAutomationAddresses(track))
+    {
+        auto addresses = displayedAutomationAddresses(track);
+        if (selectedPair)
+            for (const auto& id : {selectedPair->outgoing, selectedPair->incoming})
+                if (const auto* clip = p.clipFor(id); clip && clip->track == track)
+                    for (int band = 0; band < 4; ++band)
+                    {
+                        if (!owner.transitionCurveVisible(band)) continue;
+                        const AutomationAddress address {track, (AutomationTarget) band, {}, {}, id};
+                        if (std::find(addresses.begin(), addresses.end(), address) == addresses.end())
+                            addresses.push_back(address);
+                    }
+        for (const auto& address : addresses)
         {
-            const auto* selectedPair = p.transitionFor(owner.selectedTransition);
             const int band = (int) address.target;
             const bool pairCurve = selectedPair && band >= 0 && band < 4 && owner.transitionCurveVisible(band)
                 && (address.clipId == selectedPair->outgoing || address.clipId == selectedPair->incoming);
@@ -971,6 +980,7 @@ std::vector<Timeline::CutAmountHandle> Timeline::cutAmountHandles(bool includeOf
                 }
             }
         }
+    }
     return result;
 }
 

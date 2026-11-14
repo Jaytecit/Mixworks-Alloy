@@ -2,8 +2,9 @@
 
 Current state: [handover](../HANDOVER.md), [app guide](../README.md),
 [visual direction](VISUAL-DIRECTION.md), [roadmap](../FINISHING-PLAN.md) and
-[verification](../VERIFICATION.md). Source version is 0.55.68; exact local activation
-and candidate hashes live in the handover. The current catalogue has 204 scenes: 203 with six named looks plus Jumping Techno Tunnel.
+[verification](../VERIFICATION.md). Alloy 0.55.133 bundles Visual Studio 0.1.33
+and 1,000 Studio GLSL scenes. The handover records the exact local activation
+and candidate hashes.
 [The roadmap](../FINISHING-PLAN.md) is the single outstanding-work queue;
 [the 4 November audit](DOCUMENTATION-AUDIT-20261104.md) records reconciliation.
 
@@ -13,6 +14,11 @@ licensing records and dated failed/passing evidence remain preserved. Dated find
 apply to their original candidates; they are not instructions to resume old work.
 
 ## Current guides
+
+The [13 November functional audit](AUDIT-20261113.md) traces the main workflows
+and their remaining acceptance. The [GLSL control audit](GLSL-CONTROL-AUDIT.md)
+records the scene-control work. The [14 November promo record](PROMO-20261114.md)
+documents the locally reviewed film and its source provenance.
 
 Product audit, 21 October 2026 (0.55.12; audit only): [findings](ALLOY_PRODUCT_AUDIT.md), [interface/workflow coverage](ALLOY_AUDIT_COVERAGE.md), [prioritised remediation](ALLOY_REMEDIATION_PLAN.md). The audit records runtime/source evidence and remaining acceptance gaps; it does not mark planned features implemented.
 
@@ -33,7 +39,8 @@ Editing comparison,22 October2026 (0.55.42; audit and plan only): [editing audit
 | Save a downbeat and preserve manual-versus-automatic comparisons | [Downbeat references](DOWNBEAT-REFERENCES.md) |
 | Drag source-grid anchors, calculate BPM and make precise timing corrections | [Source grid alignment](SOURCE-GRID-ALIGNMENT.md) |
 | Identify a source key and compare segment pitch by listening | [Key and harmony by ear](KEY-AND-HARMONY-BY-EAR.md) |
-| Fixed ruler, overview, four lanes and resizing | [Timeline layout](TIMELINE-LAYOUT-049.md) |
+| Fixed ruler, overview, lane visibility and resizing | [Timeline editing](TIMELINE-EDITING.md), [layout background](TIMELINE-LAYOUT-049.md) |
+| Studio playback, scene replacement, automatic schedules and fullscreen | [Visual scenes](VISUAL-SCENES.md), [Studio guide](../visual-studio/README.md) |
 | Popup help and its saved switch | [Popup hints](POPUP-HINTS.md) |
 | Concise messages, per-track retry results and failures in Source corrections | [Messages and retry review](UI-MESSAGES-AND-RETRY-REVIEW.md) |
 | Bar jumps, linked movement and long seeks | [Bar navigation](BAR-NAVIGATION.md), [long navigation](LONG-NAVIGATION.md) |
@@ -57,6 +64,7 @@ Editing comparison,22 October2026 (0.55.42; audit and plan only): [editing audit
 
 `research/` retains dated reference observations and measurements. A historical statement that something is implemented, missing or pending applies to that checkpoint; it is not the current release status or an instruction to repeat a destructive cleanup.
 
+- [Auto Arrange capability review](research/AUTO-ARRANGER-CAPABILITY-REVIEW-20261112.md) and [mixing audit](research/AUTO-ARRANGER-MIXING-AUDIT-20261112.md) record the 12 November research behind the shared pair planner.
 - [Engine reconstruction](research/ENGINE-RECONSTRUCTION.md) and [recovered-rhythm assessment](research/RECOVERED-RHYTHM-ASSESSMENT.md): reference reconstruction and opt-in experiments; automatic-control admission is excluded from the current build.
 - [Detection v0.31](research/DETECTION-AND-ALIGNMENT.md), [v0.32](research/DETECTION-V032.md), [real-music comparison](research/DJSTUDIO-REAL-MUSIC-AUDIT.md) and [rhythm reliability](research/RHYTHM-RELIABILITY.md): historical detector evidence and limitations.
 - [Better Off Alone](research/BETTER-OFF-ALONE-DOWNBEAT.md), [first downbeats](research/FIRST-DOWNBEAT-VALIDATION.md) and [real tracks](research/REAL-TRACK-VALIDATION.md): earlier bounded evaluations.

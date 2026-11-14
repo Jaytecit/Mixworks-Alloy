@@ -17,7 +17,7 @@
 namespace mixworks
 {
 constexpr int trackCount = 4;
-constexpr int projectVersion = 53;
+constexpr int projectVersion = 54;
 enum class LaunchTiming { immediate, nextBeat, nextBar, nextPhrase };
 struct LaunchSettings
 {
@@ -385,6 +385,7 @@ struct Clip
     double audioSlip = 0; // Timeline seconds of audio-only delay; automation and frame clocks stay fixed.
     // Alignment-only source positions; independent of playback and parameters.
     std::optional<double> introAnchor, outroAnchor;
+    bool manualTransitionArea = false;
     // Separate source-elapsed fade positions preserve fades across splits/retiming.
     // Omitted positions use clip edges. Slices may retain off-segment positions.
     std::optional<double> fadeInAnchor, fadeOutAnchor;
@@ -419,6 +420,7 @@ struct Clip
     double transitionTime(bool intro) const; // Local timeline seconds.
     WaveformRange waveformRange(double localBegin, double localEnd) const;
     double sourceSpan() const { return loopSpan > 0 ? loopSpan : length * rate; }
+    bool playbackClockFits(const TempoMap&) const;
     double maxLength() const;
     Clip slice(double begin, double duration) const;
     void adoptTimelineControls(const TrackSettings&);
@@ -435,6 +437,7 @@ struct Project
 {
     std::vector<PerformanceTake> performanceTakes;
     std::vector<VisualSceneClip> visualScenes;
+    VisualOverrides visualOverrides;
     juce::String visualImage; // One caller-selected local image shared by scene shaders.
     enum class TransitionEdit { moveWindow, resizeStart, resizeEnd, moveOutgoing, moveIncoming };
     struct TransitionLink
@@ -494,6 +497,8 @@ struct Project
     double snappedMoveTime(double reference, double seconds, bool enabled) const;
     double snappedClipStart(const Clip&, double seconds, bool enabled, double magnetSeconds = 0) const;
     juce::Result moveTransitionAnchor(const juce::String& clipId, bool intro, double timelineTime, bool snapToBeat);
+    bool transitionHasStaleClock(const juce::String& incoming) const;
+    juce::Result syncTransitionPlaybackClocks(const juce::String& incoming);
     void ensureTransitionLinks();
     juce::Result validateTransitionLinks() const;
     juce::Result linkClips(const juce::String& outgoing, const juce::String& incoming);
@@ -517,6 +522,7 @@ struct Project
     juce::Result moveClipGroup(const std::vector<juce::String>& ids, const juce::String& anchor, double start, int track, bool snapping);
     juce::Result applyPlacements(const Project&);
     juce::Range<double> transitionRange(const TransitionLink&) const;
+    static juce::Range<double> transitionRange(const TransitionLink&, const Clip& outgoing, const Clip& incoming);
     juce::Result editTransition(const juce::String& incoming, TransitionEdit, double delta, bool snapping);
     const TransitionLink* transitionFor(const juce::String& incoming) const;
     juce::Result setTransitionLength(const juce::String& incoming, double bars);

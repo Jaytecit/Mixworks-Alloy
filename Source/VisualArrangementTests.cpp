@@ -1,6 +1,7 @@
 #include "Workstation.h"
 #include "AutoArrangement.h"
 #include "MilkDrop.h"
+#include "StudioWorkspace.h"
 #include <cmath>
 #include <map>
 #include <set>
@@ -233,7 +234,15 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
     check(arrangeVisualScenes(simultaneous,pool,random).wasOk() && simultaneous.visualScenes.size()==1,
         "coincident sub-frame music placements share a scene instead of aborting the music arrangement");
 
-    auto owned=std::make_unique<Workstation>(false); auto& ui=*owned; ui.stopTimer(); ui.setSize(1920,1080);
+    const auto workstation = []
+    {
+        auto desk = std::make_unique<Workstation>(false);
+        desk->stopTimer();
+        desk->setSize(1920, 1080);
+        return desk;
+    };
+    auto browserDesk = workstation();
+    auto& ui = *browserDesk;
     ui.engine.project=plan.project; ui.engine.project.visualScenes.clear(); ui.engine.library={source("One",true),source("Two",true),source("Three",true)};
     const auto musicBefore=juce::JSON::toString(projectToJson(ui.engine.project)["clips"]);
     ui.sceneLane->showBrowser();
@@ -270,7 +279,9 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
     if (dialog)
     {
         auto* sourceChoice=dialog->getComboBoxComponent("visualSources");
-        check(sourceChoice && sourceChoice->getNumItems()==3 && sourceChoice->getSelectedId()==1 && !sourceChoice->isEnabled(),"Auto Arrange offers all sources, defaulting to Originals and disabled with Keep visual lane");
+        check(sourceChoice && sourceChoice->getNumItems()==3
+              && sourceChoice->getSelectedId()==(int)VisualSceneSource::both && !sourceChoice->isEnabled(),
+              "Auto Arrange defaults to GLSL + MilkDrop and disables the source picker with Keep visual lane");
         dialog->getComboBoxComponent("visuals")->setSelectedItemIndex(0,juce::sendNotificationSync);
         check(sourceChoice && sourceChoice->isEnabled(),"creating a visual show enables the source selector");
         check(sourceChoice && sourceChoice->getBottom()+8<=dialog->getButton(0)->getY(),"all visual choices remain clear of action buttons on the actual display");
@@ -278,74 +289,132 @@ void runVisualArrangementTests(const std::function<void(bool, const juce::String
         check(output && png.writeImageToStream(dialog->createComponentSnapshot(dialog->getLocalBounds()),*output),"capture actual Auto Arrange visual choices");
         dialog->exitModalState(0); pump();
     }
-    AutoArrangementOptions make; make.startingId=ui.engine.library[0]->id; make.trackCount=2; make.overlapBeats=8;
+    const auto library = ui.engine.library;
+    browserDesk.reset();
+    AutoArrangementOptions make; make.startingId=library[0]->id; make.trackCount=2; make.overlapBeats=8;
     make.sectionTransitions=false; make.transitions=AutoTransitionStyle::smooth; make.createVisualScenes=true;
+    const auto wait = [&](const Workstation& desk)
     {
-        const auto before=juce::JSON::toString(projectToJson(ui.engine.project));
-        auto unavailable=make; unavailable.visualSceneSource=VisualSceneSource::milkdrop;
-        ui.startAutoArrangement(unavailable);
-        check(!ui.busy && before==juce::JSON::toString(projectToJson(ui.engine.project)) && ui.status.contains("Import a MilkDrop"),
-            "native Auto Arrange refuses absent imports before preparing or replacing music");
-    }
-    const auto wait=[&]
-    {
-        const auto deadline=juce::Time::getMillisecondCounterHiRes()+30000;
-        while(ui.busy && juce::Time::getMillisecondCounterHiRes()<deadline) pump();
-        return !ui.busy;
+        const auto deadline = juce::Time::getMillisecondCounterHiRes() + 30000;
+        while (desk.busy && juce::Time::getMillisecondCounterHiRes() < deadline) pump();
+        return !desk.busy;
     };
-    // Exercise the actual dialog and its Make mix callback, rather than supplying
-    // createVisualScenes directly to the worker as the checks below do.
-    ui.engine.project=Project{};
-    ui.autoArrangeButton.onClick();
-    dialog=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
-    check(dialog && dialog->getComboBoxComponent("visuals")->getSelectedItemIndex()==0,
-        "right-panel Auto Arrange defaults to creating visuals for an empty visual lane");
-    if (dialog)
     {
-        dialog->getTextEditor("amount")->setText("2");
-        dialog->getComboBoxComponent("transitions")->setSelectedItemIndex(1,juce::sendNotificationSync);
-        dialog->getButton(0)->triggerClick();
-        const auto deadline=juce::Time::getMillisecondCounterHiRes()+30000;
-        do { pump(); } while ((juce::Component::getCurrentlyModalComponent() || ui.busy)
-            && juce::Time::getMillisecondCounterHiRes()<deadline);
-        check(!ui.busy && ui.engine.project.clips.size()==2 && ui.engine.project.visualScenes.size()==2,
-            "pressing Make mix in the real Auto Arrange dialog publishes music and visual scenes together");
-        if (ui.busy) return;
+        auto milkDesk = workstation();
+        milkDesk->engine.library = library;
+        auto milk = make;
+        milk.visualSceneSource = VisualSceneSource::milkdrop;
+        const bool noImports = discoverMilkDropScenes(milkDropLibraryRoot()).empty();
+        milkDesk->startAutoArrangement(milk);
+        const bool started = milkDesk->busy && milkDesk->importCancellation && milkDesk->engine.project.clips.empty();
+        const bool finished = wait(*milkDesk);
+        const auto& mix = milkDesk->engine.project;
+        check(noImports && started && finished && mix.clips.size() == 2 && mix.visualScenes.size() == 2
+              && validateVisualScenes(mix.visualScenes).wasOk()
+              && std::any_of(mix.visualScenes.begin(), mix.visualScenes.end(), [&](const auto& scene)
+                 { return scene.scene == "studio-milk/prism" && scene.start == 0. && std::abs(scene.end() - mix.duration()) < 1.e-7; })
+              && std::any_of(mix.visualScenes.begin(), mix.visualScenes.end(), [](const auto& scene)
+                 { return visualLayer(scene.scene) == VisualLayer::sprite; }),
+              "MilkDrop-only Auto Arrange publishes the bundled preset without imports: " + milkDesk->status);
     }
-    ui.startAutoArrangement(make);
-    check(wait() && ui.engine.project.clips.size()==2 && ui.engine.project.visualScenes.size()==2,"production Auto Arrange prepares audio and publishes matching visual scenes together");
-    if (ui.busy) return;
-    const auto completed=juce::JSON::toString(projectToJson(ui.engine.project));
-    const auto history=ui.undoHistory.size();
-    ui.startAutoArrangement(make); if(ui.importCancellation) *ui.importCancellation=true;
-    check(wait() && ui.undoHistory.size()==history && completed==juce::JSON::toString(projectToJson(ui.engine.project)),"cancelling automatic music/visual generation preserves the whole current arrangement");
+    const auto studioShow = [](const Project& mix, int shaderCount, bool both = false)
+    {
+        std::array<int, 4> counts {};
+        for (const auto& scene : mix.visualScenes) ++counts[(size_t)visualLayer(scene.scene)];
+        return counts == std::array<int, 4>{1, both ? 1 : 0, shaderCount, 1}
+            && validateVisualScenes(mix.visualScenes).wasOk();
+    };
+    juce::PNGImageFormat png;
+    {
+        auto studioDesk = workstation();
+        auto& mix = studioDesk->engine.project;
+        mix = crowded(true);
+        const auto beforeMusic = projectToJson(mix);
+        const bool validMusic = mix.validateTransitionLinks().wasOk();
+        studioDesk->studioTab.onClick();
+        auto& studio = *studioDesk->studioWorkspace;
+        for (auto* child : studio.getChildren())
+            if (auto* button = dynamic_cast<juce::TextButton*>(child); button && button->getButtonText() == "Match Mix")
+            { button->onClick(); break; }
+        const auto musicAfter = projectToJson(mix);
+        const auto blends = std::count_if(mix.visualScenes.begin(), mix.visualScenes.end(), [](const auto& scene)
+            { return visualLayer(scene.scene) == VisualLayer::shader && scene.transition == "dissolve"; });
+        bool covered = studioShow(mix, 3, true) && blends == 2;
+        for (double time = 0.; covered && time < mix.duration(); time += .037)
+        {
+            const auto active = std::count_if(mix.visualScenes.begin(), mix.visualScenes.end(), [time](const auto& scene)
+                { return visualLayer(scene.scene) == VisualLayer::shader && scene.start <= time && time < scene.end(); });
+            covered = active >= 1 && active <= 2;
+        }
+        check(validMusic && covered && studioDesk->undoHistory.size() == 1
+              && juce::JSON::toString(musicAfter["clips"]) == juce::JSON::toString(beforeMusic["clips"])
+              && juce::JSON::toString(musicAfter["transitionLinks"]) == juce::JSON::toString(beforeMusic["transitionLinks"]),
+              "Studio Match Mix publishes a continuous show with overlapping preroll and preserves the music: " + studioDesk->status);
+        auto crowdedOutput = report.getSiblingFile("crowded-visuals-lane.png").createOutputStream();
+        check(crowdedOutput && png.writeImageToStream(studio.createComponentSnapshot(studio.getLocalBounds()), *crowdedOutput),
+              "capture the crowded Studio timeline");
+    }
+    {
+        auto toolbar = workstation();
+        toolbar->engine.library = library;
+        toolbar->autoArrangeButton.onClick();
+        dialog = dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
+        const auto* visuals = dialog ? dialog->getComboBoxComponent("visuals") : nullptr;
+        check(visuals && visuals->getSelectedItemIndex() == 0,
+              "toolbar Auto Arrange defaults to creating visuals for an empty visual lane: " + toolbar->status);
+        bool started = false;
+        if (dialog)
+        {
+            dialog->getTextEditor("amount")->setText("2");
+            dialog->getComboBoxComponent("transitions")->setSelectedItemIndex(1, juce::sendNotificationSync);
+            dialog->getButton(0)->onClick();
+            const auto deadline = juce::Time::getMillisecondCounterHiRes() + 5000;
+            while (!toolbar->busy && juce::Time::getMillisecondCounterHiRes() < deadline) pump();
+            started = toolbar->busy && toolbar->importCancellation;
+        }
+        const bool finished = wait(*toolbar);
+        check(started && finished && toolbar->engine.project.clips.size() == 2
+              && studioShow(toolbar->engine.project, 2, true) && toolbar->undoHistory.size() == 1,
+              "Make mix publishes two songs and the default four visual lanes together: " + toolbar->status);
+    }
+    auto publication = workstation();
+    auto& desk = *publication;
+    desk.engine.library = library;
+    desk.startAutoArrangement(make);
+    const auto job = desk.importCancellation;
+    const bool started = desk.busy && job && desk.engine.project.clips.empty() && desk.engine.project.visualScenes.empty();
+    const bool published = started && wait(desk) && !desk.importCancellation && desk.undoHistory.size() == 1
+        && desk.engine.project.clips.size() == 2 && studioShow(desk.engine.project, 2);
+    check(published, "production Auto Arrange publishes prepared music and the requested GLSL show in one Undo: " + desk.status);
+    if (!published) return;
+    const auto completed=juce::JSON::toString(projectToJson(desk.engine.project));
+    const auto history=desk.undoHistory.size();
+    desk.startAutoArrangement(make); if(desk.importCancellation) *desk.importCancellation=true;
+    check(wait(desk) && desk.undoHistory.size()==history && completed==juce::JSON::toString(projectToJson(desk.engine.project)),"cancelling automatic music/visual generation preserves the whole current arrangement");
     make.createVisualScenes=false;
-    const auto kept=juce::JSON::toString(visualScenesToJson(ui.engine.project.visualScenes));
-    ui.startAutoArrangement(make);
-    check(wait() && kept==juce::JSON::toString(visualScenesToJson(ui.engine.project.visualScenes)),"Keep visual lane publishes new music without changing any existing visual block");
+    const auto kept=juce::JSON::toString(visualScenesToJson(desk.engine.project.visualScenes));
+    desk.startAutoArrangement(make);
+    check(wait(desk) && kept==juce::JSON::toString(visualScenesToJson(desk.engine.project.visualScenes)),"Keep visual lane publishes new music without changing any existing visual block");
     make.createVisualScenes=true; make.extendExisting=true; make.trackCount=1;
-    ui.startAutoArrangement(make);
-    check(wait() && ui.engine.project.clips.size()==3 && ui.engine.project.visualScenes.size()==3,"extending music can explicitly regenerate matching scenes across the completed mix");
-    const auto& p=ui.engine.project;
-    bool joins=p.visualScenes.size()==p.clips.size();
+    desk.startAutoArrangement(make);
+    check(wait(desk) && desk.engine.project.clips.size()==3 && studioShow(desk.engine.project, 3),"extending music can explicitly regenerate matching scenes across the completed mix");
+    const auto& p=desk.engine.project;
+    std::vector<const VisualSceneClip*> shaders;
+    for (const auto& visual : p.visualScenes)
+        if (visualLayer(visual.scene) == VisualLayer::shader) shaders.push_back(&visual);
+    bool joins=shaders.size()==p.clips.size();
     for(size_t i=1;i<p.clips.size() && joins;++i)
     {
         const auto* link=p.transitionFor(p.clips[i].id); if(!link) {joins=false;break;}
         const auto phase=p.transitionRange(*link);
-        joins &= p.visualScenes[i].start==phase.getStart() && p.visualScenes[i-1].end()==phase.getEnd();
+        joins &= shaders[i]->start==phase.getStart() && shaders[i-1]->end()==phase.getEnd();
     }
     check(joins,"published visual blend edges still match final prepared music, including extension joins");
-    ui.refresh();
-    auto output=report.getSiblingFile("auto-visuals-lane.png").createOutputStream(); juce::PNGImageFormat png;
-    check(output && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*output),"capture the arranged music and blended visual lane");
-    ui.engine.project=crowded(true);
-    for(size_t i=0;i<ui.engine.project.clips.size();++i) ui.engine.project.clips[i].media=ui.engine.library[i];
-    ui.sceneLane->matchMix();
-    check(ui.engine.project.visualScenes.size()==3 && validateVisualScenes(ui.engine.project.visualScenes).wasOk(),
-        "real Match mix command fills the visual lane for crowded music with earlier incoming preroll");
-    ui.timeline.pixelsPerSecond=16; ui.refresh(); ui.viewport.setViewPosition(0,0);
-    auto crowdedOutput=report.getSiblingFile("crowded-visuals-lane.png").createOutputStream();
-    check(crowdedOutput && png.writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()),*crowdedOutput),
-        "capture crowded music with its fitted automatic visual lane");
+    desk.studioTab.onClick();
+    desk.refresh();
+    auto output=report.getSiblingFile("auto-visuals-lane.png").createOutputStream();
+    check(output && png.writeImageToStream(desk.studioWorkspace->createComponentSnapshot(desk.studioWorkspace->getLocalBounds()),*output),
+          "capture the arranged Studio timeline");
+
 }
 }

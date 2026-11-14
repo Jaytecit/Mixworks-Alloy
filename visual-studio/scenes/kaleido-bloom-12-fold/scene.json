@@ -1,0 +1,56 @@
+{
+  "TITLE": "Kaleido Bloom - 12-Fold",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Spin rate",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "foldZoom",
+      "TYPE": "slider",
+      "LABEL": "Fold zoom",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "seamGlow",
+      "TYPE": "slider",
+      "LABEL": "Seam glow",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "artworkImprint",
+      "TYPE": "slider",
+      "LABEL": "Artwork imprint",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ]
+}

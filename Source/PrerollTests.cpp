@@ -77,6 +77,18 @@ void runPrerollTests(const std::function<void(bool, const juce::String&)>& check
     ui.engine.resetPlugins(); ui.engine.render(after, 256, origin + .4, midi);
     bool pcmSame = true; for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 256; ++i) pcmSame &= std::abs(before.getSample(ch, i) - after.getSample(ch, i)) < 1.e-5f;
     check(pcmSame, "adding pre-roll preserves audible PCM and the complete quiet intro");
+    const auto rebased = json(ui.engine.project);
+    const double positionBeforeUndo = origin + .4, rateBeforeUndo = ui.engine.sampleRate.load();
+    ui.engine.position = positionBeforeUndo;
+    ui.engine.sampleRate = 0; ui.undo(false);
+    check(json(ui.engine.project) == rebased && ui.engine.position == positionBeforeUndo
+        && ui.undoHistory.size() == 1 && ui.redoHistory.empty() && ui.status.contains("clock is unavailable"),
+        "Undo of a pre-roll rebase keeps both history stacks, geometry and cursor if the destination cannot be prepared");
+    ui.engine.sampleRate = rateBeforeUndo;
+    ui.undo(false);
+    check(json(ui.engine.project) == original && near(ui.engine.position,.4), "Undo atomically restores the original mix and cursor at the same source time");
+    ui.undo(true);
+    check(json(ui.engine.project) == rebased && near(ui.engine.position,positionBeforeUndo), "Redo atomically restores the rebased mix and its corresponding cursor");
     // A beat is exactly 60 native integer pixels at this zoom. Free alignment
     // must not rely on source-phase snapping to hide pointer rasterisation.
     constexpr double pixels = 131;
@@ -84,7 +96,7 @@ void runPrerollTests(const std::function<void(bool, const juce::String&)>& check
     const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
     auto event = [&](juce::Point<float> position, juce::Point<float> down, bool drag, bool alt = false)
     { return juce::MouseEvent(mouse, position, juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | (alt ? juce::ModifierKeys::altModifier : 0)), 1, 0, 0, 0, 0, &ui.timeline, &ui.timeline, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag); };
-    const juce::Point<float> from {(float) ((origin + .7) * pixels), ui.timeline.clipBounds(ui.engine.project.clips[0]).getY() + 24};
+    const juce::Point<float> from {(float) ((origin + .7) * pixels), ui.timeline.clipBounds(ui.engine.project.clips[0]).getY() + 10};
     const auto to = from.translated((float) (-attack * pixels), 0);
     ui.timeline.mouseDown(event(from, from, false, true)); ui.timeline.mouseDrag(event(to, from, true, true)); ui.timeline.mouseUp(event(to, from, true, true));
     const auto& aligned = ui.engine.project.clips[0];
@@ -107,7 +119,9 @@ void runPrerollTests(const std::function<void(bool, const juce::String&)>& check
     check(ui.engine.project.setTimelineOrigin(std::numeric_limits<double>::quiet_NaN()).failed() && json(ui.engine.project) == alignedDocument,
         "invalid pre-roll origin leaves arrangement untouched");
     ui.undo(false); check(near(ui.engine.project.clips[0].start, origin), "Undo restores the pre-roll song movement");
-    ui.undo(false); check(json(ui.engine.project) == original, "Undo removes the rebase and restores the original session clocks");
+    const double positionBeforeRebaseUndo = ui.engine.position.load();
+    ui.undo(false); check(json(ui.engine.project) == original && near(ui.engine.position,std::max(0.,positionBeforeRebaseUndo - origin)),
+        "Undo removes the rebase and atomically restores the original session clocks and mapped cursor");
     ui.undo(true); ui.undo(true); check(json(ui.engine.project) == alignedDocument, "Redo restores pre-roll and the full-intro alignment");
     const auto session = report.getSiblingFile("preroll.mixworks");
     const auto saveError = ui.engine.saveProject(session);

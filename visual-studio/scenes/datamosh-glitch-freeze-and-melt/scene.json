@@ -1,0 +1,47 @@
+{
+  "TITLE": "Datamosh Glitch / Freeze and Melt",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneBlockScale",
+      "TYPE": "slider",
+      "LABEL": "Block scale",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.75,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneGlitchDepth",
+      "TYPE": "slider",
+      "LABEL": "Glitch depth",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.5,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 128,
+    "family_name": "Firefly Meadow",
+    "variant_number": 1,
+    "variant_title": "Dusk Meadow",
+    "shader_path": "01-dusk-meadow/main.glsl",
+    "descriptor_path": "01-dusk-meadow/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 128,
+    "family_name": "Firefly Meadow",
+    "variant_number": 2,
+    "variant_title": "Blue Ghost",
+    "shader_path": "02-blue-ghost/main.glsl",
+    "descriptor_path": "02-blue-ghost/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 128,
+    "family_name": "Firefly Meadow",
+    "variant_number": 3,
+    "variant_title": "Swarm Vortex",
+    "shader_path": "03-swarm-vortex/main.glsl",
+    "descriptor_path": "03-swarm-vortex/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 128,
+    "family_name": "Firefly Meadow",
+    "variant_number": 4,
+    "variant_title": "Lantern Drift",
+    "shader_path": "04-lantern-drift/main.glsl",
+    "descriptor_path": "04-lantern-drift/scene.json",
+    "verification": "unverified"
+  }
+]

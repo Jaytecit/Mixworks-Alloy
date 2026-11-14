@@ -7,6 +7,7 @@ namespace mixworks
 {
 TempoStrip::TempoStrip(Workstation& workstation) : owner(workstation)
 {
+    setOpaque(true);
     setWantsKeyboardFocus(true); setTitle("Tempo markers"); setFocusContainerType(FocusContainerType::focusContainer);
     setTooltip("Drag a tempo pin horizontally to move it. Click a BPM number to edit. Double-click empty space or press P to add. Right-click for Add, Edit and Remove.");
 }

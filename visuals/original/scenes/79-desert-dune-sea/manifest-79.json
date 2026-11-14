@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 79,
+    "family_name": "Desert Dune Sea",
+    "variant_number": 1,
+    "variant_title": "Star Dunes",
+    "shader_path": "01-star-dunes/main.glsl",
+    "descriptor_path": "01-star-dunes/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 79,
+    "family_name": "Desert Dune Sea",
+    "variant_number": 2,
+    "variant_title": "Crescent Ridges",
+    "shader_path": "02-crescent-ridges/main.glsl",
+    "descriptor_path": "02-crescent-ridges/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 79,
+    "family_name": "Desert Dune Sea",
+    "variant_number": 3,
+    "variant_title": "Red Canyon",
+    "shader_path": "03-red-canyon/main.glsl",
+    "descriptor_path": "03-red-canyon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 79,
+    "family_name": "Desert Dune Sea",
+    "variant_number": 4,
+    "variant_title": "Moonlit Sands",
+    "shader_path": "04-moonlit-sands/main.glsl",
+    "descriptor_path": "04-moonlit-sands/scene.json",
+    "verification": "unverified"
+  }
+]

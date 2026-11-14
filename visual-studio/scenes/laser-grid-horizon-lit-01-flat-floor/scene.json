@@ -1,0 +1,47 @@
+{
+  "TITLE": "Laser Grid Horizon / Flat Floor — Lit",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0.0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "gridScale",
+      "TYPE": "slider",
+      "LABEL": "Grid density",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 2.2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "laserGain",
+      "TYPE": "slider",
+      "LABEL": "Laser intensity",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

@@ -92,7 +92,9 @@ void runLiveAutomationTests(const std::function<void(bool, const juce::String&)>
     engine.seek(0.1); check(!engine.recordingAutomation(), "seeking closes an active recording region before changing the playhead");
     const auto recorded = juce::JSON::toString(engine.captureProject());
     check(engine.restoreProject(recorded).isEmpty() && engine.project.curve(*address)->active(), "recorded punch boundaries survive decimal JSON serialization and real session reopening");
-    engine.project = vstUndo; engine.restoreManualPluginValues(); engine.render(output, 512, 0.4, midi);
+    engine.project = vstUndo;
+    engine.restoreManualPluginValues(engine.manualPluginValues(engine.project));
+    engine.render(output, 512, 0.4, midi);
     check(std::abs(output.getSample(0, 0) - 0.25 * 0.33) < 2.0e-6 && !engine.project.curve(*address)->active(), "undo restores an unautomated VST's real manual parameter value and its previous curve");
     engine.stop();
     auto& pan = engine.project.tracks[0].automation[4]; pan.enabled = true; pan.setPoint(0, -1); pan.setPoint(1, 1);

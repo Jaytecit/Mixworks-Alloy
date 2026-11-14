@@ -88,24 +88,30 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
             "sample detail across a streaming block boundary has independently known peak and RMS");
         check(media->waveformRange(0, .3).ready && media->waveformRange(0, .3).peak > .79f,
             "wide views retain the compact source overview");
-        auto differentRows = [&](const juce::Image& image, int a, int b)
+        // Keep the grid, clip and IN/OUT overlays in the same columns when
+        // comparing pixels. The short onset can sit directly below the IN tab.
+        auto silence = media->catalogueCopy();
+        silence->samples.setSize(1, count); silence->samples.clear();
+        silence->peaks.clear(); silence->waveformRms.clear();
+        auto differentRows = [&](const juce::Image& image, const juce::Image& silentImage, int x)
         {
             int different = 0;
-            // Compare only waveform pixels: the lower area deliberately includes
-            // an IN/OUT label, beat numbers and a four-pixel-wide downbeat flag.
             const auto bounds = ui.timeline.clipBounds(ui.engine.project.clips[0]);
             for (int y = (int)bounds.getY() + 32; y < std::min(image.getHeight(), (int)bounds.getBottom() - 30); ++y)
-                if (image.getPixelAt(a, y) != image.getPixelAt(b, y)) ++different;
+                if (image.getPixelAt(x, y) != silentImage.getPixelAt(x, y)) ++different;
             return different;
         };
         for (double scale : {200., 800.})
         {
             ui.timeline.pixelsPerSecond = scale; ui.refresh();
-            const auto image = ui.timeline.createComponentSnapshot({0, 0, 700, Timeline::rulerHeight + 132});
+            const juce::Rectangle<int> capture {0, 0, 700, Timeline::rulerHeight + 132};
+            const auto image = ui.timeline.createComponentSnapshot(capture);
+            ui.engine.project.clips.front().media = silence;
+            const auto silentImage = ui.timeline.createComponentSnapshot(capture);
+            ui.engine.project.clips.front().media = media;
             const double at = onsets[0] / double(sr);
-            const int silent = Clip::gridPixel(at + .05, scale);
-            check(differentRows(image, Clip::gridPixel(at - .008, scale), silent) == 0, "timeline original waveform does not precede the true onset at scale " + juce::String(scale));
-            check(differentRows(image, Clip::gridPixel(at, scale), silent) > 3, "timeline waveform retains the true onset at its source grid marker / " + juce::String(scale));
+            check(differentRows(image, silentImage, Clip::gridPixel(at - .008, scale)) == 0, "timeline original waveform does not precede the true onset at scale " + juce::String(scale));
+            check(differentRows(image, silentImage, Clip::gridPixel(at, scale)) > 3, "timeline waveform retains the true onset at its source grid marker / " + juce::String(scale));
             saveImage(image, "waveform-timeline-" + juce::String((int)scale));
         }
         clip.offset = .02; clip.start = 3;
@@ -302,63 +308,76 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     Clip b; b.media = second; b.track = 1; b.length = 24;
     Project project; project.clips = {a, b};
     auto matched = prepareTempoMap(project, true, 16);
-    // A user can correct a detector's phase by freely positioning the audio.
-    // Subsequent snapped movement must retain that phase, not reapply detection.
+    const bool matchedBoth = matched.error.isEmpty() && matched.matched == 2 && matched.project.clips.size() == 2;
+    check(matchedBoth, "two sources prepare for grid and transition checks: " + matched.error);
+    if (!matchedBoth) return;
     {
         Project moved = matched.project;
         const auto id = moved.clips[0].id;
-        auto* clip = moved.clipFor(id); clip->moveTo(clip->start + .017);
-        const auto clock = moved.gridClock(); const double phase = clock.beatsAt(clip->start);
-        const double target = clock.timeAtBeat(phase + 8.18);
+        const double freeStart = moved.clips[0].start + .017;
+        const auto free = moved.moveClip(id, freeStart, false);
+        const auto clock = moved.gridClock();
+        const auto& clip = moved.clips[0];
+        const double pulse = clock.beatsAt(clip.start + clip.firstBeatTime());
+        check(free.wasOk() && std::abs(clip.start - freeStart) < 1e-7 && std::abs(std::remainder(pulse, 1.0)) > .01,
+              "a free body move retains the requested off-grid source pulse: " + free.getErrorMessage());
+        const double target = clock.timeAtBeat(clock.beatsAt(clip.start) + 8.18);
         const auto result = moved.moveClip(id, target, true, 0, false);
-        check(result.wasOk() && std::abs(clock.beatsAt(moved.clipFor(id)->start) - phase - 8) < 1e-7,
-              "snapped body movement retains manual phase while moving by whole beats");
+        const auto& snapped = moved.clips[0];
+        check(result.wasOk() && std::abs(clock.beatsAt(snapped.start + snapped.firstBeatTime()) - std::round(pulse + 8.18)) < 1e-7,
+              "snapped body movement puts the source pulse on the project grid: " + result.getErrorMessage());
     }
     {
         auto manual = matched.project;
-        const auto id = manual.clips[0].id;
-        const auto corrected = manual.moveClip(id, manual.clips[0].start + .017, false, 0, false);
-        check(corrected.wasOk(), "manual phase fixture moves its complete linked group");
+        auto& out = manual.clips[0]; auto& in = manual.clips[1];
         const auto clock = manual.gridClock();
-        auto following = manual; const double phase = clock.beatsAt(following.clips[0].start);
-        const auto followed = following.moveClipFollowing(id, clock.timeAtBeat(phase + 1.18), true);
-        check(followed.wasOk() && std::abs(clock.beatsAt(following.clips[0].start) - phase - 1) < 1e-7,
-              "snapped title-handle movement preserves the manually corrected phase");
+        const double begin = clock.timeAtBeat(clock.beatsAt(std::max(out.start, in.start)) + 4.17);
+        const double end = clock.timeAtBeat(clock.beatsAt(std::min(out.end(), in.end())) - 4.17);
+        out.outroAnchor = out.sourceElapsed(begin - out.start); in.introAnchor = in.sourceElapsed(begin - in.start);
+        const Project::TransitionLink pair {out.id, in.id};
+        manual.transitionLinks.push_back(pair);
+        manual.transitionLinks.back().frame = std::array<double, 2>{*out.outroAnchor, out.sourceElapsed(end - out.start)};
+        const auto valid = manual.validateTransitionLinks();
+        check(valid.wasOk() && end > begin, "authored transition frame fits inside both sources: " + valid.getErrorMessage());
+        if (valid.failed() || end <= begin) return;
+
+        auto following = manual;
+        const double outBeat = clock.beatsAt(out.start), inBeat = clock.beatsAt(in.start);
+        const double targetBeat = std::round(outBeat + 1.18);
+        const auto followed = following.moveClipFollowing(pair.outgoing, clock.timeAtBeat(outBeat + 1.18), true);
+        check(followed.wasOk() && std::abs(clock.beatsAt(following.clips[0].start) - targetBeat) < 1e-7
+              && std::abs(clock.beatsAt(following.clips[1].start) - inBeat - (targetBeat - outBeat)) < 1e-7,
+              "snapped title-handle movement puts the edge on the project grid and carries the following track: " + followed.getErrorMessage());
         for (const auto edit : {Project::TransitionEdit::moveWindow, Project::TransitionEdit::resizeStart, Project::TransitionEdit::resizeEnd,
              Project::TransitionEdit::moveOutgoing, Project::TransitionEdit::moveIncoming})
         {
-            auto trial = manual; const auto link = trial.transitionLinks.front();
-            const auto range = trial.transitionRange(link);
-            const bool out = edit == Project::TransitionEdit::moveOutgoing, in = edit == Project::TransitionEdit::moveIncoming;
-            const double reference = out ? trial.clipFor(link.outgoing)->start : in ? trial.clipFor(link.incoming)->start
-                : edit == Project::TransitionEdit::resizeEnd ? range.getEnd() : range.getStart();
-            const int direction = out ? 1 : -1;
-            const double target = clock.timeAtBeat(clock.beatsAt(reference) + direction * 1.18);
-            const auto result = trial.editTransition(link.incoming, edit, target - reference, true);
-            const auto after = trial.transitionRange(*trial.transitionFor(link.incoming));
-            const double actual = out ? trial.clipFor(link.outgoing)->start : in ? trial.clipFor(link.incoming)->start
-                : edit == Project::TransitionEdit::resizeEnd ? after.getEnd() : after.getStart();
-            check(result.wasOk() && std::abs(clock.beatsAt(actual) - clock.beatsAt(reference) - direction) < 1e-7,
-                  "snapped transition gesture " + juce::String((int) edit) + " preserves its existing phase: " + result.getErrorMessage());
+            auto trial = manual;
+            const bool movingOut = edit == Project::TransitionEdit::moveOutgoing, movingIn = edit == Project::TransitionEdit::moveIncoming;
+            const bool resizingEnd = edit == Project::TransitionEdit::resizeEnd;
+            const double gestureStart = movingOut ? out.start : movingIn ? in.start : resizingEnd ? end : begin;
+            const double requestedBeat = clock.beatsAt(gestureStart) + (movingOut ? 1.18 : -1.18);
+            const auto result = trial.editTransition(pair.incoming, edit, clock.timeAtBeat(requestedBeat) - gestureStart, true);
+            const auto* link = trial.transitionFor(pair.incoming);
+            const auto after = link ? trial.transitionRange(*link) : juce::Range<double>();
+            const double actual = movingOut ? trial.clips[0].start : movingIn ? trial.clips[1].start
+                : resizingEnd ? after.getEnd() : after.getStart();
+            check(result.wasOk() && link && std::abs(clock.beatsAt(actual) - std::round(requestedBeat)) < 1e-7,
+                  "transition gesture " + juce::String((int) edit) + " snaps to the project grid: " + result.getErrorMessage());
         }
         for (bool intro : {false, true})
         {
-            auto trial = manual; const auto clipId = intro ? trial.clips[1].id : id;
-            const auto* selected = trial.clipFor(clipId); const double reference = selected->start + selected->transitionTime(intro);
-            const double target = clock.timeAtBeat(clock.beatsAt(reference) + 1.18);
-            const auto result = trial.moveTransitionAnchor(clipId, intro, target, true);
-            if (intro)
-            {
-                const auto* after = trial.clipFor(clipId);
-                check(result.wasOk() && std::abs(clock.beatsAt(after->start) - clock.beatsAt(manual.clipFor(clipId)->start) + 1) < 1e-7,
-                      "snapped IN selection moves the source by one beat without resetting manual phase");
-            }
-            else
-            {
-                const auto* after = trial.clipFor(clipId);
-                check(result.wasOk() && std::abs(clock.beatsAt(after->start + after->transitionTime(false)) - clock.beatsAt(reference) - 1) < 1e-7,
-                      "snapped OUT selection preserves the source-corrected anchor phase");
-            }
+            auto trial = manual;
+            const auto& selected = intro ? in : out;
+            const double requestedBeat = clock.beatsAt(begin) + 1.18;
+            const double snappedTime = clock.timeAtBeat(std::round(requestedBeat));
+            const auto result = trial.moveTransitionAnchor(selected.id, intro, clock.timeAtBeat(requestedBeat), true);
+            const auto& editedOut = trial.clips[0]; const auto& editedIn = trial.clips[1];
+            const auto& anchor = intro ? editedIn.introAnchor : editedOut.outroAnchor;
+            const double join = intro ? begin : snappedTime;
+            check(result.wasOk() && anchor && std::abs(*anchor - selected.sourceElapsed(snappedTime - selected.start)) < 1e-7
+                  && editedOut.start == out.start && std::abs(editedOut.start + editedOut.transitionTime(false) - join) < 1e-7
+                  && std::abs(editedIn.start + editedIn.transitionTime(true) - join) < 1e-7,
+                  juce::String(intro ? "snapped IN selects a source point at fixed OUT: " : "snapped OUT moves the join onto the project grid: ") + result.getErrorMessage());
         }
     }
     bool bars = matched.error.isEmpty();
@@ -414,18 +433,19 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
               && before == juce::JSON::toString(projectToJson(pixelUi.engine.project)),
               "fractional-position waveform pulse and source tick use the same nearest pixel without changing musical timing");
     }
-    // Reproduce removal followed by replacement, retaining the deleted source's
-    // tempo curve just as the real Remove command does. Check the whole clip,
-    // rather than only the first beat at the insertion boundary.
+    // An independent tempo map survives removal and replacement. Measure each
+    // surviving clip's full grid through both stopped and live placement.
     {
         auto replacementOwner = std::make_unique<Workstation>(false); auto& replacement = *replacementOwner; replacement.stopTimer(); replacement.setSize(1440, 940);
         for (int removed : {0, 1}) for (bool live : {false, true})
         {
             replacement.engine.project = automatic.project;
-            replacement.selectedClip = automatic.project.clips[(size_t) removed].id;
+            for (auto& point : replacement.engine.project.tempo.points) point.clipId.clear();
+            const auto removedId = automatic.project.clips[(size_t) removed].id;
+            replacement.selectedClip = removedId;
             const auto retained = replacement.engine.project.tempo;
             replacement.removeClip();
-            bool clock = true;
+            bool clock = !replacement.busy && replacement.engine.project.clips.size() == 1 && !replacement.engine.project.clipFor(removedId);
             for (double time = 0; time < 80; time += 0.137)
                 clock &= std::abs(retained.beatsAt(time) - replacement.engine.project.tempo.beatsAt(time)) < 1.0e-8;
             auto added = b; added.id = juce::Uuid().toString(); added.pendingPlacement = PendingPlacement::append;
@@ -454,18 +474,37 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
         coincident.tempo.points = {{0, 120}, {12, 150, true, coincident.clips[1].id}, {12, 120, false}};
         auto prepared = prepareTempoMap(coincident, false, 16);
         auto removalOwner = std::make_unique<Workstation>(false); auto& removal = *removalOwner; removal.stopTimer(); removal.engine.project = prepared.project;
-        removal.selectedClip = coincident.clips[1].id; removal.removeClip();
-        bool clock = prepared.error.isEmpty();
-        for (double time = 0; time < 36; time += 0.137)
-            clock &= std::abs(coincident.tempo.beatsAt(time) - removal.engine.project.tempo.beatsAt(time)) < 1.0e-8;
-        check(clock, "removing a coincident owned ramp endpoint retains the preceding curve and remaining clip grid");
-        check(removal.engine.project.tempo.points.size() == 3 && parseProject(juce::JSON::toString(projectToJson(removal.engine.project))).error.isEmpty(),
-              "detached coincident ramp and cut endpoints remain saveable without collapsing their timing");
+        const auto removedId = coincident.clips[1].id;
+        removal.selectedClip = removedId; removal.removeClip();
+        if (removal.busy)
+        {
+            struct Wait final : juce::Timer
+            {
+                Workstation& ui;
+                const double deadline = juce::Time::getMillisecondCounterHiRes() + 10000;
+                explicit Wait(Workstation& owner) : ui(owner) {}
+                void timerCallback() override
+                {
+                    if (!ui.busy || juce::Time::getMillisecondCounterHiRes() >= deadline)
+                    { stopTimer(); juce::MessageManager::getInstance()->stopDispatchLoop(); }
+                }
+            } wait(removal);
+            wait.startTimer(10); juce::MessageManager::getInstance()->runDispatchLoop();
+        }
+        const std::vector<TempoPoint> manualPoints {{0, 120}, {12, 120, false}};
+        const bool removed = prepared.error.isEmpty() && !removal.busy && removal.engine.project.clips.size() == 1
+            && !removal.engine.project.clipFor(removedId) && removal.engine.project.tempo.points == manualPoints;
+        check(removed, "removing an owned ramp target retains the coincident manual tempo marker: " + removal.status);
+        if (!removed) return;
+        const auto saved = parseProject(juce::JSON::toString(projectToJson(removal.engine.project)));
+        check(saved.error.isEmpty() && saved.project.tempo.points == manualPoints,
+              "the surviving manual tempo marker persists at its original time: " + saved.error);
         removal.undo(false);
-        const bool undo = removal.engine.project.clips.size() == 2 && removal.engine.project.tempo.points == prepared.project.tempo.points;
+        const bool undo = removal.engine.project.clips.size() == 2 && removal.engine.project.clipFor(removedId)
+            && removal.engine.project.tempo.points == prepared.project.tempo.points;
         removal.undo(true);
-        check(undo && removal.engine.project.clips.size() == 1 && removal.engine.project.tempo.points.size() == 3,
-              "Undo and Redo retain both coincident timing endpoints and restore their track ownership");
+        check(undo && removal.engine.project.clips.size() == 1 && removal.engine.project.tempo.points == manualPoints,
+              "Undo restores both coincident markers and Redo removes only the owned marker: " + removal.status);
         auto added = a; added.id = juce::Uuid().toString(); added.pendingPlacement = PendingPlacement::append;
         removal.engine.project.clips.push_back(added);
         const auto live = prepareTempoMap(removal.engine.project, false, 16, 0, 0, 2.0);
@@ -575,8 +614,10 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
     Clip dense; dense.media = limited; dense.length = 10;
     ui.engine.project.clips = {dense}; ui.timeline.pixelsPerSecond = 400; ui.refresh();
     const auto limitedImage = ui.timeline.createComponentSnapshot({0, 0, 320, Timeline::rulerHeight + 132});
-    check(differentRows(limitedImage, 20, 60) > 15, "native waveform exposes different beat energy even when maximum peaks are equally limited");
-    const auto quietBody = dense.waveformRange(0.05, 0.0525), loudBody = dense.waveformRange(0.15, 0.1525);
+    // Both columns are inside the clip, clear of the IN tab and project guides.
+    constexpr int quietColumn = 100, loudColumn = 140;
+    check(differentRows(limitedImage, quietColumn, loudColumn) > 15, "native waveform exposes different beat energy even when maximum peaks are equally limited");
+    const auto quietBody = dense.waveformRange(0.25, 0.2525), loudBody = dense.waveformRange(0.35, 0.3525);
     check(quietBody.peak == loudBody.peak && quietBody.rms < 0.3 && loudBody.rms > 0.8 && limited->samples.getSample(0, 1) == 0.1f,
           "waveform detail measures energy without normalizing, limiting or changing source PCM");
     limited->peaks.assign(4000, 0.98f); limited->prepareWaveformBody();
@@ -584,7 +625,7 @@ void runBeatGridTests(const std::function<void(bool, const juce::String&)>& chec
           "overview waveform body retains energy differences through worker-prepared buckets");
     ui.waveformMode.setSelectedId(2, juce::sendNotificationSync);
     const auto peaksImage = ui.timeline.createComponentSnapshot({0, 0, 320, Timeline::rulerHeight + 132});
-    check(differentRows(peaksImage, 20, 60) == 0, "peak-only display remains available without changing playback");
+    check(differentRows(peaksImage, quietColumn, loudColumn) == 0, "peak-only display gives equal columns to equally limited peaks");
     ui.waveformMode.setSelectedId(1, juce::sendNotificationSync);
     { auto out = report.getSiblingFile("limited-waveform.png").createOutputStream(); if (out) { out->setPosition(0); out->truncate(); juce::PNGImageFormat png; png.writeImageToStream(limitedImage, *out); } }
 

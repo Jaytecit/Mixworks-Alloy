@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 127,
+    "family_name": "Phase-Shift Lattice",
+    "variant_number": 1,
+    "variant_title": "Wave Grid",
+    "shader_path": "01-wave-grid/main.glsl",
+    "descriptor_path": "01-wave-grid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 127,
+    "family_name": "Phase-Shift Lattice",
+    "variant_number": 2,
+    "variant_title": "Twisted Truss",
+    "shader_path": "02-twisted-truss/main.glsl",
+    "descriptor_path": "02-twisted-truss/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 127,
+    "family_name": "Phase-Shift Lattice",
+    "variant_number": 3,
+    "variant_title": "Cubic Ripple",
+    "shader_path": "03-cubic-ripple/main.glsl",
+    "descriptor_path": "03-cubic-ripple/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 127,
+    "family_name": "Phase-Shift Lattice",
+    "variant_number": 4,
+    "variant_title": "Elastic Cage",
+    "shader_path": "04-elastic-cage/main.glsl",
+    "descriptor_path": "04-elastic-cage/scene.json",
+    "verification": "unverified"
+  }
+]

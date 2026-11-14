@@ -1,0 +1,47 @@
+{
+  "TITLE": "Hyperspace Stars / Spiral Jump",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneStarfieldScale",
+      "TYPE": "slider",
+      "LABEL": "Starfield scale",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.85,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneStreakLength",
+      "TYPE": "slider",
+      "LABEL": "Streak length",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 1.7,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

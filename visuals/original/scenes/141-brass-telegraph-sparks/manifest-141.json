@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 141,
+    "family_name": "Brass Telegraph Sparks",
+    "variant_number": 1,
+    "variant_title": "Spark Gap",
+    "shader_path": "01-spark-gap/main.glsl",
+    "descriptor_path": "01-spark-gap/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 141,
+    "family_name": "Brass Telegraph Sparks",
+    "variant_number": 2,
+    "variant_title": "Tesla Coil",
+    "shader_path": "02-tesla-coil/main.glsl",
+    "descriptor_path": "02-tesla-coil/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 141,
+    "family_name": "Brass Telegraph Sparks",
+    "variant_number": 3,
+    "variant_title": "Twin Electrodes",
+    "shader_path": "03-twin-electrodes/main.glsl",
+    "descriptor_path": "03-twin-electrodes/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 141,
+    "family_name": "Brass Telegraph Sparks",
+    "variant_number": 4,
+    "variant_title": "Arc Array",
+    "shader_path": "04-arc-array/main.glsl",
+    "descriptor_path": "04-arc-array/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -1,0 +1,31 @@
+Main feature shortlist
+Competitor	Main features
+DJ.Studio	Timeline mixing; automatic playlist ordering by BPM/key; phrase-aware transitions; editable transition presets; EQ/effects automation; stems; sample lanes; VST3/AU effects; DJ library integration; Ableton export; audio/video export. Features depend on edition. dj.studio
+DropLab	Beat-synchronised timeline; transition presets; tempo, volume, EQ and effects curves; stem separation; pitch shifting/time stretching; slicing and looping; playlist rearrangement that preserves existing transitions; timeline notes; multiple project tabs; audio export. Create DJ mixes
+GlideMix	Timeline mixing; beatgrid/phrase editing; harmonic matching and energy displays; tempo curves; transition effects; stems; VST3/AU effects; drawn/recorded automation; DJ library integration; separate headphone cue; live radio broadcasting; Ableton Link. Currently beta. glidemix.com
+Kuartz	Timeline plus live decks; beatgrid/key/phrase analysis; track recommendations; automatic set building through an AI assistant; transition templates; recorded automation; real-time stems; effects and VST3/AU hosting; MIDI/HID mapping; headphone cueing; recording; desktop/mobile versions. kuartz.app
+Mixxit	Manual timeline arrangement; BPM/key analysis; individual/global tempo adjustment; optional tempo matching for newly added tracks; volume/EQ automation; clip grouping, copying, markers and locking; WAV/MP3 export. Its help explicitly says tempo changes also change pitch, and tempo matching does not automatically align beats or phrases. mixxit.app
+
+
+Visuals and music-reactive features
+
+Here, “visuals” means audience-facing graphics—not waveforms, meters or coloured beatgrids.
+Competitor	What I could confirm
+DJ.Studio	Substantial built-in visualiser and video editor. Audio-reactive animations; beat-synchronised shader backgrounds; reactive spectrum displays; waveform overlay; particles; imported images/MP4 backgrounds; album artwork; track information; custom text/logo overlays; visual transitions; scheduled visual changes; video export. DJ.Studio Help Center
+GlideMix	Synchronisation with external visual software. Ableton Link sends tempo, beat and play/stop to applications such as Resolume and TouchDesigner. I found no documented built-in audience visualiser or video exporter. Link supplies timing; the external application creates the visuals. glidemix.com
+Kuartz	No audience-facing reactive visualiser or video exporter found in the published features/help reviewed. Its documented strengths concern audio, automation and performance controls. kuartz.app
+DropLab	No audience-facing visualiser, reactive scene system or video exporter found in the published feature list reviewed. Create DJ mixes
+Mixxit	No audience-facing visualiser, reactive scene system or video exporter found in the published features/help reviewed. mixxit.app
+
+
+DJ.Studio’s visuals are more developed than my earlier answer conveyed. However, its current documentation says custom Shadertoys can no longer be imported by URL; users select from its built-in library. I also found no confirmation of an unrestricted scene-building system with your proposed nested sprites, arbitrary audio mappings and custom 2D/3D scenes. DJ.Studio Help Center
+
+Why none is a confirmed “everything” product
+Candidate	What prevents it covering the combined shortlist
+DJ.Studio	Explicitly does not support MIDI controllers, and says live deck mixing is outside its plans. Its reactive visuals therefore don’t come with Kuartz-style hardware performance. DJ.Studio Help Center
+GlideMix	Offers live timeline playback, cueing and external visual synchronisation, but explicitly says controller knobs and jog wheels aren’t mapped. Help
+Kuartz	Combines extensive mixing and hardware performance features, but I couldn’t confirm DJ.Studio-style integrated visual creation/video export.
+DropLab / Mixxit	Their documented feature sets cover fewer of the advanced performance, plug-in and visual capabilities above.
+
+
+For Alloy, the potential distinction is the combination: detailed timeline editing, intelligent arrangement, a properly mapped live desk, and an integrated, customisable reactive visual system. The research supports that as a possible gap among these five; it does not establish that no other product addresses it.

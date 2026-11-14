@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 109,
+    "family_name": "Soap Film Iridescence",
+    "variant_number": 1,
+    "variant_title": "Stretched Frame",
+    "shader_path": "01-stretched-frame/main.glsl",
+    "descriptor_path": "01-stretched-frame/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 109,
+    "family_name": "Soap Film Iridescence",
+    "variant_number": 2,
+    "variant_title": "Floating Bubble",
+    "shader_path": "02-floating-bubble/main.glsl",
+    "descriptor_path": "02-floating-bubble/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 109,
+    "family_name": "Soap Film Iridescence",
+    "variant_number": 3,
+    "variant_title": "Foam Junction",
+    "shader_path": "03-foam-junction/main.glsl",
+    "descriptor_path": "03-foam-junction/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 109,
+    "family_name": "Soap Film Iridescence",
+    "variant_number": 4,
+    "variant_title": "Popping Film",
+    "shader_path": "04-popping-film/main.glsl",
+    "descriptor_path": "04-popping-film/scene.json",
+    "verification": "unverified"
+  }
+]

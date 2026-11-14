@@ -1,0 +1,29 @@
+{
+  "TITLE": "CRT Overdrive / VHS 116 · Mixed",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

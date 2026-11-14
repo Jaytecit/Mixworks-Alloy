@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 102,
+    "family_name": "Astrolabe Clockwork",
+    "variant_number": 1,
+    "variant_title": "Ecliptic",
+    "shader_path": "01-ecliptic/main.glsl",
+    "descriptor_path": "01-ecliptic/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 102,
+    "family_name": "Astrolabe Clockwork",
+    "variant_number": 2,
+    "variant_title": "Planisphere",
+    "shader_path": "02-planisphere/main.glsl",
+    "descriptor_path": "02-planisphere/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 102,
+    "family_name": "Astrolabe Clockwork",
+    "variant_number": 3,
+    "variant_title": "Zodiac Wheel",
+    "shader_path": "03-zodiac-wheel/main.glsl",
+    "descriptor_path": "03-zodiac-wheel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 102,
+    "family_name": "Astrolabe Clockwork",
+    "variant_number": 4,
+    "variant_title": "Armillary",
+    "shader_path": "04-armillary/main.glsl",
+    "descriptor_path": "04-armillary/scene.json",
+    "verification": "unverified"
+  }
+]

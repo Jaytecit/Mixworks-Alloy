@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 110,
+    "family_name": "Sundial Shadow Play",
+    "variant_number": 1,
+    "variant_title": "Plaza Gnomon",
+    "shader_path": "01-plaza-gnomon/main.glsl",
+    "descriptor_path": "01-plaza-gnomon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 110,
+    "family_name": "Sundial Shadow Play",
+    "variant_number": 2,
+    "variant_title": "Arc Dial",
+    "shader_path": "02-arc-dial/main.glsl",
+    "descriptor_path": "02-arc-dial/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 110,
+    "family_name": "Sundial Shadow Play",
+    "variant_number": 3,
+    "variant_title": "Obelisk Sweep",
+    "shader_path": "03-obelisk-sweep/main.glsl",
+    "descriptor_path": "03-obelisk-sweep/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 110,
+    "family_name": "Sundial Shadow Play",
+    "variant_number": 4,
+    "variant_title": "Eclipse Noon",
+    "shader_path": "04-eclipse-noon/main.glsl",
+    "descriptor_path": "04-eclipse-noon/scene.json",
+    "verification": "unverified"
+  }
+]

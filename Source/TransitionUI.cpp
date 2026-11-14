@@ -183,7 +183,7 @@ void Workstation::showTransitionMenu(const juce::String& incoming, juce::Rectang
     const bool ready = pendingTempo <= 0 && !tempoPreparationPending && timelineLoads.empty() && !engine.project.hasPendingPlacement();
     const bool unlocked = !engine.project.clipTransitionLocked(link->outgoing) && !engine.project.clipTransitionLocked(incoming);
     const bool editable = ready && unlocked && canAddPreparedTransition(engine, false);
-    enum Choice { edit = 1, compare, movement, protect, mute, remove, presetBase = 10, lengthBase = 100, savedBase = 200 };
+    enum Choice { edit = 1, compare, movement, protect, mute, remove, syncClocks, presetBase = 10, lengthBase = 100, savedBase = 200 };
     juce::PopupMenu menu, presets, lengths;
     menu.addSectionHeader(out->media->libraryTitle() + " -> " + in->media->libraryTitle());
     if (link->presetName.isNotEmpty()) menu.addSectionHeader(link->presetName);
@@ -206,6 +206,8 @@ void Workstation::showTransitionMenu(const juce::String& incoming, juce::Rectang
     menu.addSubMenu("Set frame length", lengths, editable);
     menu.addSeparator();
     menu.addItem(movement, "Lock pair movement", ready, link->movementLocked);
+    if (engine.project.transitionHasStaleClock(incoming))
+        menu.addItem(syncClocks, "Sync playback clocks", ready && unlocked && !engine.playing && !engine.capturingPerformance());
     menu.addItem(protect, "Protect edits", ready, link->locked);
     menu.addItem(mute, "Mute outside bounds", editable && canInsertArrangement(), link->muteOutside);
     menu.addItem(remove, link->presetOwner.isNotEmpty() ? "Remove preset" : "Unlink pair...", editable && canAddPreparedTransition(engine, !ready));
@@ -220,6 +222,7 @@ void Workstation::showTransitionMenu(const juce::String& incoming, juce::Rectang
         const auto* pair = safe->engine.project.transitionFor(incoming);
         if (!pair) return;
         if (choice == movement) safe->togglePairMovementLock(incoming);
+        else if (choice == syncClocks) safe->syncTransitionPlaybackClocks(incoming);
         else if (choice == protect) safe->setTransitionProtection(!pair->locked);
         else if (choice == mute) safe->setTransitionMuteOutside(!pair->muteOutside);
         else if (choice == remove) safe->removeSelectedTransition();
@@ -235,6 +238,19 @@ void Workstation::showTransitionMenu(const juce::String& incoming, juce::Rectang
         else if (choice >= lengthBase) safe->changeSelectedTransition((double) (choice - lengthBase), {});
         else if (choice >= presetBase) safe->changeSelectedTransition({}, (TransitionPreset) (choice - presetBase));
     });
+}
+void Workstation::syncTransitionPlaybackClocks(const juce::String& incoming)
+{
+    if (engine.playing || engine.capturingPerformance()) { setStatus("Pause playback and end recording before syncing playback clocks."); return; }
+    if (const auto unavailable = structuralEditUnavailable(); unavailable.isNotEmpty()) { setStatus(unavailable); return; }
+    auto candidate = projectEditSnapshot();
+    const auto expected = structuralEditDocument(candidate);
+    const auto result = candidate.syncTransitionPlaybackClocks(incoming);
+    if (result.failed()) { setStatus(result.getErrorMessage()); return; }
+    if (!publishStructuralEdit(std::move(candidate), expected)) return;
+    engine.resetPlugins();
+    refresh();
+    setStatus("Playback clocks synced at the current join. Retry the IN/OUT drag.");
 }
 
 void Workstation::setTransitionMuteOutside(bool mute)

@@ -1,6 +1,1002 @@
-# Mixworks current handover - 11 November 2026
+# Mixworks current handover - 14 November 2026
 
-## Current outcome
+## Current checkpoint
+
+The source and selected local launcher are Alloy 0.55.133 with Visual Studio
+0.1.33 and 1,000 indexed GLSL scenes. Use the [app guide](README.md) and
+[documentation index](docs/README.md) for current workflows. The records below
+retain the candidate and evidence for each earlier checkpoint.
+
+The [outstanding roadmap](FINISHING-PLAN.md) leads with desktop GLSL
+replacement during playback. Then review cue selection and visual joins on
+a representative mix. The 14 November [promo](docs/PROMO-20261114.md) is
+available locally for creative review.
+
+## 14 November Studio playback workflow checks on 0.55.133
+
+In the isolated two-track mix, the clip context menu replaced the active
+MilkDrop preset, Prism Current, with the Feedback Fixture during playback.
+The renderer used the new preset immediately. Clip identity, geometry,
+visual joins and audio placements and links survived save/reopen. An
+attempt to move the GLSL clip into the already occupied MilkDrop lane
+triggered the overlap guard and left the document clean. The GLSL picker
+opened, but the desktop control could not complete its submenu or native
+file chooser. The chooser blocked the owned app and that process was closed
+after confirming the baseline was saved. The later test instance closed
+gracefully.
+
+With empty visual lanes on the same audio mix, the Live **Random scene**
+button rendered an animated Liquid Chrome variant. **Random MilkDrop**
+selected the deliberately unseeded Feedback Fixture first, which appeared
+black by itself, and then rendered a moving Prism Current. Alloy kept
+playing and the audio-only session persisted with identical clips,
+links and empty visual lanes. Reopening the authored mix returned Studio
+to Timeline mode. The 1920 × 1080 fullscreen output was visually inspected.
+F11 restored the moving preview while the playhead and renderer advanced.
+
+The exact active 0.55.133 bundle was used. The launcher and production
+session were left alone. States, the saved fixture and the workflow receipt
+are under `.local/sv133`.
+
+## 14 November Studio preview pacing verified on 0.55.133
+
+Alloy 0.55.133 with Studio 0.1.33 uses a shared pixel buffer for the
+connected preview. Studio presents frames on a 30 fps schedule and rebuilds
+scene controls in small batches. The 0.55.131 trace showed approximately
+100 ms JPEG publication gaps while GPU frames finished in under 16 ms.
+The 0.55.132 trial removed JPEG stalls but repeatedly paused to refill its
+buffer. The 0.55.133 scheduler recovers without refilling mid-playback.
+
+On the isolated, muted two-track fixture, the uninterrupted desktop check
+passed steady playback at 30.02 fps and a GLSL dissolve at 29.77 fps.
+The 95th-percentile frame gaps were 46.9 ms and 44.7 ms, with maxima of
+58.4 ms and 61.4 ms. The dissolve skipped two frames. Neither sample added
+audio callback lock misses or source sample misses. The earlier desktop
+run, with live screenshots, missed the 47 ms dissolve percentile target
+at 47.8 ms. Both traces and captures are retained. The shared-buffer test
+and 77 focused Studio workspace checks passed. Sustained playback across
+the full scene catalogue remains outside this check.
+
+`out/Launch.cmd` selects `out/releases/0.55.133-8b86bdb0581a`. The visible
+Alloy title and Windows file and product versions show 0.55.133. The
+executable SHA-256 is
+`8b86bdb0581aed8b33391d6469dae7f6755431e328a4267ce24f40ee310fd1d1`.
+The previous launcher is `out/Launch.cmd.bak.version-0.55.133-20261114`.
+Source, payload hashes, reports and activation are under `.local/preview133`.
+Both isolated runs were saved and closed, and the user's session was untouched.
+
+## 14 November connected Studio preview pacing
+
+Jay reported a jumpy Visual Studio preview. Alloy 0.55.131 moves JPEG
+publication from the UI timer to the scene renderer thread and gives Studio
+0.1.31 a separate preview polling loop. The single-worker build succeeded
+and all 77 focused Studio workspace checks passed. The staged executable
+is `out/releases/0.55.131-b1b5a8dcf81a/Mixworks.exe`. Its visible title and
+Windows file and product versions show 0.55.131.
+
+The isolated two-track mix used the same four visual lanes for both builds.
+In eight seconds, 0.55.130 published 205 preview frames, with a 131 ms
+maximum gap and 21 gaps over 50 ms. 0.55.131 published 238 frames, with a
+59 ms maximum gap and nine gaps over 50 ms. The candidate sample recorded
+zero audio callback lock misses, budget overruns or source sample misses.
+The actual Studio window averaged 28.75 fps in steady playback and 28.21
+fps across a GLSL dissolve. It still had 108 ms and 101 ms peak gaps,
+respectively. An earlier single-window sample averaged 29.24 fps with a
+72 ms peak gap. The preview failed smoothness acceptance.
+
+The launcher remains on 0.55.130. The isolated instance saved and closed,
+and the staged release was left intact. Evidence is under `.local/preview131`
+and `.local/sh131/evidence`, with the baseline in `.local/sh130/evidence`.
+For the next pacing investigation, compare publication, JPEG decode and
+Tk presentation timestamps in the same run to locate the remaining stalls.
+
+## 14 November promotional film completed
+
+The 150-second music-led Alloy promo is
+`.local/promo14/delivery/Mixworks-Alloy-Promo.mp4`. Three agents assessed the
+feature story, visual edit and production approach. The finished film uses
+actual native captures, a real silent Auto Arrange operation on copies from
+Jay's library, and the packaged Studio renderer. Its Quake → Bad Man soundtrack
+is an authored native Alloy mix at 125 BPM. Picture cuts follow whole bars;
+the transition is intercut with EQ/Controller shots, returning one bar before
+the 61.44-second drop and holding two bars afterward, as Jay requested.
+
+Final verification: 1920 × 1080 / 30 fps / 4,500 frames; complete decode;
+no blank interval over half a second; −14.9 LUFS / −2.2 dBFS true peak;
+decoded audio correlation 0.99993 with the native WAV. Seventeen final encoded
+frames were reviewed. Musical listening acceptance remains Jay's judgement.
+Clean native projects, music credits, instructions and a source checkpoint are
+beside the MP4. Full media, source, hashes and evidence remain under
+`.local/promo14`; see `docs/PROMO-20261114.md` for provenance and limitations.
+
+Owned `.local/p14`, `p15` and `p16` instances were saved and closed. Original
+music, production data and user instances were untouched. No app code, build
+or launcher changed. An incomplete Record/Perform capture is preserved as
+evidence and excluded from the film; clean Arrange-mode Controller footage
+replaced it. Public publication and account-specific music licence coverage
+remain outside this local review delivery.
+
+## 14 November focused visual arrangement test repair
+
+The focused visual-arrangement suite passed 69 checks after updating the
+five failed cases for the current Studio workflow. Fresh Workstations
+independently verified MilkDrop-only with bundled Prism Current, the toolbar
+default and four-lane publication, and explicit GLSL publication in one Undo.
+A separate Studio Match Mix fixture with early incoming preroll produced
+three GLSL clips and two dissolves, with continuous coverage and unchanged
+audio clips and transition links. Both Studio timeline captures were reviewed.
+
+Only `Source/VisualArrangementTests.cpp` changed. The isolated test host
+linked the existing 0.55.130 production objects with the updated suite and
+ran through `verification.run_checks` with stress disabled. The production
+executable and launcher remain on 0.55.130. The source checkpoint, object
+hashes, report and screenshots are under `.local/visual-fixes`.
+
+## 14 November cue-driven visuals and 1,000 GLSL scenes
+
+Alloy 0.55.130 bundles Visual Studio 0.1.30. Auto Arrange and Studio's
+Match Mix use musical cues for the four lanes. Background follows sustained
+energy, GLSL follows section changes and music handovers, MilkDrop follows
+sustained bass or attack density, and sprites follow manual hotcues or
+strong section rises with a measured bass return. MilkDrop also takes the
+primary cues in MilkDrop-only mode. Timed swaps and the 32-bar fallback
+are gone. Compatible manual holds take precedence until Reset. Automatic
+section and activity cues use forward, non-looping source spans. Session
+format and analysis revision are unchanged.
+
+The shared Studio catalogue and family profiles contain 1,000 GLSL scenes.
+`files.zip` added 200 Archive variants. The second archive inside it
+contained 180 byte-identical duplicates. `Mixed_pack_150.zip` added 150
+Mixed variants without recompiling. Both sets have Motion rate and Music
+response controls. The previous 650 scene pairs match the preceding
+release byte for byte. The packaged renderer compiled and rendered all
+350 new scenes. Screenprint Layers Four Colour Archive is very dark under
+strong beat input, matching the supplied shader. Studio's picker loaded
+three samples from both packs.
+
+The Studio workspace suite passed 77 checks, including a steady 192-bar
+fixture, independent cues, bass return and held values across changes.
+The visual-arrangement suite had five failures, all reproduced on 0.55.129.
+Full regression and physical MIDI remain unverified. The exact source
+deltas, payload hashes, baseline and candidate reports, timeline and picker
+captures and activation receipt are under `.local/v130`.
+
+`out/Launch.cmd` selects `out/releases/0.55.130-f2065e5f1549-library1000`.
+The visible title and Windows file and product versions show 0.55.130.
+Executable SHA-256 is
+`f2065e5f154971a046fe0530aee61d5e6a84b9d0dae818e2c8c4619c96edf61b`.
+Rollback is `out/Launch.cmd.bak.version-0.55.130-20261114`. The isolated
+bridge saved and closed. Open user instances were left running.
+
+## 13 November shared GLSL controls
+
+Alloy 0.55.129 bundles Visual Studio 0.1.29. The remaining 567 Motion-only
+scenes across 144 families use Motion in slot 1 and Music response in slot 2.
+Families add two effect controls, with three on Strobe Slicer. Camera sweep
+holds a composed shot at zero and is available in 248 scenes. Music response
+at zero removes native audio modulation. The single Studio scene directory
+still contains the same 650 indexed scenes. Exactly 567 shader and descriptor
+pairs changed, and the other 83 pairs match 0.55.128 byte for byte.
+
+Packaged Studio passed GPU checks for all 567 scenes and 2,272 control
+endpoint comparisons using synthetic audio and Nested artwork. All 567
+matched their quiet output with Music response at zero. Each scene passed
+the standalone picker, deck edit and reset, plus Timeline hold and reset.
+Scan Tears needed bass input to exercise its tear control. The focused
+native Studio suite passed 72 checks. Physical MIDI and a full regression
+remain open. Some long labels clip in compact deck captions and are fully
+visible in the Scene panel.
+
+Both sampled default frames matched 0.55.128 exactly in 496 scenes. Another
+63 were within 0.12 mean absolute channel values on an 8-bit scale. Hollow
+Cross gained a visible tunnel opening. River Float, all three Crystallizing
+Frost variants, Black Hole Lens Jet and Black Hole Lens Static gained
+visible motion. Twin Bells gained visible Nested artwork. These eight had
+larger differences in the default samples.
+
+The launcher selects `out/releases/0.55.129-564416685c1a`. The visible title
+and Windows file and product versions show 0.55.129. Executable SHA-256 is
+`564416685c1ad475bb1ac167c24b031d4a52fc5535fcd63b73d10c7686f688b4`.
+Rollback is `out/Launch.cmd.bak.version-0.55.129-20261113`. The exact source
+checkpoint, family control map, payload hashes, Studio checks and activation
+receipt are under `.local/glsl129`. The isolated bridge instance closed after
+saving. Open user instances were left running.
+
+## 13 November second GLSL control batch
+
+Alloy 0.55.128 bundles Visual Studio 0.1.28. The 19 kept scenes that
+previously offered Motion and Artwork strength now add Music response and
+the effect controls in the GLSL audit. Lever Escapement has a small balance
+arm that makes its wheel swing visible. The other 18 retained their sampled
+default look within rendering precision.
+
+The shared `visual-studio/scenes` directory has exactly 650 scene folders,
+each with `main.glsl` and `scene.json`. This matches the active Alloy picker.
+The 19 changed scene IDs are in that catalogue. The indexed IDs have zero
+overlap with the viewer recovery folders. Three empty scene folders and
+the empty comparison tree were removed. Recovery files were retained.
+
+All 19 passed GPU endpoint checks with synthetic audio and Nested artwork,
+the standalone picker and deck edit/reset checks, and held-control/reset
+checks in the Timeline renderer. The quieter glaze highlight was verified
+in the GPU endpoint pass. Inlay contrast was used for the Timeline hold
+check. The focused native Studio suite passed 72 checks. Physical MIDI
+and a full regression remain open.
+
+The launcher selects `out/releases/0.55.128-22aaea63004b`. The title and
+Windows file/product versions show 0.55.128. Executable SHA-256 is
+`22aaea63004bbea142aaaa85dd1052a8d5015aee7211c7580eee21da4fa8052e`.
+Rollback is `out/Launch.cmd.bak.version-0.55.128-20261113`. Exact source,
+payload hashes, checks, captures and activation are under `.local/glsl128`.
+The isolated bridge instance closed after saving. Open user instances were
+left running.
+
+## 13 November first GLSL control batch
+
+Alloy 0.55.127 bundles Visual Studio 0.1.27. The 19 previously uncontrolled
+Tunnel Drive, Kaleido Bloom, Warp Flow, Beat Tiles and Shockwave Lens variants
+now expose motion, music response, artwork imprint and their effect controls.
+The eight Lib/Lit Laser Grid Horizon variants add Grid density, Laser intensity
+and Music response. Lit adds integrated Motion directly to baseline travel,
+which removes acceleration from multiplying the accumulated phase by TIME.
+
+All 27 passed packaged Studio GPU checks with quiet and active synthetic audio,
+transparent Nested artwork and every control's endpoints. Sampled defaults
+matched 0.55.126 pixel for pixel. All four Lit variants matched the linear
+reference at 8 and 20 seconds. The standalone picker loaded each scene and its
+deck adjusted and reset a control. Studio's Timeline player rendered each scene
+with a held control, Reset and a Nested sprite. The focused native Studio suite
+passed 72 checks. The desktop verification harness needed distinct synthetic
+click times and the Timeline render fixture needed the renderer's PCM length.
+Initial harness failures and passing reruns are retained under `.local/glsl127`.
+
+The visible title and Windows file/product versions show 0.55.127.
+`out/Launch.cmd` targets `out/releases/0.55.127-ab31bfad6687`, executable
+SHA-256 `ab31bfad66879d9b8743dc34723980474380a208ed8a86b2600ba630ab7b9020`.
+Rollback is `out/Launch.cmd.bak.version-0.55.127-20261113`. The exact source,
+payload hashes, control and frame evidence and activation are under
+`.local/glsl127`. The isolated bridge instance closed after saving. Open user
+instances were left running. Physical MIDI and a full regression remain open.
+
+## 13 November GLSL control audit
+
+The [GLSL control audit](docs/GLSL-CONTROL-AUDIT.md) inventories the 650
+scenes in Alloy 0.55.126's GLSL picker and the 205 active Originals. It
+records current controls, family and variant proposals, and timeline wiring
+findings. Source and packaged Studio assets match. The audit was static.
+
+## 13 November Studio startup pads and GLSL sprites
+
+Alloy 0.55.126 bundles Visual Studio 0.1.26. The original two-by-four pad
+layout shows the new labels at startup in both standalone and connected
+Live mode. Live mode enables the loaded scene's lane and Sprite, plus
+Overlay and the scene's supported nesting route. Timeline mode exposes
+all four lanes. Auto Arrange now adds a continuous sprite lane for GLSL-only
+shows and defaults it to GLSL nesting. MilkDrop-only and combined shows
+default to MilkDrop nesting. Session format and analysis revision are unchanged.
+
+The desktop Visual Studio shortcut still points to `visual-studio/Launch.cmd`,
+which now resolves the active Alloy release instead of a fixed Studio
+version. Launching the actual shortcut opened Studio 0.1.26 from
+`out/releases/0.55.126-d41de9d0d43b`. Alloy's title and Windows file and
+product versions show 0.55.126. The launcher rollback is
+`out/Launch.cmd.bak.version-0.55.126-20261113`.
+`.local/studio126` retains the source checkpoint, payload hashes, both
+startup captures, shortcut verification and the 72 passing Studio checks.
+The checks covered continuous sprite schedules in both single-engine modes.
+Physical MIDI and a full regression remain unverified.
+
+## 13 November visual controller and long timeline
+
+Alloy 0.55.125 keeps the original two rows of four Visual Studio pads. The
+top row selects Background, MilkDrop, GLSL or Sprite. The bottom row offers
+Overlay, MilkDrop, GLSL and automatic control focus via Follow. Sprite routing
+is a saved Studio hold and uses Overlay when the chosen destination cannot
+receive the sprite. The audio Follow toggle also scrolls the visual timeline,
+using its own zoom. Manual visual scrolling turns Follow off.
+
+Timeline redraws use the damaged region. Automation drawing and hit testing
+use the selected curves and transition. Zoom refreshes the viewport once.
+Playlist dropdowns compare a two-track reference instead of repeatedly copying
+and validating the full arrangement. In an isolated 280-segment, 279-transition
+fixture, median zoom was 160 ms and clip selection 169 ms. The intermediate
+0.55.124 candidate took 13.8 s median to zoom and 27.3 s to select the first
+clip on that fixture. Sampling evidence is under `.local/deck124`.
+
+The staged 0.55.125 bundle passed 70 Studio workspace checks. Desktop checks
+covered the eight-pad layout, routing, Follow, mouse-wheel zoom, clip and
+Playlist menus, and saving and reopening the sprite route. The broader
+timeline-editing suite reached the same 354 report lines and stack-overflow
+exit on 0.55.123 and 0.55.124. A full regression, physical MIDI and the
+user's own large mix remain unverified. The executable SHA-256 is
+`fb7b96adf65b` (prefix). The title and Windows metadata show 0.55.125.
+`out/Launch.cmd` selects `out/releases/0.55.125-fb7b96adf65b`; rollback is
+`out/Launch.cmd.bak.version-0.55.125-20261113`. Source, bundle hashes,
+captures, timings and activation are under `.local/deck125`. The user's open
+Alloy session was left running.
+
+## 13 November Studio controller and scene packs
+
+Jay approved persistent mouse/MIDI holds scoped to compatible controls, a
+64-bar default Auto cycle with per-control range and length, musical join
+presets, drawn keyframes with bounded bass/energy response, and random swaps
+for each of the four visual lanes. Source changes also add a Studio **Match
+Mix** button. Session format 54 adds held values and visual automation settings.
+Analysis revision 11 is retained.
+
+The first 0.55.121 build compiled against a Studio header that changed during
+the build. Its isolated Studio test exited with `0xc0000374` before producing a
+report. `.local/visual121` retains the exact failed identity, report and source.
+The clean 0.55.122 single-worker rebuild passed 61 Studio workspace checks
+and eight actual-GL renderer checks with stress off. The checks covered
+override scope and session JSON, Reset, custom cycles, bounded audio response,
+visual preset timing edits and all four random-swap paths. Actual join pixels
+and the Alloy title were inspected. The title, FileVersion and ProductVersion
+show 0.55.122. `out/Launch.cmd` selects `out/releases/0.55.122-94cd4a379a3d`.
+Executable SHA-256 is `94cd4a379a3d80023ac59ce5e6fcf2703e0421194fcc559620bea4b28766ce9e`.
+Rollback is `out/Launch.cmd.bak.version-0.55.122-20261113`, selecting 0.55.120.
+The final source archive, reports, payload manifest and activation receipt are
+under `.local/visual122`. Open instances were left running. Physical MIDI,
+real-mix listening and a complete regression remain open.
+
+The supplied `Alloy_Scenes_01_05.zip` yielded 20 unmodified scene/descriptor
+pairs. All 20 compiled and rendered with quiet audio, active audio and a
+transparent Nested sprite in Studio at 160×90. A separate extraction from
+`scenes_01_05.frag` and the Bass Rings authoring example passed the same checks.
+The supplied Family 06 generator produced four Laser Grid Horizon variants.
+A local copy fixes two `vec2` colour declarations and rewrites descending
+`smoothstep` calls with ordered edges. All four render under the same checks.
+The corrected ZIP, generator, contact sheets, reports and copy-ready prompts
+for the remaining families are in `.local/scenes0105`. Jay requested bundling
+all 24 scenes. The six families are in `visual-studio/scenes`, the picker index
+and `visual-studio/authoring/families.json`, which preserves them when the index
+is regenerated. The next generator produced the remaining 176 variants from
+families 07–50. Local fixes replace undefined descending fades, repair GLSL
+types in Polyhedron Cage and Sound Terrain, and add a bass/beat response in
+Plasma Lava. All 176 passed Studio rendering with quiet, active and transparent
+Nested inputs at 192×108. Selected contact sheets were inspected. Some effects
+such as datamosh and cellular patterns are procedural approximations. Studio's
+catalogue contains 407 scenes and is bundled in 0.55.122. The generator,
+reports and contact sheets are in `.local/scenes0750`.
+
+`visual-studio/Launch-Scene-Viewer.cmd` opens the standalone viewer. It scans
+the scenes directory and wraps Back/Forward navigation. Its optional sprite
+uses Studio's Nested route, and desktop audio uses the default WASAPI output
+through PyAudioWPatch. `.local/sceneviewer` retains a UI capture and a real
+Windows loopback check with a short owned test tone. The comparison of Lit,
+Lib and DeepSeek with the bundled Laser Grid Horizon scenes is retained in
+`.local/scene-compare06`. Those three alternate generators supplied Family 06
+only. The standalone viewer now also loads the eight Lit and Lib alternatives
+from `visual-studio/scene-viewer-scenes`, grouped beside the corresponding
+Alloy layouts. Lit's descending GLSL fades use ordered edges. All eight were
+rendered in motion with the same Nested sprite and live WASAPI stream.
+The viewer lists 415 scenes and the Alloy catalogue contains 407.
+Verification and a window capture are in `.local/sceneviewer-compare`.
+
+The standalone viewer can now mark scenes across sessions and bulk-remove
+them after confirmation. Removal moves scene folders or loose shader pairs to
+a dated recovery folder. The source scene index drops removed bundled entries
+and a copy of the previous index is stored with the recovered files. Existing
+Alloy releases keep their packaged scenes. The isolated UI check in
+`.local/sceneviewer-marks` covered mark and unmark, restart persistence,
+cancellation, bulk removal, catalogue update and rollback on a write failure.
+
+The next text-only generator prompt is in
+`.local/scenes51-100/Prompt for 200 new 3D Alloy scenes.md`. It defines 50
+3D-first families with four variants each and retains the Studio host contract.
+The authored **Abyssal Observatory** scene is available in the standalone
+viewer and importable through Alloy's **+ GLSL → Open file**. Quiet, synthetic
+active audio, transparent and opaque Nested art, and changing frames were
+verified in Studio. Captures and checks are under `.local/scenes51-100`.
+The camera now makes a roughly 17-second flyby across the chamber, looking
+toward the lens and changing height on the return pass. The scene's Camera
+sweep control defaults to full movement. Zero holds a fixed shot.
+`.local/scenes51-100/camera` retains the rendered flyby, eight inspected
+camera positions, and checks for the fixed shot, audio and Nested response.
+The supplied first batch added 20 standalone viewer scenes across families
+51–55. The local generator copy drops unused uniform declarations and fixes
+the descending viaduct fade. Hydraulic Lock also has audio-driven,
+artwork-shaped caustics and a higher Staircase Locks camera. All 20 passed
+Studio quiet, active and Nested comparisons and opened and animated in the
+viewer. The originals, corrected generator, reports and contact sheet are in
+`.local/scenes51-100/batch51-55`.
+
+The second batch added 20 standalone scenes across families 56–60. A local
+generator copy strips unused uniform declarations. Elevator Shaft Atlas now
+renders through the front of the shaft and uses the correct local coordinates
+for moving cages. Pneumatic Dispatch keeps the capsule labels visible through
+the glass, and Switchyard Insulators casts artwork-shaped corona light onto
+its hardware. All 20 passed Studio quiet, active and Nested checks and
+animated in the standalone viewer. Original and corrected generators, initial
+and final render reports, and the contact sheet are in
+`.local/scenes51-100/batch56-60`.
+
+The third batch added 20 standalone scenes across families 61–65. A local
+generator copy removes unused declarations and declares Braided Loom's
+missing high-band hit input. Curved Bowl now shows its enamel from a higher
+viewpoint. The veneer dies expose the wood edge, where Nested artwork forms a
+visible inlay. All 20 passed quiet, active and Nested Studio renders and
+animated in the standalone viewer. The original, corrected generator, initial
+and final reports and contact sheet are in `.local/scenes51-100/batch61-65`.
+
+The fourth batch added 20 standalone scenes across families 66–70. The
+corrected generator strips unused uniforms and declares Cryogenic
+Fracture's high-band hit input. Repeating Press and Split Impression use
+higher cameras and die clearance to show more of the engraved wax. All
+20 passed quiet, active and Nested Studio renders and animated in the
+standalone viewer. The original, corrected generator, initial and final
+reports and contact sheet are in `.local/scenes51-100/batch66-70`.
+
+The fifth batch added 20 standalone scenes across families 71–75. The
+corrected generator strips unused uniforms, opens up Collapsed Cavern's
+view and adds artwork-shaped light, strengthens the Nested response in
+Broad Estuary and Branching Delta, and raises the Basin Deposit camera
+to reveal its terrain. All 20 passed quiet, active and Nested Studio
+renders and animated with a Nested sprite in the standalone viewer. The
+generators, reports and contact sheet are in `.local/scenes51-100/batch71-75`.
+
+The sixth batch added 40 standalone scenes across families 76–85. The
+corrected generator reveals the Clock Escapement gears and uses Nested
+artwork on the brass and in the Geothermal Terraces pools. It also opens
+the Cracked Roof and adds depth cues in Lava Tube Ceiling. All 40 passed
+quiet, active and Nested Studio renders and animated with a Nested sprite
+in the standalone viewer. Original and corrected generators, reports and
+contact sheets are in `.local/scenes51-100/batch76-85`.
+
+The seventh batch added 40 standalone scenes across families 86–95. The
+corrected generator opens the view of the Foucault Gallery pendulums,
+lights Vertical Wall's relief from the front in response to audio, and
+maps Nested artwork onto the Radial Release pod. All 40 passed quiet,
+simulated active audio and Nested Studio renders and animated with a
+Nested sprite in the standalone viewer. The generators, reports and
+contact sheets are in `.local/scenes51-100/batch86-95`.
+
+The final batch added 20 standalone scenes across families 96–100. The
+corrected generator pulls back the Pneumatic Artificial Muscle camera to
+show the actuator fittings and hoses. All 20 passed quiet, simulated
+active audio and Nested Studio renders and animated with a Nested sprite
+in the viewer. The generators, reports and contact sheet are in
+`.local/scenes51-100/batch96-100`. The 200 generated variants across
+families 51–100 account for 88 active scenes and 112 scenes moved out by
+the viewer into `.local/removed-scenes` at this checkpoint.
+
+Alloy 0.55.123 bundles the 337 scenes Jay kept in the standalone viewer.
+78 were promoted into the shared scene directory, including Abyssal
+Observatory and the eight Lit/Lib variants. The 148 scenes removed from
+the previous Alloy catalogue remain in viewer recovery. The authoring
+generator reproduces the curated index. All 78 additions rendered in the
+packaged Studio renderer with a Nested sprite. The staged app opened and
+closed in an isolated bridge workspace, displayed 0.55.123, and showed the
+new families in the GLSL picker. `out/Launch.cmd` targets
+`out/releases/0.55.123-c79af00cdcfb`. The rollback launcher is
+`out/Launch.cmd.bak.version-0.55.123-20261113`. The delta source archive,
+catalogue, payload hashes, render checks and activation are under
+`.local/kept123`. Verification was scoped to the catalogue and startup.
+
+The pasted dynamic-camera generator was saved as
+`Downloads/alloy_scenes_51_100_dynamic_camera.py` and generated 200
+separate scenes. Its viewer launcher opens the regenerated copy under
+`.local/scenes51-100/dynamic-camera`. All compiled, and 180 met the quiet,
+simulated audio and Nested render thresholds. The remaining 20 had weak
+audio or Nested response in that check.
+
+The next generator supplies 200 scenes in families 101–150. A corrected
+copy fixes GLSL in Sundial Shadow Play and Glass Bead Curtain and improves
+Nested artwork mapping in Abyssal Jellyfish and Acoustic Levitation.
+All 200 passed quiet, simulated active audio and Nested Studio renders.
+The custom viewer detected all 200 and passed sampled Nested rendering
+and Back/Forward wrap checks. The pack and its launcher are under
+`.local/scenes101-150`, outside the bundled catalogue.
+
+Jay confirmed restoring both full packs. The shared `visual-studio/scenes`
+library now contains 650 GLSL scenes: 250 retained after the latest cull,
+200 dynamic-camera scenes and 200 from families 101–150. The 87 scenes
+removed since the previous activation are in viewer recovery. Both batch
+launchers now open the same shared viewer library. The authoring generator
+reproduces the consolidated index without restoring removed entries.
+All 400 additions compiled and rendered through Alloy's packaged Studio
+renderer with a Nested sprite. The earlier dynamic-camera checks still
+record weak audio or artwork response in 20 variants.
+`out/Launch.cmd` targets `out/releases/0.55.123-c79af00cdcfb-library650`,
+an asset-only update using the verified 0.55.123 executable and metadata.
+The existing app instance was left running. Rollback is
+`out/Launch.cmd.bak.library650-20261113`. The catalogue, hashes, render
+report and activation are under `.local/scenes-unified`.
+
+The standalone viewer now updates the active launcher release's GLSL
+catalogue when **Remove marked** archives scenes from the shared library.
+Reopen **+ GLSL** in Alloy to see the change. The source catalogue and
+authoring profiles are updated in the same operation, and the recovery
+folder retains their previous contents. Installed shader files remain
+available to mixes that already reference them. The active Studio script
+can start with another scene if Signal Loom is removed. The executable
+was reused. An isolated viewer fixture verified cancellation, removal,
+both catalogue updates, rollback, regeneration and the preview fallback.
+The 650-entry live catalogue was checked without removing any of its
+scenes. Evidence is in `.local/scene-live-sync`.
+
+## 13 November functional audit and arranger follow-up
+
+The [team audit](docs/AUDIT-20261113.md) inspected the active 0.55.118
+bundle and retained 430 fresh focused checks for save/export, recovery,
+source-grid correction, take targeting and Studio audio. The open ten-song
+timeline showed eight eight-bar joins and one four-bar join. Its session was
+only observed. The team recorded timing/correction, visual output and take
+export findings for later focused reproduction.
+
+Jay requested musical overlap and technique selection with up to 64 bars and
+asked whether analysis can retain evidence for the last 64 bars. The arranger
+follow-up uses the retained waveform and section markers. Per-bar vocal,
+melodic and local harmonic evidence remains under W19. Candidate source and
+verification evidence are kept under `.local/audit1113`.
+
+Alloy 0.55.120 passed **404 focused checks** serially with stress off
+(arranger 204, stems 81, saved-mix comparison 71, Studio workspace 48).
+`out/Launch.cmd` selects `out/releases/0.55.120-373305f4c4cb`.
+Executable SHA-256 is `373305f4c4cb52c308779ede5518fb61054038b27edd94c6c655452060df978f`.
+Rollback is `out/Launch.cmd.bak.version-0.55.120-20261113`, selecting 0.55.118.
+The staged bundle, source archive and activation receipt match. The user's open
+0.55.118 instance was left running and the isolated 0.55.120 check closed cleanly.
+The 25-song metadata comparison spans 8–54 bars on the timeline and 8–59 in
+Library Auto Arrange. Three hydrated joins rendered at 8, 53.4 and 54 bars.
+In the isolated two-track app, the actual Blend button changed the displayed
+8-bar frame to a 49-bar bass handover. Exact Undo, source-backed reopen and the
+0.55.120 title were verified. Matched before/after listening excerpts are in
+`.local/audit1113/audition-120`. No independent listening or vocal/melodic clash
+acceptance was established. Analysis revision 11 and session 53 are unchanged.
+
+Automatic Studio schedules choose from all 67 sprite and 13 background images
+in the bundled folders. Sprites cover the timeline inside MilkDrop feedback.
+Backgrounds feed GLSL and adjacent identical file content extends the previous
+clip. The 44-placement fixture rendered the opening, middle and end with both
+routes active. Native gestures selected across two lanes, moved the group,
+deleted it and restored both operations with Undo. Live real-show listening,
+physical device acceptance and a complete regression remain open.
+
+The first .119 compile exposed a fixture type error; the linked .119 diagnostic
+then exposed shared effects in the stems chronology fixture. The .120 fixture
+asserts refusal for the shared mixer and gives independent placements their own
+effects owners. Both .119 diagnostics and .120 evidence are retained separately.
+
+## Previous outcome — shared pair planner, Alloy 0.55.118
+
+The .118 activation selected `out/releases/0.55.118-71c16088e355`.
+Rollback: `out/Launch.cmd.bak.version-0.55.118-20261113`, selecting 0.55.113.
+Executable SHA-256: `71c16088e355b3edaddb16c3e09fa9e394ca32a1e0b7ebf6bc5d51dfbd2d6d23`.
+The visible title, Windows FileVersion and ProductVersion all show 0.55.118.
+The exact complete local bundle, launcher backup, source archive and scoped
+activation receipt are retained independently of Git. No commit or public release.
+
+Library **Auto Arrange** and **Blend timeline tracks** now use the same bounded
+pair planner. The latter keeps timeline order. It scores nearby entry/exit
+passages and four/eight-bar overlaps; sixteen bars require accepted key/bar and
+measured-level evidence. Entry/exit changes are bounded to eight source bars and
+20% of eligible segments. A middle song retains four beats between handovers.
+Extensions preserve the established tail. Authored EQ remains intact; authored
+volume crossing the proposed frame makes the planner refuse safely.
+
+The measured bass pass coordinates faders, low-end exchange and subtractive
+upper-band EQ. Incoming bass rises once from -18dB to neutral; outgoing bass
+falls once and stays down. Each generated exchange has two analytical endpoints,
+including a nonzero source cue; middle songs retain separate entrance and exit
+spans. Generated IN/OUT gates prevent an unfaded file lead before the cue and
+stop outgoing audio at OUT. Existing DSP, analysis revision11 and session53 are
+retained. No vocal/phrase classifier, new stem/loop/delay DSP or detector reset.
+Original music, saved mix, production analysis/corrections and references remain
+untouched. Details: `docs/AUTO-ARRANGEMENT.md`.
+
+All **354 focused native checks** passed serially, below normal priority with
+stress off: Auto Arrange202, stems80, saved-mix comparison72. The real 25-song
+saved mix completed both planning paths; timeline duration changed from91:58 to
+87:37, median overlap7.37 to8 bars, with five later entries. Library planning
+changed song order and completed all25 songs. These full-mix files are metadata
+planning evidence. Three pairs (joins1,9,16) were actually hydrated, refined,
+prepared and rendered before/after. All six excerpts are loudness matched and
+unclipped, retained explicitly for Jay's listening. Measurements and audio links:
+`.local/pair1112/COMPARISON.md`. Levels are not perceptual-quality proof; the
+existing tentative phase on Overnight (Edit) remains tentative.
+
+The live **Blend timeline tracks** button regenerated the two-source comparison;
+Undo restored clips, tempo, transition links, controls and master data exactly.
+The restored session reopened with both sources. Both actual bass curves were
+visually inspected with two points and no dip/return. Muted playback crossed the
+handover (413 callbacks, positive output peak), then was paused and rewound.
+The new **0.55.118 preview remains OPEN**, root `.local/pb118`, PID25544,
+window2885176, session `sessions/ready-to-audition.mixworks`. It was handed off
+unmuted at1880.951s, incoming BAS visible, before Are You Ready -> It's A New
+Dream. The original0.55.113 PID19812 and Jay's earlier0.55.114 preview PID21120
+remain open. Do not close them. The earlier114 preview contains an audition-only
+bass correction; its generator is still114. The owned116 verification instance
+was saved and closed. A full regression, sustained listening and physical-device
+acceptance were not claimed.
+
+Evidence and continuation: `.local/pair1112/WORK.md`, source-118.zip/json,
+three native receipts, ui-*-118.json, live-playback-118.json, visible-118.png,
+metadata-118.json, payload-118.json and activation-118.json; native outgoing and
+incoming screenshots are in `.local/pb118/evidence`. The UI harness initially
+assumed the first file must start before1s; observed correct bar placement starts
+at1.382s. Its assertion now allows the first project bar. No app behaviour was
+changed to satisfy that harness assumption.
+
+### Diagnostic candidates retained
+
+- 114: arranger196/2 and stems77/1 exposed generated fade padding mistaken for
+  manual automation on short middle songs; comparison61/0. A clock assertion
+  also incorrectly rejected neutral exterior padding. Source/logs and failures
+  remain retained. Jay flagged the compensating bass dips/returns and flat dots.
+- 115: arranger198/0, stems80/1 (obsolete clip-local controls assertion), real
+  comparison64/0. The stem assertion now samples authoritative effect controls.
+- 116: all344 checks passed, but real-file reopen exposed two unnecessary
+  incoming bass points before a nonzero cue. Unactivated.
+- 117: arranger201/1 and comparison69/1 exposed repeat-Blend ownership and
+  library-plan serialization failures; stems80/0. The new two-node and incoming
+  PCM checks passed. Boundary cleanup had retained exterior guard interpolation
+  with an inside -160dB value lacking gain-space representation, and slicing
+  dropped generated ownership. 118 slices the whole inside representation,
+  retains inherited ownership and owns synthesized padding. Original failures,
+  the one-check parse diagnosis and all source checkpoints remain available.
+
+## Previous timing checkpoint
+
+**First Phase 3 timing checkpoint verified in Alloy 0.55.113.**
+That checkpoint selected `out/releases/0.55.113-92e8d4ae2eef`. Its rollback is
+`out/Launch.cmd.bak.version-0.55.113-20261112`, which selects 0.55.110. The
+executable SHA-256 is `92e8d4ae2eefbab07e4865411f03b846a4564d8155d622611c87b7ce2513fe1c`.
+The captured title, Windows FileVersion and ProductVersion agree.
+
+Ordinary append and drop use the known source bar phase even with Crossfade
+selected. The append takes the next valid placement after the existing audio.
+The drop takes the closest valid placement. Sources with reliable pulse and
+unknown bar phase still align to beats. The new fixture checks a trimmed second
+source before and after its late downbeat anchor. The detector remains at
+analysis revision 11. Production analysis, reviews and sessions were preserved.
+
+All **180 scoped checks** passed on the activated executable. The grid suite
+passed 52 checks with an explicit paired frame, current snap targets, and Undo
+and Redo after tempo preparation commits. Deleting a track removes its owned
+tempo target and preserves a coincident manual point. Rhythm reliability passed
+83 checks, including the incoming native tempo at the aligned downbeat of an
+independent drop. The waveform suite passed 45 checks using the same pixel
+columns in the real and silent renders. The peak-only check samples away from
+the IN tab. The UI captures, complete bundle hashes, source archive, and
+reports are in `.local/gridfix113`. This was a scoped native verification with
+stress off. A full regression and real-mix listening remain open.
+
+`.local/p3grid1112` retains the unactivated 0.55.111 candidate and failures
+reproduced on 0.55.110. `.local/gridfix112` retains the next run, which cleared
+the crash and original failures and exposed two older grid-fixture issues.
+
+**Previous manual timeline checkpoint verified in Alloy 0.55.110.**
+The previous bundle is `out/releases/0.55.110-a551958e9513`. Its rollback is
+`out/Launch.cmd.bak.version-0.55.110-20261112`. Executable SHA-256 is
+`a551958e951381026a4136360400b39068639daafb09b1e9d59bae885c123844`.
+The visible title, FileVersion and ProductVersion agree. Studio remains 0.1.24.
+
+- A manual OUT highlights the outgoing tail and the corresponding area on the
+  next clip. IN edits update the area. It survives Undo and source-backed Open.
+- Pair lock buttons have their own space away from IN/OUT triangles and tabs.
+  The native checks operated the toggle at 0.1, 80 and 1,600 pixels per second.
+- The workspace selector shows two, three or four audio lanes. New insertions,
+  paste and Auto Arrange use visible lanes. Existing placements on hidden lanes
+  stay in the mix.
+- When captured and current tempo maps agree at the new placement, an unlocked
+  IN edit can proceed. For a genuine mismatch, pause and choose **Sync playback
+  clocks** in the pair's transition menu. This is one Undoable edit and keeps
+  clip positions, source span and join geometry. Save refuses incompatible
+  saved clock geometry before writing. The repaired fixture reopened and
+  accepted its IN edit at the same join.
+- A prepared timeline hotcue moves the cue highlight and viewport when the
+  whole-mix seek commits. The test observed the old clock, view and document
+  while queued, then the new clock and selection together.
+
+All **582 focused checks** passed serially with stress off and clean retention
+(pairs 75, zoom 12, markers 199, timeline cues 18, seek 90, Auto Arrange 188).
+Source, launcher, hashes and inspected one-track, paired and two-lane captures
+are retained in `.local/manual110`. `.local/manual1112` retains the .108
+queued-cue failure, the initial compile failure and the unactivated .109 result.
+The .109 fixture showed that ordinary Save and Open could not recover a genuine
+clock mismatch. The final build uses the explicit sync action. These are native
+gesture and owned-source checks. A real-mix desktop pass remains open.
+
+### Auto arranger research — 12 November
+
+The [capability review](docs/research/AUTO-ARRANGER-CAPABILITY-REVIEW-20261112.md)
+traces earlier changes, current styles, both planning paths, DJ practice and
+buildable improvements. Jay authorised unrestricted work on the open arrangement
+and saved `Desktop/Mixworks/Sessidafn.mixworks`; that session need not be preserved.
+Its research copy has 25 songs, 18 short blends and six bass handovers, all with
+source offsets zero. Frame spans are 6.69–7.81 bars. Read-only inspection of the
+25 identity-matched analysis records found two tentative bar phases and all keys
+below the current review threshold; this does not establish incorrect musical
+labels. `.local/arranger-research-1112` retains the session, relevant analysis
+inputs, audit script, summaries and inspected-source identities independently
+of Git. Recommended first work is a shared pair planner choosing source cues,
+length and coordinated volume/EQ treatment, followed by join-aware song selection.
+Loop, echo and stem techniques have explicit prerequisites in the review.
+Research only: no app code/build, detector reset, audio render or listening
+acceptance. The production instance remains open on 0.55.113.
+
+### Phase 3 timing baseline
+
+Fresh revision 11 analysis of three development recordings used the exact
+0.55.110 bundle and compared the outputs to one digest-matched reviewed anchor
+per recording. The 25 constant-tempo 4/4 construction checks passed.
+
+| Recording | Automatic BPM | Pulse difference at reviewed anchor | Bar difference at reviewed anchor |
+| --- | ---: | ---: | --- |
+| Nvrsaynvr (Dustin Zahn Remix) | 125.99989 | 0.75 ms | Two beats away |
+| Rivera (Original Mix) | 127.00120 | 14.68 ms | Unknown; detector flagged tempo variation |
+| Alien (Original Mix) | 124.99991 | 2.84 ms | 2.84 ms |
+
+The reviewed anchors do not supply independent tempo or drift measurements
+across each recording. The source hashes, original review hashes, candidate
+identity, fresh analysis and comparison survive in `.local/p3grid1112`.
+Three other recordings in the frozen selection remain reserved for a later
+detector comparison. W11 still needs separately annotated passages near the
+beginning, middle and end, musical verification of both bar disagreements and
+a holdout pass before declaring automatic timing accurate on real tracks.
+
+### Full-track timing check on 0.55.113
+
+The active executable freshly analysed Nvrsaynvr, Rivera and Alien on the
+digest-matched originals. Native physical diagnostics covered contiguous
+20-second windows from sample zero through each decoded end. All 21 capture
+and identity checks passed. The checked grids reproduced the 0.55.110 baseline.
+
+- **Nvrsaynvr, 125.99989 BPM.** The pulse holds across the recording. Repeated
+  bass waveform matches fitted about 0.3 ms of drift over 0.5–228.1 s, and
+  about 0.05 ms over 281.0–347.2 s using a later template. The two templates
+  cover different passages. The saved downbeat at 75.269 s is on the same
+  pulse and two beats away from Alloy's bar phase. The model voted 184 times
+  for Alloy's phase and seven times for the reviewed phase. The two largest
+  sustained band-energy changes, at 91.459 and 213.364 s, also fall on Alloy's
+  phase, 64 bars apart. Smaller changes are mixed. The evidence favors Alloy's
+  phase and the saved disagreement still needs musical adjudication.
+- **Rivera, 127.00120 BPM.** In the native 0–20 and 440–460 s windows, the
+  recurring physical pulse fitted 127.00017 and 127.00247 BPM. Measured
+  attacks were about 16 ms early at the start and 12 ms early near the end on
+  Alloy's grid. The separately decoded repeated bass waveform fitted about
+  3.5 ms of relative drift over 30.7–422.9 s. No native physical window
+  corroborated a tempo or phase change. The first neural window alone trips
+  the independent review rule. Its local score is 0.871 against 0.0004 for
+  the global grid, with a median neural event about 191 ms after the global
+  pulse. The resulting variable flag prevents acceptance of a downbeat.
+  The saved review and Alloy's provisional guess select the same bar phase.
+  Neural bar votes are unanimous for that phase in the middle third and mixed
+  in the last third. This supports a steady tempo and leaves bar confidence open.
+- **Alien, 124.99991 BPM.** The reviewed and automatic bar phases agree.
+  Repeated bass waveform matches fitted about 0.33 ms of drift over
+  0.5–368.2 s. The model's 193 accepted downbeat candidates use one phase.
+
+Evidence and scripts are in `.local/phase3-real-1112`, with every predicted
+beat and unsupported observation in per-track CSVs, 20-second windows and the
+reproduced Rivera review decision. The FLAC waveform shares the native sample
+count. The independent MP3 decode exposes different boundary frame counts,
+and the native PCM head export produced no usable capture. MP3 waveform
+correlations establish relative drift within that decoder. Absolute offsets
+above use the native attack data. No real-time listening or independent
+multi-point musical labels were collected. The three reserved recordings,
+protected reviews, production analysis and launcher were preserved.
+
+**Phase 2 local checkpoint verified in Alloy 0.55.108 and Studio 0.1.24.**
+The previous bundle is `out/releases/0.55.108-96fae2c35fb1`. Its rollback is
+`out/Launch.cmd.bak.version-0.55.108-20261112`. Executable SHA-256 is
+`96fae2c35fb14e7f47b312ddce8d66414d8a3306d155943204394f55ea2f81ab`.
+The title, Windows FileVersion and ProductVersion agree. The standalone
+launcher selects Studio 0.1.24 and its previous launcher is retained with the
+evidence.
+
+**Random scene** and **Random MilkDrop** are available in Studio's live mode.
+MilkDrop uses Alloy's imported and linked presets. Studio discards pending
+shuffles when Alloy takes over and restores its previous live scene when the
+lanes become empty. In Alloy, the four-lane context menu now replaces GLSL or
+MilkDrop clips using the regular pickers. A replacement keeps timing and join
+settings and resets scene controls, animation and source offset. The target
+lane must accommodate the clip when the scene type changes.
+
+All 42 focused Studio checks passed with clean retention. The native route
+replaced future and active clips across engines and restored the original
+animation with Undo. The integrated GPU renderer displayed tracks 1, 22 and 44
+of a 44-placement fixture after the visual schedule round-trip. The fixture
+used one shared source descriptor. The Studio harness rendered both random
+choices, exercised rapid requests and both ownership handoffs, and confirmed
+no authored timeline writes. Evidence and source identity are in
+`.local/p2finish108`. The unactivated .107 diagnostic in `.local/p2finish1112`
+retains the stale assertion that expected Balanced to hard-cut. The .108 fixture
+checks the current blend and the bar-aligned visual handover.
+
+Real-mix artistic acceptance and desktop gestures on this candidate remain open.
+
+**12 November Auto Arranger two-track checkpoint verified in 0.55.106.**
+`out/Launch.cmd` selects `out/releases/0.55.106-da935a93ddaf`. Rollback is
+`out/Launch.cmd.bak.version-0.55.106-20261112`. Executable SHA-256
+`da935a93ddafd3b2dddce0f9ba111006f6c517a616610261c644c0d5114822fe`.
+The title area, Windows FileVersion and ProductVersion agree.
+
+Balanced defaults to a short equal-power blend. Bold and DJ set use the same
+short placement with their optional filters. The planner checks room between
+joins and the level balance of shorter windows. A bounded source read checks
+both tracks for strong low end near the crossover. If both qualify, editable EQ
+nodes hand over the bass over one beat while the volume fade continues. Hard
+cuts remain an explicit style. A pair owns its generated nodes so another
+preset can replace them. [Audit](docs/research/AUTO-ARRANGER-MIXING-AUDIT-20261112.md)
+and [current behaviour](docs/AUTO-ARRANGEMENT.md) describe the change.
+
+188 focused Auto Arrange checks and 17 comparison checks passed, serially with
+stress off and clean retention. The first linked .105 surfaced a Crossfade
+replacement collision. .106 assigns ownership and passes that workflow.
+The .105 post-build step also hit a Tk DLL sharing lock. The build now skips
+byte-identical Tk files and .106 packaged successfully with Studio open.
+Source, bundle, rollback, native reports and inspected pixels are retained in
+`.local/aa1112`. Production apps, analysis and sessions were left in place.
+
+Three 21.6-second native renders in `.local/aa1112/listen-106` use Superstrobe's
+Wonderland (Original Mix) into Efdemin's Acid Bells, with identical placement
+and source trims. The actual overlap is 7.51 bars. Constant post-render gains
+match the three at −20.90 to −20.89 LUFS. The bass handover measured 0.5 dB lower
+in 35–180 Hz RMS over the frame than the plain blend. The WAVs are retained for
+Jay's audition. These focused results cover one real pair, with listening
+preference and broad regression still open.
+
+**Phase 1 complete on 11 November.** Jay reports excellent playback in his own
+use and accepted it as verified. Two-point automatic fades passed local checks.
+Jay deferred track movement while continuing to make mixes and looking for a
+repeatable case. Phase 2 reuses the full Visual Studio interface shown by
+`visual-studio/Launch.cmd`. Alloy's visual tab needs the four lanes, manual
+placement and the Open Visual Studio button. Studio follows scheduled visuals
+when the mix has visual clips and renders a live scene from Alloy's master audio
+when the four lanes are empty. Jay requested default sending and listening.
+
+The [manual timeline checkpoint](FINISHING-PLAN.md#manual-timeline-editing-checkpoint)
+covers W36–W38, the IN-marker refusal and the queued-hotcue recheck, ahead of
+Phase 3 analysis, catalogue reliability and assisted arrangement.
+
+**Timeline focus and large MilkDrop picker verified in Alloy 0.55.104 and
+Studio 0.1.23.** `out/Launch.cmd` selects `out/releases/0.55.104-64391d5fbdfd`.
+Rollback is `out/Launch.cmd.bak.version-0.55.104-20261111`. Executable SHA-256
+`64391d5fbdfd7e4145b28ce1c10d0c0a7c4a082be3fae305c327185f9554a254`.
+The visible version and Windows file and product versions agree.
+
+Studio previously received parameters only for a visual clip selected in
+Alloy. **Follow playhead** now chooses the current visual, prioritising GLSL,
+MilkDrop, sprites, then backgrounds. The dropdown pins a clip from another
+layer and selecting a visual in Alloy also pins it. The Studio deck maps the
+focused clip's controls, including Sprite controls and per-scene wheel
+assignments. The .103 diagnostic passed the native checks but lost a wheel
+assignment when returning to a clip. The .104 bundle passed 35 native checks
+and simulated FLkey pot, wheel and pad routing. The physical port was not tested.
+
+Jay traced the reported .102 hang to opening **+ MilkDrop** with nearly 60,000
+presets. The old picker read the 22 MB linked index again and built a menu item
+for each entry. The searchable list now uses Alloy's loaded index and draws the
+visible rows. The isolated desktop displayed 60,001 rows including the built-in
+preset, filtered to the last indexed title and placed it. Playback advanced
+22.18 seconds between picker checks. Studio followed a GLSL clip change,
+edited a pinned background and rendered the selected MilkDrop preset. The
+edit and preset survived save/reopen. Evidence is in
+`.local/studio-targets-verified-1111`, with the .103 diagnostic in
+`.local/studio-targets-1111`. Production files and devices were left alone.
+
+**Fullscreen output verified in Alloy 0.55.102 and Studio 0.1.21.**
+The prior bundle is `out/releases/0.55.102-55e2969793eb`, with rollback at
+`out/Launch.cmd.bak.version-0.55.102-20261111`. Executable SHA-256
+`55e2969793eb21834c2eb1da7be89ddf2a7f0db2cada4d8c46b402e1f2306759`.
+The visible version and Windows file and product versions agree. The GPU
+renders the fullscreen image at the other monitor's pixel dimensions. Studio
+keeps the clip controls available. **Return preview**, Esc and F11 reattach
+the picture. The **FPS counter** defaults off and measures presented frames
+on the fullscreen output when enabled.
+
+The exact build passed 31 focused Studio checks. On the two-display desktop
+the fullscreen window covered the left display at 1920 × 1080, the FPS overlay
+read 30 and could be removed, and a Blend amount edit from .38 to .80 reached
+the fullscreen image and survived save/reopen. Esc and the Studio button both
+returned the preview. Across 71.42 seconds of muted playback and 7,143 audio
+callbacks, one lock miss occurred in the first detach interval, with zero
+overruns or missing source samples. A simulated single-display inventory
+exercised the real primary display at 1920 × 1080. Mixed-DPI hardware remains
+unverified. The failed first compile and successful incremental build,
+source and bundle identities, rollback and screenshots are retained in
+`.local/studio-fullscreen-1111`. Scene replacement and live-only random scene
+and MilkDrop controls remain in Phase 2.
+
+**Studio startup recovery verified in Alloy 0.55.101 and Studio 0.1.20.**
+The previous bundle is `out/releases/0.55.101-0e8cfd4cff81`, with rollback at
+`out/Launch.cmd.bak.version-0.55.101-20261111`. The executable SHA-256 is
+`0e8cfd4cff81bded4a90a7ffb14409496782a1acf28c98ab9cdaee0116b36ac5`.
+The visible version and Windows file and product versions agree. Studio waits
+up to five seconds for its first timeline snapshot if Windows briefly denies
+access or the snapshot is being replaced. A Windows sharing lock reproduced
+Jay's startup dialog on .100. On .101 the packaged Studio recovered after four
+denied reads and connected. All 31 focused Studio workspace checks passed.
+The desktop button opened full Studio 0.1.20 and rendered the selected timeline
+clip. Evidence and the previous standalone launcher are retained in
+`.local/studio-startup-1111`.
+
+**First Phase 2 checkpoint verified in Alloy 0.55.100 and Visual Studio 0.1.19.**
+The prior bundle is `out/releases/0.55.100-409fc57fb9c0`.
+Executable SHA-256 `409fc57fb9c0790ae7b448fbcacabc14bfb3147734d5d9ff9e85ba735daeba8a`.
+The title area, FileVersion and ProductVersion agree. The Alloy launcher rollback
+is `out/Launch.cmd.bak.version-0.55.100-20261111`. The previous standalone
+launcher is retained with the evidence in `.local/phase2-full-studio-verified-1111`.
+
+The exact bundle passed 40 focused native checks covering Studio timeline edits,
+automation and the post-master audio feed. The desktop fixture confirmed the four
+lanes, manual scene placement, opening and refocusing one full Studio window,
+live audio reception, automatic switching both ways, Blend amount editing with
+Undo and Redo, source-backed save/reopen and continued Alloy playback after
+closing Studio. During placement while playing the audio clock advanced 21 seconds
+over 2,100 callbacks with no added overruns, lock misses or missing source samples.
+Standalone Studio also received the test feed on startup. The owned instances
+closed and the generated WAV was removed. Verification used a muted monitor and
+did not qualify physical devices, optional Studio media inputs or full regression.
+
+The unactivated .99 diagnostic in `.local/phase2-full-studio-1111` exposed an
+isolated Python import failure and fixture assumptions about the old embedded
+preview. The .100 exact-bundle desktop run verified the fixes.
+
+**11 November Undo and time-splice checkpoint verified in 0.55.98.** The local
+bundle is `out/releases/0.55.98-105cf0b5d700`. `out/Launch.cmd` selects it, with
+`.96` rollback at `out/Launch.cmd.bak.version-0.55.98-20261111`. Studio is 0.1.18.
+Executable SHA-256 `105cf0b5d700124e043420d5d5a968bd9489b18f7f5e1210e8be9ed8aa9697b4`.
+Visible title and Windows FileVersion/ProductVersion match 0.55.98.
+
+Normal Undo/Redo prepares the history candidate, effect ownership and parameter
+mapping outside the render lock. The displaced model becomes the opposite
+history entry after publication. Rebased pre-roll Undo/Redo, Ripple Delete and
+Close Gap prepare audio before publishing the arrangement and mapped cursor in
+one transaction. While playing, a splice follows the current cursor within its
+prepared 100 ms window. Failed preparation retains both history stacks and the
+current mix. Source-section history rolls back its disk writes if publication
+fails. Undo now waits for export, a prepared seek or launch, rehearsal or take
+playback to finish. Required VST parameter writes and seek resets still run
+serially with rendering. Saved format and detector revision stay the same.
+
+The final bundle passed **371 focused native checks** across cursor and
+source-section history (146), live transitions (103), seek (90) and native VST
+effects (32). The native splice callback matched independent nonzero PCM
+exactly and advanced the sample clock. The isolated desktop Edit menu and Undo/
+Redo buttons ran for **27.47 seconds, 2,746 callbacks and 756 Studio paints** with
+zero added lock misses, source waits, missing samples, overruns, oversized
+blocks or export-silence callbacks. Close Gap moved the stopped cursor from
+5 to 3 seconds. Save/reopen matched all 1,024 probed PCM frames. The owned app
+closed normally and the exact-hash generated WAV was removed after exit.
+
+The .97 diagnostic passed its ripple, live, seek and VST cases. Its pre-roll
+fixture still used the waveform to move a segment. .98 moves through the title
+header and checks refusal directly after the rebase. The same unrelated
+queued-hotcue assertion fails on .96 and .97 in the broader marker suite.
+Both reports are retained. One injected Ctrl+Shift+Delete attempt invoked
+ordinary Delete. The native key-handler test passed and the desktop Edit menu
+worked, while the physical shortcut remains unverified. JUCE reads the current
+modifier state during dispatch, so the injection result does not establish the
+physical chord's behaviour.
+
+Evidence is in `.local/phase1-cursor-verified-1111`, including source and bundle
+identities, native reports, desktop states, pixels and rollback receipt.
+Diagnostic evidence is in `.local/phase1-cursor-history-1111`. The user's running
+app, music, sessions and retained analysis were left in place. This checkpoint
+covers focused local acceptance. Broad plugin and hardware qualification,
+inspector/reverse/loop transaction scopes and wider W04/W14 coverage remain in
+the backlog. Model snapshot cost and new elastic-window preparation remain
+known limits. Catalogue-scale startup/reopen is in Phase 3.
+
+### 11 November reported IN-marker refusal on .96
+
+Jay authorised inspection of the original instance. Dragging the exposed IN
+line on XTC above Ultraschall produced the earlier-playback-clock refusal.
+The pair displayed Unlocked. Saving serialises the mix, while reopening binds
+beatmatched clips to the saved tempo map. The specific edit that separated the
+clocks is unverified. The original session was left open without saving or
+reopening it. Separately, a disposable .96 fixture reproduced the Unlocked
+button intercepting the IN triangle at the reported zoom. Dragging the orange
+line below the transition header slid the incoming clip under the fixed OUT.
+Fixture states and captures are in `.local/phase1-in-handle-1111`. The movement
+report is deferred pending Jay's clearer reproduction. The manual timeline
+checkpoint carries stale-clock recovery under W04 and overlapping pointer
+targets under W38.
+
+## Prior .96 focused checkpoint (superseded above)
 
 **11 November duplication/range checkpoint verified in 0.55.96.** Complete
 local bundle: `out/releases/0.55.96-e055fd1224e5`; `out/Launch.cmd` selects it after the

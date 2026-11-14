@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 86,
+    "family_name": "Waterfall Gorge",
+    "variant_number": 1,
+    "variant_title": "Twin Falls",
+    "shader_path": "01-twin-falls/main.glsl",
+    "descriptor_path": "01-twin-falls/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 86,
+    "family_name": "Waterfall Gorge",
+    "variant_number": 2,
+    "variant_title": "Stepped Cascades",
+    "shader_path": "02-stepped-cascades/main.glsl",
+    "descriptor_path": "02-stepped-cascades/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 86,
+    "family_name": "Waterfall Gorge",
+    "variant_number": 3,
+    "variant_title": "Mist Chasm",
+    "shader_path": "03-mist-chasm/main.glsl",
+    "descriptor_path": "03-mist-chasm/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 86,
+    "family_name": "Waterfall Gorge",
+    "variant_number": 4,
+    "variant_title": "Frozen Falls",
+    "shader_path": "04-frozen-falls/main.glsl",
+    "descriptor_path": "04-frozen-falls/scene.json",
+    "verification": "unverified"
+  }
+]

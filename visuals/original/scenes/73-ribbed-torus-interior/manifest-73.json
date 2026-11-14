@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 73,
+    "family_name": "Ribbed Torus Interior",
+    "variant_number": 1,
+    "variant_title": "Smooth Ring",
+    "shader_path": "01-smooth-ring/main.glsl",
+    "descriptor_path": "01-smooth-ring/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 73,
+    "family_name": "Ribbed Torus Interior",
+    "variant_number": 2,
+    "variant_title": "Ribbed Tube",
+    "shader_path": "02-ribbed-tube/main.glsl",
+    "descriptor_path": "02-ribbed-tube/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 73,
+    "family_name": "Ribbed Torus Interior",
+    "variant_number": 3,
+    "variant_title": "Spiral Grooves",
+    "shader_path": "03-spiral-grooves/main.glsl",
+    "descriptor_path": "03-spiral-grooves/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 73,
+    "family_name": "Ribbed Torus Interior",
+    "variant_number": 4,
+    "variant_title": "Segmented Hull",
+    "shader_path": "04-segmented-hull/main.glsl",
+    "descriptor_path": "04-segmented-hull/scene.json",
+    "verification": "unverified"
+  }
+]

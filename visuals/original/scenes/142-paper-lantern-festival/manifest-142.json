@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 142,
+    "family_name": "Paper Lantern Festival",
+    "variant_number": 1,
+    "variant_title": "Sky Ascent",
+    "shader_path": "01-sky-ascent/main.glsl",
+    "descriptor_path": "01-sky-ascent/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 142,
+    "family_name": "Paper Lantern Festival",
+    "variant_number": 2,
+    "variant_title": "River Float",
+    "shader_path": "02-river-float/main.glsl",
+    "descriptor_path": "02-river-float/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 142,
+    "family_name": "Paper Lantern Festival",
+    "variant_number": 3,
+    "variant_title": "Dense Swarm",
+    "shader_path": "03-dense-swarm/main.glsl",
+    "descriptor_path": "03-dense-swarm/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 142,
+    "family_name": "Paper Lantern Festival",
+    "variant_number": 4,
+    "variant_title": "Crimson Night",
+    "shader_path": "04-crimson-night/main.glsl",
+    "descriptor_path": "04-crimson-night/scene.json",
+    "verification": "unverified"
+  }
+]

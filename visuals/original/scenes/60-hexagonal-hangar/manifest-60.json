@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 60,
+    "family_name": "Hexagonal Hangar",
+    "variant_number": 1,
+    "variant_title": "Iris Doors",
+    "shader_path": "01-iris-doors/main.glsl",
+    "descriptor_path": "01-iris-doors/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 60,
+    "family_name": "Hexagonal Hangar",
+    "variant_number": 2,
+    "variant_title": "Bulkhead Corridor",
+    "shader_path": "02-bulkhead-corridor/main.glsl",
+    "descriptor_path": "02-bulkhead-corridor/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 60,
+    "family_name": "Hexagonal Hangar",
+    "variant_number": 3,
+    "variant_title": "Split Gates",
+    "shader_path": "03-split-gates/main.glsl",
+    "descriptor_path": "03-split-gates/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 60,
+    "family_name": "Hexagonal Hangar",
+    "variant_number": 4,
+    "variant_title": "Cargo Stacks",
+    "shader_path": "04-cargo-stacks/main.glsl",
+    "descriptor_path": "04-cargo-stacks/scene.json",
+    "verification": "unverified"
+  }
+]

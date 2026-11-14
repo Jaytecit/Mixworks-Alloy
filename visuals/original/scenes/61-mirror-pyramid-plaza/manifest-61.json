@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 61,
+    "family_name": "Mirror Pyramid Plaza",
+    "variant_number": 1,
+    "variant_title": "Great Pyramid",
+    "shader_path": "01-great-pyramid/main.glsl",
+    "descriptor_path": "01-great-pyramid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 61,
+    "family_name": "Mirror Pyramid Plaza",
+    "variant_number": 2,
+    "variant_title": "Twin Obelisks",
+    "shader_path": "02-twin-obelisks/main.glsl",
+    "descriptor_path": "02-twin-obelisks/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 61,
+    "family_name": "Mirror Pyramid Plaza",
+    "variant_number": 3,
+    "variant_title": "Stepped Temple",
+    "shader_path": "03-stepped-temple/main.glsl",
+    "descriptor_path": "03-stepped-temple/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 61,
+    "family_name": "Mirror Pyramid Plaza",
+    "variant_number": 4,
+    "variant_title": "Floating Apex",
+    "shader_path": "04-floating-apex/main.glsl",
+    "descriptor_path": "04-floating-apex/scene.json",
+    "verification": "unverified"
+  }
+]

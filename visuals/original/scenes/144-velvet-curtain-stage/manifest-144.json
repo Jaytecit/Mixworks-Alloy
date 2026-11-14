@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 144,
+    "family_name": "Velvet Curtain Stage",
+    "variant_number": 1,
+    "variant_title": "Crimson Velvet",
+    "shader_path": "01-crimson-velvet/main.glsl",
+    "descriptor_path": "01-crimson-velvet/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 144,
+    "family_name": "Velvet Curtain Stage",
+    "variant_number": 2,
+    "variant_title": "Midnight Silk",
+    "shader_path": "02-midnight-silk/main.glsl",
+    "descriptor_path": "02-midnight-silk/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 144,
+    "family_name": "Velvet Curtain Stage",
+    "variant_number": 3,
+    "variant_title": "Gold Fringe",
+    "shader_path": "03-gold-fringe/main.glsl",
+    "descriptor_path": "03-gold-fringe/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 144,
+    "family_name": "Velvet Curtain Stage",
+    "variant_number": 4,
+    "variant_title": "Parting Reveal",
+    "shader_path": "04-parting-reveal/main.glsl",
+    "descriptor_path": "04-parting-reveal/scene.json",
+    "verification": "unverified"
+  }
+]

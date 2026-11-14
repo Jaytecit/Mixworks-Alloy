@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 139,
+    "family_name": "Kinetic Domino Cascade",
+    "variant_number": 1,
+    "variant_title": "Serpent Path",
+    "shader_path": "01-serpent-path/main.glsl",
+    "descriptor_path": "01-serpent-path/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 139,
+    "family_name": "Kinetic Domino Cascade",
+    "variant_number": 2,
+    "variant_title": "Spiral Fall",
+    "shader_path": "02-spiral-fall/main.glsl",
+    "descriptor_path": "02-spiral-fall/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 139,
+    "family_name": "Kinetic Domino Cascade",
+    "variant_number": 3,
+    "variant_title": "Double Row",
+    "shader_path": "03-double-row/main.glsl",
+    "descriptor_path": "03-double-row/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 139,
+    "family_name": "Kinetic Domino Cascade",
+    "variant_number": 4,
+    "variant_title": "Standing Reset",
+    "shader_path": "04-standing-reset/main.glsl",
+    "descriptor_path": "04-standing-reset/scene.json",
+    "verification": "unverified"
+  }
+]

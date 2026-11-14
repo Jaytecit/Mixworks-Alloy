@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 62,
+    "family_name": "Suspended Monorail",
+    "variant_number": 1,
+    "variant_title": "Sinuous Track",
+    "shader_path": "01-sinuous-track/main.glsl",
+    "descriptor_path": "01-sinuous-track/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 62,
+    "family_name": "Suspended Monorail",
+    "variant_number": 2,
+    "variant_title": "Twin Rails",
+    "shader_path": "02-twin-rails/main.glsl",
+    "descriptor_path": "02-twin-rails/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 62,
+    "family_name": "Suspended Monorail",
+    "variant_number": 3,
+    "variant_title": "Corkscrew Loop",
+    "shader_path": "03-corkscrew-loop/main.glsl",
+    "descriptor_path": "03-corkscrew-loop/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 62,
+    "family_name": "Suspended Monorail",
+    "variant_number": 4,
+    "variant_title": "Sky Viaduct",
+    "shader_path": "04-sky-viaduct/main.glsl",
+    "descriptor_path": "04-sky-viaduct/scene.json",
+    "verification": "unverified"
+  }
+]

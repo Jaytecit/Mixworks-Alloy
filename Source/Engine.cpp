@@ -5,6 +5,7 @@
 #include "Beatmatch.h"
 #include <cmath>
 #include <map>
+#include <set>
 #include <limits>
 #include <tuple>
 
@@ -382,7 +383,8 @@ void Engine::warmSeek(PreparedSeek& prepared, const std::function<bool()>& cance
         { prepared.error = "The seek destination audio could not be prepared. Playback was kept."; return; }
     }
     if (cancelled && cancelled()) { prepared.error = "Seek preparation was superseded."; return; }
-    prepared.renderer.prepare(prepared.clips, prepared.seconds, prepared.rate, prepared.frames);
+    const int lookahead = prepared.editPosition && prepared.running ? (int)std::ceil(prepared.rate * .1) : 0;
+    prepared.renderer.prepare(prepared.clips, prepared.seconds, prepared.rate, prepared.frames + lookahead);
     }
     catch (const std::exception&)
     { prepared.error = "The seek destination could not be prepared. Playback was kept."; }
@@ -392,7 +394,23 @@ Engine::PreparedSeek Engine::prepareSeek(double seconds)
     auto prepared = snapshotSeek(seconds); warmSeek(prepared);
     return prepared;
 }
-juce::Result Engine::commitSeek(PreparedSeek prepared)
+Engine::PreparedSeek Engine::prepareEditSeek(const Project& replacement, std::function<double(double)> positionMap)
+{
+    PreparedSeek prepared;
+    prepared.editPosition = std::move(positionMap);
+    {
+        const juce::ScopedLock guard(lock);
+        prepared.owner = this; prepared.request = seekRequest; prepared.revision = visualClockRevision;
+        prepared.seconds = prepared.editPosition(position.load()); prepared.rate = sampleRate; prepared.frames = blockSize;
+        prepared.running = playing;
+    }
+    if (!std::isfinite(prepared.seconds) || prepared.seconds < 0 || !std::isfinite(prepared.rate) || prepared.rate <= 0 || prepared.frames <= 0)
+        prepared.error = "The audio clock is unavailable. Mix and playback kept.";
+    prepared.clips = replacement.clips;
+    warmSeek(prepared);
+    return prepared;
+}
+juce::Result Engine::commitSeek(PreparedSeek prepared, Project* replacement, const ManualPluginValues& manualValues)
 {
     if (prepared.error.isNotEmpty()) return juce::Result::fail(prepared.error);
     // Declare retirement owners before the guard so their destruction, including
@@ -401,9 +419,10 @@ juce::Result Engine::commitSeek(PreparedSeek prepared)
     std::unique_ptr<Project> retiredProgramme;
     std::array<RehearsalAudio, 3> retiredRehearsal;
     const juce::ScopedLock guard(lock);
+    const auto& target = replacement ? *replacement : project;
     if (prepared.owner != this || prepared.request != seekRequest || prepared.revision != visualClockRevision
         || prepared.rate != sampleRate || prepared.frames != blockSize || prepared.running != playing
-        || prepared.clips.size() != project.clips.size())
+        || (bool)prepared.editPosition != (replacement != nullptr) || prepared.clips.size() != target.clips.size())
         return juce::Result::fail("Playback changed during seek preparation. Choose the position again.");
     const auto identity = [](const Clip& c)
     {
@@ -411,8 +430,15 @@ juce::Result Engine::commitSeek(PreparedSeek prepared)
             c.start,c.length,c.offset,c.audioSlip,c.rate,c.pitchSemitones,c.reversed,c.loopSpan,c.loopPhase,c.preparedOffset,c.elasticPlayback);
     };
     for (size_t i = 0; i < prepared.clips.size(); ++i)
-        if (identity(prepared.clips[i]) != identity(project.clips[i]))
+        if (identity(prepared.clips[i]) != identity(target.clips[i]))
             return juce::Result::fail("The arrangement changed during seek preparation. Choose the position again.");
+    if (replacement)
+    {
+        const double now = prepared.editPosition(position.load());
+        if (!std::isfinite(now) || now < prepared.seconds || now - prepared.seconds > (prepared.running ? .1 : 0.))
+            return juce::Result::fail("Playback advanced while preparing the edit. Try again. Mix kept.");
+        prepared.seconds = now;
+    }
     ++seekRequest; seekPending = false; ++takeAuditionRequest; retiredAudition.swap(takeAudition);
     retiredProgramme.swap(queuedProgramme); queuedProgrammeCommitted = false;
     if (rehearsalActive()) { playing = false; position = rehearsalReturn; }
@@ -422,27 +448,37 @@ juce::Result Engine::commitSeek(PreparedSeek prepared)
     cancelScheduledPause(ScheduledPauseReason::transportChanged); cancelLiveHotcues(ScheduledPauseReason::transportChanged,true);
     finishAutomation(); pauseFinishPending = false;
     for (auto& shift:replayShifts) shift.second=0;
+    if (replacement)
+    {
+        if (capturingPerformance()) replacement->performanceTakes.swap(project.performanceTakes);
+        std::swap(project, *replacement);
+        tempo = project.bpm;
+        if (capturingPerformance()) performanceProjectPending = true;
+    }
     position = prepared.seconds; ++visualClockRevision; deviceClockValid = false;
     std::swap(elasticRenderer, prepared.renderer);
     resetPlugins(false);
+    restoreManualPluginValues(manualValues);
     return juce::Result::ok();
 }
-juce::Result Engine::seek(double seconds)
+juce::Result Engine::seek(double seconds, std::function<void()> onCommit)
 {
-    if (attached) return queueSeek(seconds);
+    if (attached) return queueSeek(seconds, std::move(onCommit));
     const auto result = commitSeek(prepareSeek(seconds));
     seekPending = false;
     seekError = result.getErrorMessage();
     if (result.failed() && onSeekStatus) onSeekStatus(seekError);
+    if (result.wasOk() && onCommit) onCommit();
     return result;
 }
-juce::Result Engine::queueSeek(double seconds)
+juce::Result Engine::queueSeek(double seconds, std::function<void()> onCommit)
 {
     auto prepared = snapshotSeek(seconds);
     seekError = prepared.error;
     if (seekError.isNotEmpty())
     { if (prepared.owner) seekPending = false; if (onSeekStatus) onSeekStatus(seekError); return juce::Result::fail(seekError); }
     if (!seekWorker) seekWorker = std::make_unique<SeekWorker>(*this);
+    prepared.onCommit = std::move(onCommit);
     seekPending = true; seekWorker->submit(std::move(prepared));
     if (onSeekStatus) onSeekStatus("Preparing playback position...");
     return juce::Result::ok();
@@ -450,9 +486,15 @@ juce::Result Engine::queueSeek(double seconds)
 void Engine::prepareClipProcessing()
 {
     const juce::ScopedLock guard(lock);
+    std::set<juce::String> active;
+    for (const auto& clip : project.clips)
+    {
+        active.insert(clip.id);
+        active.insert(effectsIdentity(clip.effects));
+    }
     for (auto it = clipProcessors.begin(); it != clipProcessors.end();)
-        if (!project.clipFor(it->first) && std::none_of(project.clips.begin(),project.clips.end(),[&](const auto& c) { return effectsIdentity(c.effects)==it->first; })) it=clipProcessors.erase(it); else ++it;
-    for (const auto& c : project.clips) { clipProcessors.try_emplace(c.id); clipProcessors.try_emplace(effectsIdentity(c.effects)); }
+        if (!active.count(it->first)) it = clipProcessors.erase(it); else ++it;
+    for (const auto& id : active) clipProcessors.try_emplace(id);
 }
 void Engine::resetPlugins(bool resetElastic)
 {
@@ -1216,7 +1258,15 @@ juce::var Engine::captureProject(bool programmeSnapshot)
 juce::String Engine::saveProject(const juce::File& file)
 {
     juce::var document;
-    { const juce::ScopedLock guard(lock); if (!playbackReady()) return "Audio is still preparing or unavailable. Wait for the source checks before saving."; const auto destination = validateWriteDestination(file); if (destination.failed()) return destination.getErrorMessage(); document = captureProject(); }
+    {
+        const juce::ScopedLock guard(lock);
+        if (!playbackReady()) return "Audio is still preparing or unavailable. Wait for the source checks before saving.";
+        if (project.followTrackTempo && std::any_of(project.clips.begin(), project.clips.end(), [&](const auto& clip) { return !clip.playbackClockFits(project.tempo); }))
+            return "A track uses an earlier playback clock. Sync playback clocks from its transition menu before saving.";
+        const auto destination = validateWriteDestination(file);
+        if (destination.failed()) return destination.getErrorMessage();
+        document = captureProject();
+    }
     return writeWithBackup(file, juce::JSON::toString(document, false, 17));
 }
 juce::String Engine::exportPlaylist(const juce::File& file, PlaylistExport format)
@@ -1486,8 +1536,10 @@ void Engine::handleAsyncUpdate()
     if (seekWorker)
         if (auto completed = seekWorker->take(); completed && completed->request == seekRequest)
         {
+            auto onCommit = std::move(completed->onCommit);
             const auto result = commitSeek(std::move(*completed)); seekPending = false; seekError = result.getErrorMessage();
             if (onSeekStatus) onSeekStatus(result.failed() ? seekError : "Playback position ready.");
+            if (result.wasOk() && onCommit) onCommit();
             if (onControl) onControl(false);
         }
     if (!controls.empty() && onControl) onControl(changed);

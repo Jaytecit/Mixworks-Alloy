@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 97,
+    "family_name": "Kaleido 3D Mirror",
+    "variant_number": 1,
+    "variant_title": "Octahedral Fold",
+    "shader_path": "01-octahedral-fold/main.glsl",
+    "descriptor_path": "01-octahedral-fold/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 97,
+    "family_name": "Kaleido 3D Mirror",
+    "variant_number": 2,
+    "variant_title": "Cubic KIFS",
+    "shader_path": "02-cubic-kifs/main.glsl",
+    "descriptor_path": "02-cubic-kifs/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 97,
+    "family_name": "Kaleido 3D Mirror",
+    "variant_number": 3,
+    "variant_title": "Cross Fold",
+    "shader_path": "03-cross-fold/main.glsl",
+    "descriptor_path": "03-cross-fold/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 97,
+    "family_name": "Kaleido 3D Mirror",
+    "variant_number": 4,
+    "variant_title": "Prism Vault",
+    "shader_path": "04-prism-vault/main.glsl",
+    "descriptor_path": "04-prism-vault/scene.json",
+    "verification": "unverified"
+  }
+]

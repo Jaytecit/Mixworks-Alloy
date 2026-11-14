@@ -149,11 +149,32 @@ void runHotcueTests(const std::function<void(bool, const juce::String&)>& check,
     check(!ui.timeline.hotcueFlags().empty(), "explicit hotcue locate reveals its labels even after hiding them");
     check(!ui.engine.playing && std::abs(ui.engine.position.load() - 36.017) < 1.e-7 && json(ui.engine.project) == beforeLocate
         && ui.undoHistory.size() == history && !ui.dirty && deck.channelButtons[1].getToggleState(), "HC2 pad locates its own song/source while stopped, selects the matching label, and preserves document/history");
-    ui.engine.playing = true; deck.refresh(true); const double at = ui.engine.position;
-    deck.channelButtons[0].onClick();
-    check(deck.channelButtons[0].isEnabled() && ui.engine.position == at && json(ui.engine.project) == beforeLocate
-        && ui.status.containsIgnoreCase("queued"),
-        "playing cue press queues its explicit target without seeking the programme or changing the document"); ui.engine.playing = false;
+    {
+        // Use the attached app's seek path without opening a physical audio device.
+        const juce::ScopedValueSetter<bool> attached(ui.engine.attached, true);
+        ui.engine.playing = true; deck.refresh(true); const double at = ui.engine.position;
+        ui.timeline.pixelsPerSecond = 60; ui.timeline.updateSize(); ui.viewport.setViewPosition(900, 0);
+        const int viewBefore = ui.viewport.getViewPositionX();
+        deck.channelButtons[0].onClick();
+        check(deck.channelButtons[0].isEnabled() && ui.engine.seekPending && ui.engine.position == at && json(ui.engine.project) == beforeLocate
+            && ui.viewport.getViewPositionX() == viewBefore && ui.timeline.selectedHotcue && ui.timeline.selectedHotcue->slot == 1
+            && ui.status.containsIgnoreCase("queued"),
+            "playing cue press queues its explicit target while keeping the programme, document and view");
+        const auto deadline = juce::Time::getMillisecondCounter() + 3000;
+        while (ui.engine.seekPending && juce::Time::getMillisecondCounter() < deadline)
+        {
+           #if JUCE_WINDOWS
+            MSG message; while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+           #endif
+            juce::Thread::sleep(2);
+        }
+        check(!ui.engine.seekPending && ui.engine.seekError.isEmpty() && std::abs(ui.engine.position.load() - 4.017) < 1.e-7
+            && ui.engine.playing && json(ui.engine.project) == beforeLocate && ui.viewport.getViewPositionX() != viewBefore
+            && ui.timeline.selectedHotcue && ui.timeline.selectedHotcue->slot == 0,
+            "prepared cue commits the whole mix clock, selected flag and viewport together");
+        ui.engine.playing = false;
+        ui.timeline.pixelsPerSecond = 10; ui.timeline.updateSize();
+    }
     ui.engine.project.clips[0] = trimmed; ui.refresh();
     check(!deck.channelButtons[0].isEnabled() && deck.channelButtons[2].isEnabled() && ui.engine.project.clips[0].hotcues == defaults,
         "Controller keeps out-of-range numbered slots visible and disables only their locate action");

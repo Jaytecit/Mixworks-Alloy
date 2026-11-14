@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 140,
+    "family_name": "Botanical Phyllotaxis",
+    "variant_number": 1,
+    "variant_title": "Sunflower",
+    "shader_path": "01-sunflower/main.glsl",
+    "descriptor_path": "01-sunflower/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 140,
+    "family_name": "Botanical Phyllotaxis",
+    "variant_number": 2,
+    "variant_title": "Pinecone",
+    "shader_path": "02-pinecone/main.glsl",
+    "descriptor_path": "02-pinecone/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 140,
+    "family_name": "Botanical Phyllotaxis",
+    "variant_number": 3,
+    "variant_title": "Romanesco",
+    "shader_path": "03-romanesco/main.glsl",
+    "descriptor_path": "03-romanesco/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 140,
+    "family_name": "Botanical Phyllotaxis",
+    "variant_number": 4,
+    "variant_title": "Lotus Spiral",
+    "shader_path": "04-lotus-spiral/main.glsl",
+    "descriptor_path": "04-lotus-spiral/scene.json",
+    "verification": "unverified"
+  }
+]

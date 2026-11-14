@@ -70,12 +70,22 @@ void Workstation::locateHotcue(int slot)
         }
     }
     if(empty) { editHotcue(id,slot); return; }
-    if (engine.seek(*time).failed()) return; // Global seek is captured in the current editable take.
-    setFollowPlayhead(false);
-    viewport.setViewPosition(std::max(0,Clip::gridPixel(*time,timeline.pixelsPerSecond)-viewport.getViewWidth()/2),viewport.getViewPositionY());
-    for(const auto& flag:timeline.hotcueFlags(true)) if(flag.clipId==id && flag.slot==slot) { timeline.selectHotcue(flag); break; }
-    setStatus("HC"+juce::String(slot+1)+" / "+title+(engine.seekPending ? " / preparing whole mix at " : " / whole mix jumped to ")+timeText(*time)
-        +juce::String(engine.playing ? "; playback continues on all lanes." : "; playback stays stopped.")+" Timeline cues jump immediately; launch quantisation does not delay them.");
+    const auto label = "HC" + juce::String(slot + 1) + " / " + title;
+    const auto reveal = [safe = juce::Component::SafePointer<Workstation>(this), id, slot, label, at = *time]
+    {
+        if (!safe) return;
+        safe->setFollowPlayhead(false);
+        auto& view = safe->viewport;
+        auto& timeline = safe->timeline;
+        view.setViewPosition(std::max(0, Clip::gridPixel(at, timeline.pixelsPerSecond) - view.getViewWidth() / 2), view.getViewPositionY());
+        for (const auto& flag : timeline.hotcueFlags(true))
+            if (flag.clipId == id && flag.slot == slot) { timeline.selectHotcue(flag); break; }
+        safe->setStatus(label + " / whole mix jumped to " + timeText(at)
+            + (safe->engine.playing ? "; playback continues on all lanes." : "; playback stays stopped."));
+        safe->refresh();
+    };
+    if (engine.seek(*time, reveal).failed()) return;
+    if (engine.seekPending) setStatus(label + " / queued while preparing the whole mix at " + timeText(*time));
     refresh();
 }
 }

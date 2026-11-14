@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 58,
+    "family_name": "Reactor Core Chamber",
+    "variant_number": 1,
+    "variant_title": "Tokamak Torus",
+    "shader_path": "01-tokamak-torus/main.glsl",
+    "descriptor_path": "01-tokamak-torus/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 58,
+    "family_name": "Reactor Core Chamber",
+    "variant_number": 2,
+    "variant_title": "Vertical Shaft",
+    "shader_path": "02-vertical-shaft/main.glsl",
+    "descriptor_path": "02-vertical-shaft/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 58,
+    "family_name": "Reactor Core Chamber",
+    "variant_number": 3,
+    "variant_title": "Spherical Cage",
+    "shader_path": "03-spherical-cage/main.glsl",
+    "descriptor_path": "03-spherical-cage/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 58,
+    "family_name": "Reactor Core Chamber",
+    "variant_number": 4,
+    "variant_title": "Meltdown Surge",
+    "shader_path": "04-meltdown-surge/main.glsl",
+    "descriptor_path": "04-meltdown-surge/scene.json",
+    "verification": "unverified"
+  }
+]

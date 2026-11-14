@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 76,
+    "family_name": "Knot Sculpture Garden",
+    "variant_number": 1,
+    "variant_title": "Trefoil Centerpiece",
+    "shader_path": "01-trefoil-centerpiece/main.glsl",
+    "descriptor_path": "01-trefoil-centerpiece/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 76,
+    "family_name": "Knot Sculpture Garden",
+    "variant_number": 2,
+    "variant_title": "Linked Rings",
+    "shader_path": "02-linked-rings/main.glsl",
+    "descriptor_path": "02-linked-rings/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 76,
+    "family_name": "Knot Sculpture Garden",
+    "variant_number": 3,
+    "variant_title": "Spring Coil",
+    "shader_path": "03-spring-coil/main.glsl",
+    "descriptor_path": "03-spring-coil/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 76,
+    "family_name": "Knot Sculpture Garden",
+    "variant_number": 4,
+    "variant_title": "Crown Loop",
+    "shader_path": "04-crown-loop/main.glsl",
+    "descriptor_path": "04-crown-loop/scene.json",
+    "verification": "unverified"
+  }
+]

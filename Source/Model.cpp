@@ -224,6 +224,7 @@ void Clip::applyPlacement(const Clip& source)
 {
     start = source.start; length = source.length; rate = source.rate; track = source.track; routingStart = source.routingStart;
     fadeIn = source.fadeIn; fadeOut = source.fadeOut; introAnchor = source.introAnchor; outroAnchor = source.outroAnchor;
+    manualTransitionArea = source.manualTransitionArea;
     tempoMap = source.tempoMap; tempoSourceBpm = source.tempoSourceBpm; prepared = source.prepared; preparedOffset = source.preparedOffset;
     elasticPlayback = source.elasticPlayback; elasticSource = source.elasticSource; pendingPlacement = source.pendingPlacement;
     pitchSemitones = source.pitchSemitones;
@@ -341,6 +342,12 @@ double Clip::transitionTime(bool intro) const
 {
     if (intro) return introAnchor ? localTimeForSource(*introAnchor) : 0;
     return outroAnchor ? localTimeForSource(*outroAnchor) : length;
+}
+bool Clip::playbackClockFits(const TempoMap& map) const
+{
+    if (tempoSourceBpm <= 0) return true;
+    const double beats = map.beatsAt(end()) - map.beatsAt(start);
+    return std::abs(beats - length * rate * tempoSourceBpm / 60) <= std::max(1.e-8, std::abs(beats) * 1.e-8);
 }
 double Clip::sourceTimeAt(double local) const
 {
@@ -1437,6 +1444,7 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
     auto* root = new juce::DynamicObject();
     root->setProperty("format", "mixworks-session"); root->setProperty("version", projectVersion);
     root->setProperty("visualScenes", visualScenesToJson(p.visualScenes));
+    root->setProperty("visualOverrides", visualOverridesToJson(p.visualOverrides));
     root->setProperty("visualImage", p.visualImage);
     root->setProperty("name", p.name); root->setProperty("bpm", p.bpm); root->setProperty("masterDb", p.masterDb); root->setProperty("snap", p.snap);
     root->setProperty("snapDivision", p.snapDivision);
@@ -1521,6 +1529,7 @@ juce::var projectToJson(const Project& p, const std::vector<std::shared_ptr<Medi
         obj->setProperty("fadeIn", c.fadeIn); obj->setProperty("fadeOut", c.fadeOut); obj->setProperty("gainDb", c.gainDb);
         obj->setProperty("introAnchor", c.introAnchor ? juce::var(*c.introAnchor) : juce::var());
         obj->setProperty("outroAnchor", c.outroAnchor ? juce::var(*c.outroAnchor) : juce::var());
+        if (c.manualTransitionArea) obj->setProperty("manualTransitionArea", true);
         obj->setProperty("fadeInAnchor", c.fadeInAnchor ? juce::var(*c.fadeInAnchor) : juce::var());
         obj->setProperty("fadeOutAnchor", c.fadeOutAnchor ? juce::var(*c.fadeOutAnchor) : juce::var());
         auto controls = p.effectSettings(c);
@@ -1708,6 +1717,9 @@ ProjectResult parseProject(const juce::String& text)
         { r.error = "Invalid visual image reference."; return r; }
         r.project.visualImage = d["visualImage"].toString();
     }
+    if (d.hasProperty("visualOverrides"))
+        if (const auto overrides = readVisualOverrides(d["visualOverrides"], r.project.visualOverrides); overrides.failed())
+            return fail(overrides.getErrorMessage());
     if ((int)d["version"] >= 43 || d.hasProperty("visualScenes"))
     {
         const auto scenes = readVisualScenes(d["visualScenes"], r.project.visualScenes);
@@ -1993,6 +2005,8 @@ ProjectResult parseProject(const juce::String& text)
             if (!c.hasProperty("introAnchor") || !c.hasProperty("outroAnchor") || !anchor(c["introAnchor"]) || !anchor(c["outroAnchor"])) return fail("Invalid alignment markers.");
             if (!c["introAnchor"].isVoid()) clip.introAnchor = (double) c["introAnchor"];
             if (!c["outroAnchor"].isVoid()) clip.outroAnchor = (double) c["outroAnchor"];
+            if (c.hasProperty("manualTransitionArea") && !c["manualTransitionArea"].isBool()) return fail("Invalid manual transition area.");
+            clip.manualTransitionArea = (bool) c["manualTransitionArea"];
         }
         if ((int) d["version"] >= 10)
         {
@@ -2020,8 +2034,7 @@ ProjectResult parseProject(const juce::String& text)
             if (clip.tempoSourceBpm > 0)
             {
                 if (!clip.beatmatched || !r.project.followTrackTempo || r.project.tempo.points.empty()) return fail("A captured source clock requires a matched tempo map.");
-                const double beats = r.project.tempo.beatsAt(clip.end()) - r.project.tempo.beatsAt(clip.start);
-                if (std::abs(beats - clip.length * clip.rate * clip.tempoSourceBpm / 60) > std::max(1.0e-8, std::abs(beats) * 1.0e-8))
+                if (!clip.playbackClockFits(r.project.tempo))
                     return fail("The captured source clock does not match saved segment geometry.");
             }
         }

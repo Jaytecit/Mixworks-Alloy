@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 64,
+    "family_name": "Gyroid Minimal Surface",
+    "variant_number": 1,
+    "variant_title": "Smooth Gyroid",
+    "shader_path": "01-smooth-gyroid/main.glsl",
+    "descriptor_path": "01-smooth-gyroid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 64,
+    "family_name": "Gyroid Minimal Surface",
+    "variant_number": 2,
+    "variant_title": "Double Wall",
+    "shader_path": "02-double-wall/main.glsl",
+    "descriptor_path": "02-double-wall/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 64,
+    "family_name": "Gyroid Minimal Surface",
+    "variant_number": 3,
+    "variant_title": "Twisted Lattice",
+    "shader_path": "03-twisted-lattice/main.glsl",
+    "descriptor_path": "03-twisted-lattice/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 64,
+    "family_name": "Gyroid Minimal Surface",
+    "variant_number": 4,
+    "variant_title": "Foam Cavern",
+    "shader_path": "04-foam-cavern/main.glsl",
+    "descriptor_path": "04-foam-cavern/scene.json",
+    "verification": "unverified"
+  }
+]

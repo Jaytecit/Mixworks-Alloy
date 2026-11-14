@@ -1,0 +1,130 @@
+// Family 102: Astrolabe Clockwork — Ecliptic
+#version 330 core
+
+uniform vec2 RENDERSIZE;
+uniform float TIME;
+uniform float syn_Level;
+uniform float syn_BassLevel;
+uniform float syn_MidLevel;
+uniform float syn_HighLevel;
+uniform float syn_Hits;
+uniform float syn_BassHits;
+uniform float syn_OnBeat;
+uniform float syn_BPMSin;
+uniform sampler2D syn_Media;
+uniform float syn_MediaType;
+uniform float motion;
+
+out vec4 fragColor;
+
+const int VARIANT = 0;
+
+mat2 rot2(float a) {
+    float c = cos(a), s = sin(a);
+    return mat2(c, -s, s, c);
+}
+
+vec3 pal3(float t, vec3 a, vec3 b, vec3 d) {
+    return clamp(a + b * cos(6.2831853 * (t + d)), 0.0, 1.0);
+}
+vec3 pal(float t) {
+    return pal3(t + 0.14 * syn_MidLevel, vec3(0.48, 0.44, 0.54), vec3(0.50, 0.48, 0.45), vec3(0.55, 0.08, 0.85));
+}
+
+float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+vec2 hash22(vec2 p) {
+    vec3 a = fract(p.xyx * vec3(123.34, 234.34, 345.65));
+    a += dot(a, a + 34.45);
+    return fract(vec2(a.x * a.y, a.y * a.z));
+}
+
+float sdBox2(vec2 p, vec2 b) {
+    vec2 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+float sdBox3(vec3 p, vec3 b) {
+    vec3 q = abs(p) - b;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+float sdTorus(vec3 p, vec2 t) {
+    vec2 q = vec2(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
+}
+float sdCyl(vec3 p, float h, float r) {
+    vec2 d = abs(vec2(length(p.xz), p.y)) - vec2(r, h);
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+float sdSeg(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+
+vec4 sampleMedia(vec2 uv) {
+    if (syn_MediaType <= 0.0) return vec4(0.0);
+    vec2 m = smoothstep(0.0, 0.008, uv) * (1.0 - smoothstep(0.992, 1.0, uv));
+    vec4 c = texture(syn_Media, clamp(uv, 0.0, 1.0));
+    c.a *= m.x * m.y;
+    return c;
+}
+vec4 sampleMediaTile3D(vec2 uv, float dist) {
+    if (syn_MediaType <= 0.0) return vec4(0.0);
+    float lod = clamp(log2(max(dist * 0.35, 1.0)), 0.0, 4.0);
+    return textureLod(syn_Media, fract(uv), lod);
+}
+vec4 sampleTriplanar(vec3 pos, vec3 n, float sc, float dist) {
+    if (syn_MediaType <= 0.0) return vec4(0.0);
+    vec3 w = abs(n);
+    w = w * w * w;
+    w /= max(w.x + w.y + w.z, 1e-4);
+    vec4 cx = sampleMediaTile3D(pos.zy * sc, dist);
+    vec4 cy = sampleMediaTile3D(pos.xz * sc, dist);
+    vec4 cz = sampleMediaTile3D(pos.xy * sc, dist);
+    return cx * w.x + cy * w.y + cz * w.z;
+}
+
+float starLayer(vec2 uv, float thresh) {
+    vec2 id = floor(uv), gv = fract(uv) - 0.5;
+    float r = hash21(id);
+    if (r < thresh) return 0.0;
+    vec2 off = vec2(hash21(id + 11.3), hash21(id + 57.9)) - 0.5;
+    float d = length(gv - off * 0.55);
+    float rad = 0.04 + 0.06 * fract(r * 41.0);
+    return smoothstep(rad, 0.0, d) * (0.65 + 0.35 * sin(TIME * 2.5 + r * 62.83));
+}
+
+vec3 renderScene(vec2 uv, vec2 p, float t) {
+    vec3 col = vec3(0.015, 0.02, 0.05) + vec3(0.7, 0.85, 1.0) * starLayer(p * 18.0, 0.87);
+    vec4 img = sampleMedia(uv);
+    col = mix(col, img.rgb * 0.65, img.a * smoothstep(0.45, 0.18, length(p)));
+    float rings = 0.0;
+    for (int i = 0; i < 5; ++i) {
+        float fi = float(i);
+        vec2 rp = rot2(t * (0.25 + 0.15 * fi) * (mod(fi, 2.0) * 2.0 - 1.0) + syn_MidLevel) * p;
+        if (VARIANT == 0 || VARIANT == 3) rp -= 0.05 * fi * vec2(cos(t * 0.5), sin(t * 0.5));
+        float r = 0.12 + fi * 0.085 + 0.015 * syn_BassLevel;
+        float ring = exp(-abs(length(rp) - r) * 75.0);
+        float ticks = step(0.85, cos(atan(rp.y, rp.x + 1e-6) * (12.0 + fi * 6.0))) * exp(-abs(length(rp) - r) * 30.0);
+        rings += ring + 0.6 * ticks;
+    }
+    if (VARIANT == 2) rings += exp(-abs(sin(atan(p.y, p.x + 1e-6) * 6.0 + t * 0.5)) * 28.0) * smoothstep(0.48, 0.12, length(p));
+    vec3 brass = mix(vec3(0.88, 0.66, 0.24), pal(0.22), 0.25 + 0.35 * syn_OnBeat);
+    return col + brass * rings * (0.85 + 0.65 * syn_OnBeat);
+}
+
+
+
+void main() {
+    vec2 res = max(RENDERSIZE, vec2(1.0));
+    vec2 uv = gl_FragCoord.xy / res;
+    vec2 p = (gl_FragCoord.xy - 0.5 * res) / res.y;
+    float t = motion * 1.35;
+    vec3 col = renderScene(uv, p, t);
+    col *= clamp(1.0 - 0.24 * dot(p, p), 0.28, 1.0);
+    col = col / (vec3(1.0) + 0.18 * col);
+    fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}

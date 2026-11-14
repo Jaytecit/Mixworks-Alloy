@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 68,
+    "family_name": "Kinetic Mobius Loop",
+    "variant_number": 1,
+    "variant_title": "Single Twist",
+    "shader_path": "01-single-twist/main.glsl",
+    "descriptor_path": "01-single-twist/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 68,
+    "family_name": "Kinetic Mobius Loop",
+    "variant_number": 2,
+    "variant_title": "Triple Twist",
+    "shader_path": "02-triple-twist/main.glsl",
+    "descriptor_path": "02-triple-twist/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 68,
+    "family_name": "Kinetic Mobius Loop",
+    "variant_number": 3,
+    "variant_title": "Segmented Band",
+    "shader_path": "03-segmented-band/main.glsl",
+    "descriptor_path": "03-segmented-band/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 68,
+    "family_name": "Kinetic Mobius Loop",
+    "variant_number": 4,
+    "variant_title": "Split Rail",
+    "shader_path": "04-split-rail/main.glsl",
+    "descriptor_path": "04-split-rail/scene.json",
+    "verification": "unverified"
+  }
+]

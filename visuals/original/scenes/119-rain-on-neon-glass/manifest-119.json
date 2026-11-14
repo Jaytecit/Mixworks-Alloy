@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 119,
+    "family_name": "Rain on Neon Glass",
+    "variant_number": 1,
+    "variant_title": "Downpour",
+    "shader_path": "01-downpour/main.glsl",
+    "descriptor_path": "01-downpour/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 119,
+    "family_name": "Rain on Neon Glass",
+    "variant_number": 2,
+    "variant_title": "Light Drizzle",
+    "shader_path": "02-light-drizzle/main.glsl",
+    "descriptor_path": "02-light-drizzle/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 119,
+    "family_name": "Rain on Neon Glass",
+    "variant_number": 3,
+    "variant_title": "Fast Cruise",
+    "shader_path": "03-fast-cruise/main.glsl",
+    "descriptor_path": "03-fast-cruise/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 119,
+    "family_name": "Rain on Neon Glass",
+    "variant_number": 4,
+    "variant_title": "Red Tail-Lights",
+    "shader_path": "04-red-tail-lights/main.glsl",
+    "descriptor_path": "04-red-tail-lights/scene.json",
+    "verification": "unverified"
+  }
+]

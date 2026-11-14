@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 59,
+    "family_name": "Escher Stairwell",
+    "variant_number": 1,
+    "variant_title": "Ascending Loops",
+    "shader_path": "01-ascending-loops/main.glsl",
+    "descriptor_path": "01-ascending-loops/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 59,
+    "family_name": "Escher Stairwell",
+    "variant_number": 2,
+    "variant_title": "Cross Bridges",
+    "shader_path": "02-cross-bridges/main.glsl",
+    "descriptor_path": "02-cross-bridges/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 59,
+    "family_name": "Escher Stairwell",
+    "variant_number": 3,
+    "variant_title": "Inverted Towers",
+    "shader_path": "03-inverted-towers/main.glsl",
+    "descriptor_path": "03-inverted-towers/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 59,
+    "family_name": "Escher Stairwell",
+    "variant_number": 4,
+    "variant_title": "Spiral Steps",
+    "shader_path": "04-spiral-steps/main.glsl",
+    "descriptor_path": "04-spiral-steps/scene.json",
+    "verification": "unverified"
+  }
+]

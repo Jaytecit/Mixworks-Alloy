@@ -1,0 +1,47 @@
+{
+  "TITLE": "Caustic Pool Floor / Deep Reef",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneCausticStrength",
+      "TYPE": "slider",
+      "LABEL": "Caustic strength",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.7,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "scenePatternScale",
+      "TYPE": "slider",
+      "LABEL": "Pattern scale",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.7,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

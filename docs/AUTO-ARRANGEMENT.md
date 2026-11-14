@@ -4,32 +4,27 @@ Auto Arrange finds a feasible progression using a bounded heuristic, not an exha
 
 With an existing mix, the **Auto Arrange** dialog opens with **Extend current arrangement** selected. Enter additional songs or minutes and choose **Extend mix**. The existing arrangement stays in place, already-used sources are excluded, and one Undo restores the previous mix. Use **Create new arrangement** in the Action selector to start over. The first-song selector applies only to a new arrangement.
 
-**Visuals → Create scenes with transition blends** generates one editable scene
-per song, fading across each final prepared music transition. It replaces the
-whole visual lane, including when extending a mix. **Keep visual lane** leaves
-visual blocks intact and is the default when any already exist. Scene choices
-use independent randomness and do not change music selection. For an existing
-arrangement, **Match mix** in the visual library creates the same kind of lane
-without rearranging music. Later music edits require matching again. See
-[Visual scenes](VISUAL-SCENES.md) for placement, playback and current scope.
-
-Crowded or nested music handovers no longer stop visual generation. The visual
-planner follows transition order rather than raw clip starts, shortens competing
-fades and uses cuts where needed. Music placement, timing and audio treatment
-remain unchanged. Exceptionally short coincident placements may share scenes.
+**Visuals → Create automatic visual show** replaces the visual lanes with an
+editable schedule. GLSL scenes use the full Backgrounds image pool as shader
+inputs. MilkDrop presets continuously use the Sprites image pool inside their
+feedback. Choose **GLSL + MilkDrop** for all four lanes. Consecutive uses of
+the same background form a single clip. **Keep visual lane** retains the
+existing visual schedule and is selected by default when visual clips exist.
+Detected musical cues guide each lane. A visual can hold for the whole mix when
+its lane has no cue. [Visual scenes](VISUAL-SCENES.md)
 
 ## Energy direction
 
 | Direction | Preference |
 | --- | --- |
-| Unrestricted | Nearby BPM and harmonic compatibility, without an energy trajectory. |
+| Unrestricted | Nearby BPM, harmonic compatibility and local handover quality, without an energy trajectory. |
 | Keep pace | Stay near the starting musical activity and tempo; discourage substantial activity drops. |
 | Build energy | Gradually approach higher available activity and tempo, allowing small rises, plateaus and necessary reversals. |
 | Wind down | Gradually approach lower available activity and tempo, allowing plateaus and necessary reversals. |
 
 An explicit first song stays fixed. Otherwise, Unrestricted chooses randomly; the other directions choose a start with room for the progression in the largest BPM/key-connected group. Count mode follows position within the feasible library count; duration mode follows elapsed mix time. One-step onward preference discourages immediate dead ends.
 
-The current key compatibility,8% adjacent BPM bound, supported beat/downbeat evidence, source availability, valid placement, no repeats, whole-track targeting and three-hour maximum remain. Energy/genre preferences never veto an otherwise feasible track. A short result reports a compatibility, placement, duration or library limit.
+The current key compatibility,8% adjacent BPM bound, supported beat/downbeat evidence, source availability, valid placement, no repeats, whole-song count targeting and three-hour maximum remain. Energy/genre preferences never veto an otherwise feasible track. A short result reports a compatibility, placement, duration or library limit.
 
 ## Musical activity analysis
 
@@ -46,7 +41,7 @@ The arranger uses central80% mean activity for its overall target and two halves
 
 New imports obtain profiles while PCM is available. Existing tracks are upgraded on the Auto Arrange worker when an energy direction or **DJ set (varied)** needs them. Progress says **Analysing rhythm, bass and dynamics**. Cancellation preserves the mix; completed compatible cache results can survive a later cancellation, but partial profiles are never published. Ordinary warm catalogue startup does not decode every old source merely to add features.
 
-Profiles are bound to the enclosing record's source identity and independently versioned. Missing/malformed/future supplementary data does not invalidate valid grids. An opaque newer supplement survives a same-source manual correction. Current detector analysis revision11 and session format41 are unchanged by supplementary activity analysis; no analysis/correction/arrangement/cache reset is required. The activity feature originally landed with session34/portable preset3; those are historical identities.
+Profiles are bound to the enclosing record's source identity and independently versioned. Missing/malformed/future supplementary data does not invalidate valid grids. An opaque newer supplement survives a same-source manual correction. Current detector analysis revision11 and session format53 are unchanged by supplementary activity analysis; no analysis/correction/arrangement/cache reset is required. The activity feature originally landed with session34/portable preset3; those are historical identities.
 
 ## Preferred genre
 
@@ -58,15 +53,54 @@ Normalization handles case/punctuation and explicit Hip-Hop/hiphop, D&B/dnb/drum
 
 | Style | Actual treatment |
 | --- | --- |
-| Balanced | Equal-power volume curves with a section-aware bass handover and gentle filters when measured changes warrant them. Equal-power blend when level evidence is missing. |
+| Balanced (default) | Uses section and level evidence to choose the overlap. Selects equal-power volume, coordinated volume/EQ for competing bass, or a restrained filter when the sources change in opposite directions. |
 | Smooth | Linear full-band volume crossfade. |
-| Bold | Equal-power volume curves with bass handover, stronger filters at smaller recording-level changes, and mid/high fades. |
+| Bold | Uses the shared overlap search and bass check, with a stronger filter fade when the overlap has a measured level contrast. |
 | Use my settings | Selected insertion preset, overlap and section setting; alignment-only works without overlap measurements. |
 | Constant power | Equal-power volume curves across the full band. |
-| Hard cuts only | Midpoint cut with a short click-prevention ramp, no automatic bass/filter. |
-| DJ set (varied) | Equal-power phrase blends, rhythmic bass handovers and restrained filters, using actual local musical activity and recent choices. |
+| Hard cuts only | Fast volume swap at a shared section change or near the middle of the frame on the grid. Uses a short click-prevention ramp. |
+| DJ set (varied) | Uses the shared overlap search and bass check. Local musical activity and the previous two joins govern whether it adds a restrained filter fade. |
 
-DJ set falls back to an equal-power blend with missing activity. Rhythmic bass on both sources favours a bass handover. Dense changing activity can justify a filter at depth 0.3, followed by two joins without another automatic filter handover. A substantial incoming lift may prefer eight bars. The actual placed window determines whether the report calls it a Quick phrase blend. Safe treatments may repeat. Completion details list the generated techniques.
+**Blend timeline tracks** blends the songs already on the timeline in their
+current order. It shares the Balanced pair planner and measured bass pass with
+library **Auto Arrange**, which also chooses the song order. Both commit one
+Undo step. The timeline command removes owned automatic treatments, retains
+source controls, and refuses a blend that would replace authored volume
+inside its new frame. Authored EQ remains intact and prevents an automatic EQ
+handover on that pair.
+
+Balanced, Bold and DJ set use reviewed section markers and sustained changes in
+retained waveform energy across up to 64 bars of the outgoing tail and incoming
+head. Compatible tracks can overlap for up to 64 bars. The two section changes,
+available source audio and earlier handovers constrain the length. Four and
+eight bars remain fallbacks. The search ranks level continuity and section
+evidence, then tests at most six candidates on the actual tempo map. A middle
+song retains at least four beats between its two handovers.
+
+The planner may trim up to eight source bars or 20% of a segment, whichever is
+smaller, on segments at least sixteen bars long. An extension preserves the
+existing tail. Re-blending a generated timeline keeps its current source spans.
+The energy suggestions identify changes in level and are useful for auditioning
+candidate handovers. They do not label vocals, melody or phrase structure.
+Automatically planned joins use their IN/OUT boundaries as audible limits, so
+file lead-in before a nonzero cue cannot play briefly at full level before the
+fade. Departing audio stops at the planned OUT.
+
+The audible bass pass measures short windows from the chosen sources. It ranks
+interior bars by local level agreement and nearby section evidence.
+When both sources have sufficient bass, a four-beat low-end exchange is
+coordinated with the faders and subtractive mid/treble curves. Low-shelf cuts
+are bounded to 18 dB: Alloy's EQ uses overlapping shelves and a peaking band,
+not independent crossover bands. This avoids multiplying an independent bass
+swap by two attenuated faders. Incoming bass rises once from −18 dB to neutral;
+outgoing bass falls once to −18 dB and stays there. Each generated bass exchange
+uses two editable analytical endpoints, with no dip-and-return or rows of flat
+points. Each handover's volume shape uses three points and its upper-band shapes
+use five; exterior controls and other joins can add points. Missing evidence keeps the ordinary volume
+blend. Hard cuts remain an explicit choice.
+
+The [two-track mixing audit](research/AUTO-ARRANGER-MIXING-AUDIT-20261112.md)
+records the behaviour before this change and the listening criteria.
 
 Auto Arrange applies attenuation-only segment gain using the middle 80% of each
 song and its measured sample peaks. It aims for −18 dBFS RMS and caps measured
@@ -81,6 +115,9 @@ New joins are movement-locked. Consecutive locked pairs move as a group, and
 editable. Extending a mix preserves the earlier pairs' lock choices.
 
 All generated treatments are ordinary editable automation nodes. No new delay/loop/stem DSP or vocal/drop classifier is implied. RMS change flags remain activity suggestions; a bar grid alone does not prove phrasing. Genre-specific technique palettes, Wave/Journey curves, advanced routing and the remaining [technique catalogue](research/DJ-ARRANGEMENT-TARGETS-20261023.md#technique-catalogue) are targets, not shipped capabilities.
+
+Short blends and bass handovers own their generated points. Applying a named
+preset to the pair replaces those points and preserves manual automation.
 
 Controlled audio tests cover gain invariance, equal-RMS rhythm differences, bass/drone distinction, dynamics, silence/DC/nonfinite data, stereo/rates, local activity, ranking and a rendered prepared join. Cache tests cover warm access, upgrades, corrections and future versions. Representative real sources can be measured read-only with isolated caches. These do not establish listening acceptance, every-genre semantic accuracy, physical MIDI/ASIO or audience response. Human-ranked references are the next calibration layer.
 

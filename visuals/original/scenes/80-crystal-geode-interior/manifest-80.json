@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 80,
+    "family_name": "Crystal Geode Interior",
+    "variant_number": 1,
+    "variant_title": "Quartz Cluster",
+    "shader_path": "01-quartz-cluster/main.glsl",
+    "descriptor_path": "01-quartz-cluster/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 80,
+    "family_name": "Crystal Geode Interior",
+    "variant_number": 2,
+    "variant_title": "Amethyst Cave",
+    "shader_path": "02-amethyst-cave/main.glsl",
+    "descriptor_path": "02-amethyst-cave/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 80,
+    "family_name": "Crystal Geode Interior",
+    "variant_number": 3,
+    "variant_title": "Floating Shards",
+    "shader_path": "03-floating-shards/main.glsl",
+    "descriptor_path": "03-floating-shards/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 80,
+    "family_name": "Crystal Geode Interior",
+    "variant_number": 4,
+    "variant_title": "Prism Chamber",
+    "shader_path": "04-prism-chamber/main.glsl",
+    "descriptor_path": "04-prism-chamber/scene.json",
+    "verification": "unverified"
+  }
+]

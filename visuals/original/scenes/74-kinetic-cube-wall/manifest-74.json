@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 74,
+    "family_name": "Kinetic Cube Wall",
+    "variant_number": 1,
+    "variant_title": "Wave Pistons",
+    "shader_path": "01-wave-pistons/main.glsl",
+    "descriptor_path": "01-wave-pistons/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 74,
+    "family_name": "Kinetic Cube Wall",
+    "variant_number": 2,
+    "variant_title": "Ripple Matrix",
+    "shader_path": "02-ripple-matrix/main.glsl",
+    "descriptor_path": "02-ripple-matrix/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 74,
+    "family_name": "Kinetic Cube Wall",
+    "variant_number": 3,
+    "variant_title": "Checker Steps",
+    "shader_path": "03-checker-steps/main.glsl",
+    "descriptor_path": "03-checker-steps/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 74,
+    "family_name": "Kinetic Cube Wall",
+    "variant_number": 4,
+    "variant_title": "Exploding Tiles",
+    "shader_path": "04-exploding-tiles/main.glsl",
+    "descriptor_path": "04-exploding-tiles/scene.json",
+    "verification": "unverified"
+  }
+]

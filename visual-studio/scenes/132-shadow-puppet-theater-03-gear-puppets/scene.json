@@ -1,0 +1,47 @@
+{
+  "TITLE": "Shadow Puppet Theater / Gear Puppets",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneShadowSoftness",
+      "TYPE": "slider",
+      "LABEL": "Shadow softness",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneBacklightStrength",
+      "TYPE": "slider",
+      "LABEL": "Backlight strength",
+      "DEFAULT": 1.0,
+      "MIN": 0.3,
+      "MAX": 1.45,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

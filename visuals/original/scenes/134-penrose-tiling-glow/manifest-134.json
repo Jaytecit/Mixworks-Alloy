@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 134,
+    "family_name": "Penrose Tiling Glow",
+    "variant_number": 1,
+    "variant_title": "Five-Fold Grid",
+    "shader_path": "01-five-fold-grid/main.glsl",
+    "descriptor_path": "01-five-fold-grid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 134,
+    "family_name": "Penrose Tiling Glow",
+    "variant_number": 2,
+    "variant_title": "Star Rosettes",
+    "shader_path": "02-star-rosettes/main.glsl",
+    "descriptor_path": "02-star-rosettes/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 134,
+    "family_name": "Penrose Tiling Glow",
+    "variant_number": 3,
+    "variant_title": "Golden Bands",
+    "shader_path": "03-golden-bands/main.glsl",
+    "descriptor_path": "03-golden-bands/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 134,
+    "family_name": "Penrose Tiling Glow",
+    "variant_number": 4,
+    "variant_title": "Quasi-Crystal",
+    "shader_path": "04-quasi-crystal/main.glsl",
+    "descriptor_path": "04-quasi-crystal/scene.json",
+    "verification": "unverified"
+  }
+]

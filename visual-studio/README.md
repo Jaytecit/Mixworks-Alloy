@@ -1,5 +1,13 @@
 # Mixworks Visual Studio
 
+Alloy 0.55.133 ships Studio 0.1.33 and a shared catalogue of 1,000 GLSL scenes.
+Open Studio from Alloy to follow the audio master and visual lanes. An empty
+visual timeline uses Live mode. An authored show uses Timeline mode, with a
+30 fps connected preview and **F11** fullscreen. See the
+[visual timeline guide](../docs/VISUAL-SCENES.md) for setup and measured results.
+
+## Earlier preview launchers
+
 **Launch-Scene-Library.cmd** opens the 0.1.15 preview at Lantern Arcade. Pick
 a family in the left selector and one of its eight scenes in the right
 selector. The seven older scenes are under **Studio originals**. Load one
@@ -9,17 +17,29 @@ audio source with detectable beats. Some scenes retain a moving trace after
 the sprite is swapped or cleared. Use **Clear Nested history** for a fresh
 comparison on those scenes.
 
-Visual Studio is a standalone Windows scene player. Launch **Launch.cmd** in
-this directory. It starts with silent demo audio. Use **Studio scenes** to
+## Current launcher and playback
+
+**Launch.cmd** opens standalone Visual Studio from the active Alloy release.
+It listens for Alloy's master audio on local loopback by default.
+Select **Demo pulse** to audition without Alloy. Use **Studio scenes** to
 choose Signal Loom, Vector Tunnel, Glass Garden, Shrouded, Contour Bloom, Waxfall or Tidal Culture. **Open scene…**
 accepts a local GLSL fragment, the `main.glsl`
 inside a scene folder, or a `.milk` preset. Open trusted source files.
 
-**Launch-25-Anchors.cmd** opens the 0.1.12 scene preview at Fault Ledger. The
+**Random scene** picks a different bundled GLSL scene. **Random MilkDrop**
+picks from presets imported or linked in Alloy, with Prism Current available
+when the library is empty. Both use Studio's live preview and are disabled
+while Studio follows a scheduled visual show in Alloy.
+
+In Alloy's visual timeline, right-click a GLSL or MilkDrop clip to replace its
+scene or preset. The clip keeps its start, length and join settings. Choosing
+the other scene type moves the clip to that lane if it fits. The new scene
+starts with its own controls, and one Undo restores the previous look and animation.
+
+The earlier **Launch-25-Anchors.cmd** opens the 0.1.12 scene preview at Fault Ledger. The
 **Studio scenes** picker includes one anchor per family. Set **Media → Sprite →
 Render as → Nested** to let artwork drive the scene. Each anchor has a motion
-rate, music response and sprite imprint control. The main **Launch.cmd** opens
-the previous verified Studio release.
+rate, music response and sprite imprint control.
 
 **Launch-Fault-Ledger.cmd** opens Studio 0.1.13 at Ridge Unzip. The first
 eight entries in **Studio scenes** make up the Fault Ledger family. Use the
@@ -31,8 +51,9 @@ needs a beat to fire, and Shelf Rejoin keeps a fading trace after swapping art.
 
 - The controller follows Alloy's graphite and copper theme. It puts wheels
   at the left, eight pots over two pad rows, nine faders with reset buttons,
-  and a transport pad cluster at the right. Pot and bottom-pad labels follow
-  the scene. The top pads change the pot bank.
+  and two rows of four pads at the right for control lane and sprite routing.
+  In Live mode, the loaded scene and Sprite pads are available. Overlay and
+  the loaded scene's supported nesting destination are available.
 - **Scene** displays the selected shader's own groups, ranges and defaults.
   Sliders, toggles, choices, colours, triggers and XY pads are available. Save
   and Load create and reopen a `.look.json` for that exact shader and descriptor
@@ -174,6 +195,32 @@ fallback for file playback.
 
 ## Authoring
 
+### Standalone scene viewer
+
+Run [Launch-Scene-Viewer.cmd](Launch-Scene-Viewer.cmd) to scan the `scenes`
+folder. Choose from the list or use **Back**, **Forward** or the arrow keys.
+The ends wrap around. Use **Reload scenes** after adding folders. Choose an
+image with **Choose Nested sprite…** to feed it into compatible shaders.
+
+The retained Lit and Lib alternatives are grouped with their **Laser Grid Horizon** layouts in the viewer list. Use **Back** and **Forward** to compare the versions with
+the same sprite and desktop audio connection.
+
+Use **Mark** or **Ctrl+M** on a scene to add it to the removal list. The marks
+are saved per library and survive a restart. **Remove marked** moves the marked
+scenes into a dated recovery folder and shows its location. From the shared
+library, the same action updates the catalogue used by the current Alloy
+launcher. Close and reopen **+ GLSL** to see the updated list. The active
+release keeps the shader files for mixes that already reference them. The
+recovery folder includes the previous catalogues.
+
+The viewer uses the Windows default playback device through WASAPI loopback.
+Use **Reconnect audio** after changing speakers or headphones. To install the
+viewer-only dependency from the repository root, run:
+
+```powershell
+.\.local\visual-studio-env\Scripts\python.exe -m pip install --only-binary=:all: --target .local/scene-viewer-deps PyAudioWPatch==0.2.12.9
+```
+
 Use the [scene rulebook](../docs/STUDIO-SCENE-RULEBOOK.md) for the additional
 Studio library. It records the family roster and the full-frame, Nested media
 and visual comparison checks for new scenes.
@@ -233,13 +280,43 @@ builds the runtime with Nested and live Feedback controls. Alternatively, give
 `studio.py --projectm <directory>` the path to that runtime. For presets
 with external textures, Studio checks the preset directory and nearby
 `Textures` folders.
-Visual Studio can open from the Mixworks visuals timeline using **Open Visual Studio**
-or **View > Open Visual Studio**. In connected mode the timeline owns clip placement,
-transport, persistence and rendering. Select a clip in Mixworks to expose its controls
-in Studio. Edits and automation use the actual arrangement and native Undo; closing
-Studio leaves Mixworks and its session running. The right-hand Mixworks preview uses
-the full panel height, with aspect ratio preserved. The connected output window has
-F11 full screen and Escape to leave full screen.
+Open the full Visual Studio from Alloy's four visual lanes using **Open Visual Studio**
+or **View > Open Visual Studio**. Alloy sends its master audio on local loopback
+by default. Empty lanes put Studio in Live mode, with scene, meta and media controls.
+Once the mix has visual clips, **Control Lane** selects Background, MilkDrop,
+GLSL or Sprite. The controls follow that lane's clips as the playhead moves.
+**Sprite Route** sends the sprite to MilkDrop feedback, a compatible GLSL
+scene, or the final Overlay. A missing or incompatible destination uses
+Overlay for that frame. The audio timeline's **Follow playhead** button also
+keeps the Visual Studio timeline marker in view.
+
+In the clip picker, **Follow playhead** exposes the controls for the
+current visual. The clip dropdown lets you focus another layer. Clicking a clip
+in Alloy also focuses it in Studio. Use **MIDI** to connect your controller.
+The mapped pots, pads and wheels follow the focused clip's controls. Moving a
+control holds its value across compatible clips, including after reopening.
+**Reset** returns that parameter to the current timeline value. Shared GLSL
+Motion and grading controls carry across scenes that expose them. A
+scene-specific control carries within its family when the control matches.
+
+Continuous controls have an **Auto** toggle. Open **Automation** to set the
+minimum, maximum and cycle length in bars. The default is a full 64-bar cycle.
+The same panel sets a bass or overall energy response and its maximum depth.
+On the Alloy lane, right-click a clip and choose **Draw automation**. Ctrl-click
+sets a point and Shift-click removes an interior point. Auto takes precedence
+over drawn points while enabled. The audio response is added to the current
+value, within the control's bounds. A manual hold takes precedence until Reset.
+
+The four **Swap** buttons pick a different available item for the named lane
+at the playhead. A swap keeps the clip's timing and compatible controls. In a
+gap, it places the item at the playhead. Use Alloy's **+ MilkDrop** to link more
+presets. Changes use Alloy's Undo and save with the mix. Closing Studio leaves
+Alloy running.
+**Fullscreen output** moves the picture
+to the other monitor at its display resolution, or uses the current monitor if
+there is only one. Studio stays available for scene and timeline controls. Click
+**Return preview**, or press F11 or Escape, to bring the picture back. The
+**FPS counter** checkbox shows the measured frame rate on the fullscreen output.
 
 **Original / MilkDrop** runs from the original GLSL scene at 0 to MilkDrop at 1.
 Intermediate settings retain the nested treatment as well as blending the images.
@@ -248,10 +325,14 @@ under the playhead in the MilkDrop lane. With no active preset, the original rem
 
 The auto arranger deals across shuffled scene families, without repeating a scene
 until the available library is exhausted. A fresh arrangement gets a new order.
-Backgrounds, MilkDrop, GLSL and sprites have independent boundaries: long background
-holds, offset MilkDrop phrases, music/section-aligned GLSL changes and intermittent
-sprite accents. The endpoints still match the overall mix. Longer musical passages
-get additional GLSL changes when section markers are sparse.
+Backgrounds follow sustained shifts in energy, MilkDrop follows sustained changes
+in groove, GLSL follows section cues and track handovers, and sprites follow
+marked hits or strong bass returns. A lane can hold its starting element to the
+end of the mix. Manual control holds remain active on compatible clips until Reset.
+Match Mix chooses **Dissolve**, **Bass Handoff** or **Downbeat Cut** from the
+audio join. Right-click the coloured strip at a visual join to change the
+preset. Drag its edges to change the duration or drag the body to move it.
+These gestures leave the music timing in place.
 
 Sprite Bounce now has one bounce per audible beat. Drift, Orbit, Spin and Pendulum
 use musical periods too. Connected playback uses the absolute native beat clock,

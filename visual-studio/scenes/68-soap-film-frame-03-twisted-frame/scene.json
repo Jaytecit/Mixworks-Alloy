@@ -1,0 +1,56 @@
+{
+  "TITLE": "Soap Film Frame / Twisted Frame",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "frameTwist",
+      "TYPE": "slider",
+      "LABEL": "Frame twist",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 1.7,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "iridescence",
+      "TYPE": "slider",
+      "LABEL": "Iridescence",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 1.5,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Artwork strength",
+      "DEFAULT": 0.8,
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "TITLE": "Infinite Mirror Room / Corner",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneFrameSpacing",
+      "TYPE": "slider",
+      "LABEL": "Frame spacing",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.65,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneDepthFalloff",
+      "TYPE": "slider",
+      "LABEL": "Depth falloff",
+      "DEFAULT": 1.0,
+      "MIN": 0.45,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

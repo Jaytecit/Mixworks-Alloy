@@ -19,8 +19,10 @@ std::optional<juce::String> Timeline::audioSlipAt(juce::Point<float> point) cons
 }
 void Timeline::paintAudioSlipHandles(juce::Graphics& g)
 {
+    const auto damage = g.getClipBounds().toFloat();
     for (const auto& clip : owner.engine.project.clips)
     {
+        if (!clipBounds(clip).intersects(damage)) continue;
         for (bool left : {true,false})
         {
             const auto trim=edgeTrimBounds(clip,left); if (trim.isEmpty()) continue;
@@ -44,10 +46,15 @@ void Timeline::paintAudioSlipHandles(juce::Graphics& g)
 void Timeline::refreshMovementLocks()
 {
     std::set<juce::String> retained;
+    const auto& project = owner.engine.project;
+    std::map<juce::String, const Clip*> clips;
+    for (const auto& clip : project.clips) clips.emplace(clip.id, &clip);
+    const auto why=owner.busy || owner.pendingTempo>0 || owner.tempoPreparationPending || project.hasPendingPlacement()
+        ? juce::String("Wait for preparation before changing this pair's movement lock.") : owner.engine.exporting ? juce::String("Finish or cancel export before changing a movement lock.") : juce::String();
     for(const auto& link:owner.engine.project.transitionLinks)
     {
-        const auto* in=owner.engine.project.clipFor(link.incoming); const auto* out=owner.engine.project.clipFor(link.outgoing);
-        if(!in || !out)continue;
+        const auto in=clips.find(link.incoming), out=clips.find(link.outgoing);
+        if(in==clips.end() || out==clips.end()) continue;
         retained.insert(link.incoming); auto& button=movementLockButtons[link.incoming];
         if(!button)
         {
@@ -56,19 +63,58 @@ void Timeline::refreshMovementLocks()
             button->onClick=[safe=juce::Component::SafePointer<Workstation>(&owner),incoming=link.incoming]
                 {if(safe)safe->togglePairMovementLock(incoming);};
         }
-        const auto header=clipBounds(*in).withHeight(22); const float width=std::min(72.f,header.getWidth()-36-(in->stems ? 120.f : 0.f));
-        button->setVisible(laneSize(in->track)>=30 && width>=48);
-        button->setBounds(juce::Rectangle<float>(header.getX()+4+(in->stems ? 120.f : 0.f),header.getY()+2,std::max(0.f,width),18).toNearestInt());
         button->setButtonText(link.movementLocked ? "Locked" : "Unlocked"); button->setToggleState(link.movementLocked,juce::dontSendNotification);
-        const auto pair=out->media->libraryTitle()+" -> "+in->media->libraryTitle();
+        const auto pair=out->second->media->libraryTitle()+" -> "+in->second->media->libraryTitle();
         button->setTitle("Pair movement lock / "+pair);
         button->setTooltip(pair+": lock their track movement together. Consecutive locked pairs form a group; unlock this pair before changing its IN/OUT alignment.");
         button->setDescription(link.movementLocked ? "Locked: these two tracks move together by their headers." : "Unlocked: these two tracks can move independently by their headers.");
-        const auto why=owner.busy || owner.pendingTempo>0 || owner.tempoPreparationPending || owner.engine.project.hasPendingPlacement()
-            ? juce::String("Wait for preparation before changing this pair's movement lock.") : owner.engine.exporting ? juce::String("Finish or cancel export before changing a movement lock.") : juce::String();
         button->setEnabled(why.isEmpty()); button->getProperties().set("mixworksHintDisabled",why);
     }
     for(auto it=movementLockButtons.begin();it!=movementLockButtons.end();)if(!retained.count(it->first))it=movementLockButtons.erase(it);else ++it;
+}
+void Timeline::layoutMovementLocks()
+{
+    constexpr int width = 72, gap = 3;
+    const auto view = owner.viewport.getViewArea();
+    const auto usable = view.reduced(4, 0);
+    std::array<std::vector<juce::Range<int>>, trackCount> occupied;
+    std::set<juce::String> displayed;
+
+    const auto place = [&](const juce::String& id, const Clip& clip)
+    {
+        const auto found = movementLockButtons.find(id);
+        if (found == movementLockButtons.end() || usable.getWidth() < width
+            || clip.end() * pixelsPerSecond < view.getX() || clip.start * pixelsPerSecond >= view.getRight()) return;
+        const auto body = clipBounds(clip);
+        if (body.getHeight() < 24 || !body.intersects(view.toFloat())) return;
+        const int height = std::min(18, (int) body.getHeight() - 9);
+        const int y = juce::roundToInt(std::min(body.getY() + 22, body.getBottom() - height));
+        if (y < view.getY() || y + height > view.getBottom()) return;
+        auto& slots = occupied[(size_t) clip.track];
+        const auto freeX = [&](int x)
+        {
+            for (const auto slot : slots)
+                if (x + width + gap > slot.getStart() && x < slot.getEnd() + gap) x = slot.getEnd() + gap;
+            return x;
+        };
+        int x = freeX(juce::jlimit(usable.getX(), usable.getRight() - width, juce::roundToInt(body.getX()) + 4));
+        if (x + width > usable.getRight()) x = freeX(usable.getX());
+        if (x + width > usable.getRight()) return;
+        slots.push_back({x, x + width});
+        std::sort(slots.begin(), slots.end(), [](const auto a, const auto b) { return a.getStart() < b.getStart(); });
+        found->second->setBounds(x, y, width, height);
+        displayed.insert(id);
+    };
+    const auto& project = owner.engine.project;
+    if (const auto* link = project.transitionFor(owner.selectedTransition))
+    {
+        if (const auto* clip = project.clipFor(link->incoming)) place(link->incoming, *clip);
+        if (!displayed.count(link->incoming))
+            if (const auto* clip = project.clipFor(link->outgoing)) place(link->incoming, *clip);
+    }
+    for (const auto& clip : project.clips)
+        if (clip.id != owner.selectedTransition) place(clip.id, clip);
+    for (auto& [id, button] : movementLockButtons) button->setVisible(displayed.count(id) != 0);
 }
 juce::Rectangle<float> Timeline::edgeTrimBounds(const Clip& clip, bool left) const
 {

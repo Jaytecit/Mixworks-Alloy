@@ -1,0 +1,47 @@
+{
+  "TITLE": "Diffraction Grating / Feather Scale",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneGratingFrequency",
+      "TYPE": "slider",
+      "LABEL": "Grating frequency",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.75,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneSpectralSpread",
+      "TYPE": "slider",
+      "LABEL": "Spectral spread",
+      "DEFAULT": 1.0,
+      "MIN": 0.25,
+      "MAX": 1.65,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

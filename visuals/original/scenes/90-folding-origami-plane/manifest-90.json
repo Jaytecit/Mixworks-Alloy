@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 90,
+    "family_name": "Folding Origami Plane",
+    "variant_number": 1,
+    "variant_title": "Miura Fold",
+    "shader_path": "01-miura-fold/main.glsl",
+    "descriptor_path": "01-miura-fold/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 90,
+    "family_name": "Folding Origami Plane",
+    "variant_number": 2,
+    "variant_title": "Accordion",
+    "shader_path": "02-accordion/main.glsl",
+    "descriptor_path": "02-accordion/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 90,
+    "family_name": "Folding Origami Plane",
+    "variant_number": 3,
+    "variant_title": "Radial Pleats",
+    "shader_path": "03-radial-pleats/main.glsl",
+    "descriptor_path": "03-radial-pleats/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 90,
+    "family_name": "Folding Origami Plane",
+    "variant_number": 4,
+    "variant_title": "Flying Cranes",
+    "shader_path": "04-flying-cranes/main.glsl",
+    "descriptor_path": "04-flying-cranes/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 124,
+    "family_name": "Glass Bead Curtain",
+    "variant_number": 1,
+    "variant_title": "Bead Screen",
+    "shader_path": "01-bead-screen/main.glsl",
+    "descriptor_path": "01-bead-screen/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 124,
+    "family_name": "Glass Bead Curtain",
+    "variant_number": 2,
+    "variant_title": "Swaying Strands",
+    "shader_path": "02-swaying-strands/main.glsl",
+    "descriptor_path": "02-swaying-strands/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 124,
+    "family_name": "Glass Bead Curtain",
+    "variant_number": 3,
+    "variant_title": "Prism Beads",
+    "shader_path": "03-prism-beads/main.glsl",
+    "descriptor_path": "03-prism-beads/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 124,
+    "family_name": "Glass Bead Curtain",
+    "variant_number": 4,
+    "variant_title": "Rain Curtains",
+    "shader_path": "04-rain-curtains/main.glsl",
+    "descriptor_path": "04-rain-curtains/scene.json",
+    "verification": "unverified"
+  }
+]

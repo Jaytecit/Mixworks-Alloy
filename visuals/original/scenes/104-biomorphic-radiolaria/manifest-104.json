@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 104,
+    "family_name": "Biomorphic Radiolaria",
+    "variant_number": 1,
+    "variant_title": "Glass Dome",
+    "shader_path": "01-glass-dome/main.glsl",
+    "descriptor_path": "01-glass-dome/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 104,
+    "family_name": "Biomorphic Radiolaria",
+    "variant_number": 2,
+    "variant_title": "Spined Cage",
+    "shader_path": "02-spined-cage/main.glsl",
+    "descriptor_path": "02-spined-cage/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 104,
+    "family_name": "Biomorphic Radiolaria",
+    "variant_number": 3,
+    "variant_title": "Twin Skeletons",
+    "shader_path": "03-twin-skeletons/main.glsl",
+    "descriptor_path": "03-twin-skeletons/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 104,
+    "family_name": "Biomorphic Radiolaria",
+    "variant_number": 4,
+    "variant_title": "Sinking Plankton",
+    "shader_path": "04-sinking-plankton/main.glsl",
+    "descriptor_path": "04-sinking-plankton/scene.json",
+    "verification": "unverified"
+  }
+]

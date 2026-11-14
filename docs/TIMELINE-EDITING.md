@@ -4,9 +4,12 @@ Workflow reference; exact current candidate and verification limits are in [HAND
 
 ## Add and select audio
 
+Use the timeline toolbar's audio lane selector to show two, three or four lanes.
+Hidden lanes continue playback. Restore a lane to edit its contents.
+
 Library/file drops use the requested lane and normally place audio at the drop time with the selected snapping policy. With a manually set, unpaired OUT, drop the next track in another lane anywhere across the outgoing track to align its IN to that OUT. The transition starts there and uses the selected default preset across the remaining shared audio. The timeline holds its existing tempo through the join, then ramps to the incoming BPM when there is enough audio. A shorter track gets an editable marker at the current tempo. The pair starts unlocked. Click **Unlocked** on the incoming track's header to move both tracks together. Unlock it to adjust either alignment marker. During playback the incoming track must start ahead of the playhead to join the OUT.
 
-Appending after a manually set, unpaired OUT also aligns the next track. Other ordinary placements create independent segments. Auto Arrange creates links. Multi-row Library dragging captures the displayed order at drag start and commits one batch with one Undo.
+Appending after a manually set, unpaired OUT also aligns the next track. Other ordinary placements create independent segments. A reliable source downbeat aligns to a project bar. An append uses the next valid position after the last clip, and a drop uses the closest valid position to the drop. Sources with a reliable beat and unknown downbeat align to a beat. Auto Arrange creates links. Multi-row Library dragging captures the displayed order at drag start and commits one batch with one Undo.
 
 Drag across the waveform to highlight audio, then right-click the highlight for applicable tools. Drag the title/header to move the placement; drag either narrow outer edge handle to trim visible and audible content. Ctrl-click builds a group. Selection follows the project Snap by default; Alt bypasses it. Right-click a segment for **Segment settings…** or press **Ctrl+T**. The ruler's **Range** control offers snap overrides and fixed selection lengths. **Shift+F10** opens the focused timeline object's menu. Selection dragging keeps the playhead, audio and musical history unchanged. See [range editing](RANGE-EDITING.md).
 
@@ -36,7 +39,7 @@ IN/OUT anchors have reachable edge tabs when zoomed off-screen. Drag displacemen
 
 ## Explicit transitions
 
-Choose **Add Transition** for two overlapping tracks, or select one and choose its overlapping partner. Existing preset/length defaults apply without moving either song. Ordinary insertion makes no join. Right-click a frame header for pair-specific actions or use **Edit transition…** to open the dockable editor. Frame edges are source-relative and independent of fades. Frames may overlap across all four lanes and exceed64bars within the shared audio. Length accepts typed positive bars.
+Choose **Add Transition** for two overlapping tracks, or select one and choose its overlapping partner. Existing preset/length defaults apply without moving either song. Ordinary insertion makes no join. Right-click a frame header for pair-specific actions or use **Edit transition…** to open the dockable editor. Frame edges are source-relative and independent of fades. Frames may overlap across the audio lanes and exceed64bars within the shared audio. Length accepts typed positive bars.
 
 **Mute outside bounds** is per-transition, saved/undoable and off by default. When enabled it cuts the incoming head before the frame and outgoing tail at/after its end; otherwise exterior audio follows its own fades/controls. Unlink / move independently removes touching links in one Undo without manufacturing another relationship. See [transition controls](TRANSITION-PRESETS.md).
 

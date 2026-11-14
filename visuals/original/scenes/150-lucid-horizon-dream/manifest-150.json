@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 150,
+    "family_name": "Lucid Horizon Dream",
+    "variant_number": 1,
+    "variant_title": "Pastel Mirror",
+    "shader_path": "01-pastel-mirror/main.glsl",
+    "descriptor_path": "01-pastel-mirror/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 150,
+    "family_name": "Lucid Horizon Dream",
+    "variant_number": 2,
+    "variant_title": "Glass Monoliths",
+    "shader_path": "02-glass-monoliths/main.glsl",
+    "descriptor_path": "02-glass-monoliths/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 150,
+    "family_name": "Lucid Horizon Dream",
+    "variant_number": 3,
+    "variant_title": "Inverted Tide",
+    "shader_path": "03-inverted-tide/main.glsl",
+    "descriptor_path": "03-inverted-tide/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 150,
+    "family_name": "Lucid Horizon Dream",
+    "variant_number": 4,
+    "variant_title": "Twilight Dream",
+    "shader_path": "04-twilight-dream/main.glsl",
+    "descriptor_path": "04-twilight-dream/scene.json",
+    "verification": "unverified"
+  }
+]

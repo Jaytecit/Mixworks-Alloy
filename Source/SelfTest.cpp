@@ -21,6 +21,8 @@ void runLibraryStartupTests(const std::function<void(bool,const juce::String&)>&
 void runSectionFlagTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runHotcueTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runSourceSectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runRippleTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runPrerollTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runLongNavigationTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::StringArray&);
 void runLongSessionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::StringArray&);
 void runLongOpenTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::StringArray&);
@@ -49,6 +51,8 @@ void runAudioUiTests(const std::function<void(bool, const juce::String&)>&, cons
 void runEditSelectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runEditingWorkflowTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runAutoArrangementTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
+void runAutoPairComparison(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
+void runAutoArrangementComparison(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
 void runLibraryPreviewTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runZoomHandleTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
 void runTransitionSwapTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
@@ -202,6 +206,12 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
+    if (args.contains("--cursor-edit-only"))
+    {
+        runRippleTests(check, output); runPrerollTests(check, output); runSourceSectionTests(check, output);
+        report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
+        output.replaceWithText(report); return failures == 0 ? 0 : 1;
+    }
     if (args.contains("--markers-only"))
     {
         runSectionFlagTests(check, output); runHotcueTests(check, output); runSourceSectionTests(check, output);
@@ -247,10 +257,17 @@ int runSelfTests(const juce::String& commandLine)
         report += juce::String(tests) + " checks; " + juce::String(failures) + " failures\n";
         output.replaceWithText(report); return failures == 0 ? 0 : 1;
     }
-    if (args.contains("--auto-arrange-only") || args.contains("--auto-arrange-catalogue"))
+    if (args.contains("--auto-pair-comparison") || args.contains("--auto-arrange-only") || args.contains("--auto-arrange-catalogue") || args.contains("--auto-arrange-comparison"))
     {
         const int catalogue = args.indexOf("--auto-arrange-catalogue"), start = args.indexOf("--start-id"), count = args.indexOf("--probe-tracks");
-        if (catalogue >= 0 && catalogue + 1 < args.size())
+        const int comparison = args.indexOf("--auto-arrange-comparison");
+        const int pair = args.indexOf("--auto-pair-comparison");
+        if (pair >= 0 && pair + 1 < args.size())
+            runAutoPairComparison(check, output, juce::File(args[pair+1].unquoted()));
+        else
+        if (comparison >= 0 && comparison + 1 < args.size())
+            runAutoArrangementComparison(check, output, juce::File(args[comparison + 1].unquoted()));
+        else if (catalogue >= 0 && catalogue + 1 < args.size())
             runAutoArrangementCatalogueProbe(check, output, juce::File(args[catalogue + 1].unquoted()), start >= 0 && start + 1 < args.size() ? args[start + 1].unquoted() : juce::String(), args.contains("--energy-sample") ? 12 : 0,
                 count >= 0 && count + 1 < args.size() ? juce::jlimit(1, 1000, args[count + 1].getIntValue()) : 0);
         else runAutoArrangementTests(check, output);

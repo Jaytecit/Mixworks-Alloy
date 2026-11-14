@@ -169,16 +169,21 @@ void runMilkDropTests(const std::function<void(bool,const juce::String&)>& check
         dialog->getButton(0)->triggerClick();
         const auto end=juce::Time::getMillisecondCounterHiRes()+60000;
         do { tick(); } while((desk.busy || juce::Component::getCurrentlyModalComponent()) && juce::Time::getMillisecondCounterHiRes()<end);
-        const auto importedCount=std::count_if(engine.project.visualScenes.begin(),engine.project.visualScenes.end(),[](const auto& s){return isMilkDropKey(s.scene);});
-        check(!desk.busy && engine.project.clips.size()==2 && engine.project.visualScenes.size()==2 && importedCount==1,
-            "real Make mix callback builds one original and one imported scene using Both: "+desk.status);
-        if(!desk.busy && engine.project.visualScenes.size()==2)
+        const auto layeredShow = [&]
+        {
+            std::array<int, 4> counts {};
+            for (const auto& visual : engine.project.visualScenes) ++counts[(size_t)visualLayer(visual.scene)];
+            return counts == std::array<int, 4>{1, 1, 2, 1} && validateVisualScenes(engine.project.visualScenes).wasOk();
+        };
+        check(!desk.busy && engine.project.clips.size()==2 && layeredShow(),
+            "real Make mix callback changes GLSL at the handover and holds the other three layers: "+desk.status);
+        if(!desk.busy && layeredShow())
         {
             desk.refresh(); auto picture=report.getSiblingFile("both-native-timeline.png").createOutputStream();
             check(picture && png.writeImageToStream(desk.createComponentSnapshot(desk.getLocalBounds()),*picture),"capture automatically arranged music and mixed-engine visual timeline");
             const auto arranged=engine.project;
             desk.undo(false); check(engine.project.visualScenes.empty(),"Undo restores the arrangement before automatic mixed-engine publication");
-            desk.undo(true); check(engine.project.visualScenes.size()==2,"Redo restores the automatically generated mixed-engine visual lane");
+            desk.undo(true); check(layeredShow(),"Redo restores the automatically generated mixed-engine visual lanes");
             engine.project.visualScenes.clear();
             desk.getProperties().set("visualSceneSource",2); lane.matchMix();
             check(engine.project.visualScenes.size()==2 && std::all_of(engine.project.visualScenes.begin(),engine.project.visualScenes.end(),[](const auto& s){return isMilkDropKey(s.scene);}),

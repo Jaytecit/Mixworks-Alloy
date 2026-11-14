@@ -13,7 +13,8 @@ struct WorkspaceLayout
     static constexpr int timeRulerHeight = 24, labelHeight = 20, laneHeight = 132;
     int preferredLibraryWidth = defaultLibraryWidth, preferredInspectorWidth = defaultInspectorWidth;
     bool libraryCollapsed = false, inspectorCollapsed = false;
-    static constexpr int visibleLaneCount = trackCount, minimumLaneHeight = 100;
+    static constexpr int minimumLaneHeight = 100;
+    int visibleLaneCount = trackCount;
     int defaultLaneHeight = laneHeight;
     int preferredTimelineHeight = 0, minimumTimelineHeight = 0, maximumTimelineHeight = 0;
     std::array<double, trackCount> laneScale {1, 1, 1, 1};

@@ -1,0 +1,56 @@
+{
+  "TITLE": "Strobe Slicer / Horizontal",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneSliceCount",
+      "TYPE": "slider",
+      "LABEL": "Slice count",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 1.7,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneShiftDistance",
+      "TYPE": "slider",
+      "LABEL": "Shift distance",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.65,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneFlashStrength",
+      "TYPE": "slider",
+      "LABEL": "Flash strength",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.4,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 72,
+    "family_name": "Gearwork Vault",
+    "variant_number": 1,
+    "variant_title": "Planetary Gears",
+    "shader_path": "01-planetary-gears/main.glsl",
+    "descriptor_path": "01-planetary-gears/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 72,
+    "family_name": "Gearwork Vault",
+    "variant_number": 2,
+    "variant_title": "Wall of Cogs",
+    "shader_path": "02-wall-of-cogs/main.glsl",
+    "descriptor_path": "02-wall-of-cogs/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 72,
+    "family_name": "Gearwork Vault",
+    "variant_number": 3,
+    "variant_title": "Bevel Tunnel",
+    "shader_path": "03-bevel-tunnel/main.glsl",
+    "descriptor_path": "03-bevel-tunnel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 72,
+    "family_name": "Gearwork Vault",
+    "variant_number": 4,
+    "variant_title": "Clockwork Core",
+    "shader_path": "04-clockwork-core/main.glsl",
+    "descriptor_path": "04-clockwork-core/scene.json",
+    "verification": "unverified"
+  }
+]

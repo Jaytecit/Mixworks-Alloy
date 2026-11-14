@@ -151,7 +151,7 @@ MatchResult prepareBeatmatch(Project p, double bpm, bool align, double overlapBe
         auto error = prepareClip(clip, cache, used); if (error.isNotEmpty()) { result.error = error; return result; }
         if (align && valid)
         {
-            clip.introAnchor.reset(); clip.outroAnchor.reset(); clip.fadeInAnchor.reset(); clip.fadeOutAnchor.reset();
+            clip.introAnchor.reset(); clip.outroAnchor.reset(); clip.fadeInAnchor.reset(); clip.fadeOutAnchor.reset(); clip.manualTransitionArea = false;
             const double downbeat = clip.firstDownbeatTime();
             const double localPhase = downbeat >= 0 && (i == 0 || overlapBeats >= 4) ? downbeat : clip.firstBeatTime();
             const double quantum = downbeat >= 0 && (i == 0 || overlapBeats >= 4) ? 4 * beat : beat;
@@ -362,7 +362,10 @@ PendingPlacements placePendingClips(Project& project, double overlapBeats, std::
         const bool markedJoin = !automatic && marked != project.clips.size() && (intent == PendingPlacement::append
             || (joinStart >= map.beatsAt(0) && (!livePosition || joinStart > map.beatsAt(*livePosition))));
         if (markedJoin || (intent == PendingPlacement::append && marked != project.clips.size())) previous = marked;
-        const bool alignBar = downbeat >= 0 && (index == 0 || selectedOverlap >= 4 || selectedPreset == TransitionPreset::alignOnly);
+        // Independent additions use the source grid regardless of the transition preset.
+        const bool independentInsertion = !automatic && intent != PendingPlacement::move;
+        const bool alignBar = valid && downbeat >= 0 && (independentInsertion || index == 0
+            || selectedOverlap >= 4 || selectedPreset == TransitionPreset::alignOnly);
         const double phase = markedJoin ? cue * bpm / 60 : (alignBar ? downbeat : source.firstBeatTime()) * bpm / 60;
         const double quantum = alignBar ? 4.0 : 1.0;
         if (automatic && intent == PendingPlacement::append)
@@ -619,7 +622,7 @@ static MatchResult buildTempoMap(Project p, bool align, double overlapBeats, int
             c.start = start; c.length = valid ? map.timeAtBeat(startBeat + lengthBeats) - start : span / c.rate;
             c.rate = span / c.length; c.beatmatched = valid; c.tempoMap = valid ? std::make_shared<const TempoMap>(map) : nullptr; c.tempoSourceBpm = 0; c.preparedOffset = 0;
             c.fadeIn = c.fadeOut = 0;
-            c.introAnchor.reset(); c.outroAnchor.reset(); c.fadeInAnchor.reset(); c.fadeOutAnchor.reset();
+            c.introAnchor.reset(); c.outroAnchor.reset(); c.fadeInAnchor.reset(); c.fadeOutAnchor.reset(); c.manualTransitionArea = false;
             previousStartBeat = startBeat; previousEndBeat = startBeat + lengthBeats;
         }
         // Reflow all ends once against the completed map, retaining each original source span.

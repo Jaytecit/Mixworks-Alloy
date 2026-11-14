@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 94,
+    "family_name": "Magnetic Field Spikes",
+    "variant_number": 1,
+    "variant_title": "Single Ferro",
+    "shader_path": "01-single-ferro/main.glsl",
+    "descriptor_path": "01-single-ferro/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 94,
+    "family_name": "Magnetic Field Spikes",
+    "variant_number": 2,
+    "variant_title": "Twin Poles",
+    "shader_path": "02-twin-poles/main.glsl",
+    "descriptor_path": "02-twin-poles/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 94,
+    "family_name": "Magnetic Field Spikes",
+    "variant_number": 3,
+    "variant_title": "Spike Wall",
+    "shader_path": "03-spike-wall/main.glsl",
+    "descriptor_path": "03-spike-wall/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 94,
+    "family_name": "Magnetic Field Spikes",
+    "variant_number": 4,
+    "variant_title": "Crown Burst",
+    "shader_path": "04-crown-burst/main.glsl",
+    "descriptor_path": "04-crown-burst/scene.json",
+    "verification": "unverified"
+  }
+]

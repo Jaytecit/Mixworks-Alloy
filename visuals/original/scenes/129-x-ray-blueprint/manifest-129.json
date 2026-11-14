@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 129,
+    "family_name": "X-Ray Blueprint",
+    "variant_number": 1,
+    "variant_title": "Cyanotype",
+    "shader_path": "01-cyanotype/main.glsl",
+    "descriptor_path": "01-cyanotype/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 129,
+    "family_name": "X-Ray Blueprint",
+    "variant_number": 2,
+    "variant_title": "Medical Scan",
+    "shader_path": "02-medical-scan/main.glsl",
+    "descriptor_path": "02-medical-scan/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 129,
+    "family_name": "X-Ray Blueprint",
+    "variant_number": 3,
+    "variant_title": "Wire Cutaway",
+    "shader_path": "03-wire-cutaway/main.glsl",
+    "descriptor_path": "03-wire-cutaway/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 129,
+    "family_name": "X-Ray Blueprint",
+    "variant_number": 4,
+    "variant_title": "Thermal X-Ray",
+    "shader_path": "04-thermal-x-ray/main.glsl",
+    "descriptor_path": "04-thermal-x-ray/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -5,15 +5,18 @@ from math import radians
 import os
 from pathlib import Path
 import re
+import time
 
 import glfw
 from OpenGL import GL as gl
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 if __package__:
+    from .display import physical_coordinates, place_window
     from .media import MEDIA_FRAGMENT, OUTPUT_FRAGMENT, SPRITE_FRAGMENT, sprite_motion
     from .scene import Control, Scene, identifier, number
 else:
+    from display import physical_coordinates, place_window
     from media import MEDIA_FRAGMENT, OUTPUT_FRAGMENT, SPRITE_FRAGMENT, sprite_motion
     from scene import Control, Scene, identifier, number
 
@@ -33,6 +36,7 @@ BUILTINS = {
     "syn_BPM": "float", "syn_BPMSin": "float", "alloy_DetectedBPM": "float", "alloy_MixBPM": "float",
     "syn_FinalPass": "sampler2D", "syn_Media": "sampler2D", "syn_MediaType": "float",
     "alloy_MilkDrop": "sampler2D", "alloy_MilkDropActive": "float", "alloy_MilkDropAmount": "float",
+    "alloy_Background": "sampler2D", "alloy_BackgroundAmount": "float", "alloy_BackgroundSize": "vec2",
     "iChannel0": "sampler2D",
 }
 for band in ("Bass", "Mid", "MidHigh", "High"):
@@ -96,7 +100,22 @@ def source_for(scene, samplers):
 const float PI = 3.141592653589793;
 out vec4 studioOutput;
 """
-        original += "\nvoid main() { studioOutput = renderMain(); }\n"
+        original += """
+void main() {
+    vec4 scene = renderMain();
+    if (alloy_BackgroundAmount > 0.) {
+        vec2 flow = .04 * (scene.rg - scene.gb);
+        float aspect = (RENDERSIZE.x * alloy_BackgroundSize.y) / (RENDERSIZE.y * alloy_BackgroundSize.x);
+        vec2 uv = (_uv + flow - .5) * min(vec2(aspect, 1. / aspect), 1.) + .5;
+        vec4 background = texture(alloy_Background, uv);
+        float amount = alloy_BackgroundAmount * background.a;
+        scene.rgb = mix(background.rgb * amount, scene.rgb, scene.a);
+        scene.rgb += (1. - scene.rgb) * background.rgb * amount * scene.a;
+        scene.a = max(scene.a, amount);
+    }
+    studioOutput = scene;
+}
+"""
     elif main_image:
         header += "\nout vec4 studioOutput;\n"
         original += "\nvoid main() { mainImage(studioOutput, gl_FragCoord.xy); }\n"
@@ -145,6 +164,7 @@ def upload_texture(image, texture=0):
 class Target:
     def __init__(self, size, spec, buffers=2):
         self.size, self.textures, self.fbos, self.front = size, [], [], 0
+        self.spec = spec
         self.mipmap = spec.get("FILTER") == "mipmap"
         try:
             for _ in range(buffers):
@@ -182,9 +202,23 @@ class Target:
             gl.glDeleteTextures(self.textures)
             gl.glDeleteFramebuffers(len(self.fbos), self.fbos)
 
+    def resized(self, size, preserve):
+        target = Target(size, self.spec, len(self.fbos))
+        if preserve:
+            try:
+                for source, destination in zip(self.fbos, target.fbos):
+                    gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, source)
+                    gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, destination)
+                    gl.glBlitFramebuffer(0, 0, *self.size, 0, 0, *size, gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+                target.front = self.front
+            except Exception:
+                target.close()
+                raise
+        return target
+
 
 class Shader:
-    def __init__(self, scene, size, vao):
+    def __init__(self, scene, size, vao, *, preview_size=None):
         self.vao, self.program = vao, 0
         self.targets, self.images, self.controls, self.uniforms = {}, {}, dict(scene.controls), {}
         self.state, self.events, self.frame = {}, set(), 0
@@ -197,9 +231,10 @@ class Shader:
             raise ValueError("An image uniform conflicts with a control or renderer uniform.")
         outputs = {}
         budget = 0
+        normal_width, normal_height = preview_size or size
         for spec in scene.passes:
             name = identifier(spec["TARGET"])
-            width, height = spec.get("WIDTH", size[0]), spec.get("HEIGHT", size[1])
+            width, height = spec.get("WIDTH", normal_width), spec.get("HEIGHT", normal_height)
             if name in names or name in outputs:
                 raise ValueError(f"Duplicate pass uniform {name}.")
             if type(width) is not int or type(height) is not int or not (1 <= width <= 1920 and 1 <= height <= 1080):
@@ -218,7 +253,7 @@ class Shader:
                     raise ValueError(f"Uniform arrays are unsupported ({name}).")
                 self.uniforms[name] = (gl.glGetUniformLocation(self.program, name), kind)
             self.samplers = []
-            available = set(outputs) | scene.images.keys() | {"syn_Media", "iChannel0", "alloy_MilkDrop"}
+            available = set(outputs) | scene.images.keys() | {"syn_Media", "iChannel0", "alloy_MilkDrop", "alloy_Background"}
             for name, (location, kind) in self.uniforms.items():
                 if kind == gl.GL_SAMPLER_2D:
                     if name not in available:
@@ -261,14 +296,16 @@ class Shader:
                        "Range inferred from the GLSL initializer. Add a JSON sidecar for custom ranges.",
                        form, default, low, high)
 
-    def render(self, elapsed, dt, audio, values, mouse, advance, media, media_type, feedback, *, milk_texture=0, milk_amount=1.):
+    def render(self, elapsed, dt, audio, values, mouse, advance, media, media_type, feedback, *, milk_texture=0, milk_amount=1.,
+               background=0, background_amount=0., background_size=(1, 1), manual_controls=()):
         gl.glBindVertexArray(self.vao)
         gl.glUseProgram(self.program)
         coords, click, down = mouse
         common = {"TIME": (elapsed,), "iTime": (elapsed,), "iTimeDelta": (dt,),
                   "iFrame": (self.frame,), "FRAMECOUNT": (self.frame,),
                   "syn_MediaType": (media_type,), "alloy_MilkDropActive": (float(bool(milk_texture)),),
-                  "alloy_MilkDropAmount": (milk_amount,), "_muv": coords,
+                  "alloy_MilkDropAmount": (milk_amount,), "alloy_BackgroundAmount": (background_amount,),
+                  "alloy_BackgroundSize": background_size, "_muv": coords,
                   "_click": (float(down), 0., 0.), **audio.uniforms}
         for name, control in self.controls.items():
             value = values[name]
@@ -283,7 +320,7 @@ class Shader:
                     value = control.high if name in self.events else control.low
             elif control.mode == "speed":
                 value = tuple(a + b * dt for a, b in zip(self.state.get(name, (0.,) * len(value)), value))
-            elif control.mode == "smooth":
+            elif control.mode == "smooth" and name not in manual_controls:
                 factor = 1 - (1 - control.rate) ** (dt * 60) if advance else 1
                 value = tuple(a + (b - a) * factor for a, b in zip(self.state.get(name, control.default), value))
             self.state[name] = common[name] = value
@@ -311,6 +348,8 @@ class Shader:
                     texture = source.textures[source.front]
                 elif sampler == "alloy_MilkDrop":
                     texture = milk_texture or media
+                elif sampler == "alloy_Background":
+                    texture = background or media
                 else:
                     texture = self.images.get(sampler, media)
                 gl.glActiveTexture(gl.GL_TEXTURE0 + unit)
@@ -584,23 +623,79 @@ void main() {
 """
 
 
+class OutputCounter:
+    def __init__(self):
+        self.start = time.monotonic()
+        self.frames = self.value = self.texture = 0
+        self.fbo = int(gl.glGenFramebuffers(1))
+        self.label = None
+
+    def sample(self):
+        now = time.monotonic()
+        elapsed = now - self.start
+        if elapsed < .5:
+            return False
+        previous = self.value
+        self.value = round(self.frames / elapsed)
+        self.start, self.frames = now, 0
+        return self.value != previous
+
+    def draw(self, height):
+        font_size = max(14, round(height / 60))
+        label = self.value, font_size
+        if self.label != label:
+            try:
+                font = ImageFont.truetype("segoeui.ttf", font_size)
+            except OSError:
+                font = ImageFont.load_default()
+            text = f"{self.value} FPS"
+            left, top, right, bottom = font.getbbox(text)
+            padding = max(5, font_size // 3)
+            size = right - left + 2 * padding, bottom - top + 2 * padding
+            image = Image.new("RGBA", size, (17, 22, 25, 255))
+            ImageDraw.Draw(image).text((padding - left, padding - top), text, font=font, fill=(245, 246, 247, 255))
+            self.texture = upload_texture(image.transpose(Image.Transpose.FLIP_TOP_BOTTOM), self.texture)
+            self.label, self.size = label, size
+        gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, self.fbo)
+        gl.glFramebufferTexture2D(gl.GL_READ_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, self.texture, 0)
+        width, label_height = self.size
+        margin = max(8, font_size // 2)
+        y = height - margin - label_height
+        gl.glBlitFramebuffer(0, 0, width, label_height, margin, y, margin + width, y + label_height,
+                             gl.GL_COLOR_BUFFER_BIT, gl.GL_NEAREST)
+
+    def close(self):
+        if self.texture:
+            gl.glDeleteTextures([self.texture])
+        gl.glDeleteFramebuffers(1, [self.fbo])
+
+
 class Engine:
     def __init__(self, runtime=None, size=SIZE):
         self.window, self.backend, self.scene, self.vao, self.composite = None, None, None, 0, None
         self.runtime, self.size, self.values = runtime, size, {}
+        self.preview_size, self.preview_target = size, None
+        self.output, self.return_output, self.output_dismissed = None, None, False
+        self.counter, self.output_empty = None, True
         self.companion = None
-        if not glfw.init():
-            raise RuntimeError("Could not start GLFW.")
         try:
-            glfw.window_hint(glfw.VISIBLE, False)
-            glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
-            glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-            glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-            self.window = glfw.create_window(*size, "Visual Studio render context", None, None)
+            with physical_coordinates():
+                if not glfw.init():
+                    raise RuntimeError("Could not start GLFW.")
+                glfw.window_hint(glfw.VISIBLE, False)
+                glfw.window_hint(glfw.DECORATED, False)
+                glfw.window_hint(glfw.FOCUS_ON_SHOW, False)
+                glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+                glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+                glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+                self.window = glfw.create_window(*size, "Mixworks Visual Studio Output", None, None)
             if not self.window:
                 raise RuntimeError("Visual Studio needs OpenGL 3.3.")
             glfw.make_context_current(self.window)
             glfw.swap_interval(0)
+            glfw.set_window_close_callback(self.window, lambda _: self.dismiss_output())
+            glfw.set_key_callback(self.window, self.output_key)
+            glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
             self.vao = int(gl.glGenVertexArrays(1))
             self.composite = Composite(size, self.vao)
             self.composite.programs["hybrid"] = compile_program(HYBRID_FRAGMENT)
@@ -617,9 +712,10 @@ class Engine:
                 "TYPE": "slider", "UI_GROUP": "MilkDrop", "DEFAULT": 0, "MIN": 0, "MAX": 1})
         return controls
 
-    def load(self, scene):
-        candidate = (MilkDrop(scene, self.size, self.runtime) if scene.path.suffix.lower() == ".milk"
-                     else Shader(scene, self.size, self.vao))
+    def load(self, scene, *, texture_paths=()):
+        candidate = (MilkDrop(scene, self.size, self.runtime, texture_paths=texture_paths)
+                     if scene.path.suffix.lower() == ".milk"
+                     else Shader(scene, self.size, self.vao, preview_size=self.preview_size))
         if self.companion:
             self.companion.close()
             self.companion = None
@@ -630,6 +726,126 @@ class Engine:
 
     def reset_controls(self):
         self.values = {name: control.default for name, control in self.controls.items()}
+
+    def resize(self, size, assets):
+        if size == self.size:
+            return
+        assets = (self.backend, self.companion, *assets)
+        targets = [(self.composite.targets, name, False) for name in self.composite.targets]
+        targets.extend((asset.targets, "syn_FinalPass", True) for asset in assets if isinstance(asset, Shader))
+        gl.glDisable(gl.GL_SCISSOR_TEST)
+        gl.glColorMask(True, True, True, True)
+        replacements = []
+        try:
+            for group, name, preserve in targets:
+                replacements.append((group, name, group[name].resized(size, preserve)))
+        except Exception:
+            for _, _, target in replacements:
+                target.close()
+            raise
+        for group, name, target in replacements:
+            group[name].close()
+            group[name] = target
+        for asset in assets:
+            if isinstance(asset, MilkDrop):
+                asset.set_window_size(asset.handle, *size)
+                asset.size = size
+        self.size = self.composite.size = size
+        self.composite.media_key = None
+
+    def set_output(self, output, return_output=None, assets=()):
+        if output == self.output:
+            return
+        if output is None:
+            glfw.hide_window(self.window)
+            self.resize(self.preview_size, assets)
+            with physical_coordinates():
+                glfw.set_window_size(self.window, *self.preview_size)
+        elif not self.output or output["bounds"] != self.output["bounds"]:
+            bounds = output["bounds"]
+            size = tuple(bounds[2:])
+            with physical_coordinates():
+                if os.name == "nt":
+                    hwnd = glfw.get_win32_window(self.window)
+                    place_window(hwnd, bounds)
+                    # A cross-monitor DPI change can apply an intermediate rectangle.
+                    if glfw.get_framebuffer_size(self.window) != size:
+                        place_window(hwnd, bounds)
+                else:
+                    glfw.set_window_pos(self.window, *bounds[:2])
+                    glfw.set_window_size(self.window, *size)
+                if glfw.get_framebuffer_size(self.window) != size:
+                    raise RuntimeError("The output window could not match the display's pixel dimensions.")
+            self.resize(size, assets)
+        if output and output.get("showFps"):
+            if self.counter is None:
+                self.counter = OutputCounter()
+        elif self.counter:
+            self.counter.close()
+            self.counter = None
+        self.output, self.return_output, self.output_dismissed = output, return_output, False
+
+    def output_key(self, _window, key, _scan, action, _modifiers):
+        if action == glfw.PRESS and key in (glfw.KEY_ESCAPE, glfw.KEY_F11):
+            self.dismiss_output()
+
+    def dismiss_output(self):
+        glfw.set_window_should_close(self.window, False)
+        if self.output and not self.output_dismissed:
+            self.output_dismissed = True
+            glfw.hide_window(self.window)
+            self.return_output(self.output["token"])
+
+    def present_output(self, *, empty=False):
+        if not self.output or self.output_dismissed:
+            return False
+        self.output_empty = empty
+        if self.counter:
+            self.counter.sample()
+        self.draw_output()
+        if self.counter:
+            self.counter.frames += 1
+        return True
+
+    def refresh_output_counter(self):
+        if self.counter and not self.output_dismissed and self.counter.sample():
+            self.draw_output()
+
+    def draw_output(self):
+        target = self.composite.targets["output"]
+        gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, 0)
+        gl.glDisable(gl.GL_SCISSOR_TEST)
+        if self.output_empty:
+            gl.glClearColor(0., 0., 0., 1.)
+            gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        else:
+            gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, target.fbos[0])
+            gl.glBlitFramebuffer(0, 0, *self.size, 0, 0, *self.size, gl.GL_COLOR_BUFFER_BIT, gl.GL_NEAREST)
+        if self.counter:
+            self.counter.draw(self.size[1])
+        if not glfw.get_window_attrib(self.window, glfw.VISIBLE):
+            glfw.show_window(self.window)
+        glfw.swap_buffers(self.window)
+
+    def read_preview(self, pixel_format):
+        target = self.composite.targets["output"]
+        gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, target.fbos[0])
+        size = self.size
+        if size != self.preview_size:
+            scale = min(a / b for a, b in zip(self.preview_size, size))
+            dimensions = tuple(max(1, round(side * scale)) for side in size)
+            if self.preview_target is None or self.preview_target.size != dimensions:
+                preview = Target(dimensions, {"FLOAT": False, "WRAP": "clamp"}, buffers=1)
+                if self.preview_target:
+                    self.preview_target.close()
+                self.preview_target = preview
+            gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, target.fbos[0])
+            gl.glBindFramebuffer(gl.GL_DRAW_FRAMEBUFFER, self.preview_target.fbos[0])
+            gl.glBlitFramebuffer(0, 0, *size, 0, 0, *dimensions, gl.GL_COLOR_BUFFER_BIT, gl.GL_LINEAR)
+            gl.glBindFramebuffer(gl.GL_READ_FRAMEBUFFER, self.preview_target.fbos[0])
+            size = dimensions
+        gl.glReadBuffer(gl.GL_COLOR_ATTACHMENT0)
+        return size, gl.glReadPixels(0, 0, *size, pixel_format, gl.GL_UNSIGNED_BYTE)
 
     def render(self, elapsed, dt, audio, meta, media_values, media=None,
                mouse=((0., 0.), (0., 0.), False), advance=True, update_scene=True):
@@ -683,9 +899,9 @@ class Engine:
             scene_texture = self.composite.draw("hybrid", {"scene": scene_texture, "milk": milk_texture}, {"amount": (milk_mix,)})
         self.composite.draw("output", {"source": scene_texture, "media": empty if nested else sprite},
                             {**meta, "overlayMode": media_values["overlayMode"]})
-        gl.glReadBuffer(gl.GL_COLOR_ATTACHMENT0)
-        pixels = gl.glReadPixels(0, 0, *self.size, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE)
-        return Image.frombytes("RGBA", self.size, pixels).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        self.present_output()
+        size, pixels = self.read_preview(gl.GL_RGBA)
+        return Image.frombytes("RGBA", size, pixels).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
     def close(self):
         if self.companion:
@@ -694,6 +910,10 @@ class Engine:
             self.backend.close()
         if self.composite:
             self.composite.close()
+        if self.preview_target:
+            self.preview_target.close()
+        if self.counter:
+            self.counter.close()
         if self.vao:
             gl.glDeleteVertexArrays(1, [self.vao])
         if self.window:

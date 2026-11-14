@@ -31,36 +31,8 @@
   ],
   "Fault Ledger": [
     {
-      "title": "Ridge Unzip",
-      "folder": "fault-ledger"
-    },
-    {
       "title": "Basin Collapse",
       "folder": "fault-ledger-basin-collapse"
-    },
-    {
-      "title": "Paired Fault Slip",
-      "folder": "fault-ledger-paired-slip"
-    },
-    {
-      "title": "Terrace Ratchet",
-      "folder": "fault-ledger-terrace-ratchet"
-    },
-    {
-      "title": "Diagonal Shear",
-      "folder": "fault-ledger-diagonal-shear"
-    },
-    {
-      "title": "Island Breakaway",
-      "folder": "fault-ledger-island-breakaway"
-    },
-    {
-      "title": "Crosscut Relay",
-      "folder": "fault-ledger-crosscut-relay"
-    },
-    {
-      "title": "Shelf Rejoin",
-      "folder": "fault-ledger-shelf-rejoin"
     }
   ],
   "Lantern Arcade": [
@@ -69,40 +41,10 @@
       "folder": "lantern-arcade"
     },
     {
-      "title": "T Junction Relay",
-      "folder": "lantern-arcade-t-junction-relay",
-      "treatment": "Beat relay",
-      "description": "Bright signs stagger the light relays at the junction."
-    },
-    {
       "title": "Courtyard Flood",
       "folder": "lantern-arcade-courtyard-flood",
       "treatment": "Colour transfer",
       "description": "Sprite colours wash across the courtyard masonry."
-    },
-    {
-      "title": "Elevated Walk Flicker",
-      "folder": "lantern-arcade-elevated-walk-flicker",
-      "treatment": "Repeated impressions",
-      "description": "Repeated artwork becomes a row of engraved walkway plates."
-    },
-    {
-      "title": "Underpass Slit",
-      "folder": "lantern-arcade-underpass-slit",
-      "treatment": "Drawn fibres",
-      "description": "The artwork is drawn into separate bars of light running under the passage."
-    },
-    {
-      "title": "Corner Spill",
-      "folder": "lantern-arcade-corner-spill",
-      "treatment": "Colour separation",
-      "description": "Separated colour beams spill around the corner."
-    },
-    {
-      "title": "Paired Alley Chase",
-      "folder": "lantern-arcade-paired-alley-chase",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels steer the two passages in different directions."
     },
     {
       "title": "Roofwell Descent",
@@ -111,191 +53,7 @@
       "description": "Light and dark give the roofwell different relief and shadow."
     }
   ],
-  "Paper Mechanics": [
-    {
-      "title": "Fan Unfurl",
-      "folder": "paper-mechanics"
-    },
-    {
-      "title": "Box Inversion",
-      "folder": "paper-mechanics-box-inversion",
-      "treatment": "Silhouette cutout",
-      "description": "The silhouette becomes a cutout through the inverted box panels."
-    },
-    {
-      "title": "Map Gatefold",
-      "folder": "paper-mechanics-map-gatefold",
-      "treatment": "Repeated impressions",
-      "description": "Staggered impressions repeat across the folded map."
-    },
-    {
-      "title": "Corner Peel",
-      "folder": "paper-mechanics-corner-peel",
-      "treatment": "Brightness relief",
-      "description": "Bright marks lift the peeling paper and change its lighting."
-    },
-    {
-      "title": "Accordion Advance",
-      "folder": "paper-mechanics-accordion-advance",
-      "treatment": "Beat relay",
-      "description": "The sprite holds selected accordion creases back after each hit."
-    },
-    {
-      "title": "Pocket Turn",
-      "folder": "paper-mechanics-pocket-turn",
-      "treatment": "Colour transfer",
-      "description": "Colour bleeds into the turning pockets."
-    },
-    {
-      "title": "Pleat Collapse",
-      "folder": "paper-mechanics-pleat-collapse",
-      "treatment": "Moving fragments",
-      "description": "Artwork fractures into chips that ride away on collapsing pleats."
-    },
-    {
-      "title": "Saddle Twist",
-      "folder": "paper-mechanics-saddle-twist",
-      "treatment": "Drawn fibres",
-      "description": "The artwork is drawn into tight fibres following the twisted paper."
-    }
-  ],
-  "Sediment Clock": [
-    {
-      "title": "Delta Prograde",
-      "folder": "sediment-clock"
-    },
-    {
-      "title": "Shelf Slump",
-      "folder": "sediment-clock-shelf-slump",
-      "treatment": "Brightness relief",
-      "description": "Brightness raises ridges and carves hollows in the slumping shelf."
-    },
-    {
-      "title": "Core Stack",
-      "folder": "sediment-clock-core-stack",
-      "treatment": "Repeated impressions",
-      "description": "Copies of the image are pressed into successive bands."
-    },
-    {
-      "title": "Fan Bury",
-      "folder": "sediment-clock-fan-bury",
-      "treatment": "Colour transfer",
-      "description": "Sprite colour is sorted into bands as the sediment fan buries them."
-    },
-    {
-      "title": "Canyon Refill",
-      "folder": "sediment-clock-canyon-refill",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels redirect the movement along the canyon walls."
-    },
-    {
-      "title": "Bar Migration",
-      "folder": "sediment-clock-bar-migration",
-      "treatment": "Moving fragments",
-      "description": "Artwork breaks into drifting clasts on migrating sandbars."
-    },
-    {
-      "title": "Levee Breach",
-      "folder": "sediment-clock-levee-breach",
-      "treatment": "Silhouette cutout",
-      "description": "The silhouette breaches the levee and exposes a dark cross-section."
-    },
-    {
-      "title": "Bed Scour",
-      "folder": "sediment-clock-bed-scour",
-      "treatment": "Drawn fibres",
-      "description": "The image draws thin streaks into the scoured beds."
-    }
-  ],
-  "Dune Telegraph": [
-    {
-      "title": "Crescent March",
-      "folder": "dune-telegraph"
-    },
-    {
-      "title": "Forked Slipface",
-      "folder": "dune-telegraph-forked-slipface",
-      "treatment": "Brightness relief",
-      "description": "Bright parts of the artwork raise the branching slipfaces and move their highlights."
-    },
-    {
-      "title": "Corridor Scour",
-      "folder": "dune-telegraph-corridor-scour",
-      "treatment": "Drawn fibres",
-      "description": "The image is pulled into thin wind-driven scour lines."
-    },
-    {
-      "title": "Lee Wake",
-      "folder": "dune-telegraph-lee-wake",
-      "treatment": "Persistent trace",
-      "description": "Artwork leaves a drifting sand wake that survives a swap."
-    },
-    {
-      "title": "Double Dune Collision",
-      "folder": "dune-telegraph-double-dune-collision",
-      "treatment": "Moving fragments",
-      "description": "Image fragments move across the opposing dunes on beats."
-    },
-    {
-      "title": "Edge Drift",
-      "folder": "dune-telegraph-edge-drift",
-      "treatment": "Colour transfer",
-      "description": "Sprite colours migrate along the leeward sand."
-    },
-    {
-      "title": "Star Dune Feed",
-      "folder": "dune-telegraph-star-dune-feed",
-      "treatment": "Repeated impressions",
-      "description": "Repeated impressions spiral through the star dunes."
-    },
-    {
-      "title": "Ridge Overtake",
-      "folder": "dune-telegraph-ridge-overtake",
-      "treatment": "Beat relay",
-      "description": "Bright sprite patches hold ridges back as the others advance."
-    }
-  ],
   "Rain Reedbed": [
-    {
-      "title": "Bank Gust",
-      "folder": "rain-reedbed"
-    },
-    {
-      "title": "Split Channel Bend",
-      "folder": "rain-reedbed-split-channel-bend",
-      "treatment": "Colour transfer",
-      "description": "Sprite colour washes through the two channels and stains the reed banks."
-    },
-    {
-      "title": "Island Shelter",
-      "folder": "rain-reedbed-island-shelter",
-      "treatment": "Projected shadow",
-      "description": "Artwork casts a moving shelter shadow over the reeds."
-    },
-    {
-      "title": "Diagonal Comb",
-      "folder": "rain-reedbed-diagonal-comb",
-      "treatment": "Drawn fibres",
-      "description": "The image stretches into individual diagonal reed fibres."
-    },
-    {
-      "title": "Floodplain Flatten",
-      "folder": "rain-reedbed-floodplain-flatten",
-      "treatment": "Brightness relief",
-      "description": "Bright parts lift the flooded beds and alter their grazing light."
-    },
-    {
-      "title": "Crossing Squalls",
-      "folder": "rain-reedbed-crossing-squalls",
-      "treatment": "Colour separation",
-      "description": "Two rain fronts catch separated bands of colour from the artwork."
-    },
-    {
-      "title": "Furrow Ripple",
-      "folder": "rain-reedbed-furrow-ripple",
-      "treatment": "Persistent trace",
-      "description": "Old sprite traces keep drifting down the furrows."
-    },
     {
       "title": "Perimeter Sweep",
       "folder": "rain-reedbed-perimeter-sweep",
@@ -303,191 +61,15 @@
       "description": "Bright media delays the gusts around the perimeter."
     }
   ],
-  "Salt Weather": [
-    {
-      "title": "Shoreline Freeze",
-      "folder": "salt-weather"
-    },
-    {
-      "title": "Needle Fan Advance",
-      "folder": "salt-weather-needle-fan-advance",
-      "treatment": "Drawn fibres",
-      "description": "Sprite edges stretch into long crystal needles."
-    },
-    {
-      "title": "Branch Confluence",
-      "folder": "salt-weather-branch-confluence",
-      "treatment": "Colour separation",
-      "description": "The converging branches split the sprite into colour fringes."
-    },
-    {
-      "title": "Salt Pan Drydown",
-      "folder": "salt-weather-salt-pan-drydown",
-      "treatment": "Persistent trace",
-      "description": "Image residue dries into a crust and keeps migrating."
-    },
-    {
-      "title": "Bridging Crust",
-      "folder": "salt-weather-bridging-crust",
-      "treatment": "Brightness relief",
-      "description": "Sprite brightness raises the bridge ridges and deepens pits."
-    },
-    {
-      "title": "Facet Collision",
-      "folder": "salt-weather-facet-collision",
-      "treatment": "Moving fragments",
-      "description": "Sprite chips are carried away as large facets collide."
-    },
-    {
-      "title": "Pinhole Bloom",
-      "folder": "salt-weather-pinhole-bloom",
-      "treatment": "Projected shadow",
-      "description": "The artwork casts moving shadows across the fine crystal pores."
-    },
-    {
-      "title": "Frost Retraction",
-      "folder": "salt-weather-frost-retraction",
-      "treatment": "Beat relay",
-      "description": "Bright areas hold the frost at individual junctions before it retracts."
-    }
-  ],
-  "Plankton Census": [
-    {
-      "title": "Estuary Sorting",
-      "folder": "plankton-census"
-    },
-    {
-      "title": "Reef Bypass",
-      "folder": "plankton-census-reef-bypass",
-      "treatment": "Projected shadow",
-      "description": "Sprite shadows sweep the reef and its schools."
-    },
-    {
-      "title": "Baitball Escape",
-      "folder": "plankton-census-baitball-escape",
-      "treatment": "Moving fragments",
-      "description": "Artwork breaks into small schools that scatter from the baitball."
-    },
-    {
-      "title": "Layer Migration",
-      "folder": "plankton-census-layer-migration",
-      "treatment": "Brightness relief",
-      "description": "Brightness raises the apparent water layers and moves the fish between them."
-    },
-    {
-      "title": "Counterstream Crossing",
-      "folder": "plankton-census-counterstream-crossing",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels steer opposing streams across one another."
-    },
-    {
-      "title": "Shelter Handoff",
-      "folder": "plankton-census-shelter-handoff",
-      "treatment": "Persistent trace",
-      "description": "An old sprite leaves a drifting trail between refuges."
-    },
-    {
-      "title": "Channel Split",
-      "folder": "plankton-census-channel-split",
-      "treatment": "Beat relay",
-      "description": "Bright parts hold back sections of the schools before they cross into the other channel."
-    },
-    {
-      "title": "Eddy Reunion",
-      "folder": "plankton-census-eddy-reunion",
-      "treatment": "Colour transfer",
-      "description": "Sprite colours curl into the returning schools."
-    }
-  ],
   "Fumarole Field": [
-    {
-      "title": "Ridge Jets",
-      "folder": "fumarole-field"
-    },
-    {
-      "title": "Basin Chimneys",
-      "folder": "fumarole-field-basin-chimneys",
-      "treatment": "Brightness relief",
-      "description": "Bright parts raise the ground and light the chimney faces."
-    },
-    {
-      "title": "Crack Vent Crawl",
-      "folder": "fumarole-field-crack-vent-crawl",
-      "treatment": "Drawn fibres",
-      "description": "The image becomes fine jets that crawl along the vent crack."
-    },
-    {
-      "title": "Geyser Pair",
-      "folder": "fumarole-field-geyser-pair",
-      "treatment": "Beat relay",
-      "description": "Brightness delays the eruption on one side of each geyser pair."
-    },
-    {
-      "title": "Hollow Backdraft",
-      "folder": "fumarole-field-hollow-backdraft",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels steer the reversed plume motion."
-    },
     {
       "title": "Shelf Plume Merge",
       "folder": "fumarole-field-shelf-plume-merge",
       "treatment": "Colour transfer",
       "description": "The merging plumes carry colours drawn from the artwork."
-    },
-    {
-      "title": "Offset Vent Chase",
-      "folder": "fumarole-field-offset-vent-chase",
-      "treatment": "Repeated impressions",
-      "description": "Repeated sprite impressions mark the staggered vent faces."
-    },
-    {
-      "title": "Crosswind Smear",
-      "folder": "fumarole-field-crosswind-smear",
-      "treatment": "Persistent trace",
-      "description": "A previous sprite remains as drifting material in the crosswind."
     }
   ],
   "Storm Isobars": [
-    {
-      "title": "Squall Bow",
-      "folder": "storm-isobars"
-    },
-    {
-      "title": "Triple Point Merge",
-      "folder": "storm-isobars-triple-point-merge",
-      "treatment": "Colour separation",
-      "description": "The triple point separates the sprite into colour fronts."
-    },
-    {
-      "title": "Dryline Intrusion",
-      "folder": "storm-isobars-dryline-intrusion",
-      "treatment": "Silhouette cutout",
-      "description": "The alpha silhouette cuts a dry intrusion through the rain field."
-    },
-    {
-      "title": "Polar Wrap",
-      "folder": "storm-isobars-polar-wrap",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels wind the isobars around the pole."
-    },
-    {
-      "title": "Occluded Front",
-      "folder": "storm-isobars-occluded-front",
-      "treatment": "Projected shadow",
-      "description": "A projected silhouette darkens and lengthens the occluded front."
-    },
-    {
-      "title": "Gust Ring Escape",
-      "folder": "storm-isobars-gust-ring-escape",
-      "treatment": "Beat relay",
-      "description": "Bright regions delay the local expansion of gust rings."
-    },
-    {
-      "title": "Jet Streak Split",
-      "folder": "storm-isobars-jet-streak-split",
-      "treatment": "Drawn fibres",
-      "description": "Sprite detail is drawn out into long jet streaks."
-    },
     {
       "title": "Convergence Sweep",
       "folder": "storm-isobars-convergence-sweep",
@@ -497,98 +79,24 @@
   ],
   "Caustic Basin": [
     {
-      "title": "Shoal Focus",
-      "folder": "caustic-basin"
-    },
-    {
-      "title": "Trench Split",
-      "folder": "caustic-basin-trench-split",
-      "treatment": "Colour separation",
-      "description": "The trench splits the sprite into separated wavelength bands."
-    },
-    {
       "title": "Step Refocus",
       "folder": "caustic-basin-step-refocus",
       "treatment": "Brightness relief",
       "description": "Bright detail becomes small changes in basin depth with lit edges."
     },
     {
-      "title": "Pebble Scatter",
-      "folder": "caustic-basin-pebble-scatter",
-      "treatment": "Moving fragments",
-      "description": "Artwork breaks into moving chips among the pebble reflections."
-    },
-    {
-      "title": "Channel Crosslight",
-      "folder": "caustic-basin-channel-crosslight",
-      "treatment": "Projected shadow",
-      "description": "The sprite blocks angled rays and throws moving shadows."
-    },
-    {
       "title": "Sandbar Bend",
       "folder": "caustic-basin-sandbar-bend",
       "treatment": "Colour transfer",
       "description": "The sandbar takes on colours streamed from the sprite."
-    },
-    {
-      "title": "Pool Convergence",
-      "folder": "caustic-basin-pool-convergence",
-      "treatment": "Persistent trace",
-      "description": "A sprite leaves a pool of light that drifts and fades."
-    },
-    {
-      "title": "Rim Reflection",
-      "folder": "caustic-basin-rim-reflection",
-      "treatment": "Repeated impressions",
-      "description": "Repeated reflections emboss the rim with copies of the artwork."
     }
   ],
   "Shadow Telegraph": [
-    {
-      "title": "Raking Wall",
-      "folder": "shadow-telegraph"
-    },
-    {
-      "title": "Stair Shadow Climb",
-      "folder": "shadow-telegraph-stair-shadow-climb",
-      "treatment": "Brightness relief",
-      "description": "Brightness raises treads and reshapes the shadows climbing them."
-    },
-    {
-      "title": "Parapet Sundial",
-      "folder": "shadow-telegraph-parapet-sundial",
-      "treatment": "Repeated impressions",
-      "description": "Repeated artwork is etched on a series of sundial faces."
-    },
     {
       "title": "Opposed Lamps",
       "folder": "shadow-telegraph-opposed-lamps",
       "treatment": "Colour separation",
       "description": "Opposed lamps send separate colour images across the brick."
-    },
-    {
-      "title": "Slat Crossover",
-      "folder": "shadow-telegraph-slat-crossover",
-      "treatment": "Drawn fibres",
-      "description": "Slats pull the sprite into alternating narrow light threads."
-    },
-    {
-      "title": "Corner Wrap",
-      "folder": "shadow-telegraph-corner-wrap",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels push the wall pattern around the corner."
-    },
-    {
-      "title": "Beam Eclipse",
-      "folder": "shadow-telegraph-beam-eclipse",
-      "treatment": "Silhouette cutout",
-      "description": "The silhouette cuts a gap through the beam."
-    },
-    {
-      "title": "Screen Handoff",
-      "folder": "shadow-telegraph-screen-handoff",
-      "treatment": "Persistent trace",
-      "description": "Sprite residue moves across successive screens after the handoff."
     }
   ],
   "Foil Register": [
@@ -597,113 +105,21 @@
       "folder": "foil-register"
     },
     {
-      "title": "Offset Stamp Relay",
-      "folder": "foil-register-offset-stamp-relay",
-      "treatment": "Repeated impressions",
-      "description": "Small mirrored artwork stamps are pressed into alternate strips."
-    },
-    {
-      "title": "Diagonal Brush Reversal",
-      "folder": "foil-register-diagonal-brush-reversal",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels switch the direction of the brushing."
-    },
-    {
       "title": "Fluted Panel Sweep",
       "folder": "foil-register-fluted-panel-sweep",
       "treatment": "Colour transfer",
       "description": "Pigment from the image stains the moving fluted panels."
-    },
-    {
-      "title": "Raised Seal Flash",
-      "folder": "foil-register-raised-seal-flash",
-      "treatment": "Beat relay",
-      "description": "Bright image regions flash after adjacent foil has already caught the beat."
-    },
-    {
-      "title": "Woven Foil Glide",
-      "folder": "foil-register-woven-foil-glide",
-      "treatment": "Drawn fibres",
-      "description": "Fine threads from the artwork interleave with the woven foil."
-    },
-    {
-      "title": "Tension Wrinkle",
-      "folder": "foil-register-tension-wrinkle",
-      "treatment": "Silhouette cutout",
-      "description": "The sprite opens a dark tear in the wrinkling surface."
-    },
-    {
-      "title": "Creased Edge Spark",
-      "folder": "foil-register-creased-edge-spark",
-      "treatment": "Colour separation",
-      "description": "Different colour channels strike different edges of the crease."
     }
   ],
   "Serrated Shutters": [
-    {
-      "title": "Concertina Chase",
-      "folder": "serrated-shutters"
-    },
-    {
-      "title": "Checkerboard Flip",
-      "folder": "serrated-shutters-checkerboard-flip",
-      "treatment": "Repeated impressions",
-      "description": "Copies are carved into alternating shutter blades."
-    },
-    {
-      "title": "Diagonal Unzip",
-      "folder": "serrated-shutters-diagonal-unzip",
-      "treatment": "Drawn fibres",
-      "description": "Threads from the artwork unzip the slats along the diagonal."
-    },
     {
       "title": "Slot Crossover",
       "folder": "serrated-shutters-slot-crossover",
       "treatment": "Colour separation",
       "description": "The slot separates the sprite into crossing beams."
-    },
-    {
-      "title": "Corner Aperture",
-      "folder": "serrated-shutters-corner-aperture",
-      "treatment": "Brightness relief",
-      "description": "Bright artwork rises on the corners and changes the aperture relief."
-    },
-    {
-      "title": "Opposed Banks",
-      "folder": "serrated-shutters-opposed-banks",
-      "treatment": "Beat relay",
-      "description": "Artwork holds selected shutters shut for part of each beat."
-    },
-    {
-      "title": "Floor to Ceiling Roll",
-      "folder": "serrated-shutters-floor-to-ceiling-roll",
-      "treatment": "Colour transfer",
-      "description": "Sprite colour flows up the rolling shutters."
-    },
-    {
-      "title": "Interlocking Iris",
-      "folder": "serrated-shutters-interlocking-iris",
-      "treatment": "Moving fragments",
-      "description": "Sprite fragments travel separately across the interlocking leaves."
     }
   ],
   "Ceramic Resonator": [
-    {
-      "title": "Honeycomb Buckle",
-      "folder": "ceramic-resonator"
-    },
-    {
-      "title": "Keystone Ringdown",
-      "folder": "ceramic-resonator-keystone-ringdown",
-      "treatment": "Beat relay",
-      "description": "Bright pixels delay individual keystones before their ringdown."
-    },
-    {
-      "title": "Brick Bond Slip",
-      "folder": "ceramic-resonator-brick-bond-slip",
-      "treatment": "Repeated impressions",
-      "description": "The sprite repeats in relief along the offset brick courses."
-    },
     {
       "title": "Mosaic Fan Flex",
       "folder": "ceramic-resonator-mosaic-fan-flex",
@@ -711,35 +127,13 @@
       "description": "The image becomes coloured glaze across the mosaic fan."
     },
     {
-      "title": "Travelling Ridge",
-      "folder": "ceramic-resonator-travelling-ridge",
-      "treatment": "Artwork-driven movement",
-      "description": "The image steers the slab ripple along the ridge."
-    },
-    {
       "title": "Scallop Snap",
       "folder": "ceramic-resonator-scallop-snap",
       "treatment": "Silhouette cutout",
       "description": "The silhouette opens a dark fissure through the scalloped tiles."
-    },
-    {
-      "title": "Split Panel Rebound",
-      "folder": "ceramic-resonator-split-panel-rebound",
-      "treatment": "Moving fragments",
-      "description": "Sprite pieces move as separate chips on the split panel."
-    },
-    {
-      "title": "Corner Load",
-      "folder": "ceramic-resonator-corner-load",
-      "treatment": "Projected shadow",
-      "description": "Sprite-shaped shadows rake over the corner load."
     }
   ],
   "Kinetic Typesetter": [
-    {
-      "title": "Column Set",
-      "folder": "kinetic-typesetter"
-    },
     {
       "title": "Headline Slam",
       "folder": "kinetic-typesetter-headline-slam",
@@ -753,30 +147,6 @@
       "description": "The sprite inks the diagonal proof in its own colours."
     },
     {
-      "title": "Corner Index",
-      "folder": "kinetic-typesetter-corner-index",
-      "treatment": "Repeated impressions",
-      "description": "Small repeated images are impressed into the index blocks."
-    },
-    {
-      "title": "Loose Type Cascade",
-      "folder": "kinetic-typesetter-loose-type-cascade",
-      "treatment": "Moving fragments",
-      "description": "The sprite breaks into loose type that slips out of position."
-    },
-    {
-      "title": "Margin Chase",
-      "folder": "kinetic-typesetter-margin-chase",
-      "treatment": "Drawn fibres",
-      "description": "Threads from the image run down the moving margins."
-    },
-    {
-      "title": "Reversed Forme",
-      "folder": "kinetic-typesetter-reversed-forme",
-      "treatment": "Silhouette cutout",
-      "description": "The sprite cuts letter-shaped voids through the reversed forme."
-    },
-    {
       "title": "Overprint Collision",
       "folder": "kinetic-typesetter-overprint-collision",
       "treatment": "Colour separation",
@@ -785,153 +155,27 @@
   ],
   "Cable Exchange": [
     {
-      "title": "Bus Arbitration",
-      "folder": "cable-exchange"
-    },
-    {
-      "title": "Switchyard Detour",
-      "folder": "cable-exchange-switchyard-detour",
-      "treatment": "Repeated impressions",
-      "description": "Repeated sprite impressions mark the detours and their switching plates."
-    },
-    {
-      "title": "Ring Bypass",
-      "folder": "cable-exchange-ring-bypass",
-      "treatment": "Persistent trace",
-      "description": "Old artwork circulates as a decaying packet trail in the bypass."
-    },
-    {
       "title": "Crossbar Handoff",
       "folder": "cable-exchange-crossbar-handoff",
       "treatment": "Colour separation",
       "description": "Colour channels hand off to separate crossbar routes."
     },
     {
-      "title": "Branch Fanout",
-      "folder": "cable-exchange-branch-fanout",
-      "treatment": "Drawn fibres",
-      "description": "The sprite fans into narrow signal threads."
-    },
-    {
       "title": "Loopback Queue",
       "folder": "cable-exchange-loopback-queue",
       "treatment": "Beat relay",
       "description": "Brightness keeps packets queued for different lengths after each beat."
-    },
-    {
-      "title": "Merge Priority",
-      "folder": "cable-exchange-merge-priority",
-      "treatment": "Colour transfer",
-      "description": "Sprite colour spreads into the converging traces."
-    },
-    {
-      "title": "Bridge Failover",
-      "folder": "cable-exchange-bridge-failover",
-      "treatment": "Projected shadow",
-      "description": "The sprite projects a moving blackout across the bridge and its traces."
-    }
-  ],
-  "Barograph": [
-    {
-      "title": "Stacked Seismograms",
-      "folder": "barograph"
-    },
-    {
-      "title": "Radial Drum Record",
-      "folder": "barograph-radial-drum-record",
-      "treatment": "Repeated impressions",
-      "description": "Copies of the sprite stamp into the cylindrical paper."
-    },
-    {
-      "title": "Opposed Paper Feeds",
-      "folder": "barograph-opposed-paper-feeds",
-      "treatment": "Colour separation",
-      "description": "Different sprite channels travel in opposite directions on the paper."
-    },
-    {
-      "title": "Spiral Trace Spool",
-      "folder": "barograph-spiral-trace-spool",
-      "treatment": "Artwork-driven movement",
-      "description": "The sprite steers the pen positions as the record spools."
-    },
-    {
-      "title": "Crossfeed Pens",
-      "folder": "barograph-crossfeed-pens",
-      "treatment": "Colour transfer",
-      "description": "Image colours feed into the separate pen marks."
-    },
-    {
-      "title": "Lane Skips",
-      "folder": "barograph-lane-skips",
-      "treatment": "Silhouette cutout",
-      "description": "The silhouette cuts gaps through the selected record lanes."
-    },
-    {
-      "title": "Foldout Record",
-      "folder": "barograph-foldout-record",
-      "treatment": "Brightness relief",
-      "description": "The folded chart rises and catches a bevel wherever the image is bright."
-    },
-    {
-      "title": "Alternating Drum Banks",
-      "folder": "barograph-alternating-drum-banks",
-      "treatment": "Beat relay",
-      "description": "Bright parts delay each drum bank after the hit."
     }
   ],
   "Raster Excavation": [
-    {
-      "title": "Rolling Sweep",
-      "folder": "raster-excavation"
-    },
     {
       "title": "Interlaced Quarry",
       "folder": "raster-excavation-interlaced-quarry",
       "treatment": "Colour separation",
       "description": "The interlaced rows separate the sprite into colour channels."
-    },
-    {
-      "title": "Opposed Scan Faces",
-      "folder": "raster-excavation-opposed-scan-faces",
-      "treatment": "Projected shadow",
-      "description": "The sprite casts a moving shadow between the opposing scan faces."
-    },
-    {
-      "title": "Zigzag Bench Cut",
-      "folder": "raster-excavation-zigzag-bench-cut",
-      "treatment": "Repeated impressions",
-      "description": "Repeated sprite impressions are cut into the zigzag bench."
-    },
-    {
-      "title": "Diagonal Stripping",
-      "folder": "raster-excavation-diagonal-stripping",
-      "treatment": "Drawn fibres",
-      "description": "The artwork is pulled into individual diagonal strips."
-    },
-    {
-      "title": "Patch Excavation",
-      "folder": "raster-excavation-patch-excavation",
-      "treatment": "Moving fragments",
-      "description": "Image pieces break away as moving excavation patches."
-    },
-    {
-      "title": "Corner Traverse",
-      "folder": "raster-excavation-corner-traverse",
-      "treatment": "Persistent trace",
-      "description": "Stored image marks follow the corner and fade through several sweeps."
-    },
-    {
-      "title": "Depth Relay",
-      "folder": "raster-excavation-depth-relay",
-      "treatment": "Beat relay",
-      "description": "Bright zones wait longer before triggering the next depth response."
     }
   ],
   "Sonar Curtain": [
-    {
-      "title": "Lateral Ping Sweep",
-      "folder": "sonar-curtain"
-    },
     {
       "title": "Twin Baseline",
       "folder": "sonar-curtain-twin-baseline",
@@ -943,276 +187,4224 @@
       "folder": "sonar-curtain-bottom-sounding",
       "treatment": "Brightness relief",
       "description": "Sprite brightness raises the apparent seabed."
-    },
-    {
-      "title": "Side Scan Handoff",
-      "folder": "sonar-curtain-side-scan-handoff",
-      "treatment": "Persistent trace",
-      "description": "Previous artwork stays in the wake of the side scan."
-    },
-    {
-      "title": "Fan Beam Search",
-      "folder": "sonar-curtain-fan-beam-search",
-      "treatment": "Drawn fibres",
-      "description": "The artwork is drawn into narrow rays from the beam fan."
-    },
-    {
-      "title": "Staggered Transects",
-      "folder": "sonar-curtain-staggered-transects",
-      "treatment": "Repeated impressions",
-      "description": "Repeated sprite marks appear on successive transects."
-    },
-    {
-      "title": "Cross Echo",
-      "folder": "sonar-curtain-cross-echo",
-      "treatment": "Silhouette cutout",
-      "description": "The silhouette cuts holes where the echoes cross."
-    },
-    {
-      "title": "Range Fold",
-      "folder": "sonar-curtain-range-fold",
-      "treatment": "Artwork-driven movement",
-      "description": "The sprite channels shift the direction and phase of the range folds."
-    }
-  ],
-  "Pendulum Fleet": [
-    {
-      "title": "Crossed Arms",
-      "folder": "pendulum-fleet"
-    },
-    {
-      "title": "Ceiling Cascade",
-      "folder": "pendulum-fleet-ceiling-cascade",
-      "treatment": "Beat relay",
-      "description": "Bright areas keep some weights back before they swing."
-    },
-    {
-      "title": "Sidewall Escapement",
-      "folder": "pendulum-fleet-sidewall-escapement",
-      "treatment": "Projected shadow",
-      "description": "The sprite casts swinging shadows across the sideways pendulum bank."
-    },
-    {
-      "title": "Counterphase Banks",
-      "folder": "pendulum-fleet-counterphase-banks",
-      "treatment": "Colour separation",
-      "description": "Opposing banks catch separated colours from the sprite."
-    },
-    {
-      "title": "Double Link Transfer",
-      "folder": "pendulum-fleet-double-link-transfer",
-      "treatment": "Moving fragments",
-      "description": "Sprite pieces move like separately released counterweights."
-    },
-    {
-      "title": "Suspended Bridge",
-      "folder": "pendulum-fleet-suspended-bridge",
-      "treatment": "Drawn fibres",
-      "description": "Artwork runs as strands through the hanging cables."
-    },
-    {
-      "title": "Staggered Row Catch",
-      "folder": "pendulum-fleet-staggered-row-catch",
-      "treatment": "Persistent trace",
-      "description": "The last sprite hangs on as a moving trace behind the staggered rows."
-    },
-    {
-      "title": "Floor Pivot Rebound",
-      "folder": "pendulum-fleet-floor-pivot-rebound",
-      "treatment": "Brightness relief",
-      "description": "Brightness changes the apparent raised height and lighting of the floor-mounted weights."
     }
   ],
   "Clockwork Conveyor": [
-    {
-      "title": "Corner Transfer",
-      "folder": "clockwork-conveyor"
-    },
-    {
-      "title": "Return Belt",
-      "folder": "clockwork-conveyor-return-belt",
-      "treatment": "Colour transfer",
-      "description": "The returning cargo carries pigment drawn from the sprite."
-    },
-    {
-      "title": "Sorting Gate",
-      "folder": "clockwork-conveyor-sorting-gate",
-      "treatment": "Beat relay",
-      "description": "Bright zones hold their gates before releasing the next loads."
-    },
-    {
-      "title": "Belt Weave",
-      "folder": "clockwork-conveyor-belt-weave",
-      "treatment": "Drawn fibres",
-      "description": "The image is drawn out into strands that interleave with the belt weave."
-    },
     {
       "title": "Ramp Exchange",
       "folder": "clockwork-conveyor-ramp-exchange",
       "treatment": "Brightness relief",
       "description": "Brightness raises cargo and exposes the edges of the ramp."
-    },
-    {
-      "title": "Gravity Chute",
-      "folder": "clockwork-conveyor-gravity-chute",
-      "treatment": "Moving fragments",
-      "description": "The sprite splits into chunks that drop independently."
-    },
-    {
-      "title": "Turntable Merge",
-      "folder": "clockwork-conveyor-turntable-merge",
-      "treatment": "Repeated impressions",
-      "description": "Repeated impressions mark the turntable and its transfer plates."
-    },
-    {
-      "title": "Recirculation Loop",
-      "folder": "clockwork-conveyor-recirculation-loop",
-      "treatment": "Persistent trace",
-      "description": "Older artwork keeps circulating as a fading cargo trace."
-    }
-  ],
-  "Gravity Foundry": [
-    {
-      "title": "Binary Capture",
-      "folder": "gravity-foundry"
-    },
-    {
-      "title": "Tidal Slingshot",
-      "folder": "gravity-foundry-tidal-slingshot",
-      "treatment": "Drawn fibres",
-      "description": "Sprite detail draws long particle wakes through the slingshot."
-    },
-    {
-      "title": "Edge Well Transit",
-      "folder": "gravity-foundry-edge-well-transit",
-      "treatment": "Projected shadow",
-      "description": "The sprite eclipses the travelling wells and their orbit lines."
-    },
-    {
-      "title": "Trojans Scatter",
-      "folder": "gravity-foundry-trojans-scatter",
-      "treatment": "Moving fragments",
-      "description": "Pieces of the sprite scatter as separate orbital debris."
-    },
-    {
-      "title": "Flyby Exchange",
-      "folder": "gravity-foundry-flyby-exchange",
-      "treatment": "Colour separation",
-      "description": "The flyby separates colour channels into offset passes."
-    },
-    {
-      "title": "Ring Shepherd",
-      "folder": "gravity-foundry-ring-shepherd",
-      "treatment": "Repeated impressions",
-      "description": "The sprite repeats at staggered positions among the rings."
-    },
-    {
-      "title": "Three Body Ejection",
-      "folder": "gravity-foundry-three-body-ejection",
-      "treatment": "Beat relay",
-      "description": "Bright areas hold part of the ejection back until later in the beat."
-    },
-    {
-      "title": "Counterorbit Capture",
-      "folder": "gravity-foundry-counterorbit-capture",
-      "treatment": "Persistent trace",
-      "description": "Older images trail away while new material joins the opposite orbit."
-    }
-  ],
-  "Granular Hopper": [
-    {
-      "title": "Funnel Arch Break",
-      "folder": "granular-hopper"
-    },
-    {
-      "title": "Offset Sieve",
-      "folder": "granular-hopper-offset-sieve",
-      "treatment": "Repeated impressions",
-      "description": "Repeated sprite perforations mark the sieve beds."
-    },
-    {
-      "title": "Split Hopper",
-      "folder": "granular-hopper-split-hopper",
-      "treatment": "Projected shadow",
-      "description": "The split hopper casts sprite-shaped shadows across the falling grains."
-    },
-    {
-      "title": "Incline Slide",
-      "folder": "granular-hopper-incline-slide",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels turn the path of grains along the incline."
-    },
-    {
-      "title": "Pocket Fill",
-      "folder": "granular-hopper-pocket-fill",
-      "treatment": "Persistent trace",
-      "description": "Artwork keeps building a deposit as the pockets fill."
-    },
-    {
-      "title": "Talus Spill",
-      "folder": "granular-hopper-talus-spill",
-      "treatment": "Moving fragments",
-      "description": "The image breaks into chips that travel with the spilling talus."
-    },
-    {
-      "title": "Layer Inversion",
-      "folder": "granular-hopper-layer-inversion",
-      "treatment": "Colour transfer",
-      "description": "Sprite pigments are mixed into the inverted layers."
-    },
-    {
-      "title": "Bridge Collapse",
-      "folder": "granular-hopper-bridge-collapse",
-      "treatment": "Beat relay",
-      "description": "Bright image zones delay sections of the bridge before collapse."
     }
   ],
   "Pneumatic Quilt": [
-    {
-      "title": "Diamond Inflation",
-      "folder": "pneumatic-quilt"
-    },
-    {
-      "title": "Channel Vent",
-      "folder": "pneumatic-quilt-channel-vent",
-      "treatment": "Drawn fibres",
-      "description": "The image draws taut threads between the venting pockets."
-    },
-    {
-      "title": "Checkerboard Breathing",
-      "folder": "pneumatic-quilt-checkerboard-breathing",
-      "treatment": "Repeated impressions",
-      "description": "The sprite repeats as pressed marks on alternating cells."
-    },
-    {
-      "title": "Corner Squeeze",
-      "folder": "pneumatic-quilt-corner-squeeze",
-      "treatment": "Brightness relief",
-      "description": "Brightness raises fabric near the corner and changes its lighting."
-    },
-    {
-      "title": "Spiral Bladder Fill",
-      "folder": "pneumatic-quilt-spiral-bladder-fill",
-      "treatment": "Artwork-driven movement",
-      "description": "Sprite channels twist the moving fabric around the filling spiral."
-    },
     {
       "title": "Baffle Handoff",
       "folder": "pneumatic-quilt-baffle-handoff",
       "treatment": "Beat relay",
       "description": "Bright areas hold back a pocket before its pressure wave passes on."
+    }
+  ],
+  "Tunnel Drive": [
+    {
+      "title": "Round",
+      "folder": "tunnel-drive-round"
     },
     {
-      "title": "Foldback Deflation",
-      "folder": "pneumatic-quilt-foldback-deflation",
-      "treatment": "Silhouette cutout",
-      "description": "The silhouette cuts through the folded fabric as it deflates."
+      "title": "Square",
+      "folder": "tunnel-drive-square"
     },
     {
-      "title": "Crossfeed Surge",
-      "folder": "pneumatic-quilt-crossfeed-surge",
-      "treatment": "Persistent trace",
-      "description": "Fading sprite traces travel from pocket to pocket."
+      "title": "Hexagonal",
+      "folder": "tunnel-drive-hexagonal"
+    },
+    {
+      "title": "Twisted Spiral",
+      "folder": "tunnel-drive-twisted-spiral"
+    },
+    {
+      "title": "Round · Archive",
+      "folder": "archive-tunnel-drive-v1-round"
+    },
+    {
+      "title": "Square · Archive",
+      "folder": "archive-tunnel-drive-v2-square"
+    },
+    {
+      "title": "Hexagonal · Archive",
+      "folder": "archive-tunnel-drive-v3-hexagonal"
+    },
+    {
+      "title": "Twisted Spiral · Archive",
+      "folder": "archive-tunnel-drive-v4-twisted-spiral"
+    },
+    {
+      "folder": "mixed-007-tunnel-drive-hexagonal",
+      "title": "Hexagonal 7 · Mixed"
+    },
+    {
+      "folder": "mixed-016-tunnel-drive-round",
+      "title": "Round 16 · Mixed"
+    },
+    {
+      "folder": "mixed-059-tunnel-drive-twisted-spiral",
+      "title": "Twisted Spiral 59 · Mixed"
+    },
+    {
+      "folder": "mixed-062-tunnel-drive-square",
+      "title": "Square 62 · Mixed"
+    },
+    {
+      "folder": "mixed-075-tunnel-drive-hexagonal",
+      "title": "Hexagonal 75 · Mixed"
+    },
+    {
+      "folder": "mixed-084-tunnel-drive-round",
+      "title": "Round 84 · Mixed"
+    },
+    {
+      "folder": "mixed-127-tunnel-drive-twisted-spiral",
+      "title": "Twisted Spiral 127 · Mixed"
+    },
+    {
+      "folder": "mixed-130-tunnel-drive-square",
+      "title": "Square 130 · Mixed"
+    },
+    {
+      "folder": "mixed-143-tunnel-drive-hexagonal",
+      "title": "Hexagonal 143 · Mixed"
+    }
+  ],
+  "Kaleido Bloom": [
+    {
+      "title": "6-Fold",
+      "folder": "kaleido-bloom-6-fold"
+    },
+    {
+      "title": "8-Fold",
+      "folder": "kaleido-bloom-8-fold"
+    },
+    {
+      "title": "12-Fold",
+      "folder": "kaleido-bloom-12-fold"
+    },
+    {
+      "title": "16-Fold Counter-Spin",
+      "folder": "kaleido-bloom-16-fold-counter-spin"
+    },
+    {
+      "title": "6-Fold · Archive",
+      "folder": "archive-kaleido-bloom-v1-6-fold"
+    },
+    {
+      "title": "8-Fold · Archive",
+      "folder": "archive-kaleido-bloom-v2-8-fold"
+    },
+    {
+      "title": "12-Fold · Archive",
+      "folder": "archive-kaleido-bloom-v3-12-fold"
+    },
+    {
+      "title": "16-Fold Counter-Spin · Archive",
+      "folder": "archive-kaleido-bloom-v4-16-fold-counter-spin"
+    },
+    {
+      "folder": "mixed-018-kaleido-bloom-12-fold",
+      "title": "12-Fold 18 · Mixed"
+    },
+    {
+      "folder": "mixed-022-kaleido-bloom-6-fold",
+      "title": "6-Fold 22 · Mixed"
+    },
+    {
+      "folder": "mixed-023-kaleido-bloom-8-fold",
+      "title": "8-Fold 23 · Mixed"
+    },
+    {
+      "folder": "mixed-041-kaleido-bloom-16-fold-counter-spin",
+      "title": "16-Fold Counter-Spin 41 · Mixed"
+    },
+    {
+      "folder": "mixed-086-kaleido-bloom-12-fold",
+      "title": "12-Fold 86 · Mixed"
+    },
+    {
+      "folder": "mixed-090-kaleido-bloom-6-fold",
+      "title": "6-Fold 90 · Mixed"
+    },
+    {
+      "folder": "mixed-091-kaleido-bloom-8-fold",
+      "title": "8-Fold 91 · Mixed"
+    },
+    {
+      "folder": "mixed-109-kaleido-bloom-16-fold-counter-spin",
+      "title": "16-Fold Counter-Spin 109 · Mixed"
+    }
+  ],
+  "Warp Flow": [
+    {
+      "title": "Slow Lava",
+      "folder": "warp-flow-slow-lava"
+    },
+    {
+      "title": "Tight Turbulence",
+      "folder": "warp-flow-tight-turbulence"
+    },
+    {
+      "title": "Curl Streams",
+      "folder": "warp-flow-curl-streams"
+    },
+    {
+      "title": "Ripple Glitch",
+      "folder": "warp-flow-ripple-glitch"
+    },
+    {
+      "title": "Slow Lava · Archive",
+      "folder": "archive-warp-flow-v1-slow-lava"
+    },
+    {
+      "title": "Tight Turbulence · Archive",
+      "folder": "archive-warp-flow-v2-tight-turbulence"
+    },
+    {
+      "title": "Curl Streams · Archive",
+      "folder": "archive-warp-flow-v3-curl-streams"
+    },
+    {
+      "title": "Ripple Glitch · Archive",
+      "folder": "archive-warp-flow-v4-ripple-glitch"
+    },
+    {
+      "folder": "mixed-001-warp-flow-curl-streams",
+      "title": "Curl Streams 1 · Mixed"
+    },
+    {
+      "folder": "mixed-012-warp-flow-tight-turbulence",
+      "title": "Tight Turbulence 12 · Mixed"
+    },
+    {
+      "folder": "mixed-019-warp-flow-ripple-glitch",
+      "title": "Ripple Glitch 19 · Mixed"
+    },
+    {
+      "folder": "mixed-045-warp-flow-slow-lava",
+      "title": "Slow Lava 45 · Mixed"
+    },
+    {
+      "folder": "mixed-069-warp-flow-curl-streams",
+      "title": "Curl Streams 69 · Mixed"
+    },
+    {
+      "folder": "mixed-080-warp-flow-tight-turbulence",
+      "title": "Tight Turbulence 80 · Mixed"
+    },
+    {
+      "folder": "mixed-087-warp-flow-ripple-glitch",
+      "title": "Ripple Glitch 87 · Mixed"
+    },
+    {
+      "folder": "mixed-113-warp-flow-slow-lava",
+      "title": "Slow Lava 113 · Mixed"
+    },
+    {
+      "folder": "mixed-137-warp-flow-curl-streams",
+      "title": "Curl Streams 137 · Mixed"
+    },
+    {
+      "folder": "mixed-148-warp-flow-tight-turbulence",
+      "title": "Tight Turbulence 148 · Mixed"
+    }
+  ],
+  "Beat Tiles": [
+    {
+      "title": "Grid",
+      "folder": "beat-tiles-grid"
+    },
+    {
+      "title": "Brick",
+      "folder": "beat-tiles-brick"
+    },
+    {
+      "title": "Radial Rings",
+      "folder": "beat-tiles-radial-rings"
+    },
+    {
+      "title": "Grid · Archive",
+      "folder": "archive-beat-tiles-v1-grid"
+    },
+    {
+      "title": "Brick · Archive",
+      "folder": "archive-beat-tiles-v2-brick"
+    },
+    {
+      "title": "Diamond · Archive",
+      "folder": "archive-beat-tiles-v3-diamond"
+    },
+    {
+      "title": "Radial Rings · Archive",
+      "folder": "archive-beat-tiles-v4-radial-rings"
+    },
+    {
+      "folder": "mixed-005-beat-tiles-dense-spin",
+      "title": "Dense Spin 5 · Mixed"
+    },
+    {
+      "folder": "mixed-028-beat-tiles-diamond",
+      "title": "Diamond 28 · Mixed"
+    },
+    {
+      "folder": "mixed-034-beat-tiles-grid",
+      "title": "Grid 34 · Mixed"
+    },
+    {
+      "folder": "mixed-050-beat-tiles-mirrored",
+      "title": "Mirrored 50 · Mixed"
+    },
+    {
+      "folder": "mixed-073-beat-tiles-dense-spin",
+      "title": "Dense Spin 73 · Mixed"
+    },
+    {
+      "folder": "mixed-096-beat-tiles-diamond",
+      "title": "Diamond 96 · Mixed"
+    },
+    {
+      "folder": "mixed-102-beat-tiles-grid",
+      "title": "Grid 102 · Mixed"
+    },
+    {
+      "folder": "mixed-118-beat-tiles-mirrored",
+      "title": "Mirrored 118 · Mixed"
+    },
+    {
+      "folder": "mixed-141-beat-tiles-dense-spin",
+      "title": "Dense Spin 141 · Mixed"
+    }
+  ],
+  "Shockwave Lens": [
+    {
+      "title": "Centre Rings",
+      "folder": "shockwave-lens-centre-rings"
+    },
+    {
+      "title": "Twin Orbit",
+      "folder": "shockwave-lens-twin-orbit"
+    },
+    {
+      "title": "Square Ripples",
+      "folder": "shockwave-lens-square-ripples"
+    },
+    {
+      "title": "Spiral",
+      "folder": "shockwave-lens-spiral"
+    },
+    {
+      "title": "Centre Rings · Archive",
+      "folder": "archive-shockwave-lens-v1-centre-rings"
+    },
+    {
+      "title": "Twin Orbit · Archive",
+      "folder": "archive-shockwave-lens-v2-twin-orbit"
+    },
+    {
+      "title": "Square Ripples · Archive",
+      "folder": "archive-shockwave-lens-v3-square-ripples"
+    },
+    {
+      "title": "Spiral · Archive",
+      "folder": "archive-shockwave-lens-v4-spiral"
+    },
+    {
+      "folder": "mixed-009-shockwave-lens-spiral",
+      "title": "Spiral 9 · Mixed"
+    },
+    {
+      "folder": "mixed-021-shockwave-lens-centre-rings",
+      "title": "Centre Rings 21 · Mixed"
+    },
+    {
+      "folder": "mixed-038-shockwave-lens-fast-twin",
+      "title": "Fast Twin 38 · Mixed"
+    },
+    {
+      "folder": "mixed-042-shockwave-lens-square-ripples",
+      "title": "Square Ripples 42 · Mixed"
+    },
+    {
+      "folder": "mixed-077-shockwave-lens-spiral",
+      "title": "Spiral 77 · Mixed"
+    },
+    {
+      "folder": "mixed-089-shockwave-lens-centre-rings",
+      "title": "Centre Rings 89 · Mixed"
+    },
+    {
+      "folder": "mixed-106-shockwave-lens-fast-twin",
+      "title": "Fast Twin 106 · Mixed"
+    },
+    {
+      "folder": "mixed-110-shockwave-lens-square-ripples",
+      "title": "Square Ripples 110 · Mixed"
+    },
+    {
+      "folder": "mixed-145-shockwave-lens-spiral",
+      "title": "Spiral 145 · Mixed"
+    }
+  ],
+  "Laser Grid Horizon": [
+    {
+      "title": "Flat Floor",
+      "folder": "laser-grid-horizon-flat-floor"
+    },
+    {
+      "title": "Floor and Ceiling",
+      "folder": "laser-grid-horizon-floor-and-ceiling"
+    },
+    {
+      "title": "Curved Planet Horizon",
+      "folder": "laser-grid-horizon-curved-planet-horizon"
+    },
+    {
+      "title": "Split-Screen Mirrored",
+      "folder": "laser-grid-horizon-split-screen-mirrored"
+    },
+    {
+      "title": "Flat Floor — Lib",
+      "folder": "laser-grid-horizon-lib-01-flat-floor"
+    },
+    {
+      "title": "Floor and Ceiling — Lib",
+      "folder": "laser-grid-horizon-lib-02-floor-and-ceiling"
+    },
+    {
+      "title": "Curved Planet Horizon — Lib",
+      "folder": "laser-grid-horizon-lib-03-curved-planet-horizon"
+    },
+    {
+      "title": "Split-Screen Mirrored — Lib",
+      "folder": "laser-grid-horizon-lib-04-split-screen-mirrored"
+    },
+    {
+      "title": "Flat Floor — Lit",
+      "folder": "laser-grid-horizon-lit-01-flat-floor"
+    },
+    {
+      "title": "Floor and Ceiling — Lit",
+      "folder": "laser-grid-horizon-lit-02-floor-and-ceiling"
+    },
+    {
+      "title": "Curved Planet Horizon — Lit",
+      "folder": "laser-grid-horizon-lit-03-curved-planet-horizon"
+    },
+    {
+      "title": "Split-Screen Mirrored — Lit",
+      "folder": "laser-grid-horizon-lit-04-split-screen-mirrored"
+    },
+    {
+      "title": "Flat Floor · Archive",
+      "folder": "archive-laser-grid-horizon-v1-flat-floor"
+    },
+    {
+      "title": "Floor and Ceiling · Archive",
+      "folder": "archive-laser-grid-horizon-v2-floor-and-ceiling"
+    },
+    {
+      "title": "Planet Curve · Archive",
+      "folder": "archive-laser-grid-horizon-v3-planet-curve"
+    },
+    {
+      "title": "Mirror Split · Archive",
+      "folder": "archive-laser-grid-horizon-v4-mirror-split"
+    }
+  ],
+  "Fractal Zoom": [
+    {
+      "title": "Mandelbrot",
+      "folder": "fractal-zoom-mandelbrot"
+    },
+    {
+      "title": "Julia Morph",
+      "folder": "fractal-zoom-julia-morph"
+    },
+    {
+      "title": "Burning Ship",
+      "folder": "fractal-zoom-burning-ship"
+    },
+    {
+      "title": "Multibrot",
+      "folder": "fractal-zoom-multibrot"
+    },
+    {
+      "title": "Mandelbrot · Archive",
+      "folder": "archive-fractal-zoom-v1-mandelbrot"
+    },
+    {
+      "title": "Julia Morph · Archive",
+      "folder": "archive-fractal-zoom-v2-julia-morph"
+    },
+    {
+      "title": "Burning Ship · Archive",
+      "folder": "archive-fractal-zoom-v3-burning-ship"
+    },
+    {
+      "title": "Multibrot · Archive",
+      "folder": "archive-fractal-zoom-v4-multibrot"
+    }
+  ],
+  "Monolith Canyon": [
+    {
+      "title": "Straight Corridor",
+      "folder": "monolith-canyon-straight-corridor"
+    },
+    {
+      "title": "Scattered Field",
+      "folder": "monolith-canyon-scattered-field"
+    },
+    {
+      "title": "Spiral Stair",
+      "folder": "monolith-canyon-spiral-stair"
+    },
+    {
+      "title": "Pillars That Fold",
+      "folder": "monolith-canyon-pillars-that-fold"
+    },
+    {
+      "title": "Straight Corridor · Archive",
+      "folder": "archive-monolith-canyon-v1-straight-corridor"
+    },
+    {
+      "title": "Scattered Field · Archive",
+      "folder": "archive-monolith-canyon-v2-scattered-field"
+    },
+    {
+      "title": "Spiral Stair · Archive",
+      "folder": "archive-monolith-canyon-v3-spiral-stair"
+    },
+    {
+      "title": "Folding Pillars · Archive",
+      "folder": "archive-monolith-canyon-v4-folding-pillars"
+    }
+  ],
+  "Metaball Mass": [
+    {
+      "title": "Chrome",
+      "folder": "metaball-mass-chrome"
+    },
+    {
+      "title": "Glass Lens",
+      "folder": "metaball-mass-glass-lens"
+    },
+    {
+      "title": "Jelly",
+      "folder": "metaball-mass-jelly"
+    },
+    {
+      "title": "Bursting",
+      "folder": "metaball-mass-bursting"
+    },
+    {
+      "title": "Chrome · Archive",
+      "folder": "archive-metaball-mass-v1-chrome"
+    },
+    {
+      "title": "Glass Lens · Archive",
+      "folder": "archive-metaball-mass-v2-glass-lens"
+    },
+    {
+      "title": "Jelly · Archive",
+      "folder": "archive-metaball-mass-v3-jelly"
+    },
+    {
+      "title": "Bursting · Archive",
+      "folder": "archive-metaball-mass-v4-bursting"
+    }
+  ],
+  "Datamosh Glitch": [
+    {
+      "title": "Scan Tears",
+      "folder": "datamosh-glitch-scan-tears"
+    },
+    {
+      "title": "Channel Swaps",
+      "folder": "datamosh-glitch-channel-swaps"
+    },
+    {
+      "title": "Freeze and Melt",
+      "folder": "datamosh-glitch-freeze-and-melt"
+    },
+    {
+      "title": "Macroblocks · Archive",
+      "folder": "archive-datamosh-glitch-v1-macroblocks"
+    },
+    {
+      "title": "Scan Tears · Archive",
+      "folder": "archive-datamosh-glitch-v2-scan-tears"
+    },
+    {
+      "title": "Channel Swaps · Archive",
+      "folder": "archive-datamosh-glitch-v3-channel-swaps"
+    },
+    {
+      "title": "Freeze and Melt · Archive",
+      "folder": "archive-datamosh-glitch-v4-freeze-and-melt"
+    },
+    {
+      "folder": "mixed-015-datamosh-glitch-heavy-split",
+      "title": "Heavy Split 15 · Mixed"
+    },
+    {
+      "folder": "mixed-054-datamosh-glitch-fine-blocks",
+      "title": "Fine Blocks 54 · Mixed"
+    },
+    {
+      "folder": "mixed-058-datamosh-glitch-blocks",
+      "title": "Blocks 58 · Mixed"
+    },
+    {
+      "folder": "mixed-067-datamosh-glitch-mirror-melt",
+      "title": "Mirror Melt 67 · Mixed"
+    },
+    {
+      "folder": "mixed-083-datamosh-glitch-heavy-split",
+      "title": "Heavy Split 83 · Mixed"
+    },
+    {
+      "folder": "mixed-122-datamosh-glitch-fine-blocks",
+      "title": "Fine Blocks 122 · Mixed"
+    },
+    {
+      "folder": "mixed-126-datamosh-glitch-blocks",
+      "title": "Blocks 126 · Mixed"
+    },
+    {
+      "folder": "mixed-135-datamosh-glitch-mirror-melt",
+      "title": "Mirror Melt 135 · Mixed"
+    }
+  ],
+  "Pixel Sort Cascade": [
+    {
+      "title": "Down",
+      "folder": "pixel-sort-cascade-down"
+    },
+    {
+      "title": "Sideways",
+      "folder": "pixel-sort-cascade-sideways"
+    },
+    {
+      "title": "Radial",
+      "folder": "pixel-sort-cascade-radial"
+    },
+    {
+      "title": "Diagonal",
+      "folder": "pixel-sort-cascade-diagonal"
+    },
+    {
+      "title": "Down · Archive",
+      "folder": "archive-pixel-sort-cascade-v1-down"
+    },
+    {
+      "title": "Sideways · Archive",
+      "folder": "archive-pixel-sort-cascade-v2-sideways"
+    },
+    {
+      "title": "Radial · Archive",
+      "folder": "archive-pixel-sort-cascade-v3-radial"
+    },
+    {
+      "title": "Diagonal · Archive",
+      "folder": "archive-pixel-sort-cascade-v4-diagonal"
+    }
+  ],
+  "Voronoi Shatter": [
+    {
+      "title": "Static Shards",
+      "folder": "voronoi-shatter-static-shards"
+    },
+    {
+      "title": "Exploding Shards",
+      "folder": "voronoi-shatter-exploding-shards"
+    },
+    {
+      "title": "Cracked Glass",
+      "folder": "voronoi-shatter-cracked-glass"
+    },
+    {
+      "title": "Hex Biased",
+      "folder": "voronoi-shatter-hex-biased"
+    },
+    {
+      "title": "Static Shards · Archive",
+      "folder": "archive-voronoi-shatter-v1-static-shards"
+    },
+    {
+      "title": "Exploding Shards · Archive",
+      "folder": "archive-voronoi-shatter-v2-exploding-shards"
+    },
+    {
+      "title": "Cracked Glass · Archive",
+      "folder": "archive-voronoi-shatter-v3-cracked-glass"
+    },
+    {
+      "title": "Hex-Biased · Archive",
+      "folder": "archive-voronoi-shatter-v4-hex-biased"
+    }
+  ],
+  "Radial Spectrum Burst": [
+    {
+      "title": "Rays",
+      "folder": "radial-spectrum-burst-rays"
+    },
+    {
+      "title": "Ring of Bars",
+      "folder": "radial-spectrum-burst-ring-of-bars"
+    },
+    {
+      "title": "Mirrored Halves",
+      "folder": "radial-spectrum-burst-mirrored-halves"
+    },
+    {
+      "title": "Double Ring",
+      "folder": "radial-spectrum-burst-double-ring"
+    },
+    {
+      "title": "Rays · Archive",
+      "folder": "archive-radial-spectrum-burst-v1-rays"
+    },
+    {
+      "title": "Ring of Bars · Archive",
+      "folder": "archive-radial-spectrum-burst-v2-ring-of-bars"
+    },
+    {
+      "title": "Mirrored Halves · Archive",
+      "folder": "archive-radial-spectrum-burst-v3-mirrored-halves"
+    },
+    {
+      "title": "Double Ring · Archive",
+      "folder": "archive-radial-spectrum-burst-v4-double-ring"
+    }
+  ],
+  "Waveform Ribbons": [
+    {
+      "title": "Single Ribbon",
+      "folder": "waveform-ribbons-single-ribbon"
+    },
+    {
+      "title": "Braided",
+      "folder": "waveform-ribbons-braided"
+    },
+    {
+      "title": "Lissajous",
+      "folder": "waveform-ribbons-lissajous"
+    },
+    {
+      "title": "Circular",
+      "folder": "waveform-ribbons-circular"
+    },
+    {
+      "title": "Single Ribbon · Archive",
+      "folder": "archive-waveform-ribbons-v1-single-ribbon"
+    },
+    {
+      "title": "Braided · Archive",
+      "folder": "archive-waveform-ribbons-v2-braided"
+    },
+    {
+      "title": "Lissajous · Archive",
+      "folder": "archive-waveform-ribbons-v3-lissajous"
+    },
+    {
+      "title": "Circular · Archive",
+      "folder": "archive-waveform-ribbons-v4-circular"
+    }
+  ],
+  "Strobe Slicer": [
+    {
+      "title": "Horizontal",
+      "folder": "strobe-slicer-horizontal"
+    },
+    {
+      "title": "Vertical",
+      "folder": "strobe-slicer-vertical"
+    },
+    {
+      "title": "Diagonal",
+      "folder": "strobe-slicer-diagonal"
+    },
+    {
+      "title": "Staircase",
+      "folder": "strobe-slicer-staircase"
+    },
+    {
+      "title": "Horizontal · Archive",
+      "folder": "archive-strobe-slicer-v1-horizontal"
+    },
+    {
+      "title": "Vertical · Archive",
+      "folder": "archive-strobe-slicer-v2-vertical"
+    },
+    {
+      "title": "Diagonal · Archive",
+      "folder": "archive-strobe-slicer-v3-diagonal"
+    },
+    {
+      "title": "Staircase · Archive",
+      "folder": "archive-strobe-slicer-v4-staircase"
+    }
+  ],
+  "Hex Pulse Grid": [
+    {
+      "title": "Flat Caps",
+      "folder": "hex-pulse-grid-flat-caps"
+    },
+    {
+      "title": "Outline Only",
+      "folder": "hex-pulse-grid-outline-only"
+    },
+    {
+      "title": "3D Cubes",
+      "folder": "hex-pulse-grid-3d-cubes"
+    },
+    {
+      "title": "Swirl",
+      "folder": "hex-pulse-grid-swirl"
+    },
+    {
+      "title": "Flat Caps · Archive",
+      "folder": "archive-hex-pulse-grid-v1-flat-caps"
+    },
+    {
+      "title": "Outline Only · Archive",
+      "folder": "archive-hex-pulse-grid-v2-outline-only"
+    },
+    {
+      "title": "3D Cubes · Archive",
+      "folder": "archive-hex-pulse-grid-v3-3d-cubes"
+    },
+    {
+      "title": "Swirl · Archive",
+      "folder": "archive-hex-pulse-grid-v4-swirl"
+    }
+  ],
+  "Plasma Lava": [
+    {
+      "title": "Slow",
+      "folder": "plasma-lava-slow"
+    },
+    {
+      "title": "Acid",
+      "folder": "plasma-lava-acid"
+    },
+    {
+      "title": "Molten",
+      "folder": "plasma-lava-molten"
+    },
+    {
+      "title": "Electric",
+      "folder": "plasma-lava-electric"
+    },
+    {
+      "title": "Slow · Archive",
+      "folder": "archive-plasma-lava-v1-slow"
+    },
+    {
+      "title": "Acid · Archive",
+      "folder": "archive-plasma-lava-v2-acid"
+    },
+    {
+      "title": "Molten · Archive",
+      "folder": "archive-plasma-lava-v3-molten"
+    },
+    {
+      "title": "Electric · Archive",
+      "folder": "archive-plasma-lava-v4-electric"
+    },
+    {
+      "folder": "mixed-008-plasma-lava-electric",
+      "title": "Electric 8 · Mixed"
+    },
+    {
+      "folder": "mixed-026-plasma-lava-molten",
+      "title": "Molten 26 · Mixed"
+    },
+    {
+      "folder": "mixed-065-plasma-lava-acid",
+      "title": "Acid 65 · Mixed"
+    },
+    {
+      "folder": "mixed-066-plasma-lava-slow",
+      "title": "Slow 66 · Mixed"
+    },
+    {
+      "folder": "mixed-076-plasma-lava-electric",
+      "title": "Electric 76 · Mixed"
+    },
+    {
+      "folder": "mixed-094-plasma-lava-molten",
+      "title": "Molten 94 · Mixed"
+    },
+    {
+      "folder": "mixed-133-plasma-lava-acid",
+      "title": "Acid 133 · Mixed"
+    },
+    {
+      "folder": "mixed-134-plasma-lava-slow",
+      "title": "Slow 134 · Mixed"
+    },
+    {
+      "folder": "mixed-144-plasma-lava-electric",
+      "title": "Electric 144 · Mixed"
+    }
+  ],
+  "Hyperspace Stars": [
+    {
+      "title": "Curved",
+      "folder": "hyperspace-stars-curved"
+    },
+    {
+      "title": "Spiral Jump",
+      "folder": "hyperspace-stars-spiral-jump"
+    },
+    {
+      "title": "Straight · Archive",
+      "folder": "archive-hyperspace-stars-v1-straight"
+    },
+    {
+      "title": "Curved · Archive",
+      "folder": "archive-hyperspace-stars-v2-curved"
+    },
+    {
+      "title": "Pulsing · Archive",
+      "folder": "archive-hyperspace-stars-v3-pulsing"
+    },
+    {
+      "title": "Spiral Jump · Archive",
+      "folder": "archive-hyperspace-stars-v4-spiral-jump"
+    },
+    {
+      "folder": "mixed-004-hyperspace-stars-dense",
+      "title": "Dense 4 · Mixed"
+    },
+    {
+      "folder": "mixed-040-hyperspace-stars-straight",
+      "title": "Straight 40 · Mixed"
+    },
+    {
+      "folder": "mixed-057-hyperspace-stars-pulsing",
+      "title": "Pulsing 57 · Mixed"
+    },
+    {
+      "folder": "mixed-064-hyperspace-stars-spiral-jump",
+      "title": "Spiral Jump 64 · Mixed"
+    },
+    {
+      "folder": "mixed-072-hyperspace-stars-dense",
+      "title": "Dense 72 · Mixed"
+    },
+    {
+      "folder": "mixed-108-hyperspace-stars-straight",
+      "title": "Straight 108 · Mixed"
+    },
+    {
+      "folder": "mixed-125-hyperspace-stars-pulsing",
+      "title": "Pulsing 125 · Mixed"
+    },
+    {
+      "folder": "mixed-132-hyperspace-stars-spiral-jump",
+      "title": "Spiral Jump 132 · Mixed"
+    },
+    {
+      "folder": "mixed-140-hyperspace-stars-dense",
+      "title": "Dense 140 · Mixed"
+    }
+  ],
+  "Lightning Storm": [
+    {
+      "title": "Single Bolt",
+      "folder": "lightning-storm-single-bolt"
+    },
+    {
+      "title": "Forked",
+      "folder": "lightning-storm-forked"
+    },
+    {
+      "title": "Lattice Cage",
+      "folder": "lightning-storm-lattice-cage"
+    },
+    {
+      "title": "Ball Lightning",
+      "folder": "lightning-storm-ball-lightning"
+    },
+    {
+      "title": "Single Bolt · Archive",
+      "folder": "archive-lightning-storm-v1-single-bolt"
+    },
+    {
+      "title": "Forked · Archive",
+      "folder": "archive-lightning-storm-v2-forked"
+    },
+    {
+      "title": "Lattice Cage · Archive",
+      "folder": "archive-lightning-storm-v3-lattice-cage"
+    },
+    {
+      "title": "Ball Lightning · Archive",
+      "folder": "archive-lightning-storm-v4-ball-lightning"
+    }
+  ],
+  "Heat Distortion": [
+    {
+      "title": "Bonfire",
+      "folder": "heat-distortion-bonfire"
+    },
+    {
+      "title": "Wall of Fire",
+      "folder": "heat-distortion-wall-of-fire"
+    },
+    {
+      "title": "Embers",
+      "folder": "heat-distortion-embers"
+    },
+    {
+      "title": "Plasma Torch",
+      "folder": "heat-distortion-plasma-torch"
+    },
+    {
+      "title": "Bonfire · Archive",
+      "folder": "archive-heat-distortion-v1-bonfire"
+    },
+    {
+      "title": "Wall of Fire · Archive",
+      "folder": "archive-heat-distortion-v2-wall-of-fire"
+    },
+    {
+      "title": "Embers · Archive",
+      "folder": "archive-heat-distortion-v3-embers"
+    },
+    {
+      "title": "Plasma Torch · Archive",
+      "folder": "archive-heat-distortion-v4-plasma-torch"
+    }
+  ],
+  "Liquid Chrome": [
+    {
+      "title": "Sphere",
+      "folder": "liquid-chrome-sphere"
+    },
+    {
+      "title": "Sheet",
+      "folder": "liquid-chrome-sheet"
+    },
+    {
+      "title": "Torus",
+      "folder": "liquid-chrome-torus"
+    },
+    {
+      "title": "Splashing",
+      "folder": "liquid-chrome-splashing"
+    },
+    {
+      "title": "Sphere · Archive",
+      "folder": "archive-liquid-chrome-v1-sphere"
+    },
+    {
+      "title": "Sheet · Archive",
+      "folder": "archive-liquid-chrome-v2-sheet"
+    },
+    {
+      "title": "Torus · Archive",
+      "folder": "archive-liquid-chrome-v3-torus"
+    },
+    {
+      "title": "Splashing · Archive",
+      "folder": "archive-liquid-chrome-v4-splashing"
+    }
+  ],
+  "Moiré Interference": [
+    {
+      "title": "Linear",
+      "folder": "moire-interference-linear"
+    },
+    {
+      "title": "Radial",
+      "folder": "moire-interference-radial"
+    },
+    {
+      "title": "Dot",
+      "folder": "moire-interference-dot"
+    },
+    {
+      "title": "Rotating",
+      "folder": "moire-interference-rotating"
+    },
+    {
+      "title": "Linear · Archive",
+      "folder": "archive-moire-interference-v1-linear"
+    },
+    {
+      "title": "Radial · Archive",
+      "folder": "archive-moire-interference-v2-radial"
+    },
+    {
+      "title": "Dot · Archive",
+      "folder": "archive-moire-interference-v3-dot"
+    },
+    {
+      "title": "Rotating · Archive",
+      "folder": "archive-moire-interference-v4-rotating"
+    }
+  ],
+  "Truchet Maze": [
+    {
+      "title": "Arcs",
+      "folder": "truchet-maze-arcs"
+    },
+    {
+      "title": "Diagonals",
+      "folder": "truchet-maze-diagonals"
+    },
+    {
+      "title": "Triangles",
+      "folder": "truchet-maze-triangles"
+    },
+    {
+      "title": "Weave",
+      "folder": "truchet-maze-weave"
+    },
+    {
+      "title": "Arcs · Archive",
+      "folder": "archive-truchet-maze-v1-arcs"
+    },
+    {
+      "title": "Diagonals · Archive",
+      "folder": "archive-truchet-maze-v2-diagonals"
+    },
+    {
+      "title": "Triangles · Archive",
+      "folder": "archive-truchet-maze-v3-triangles"
+    },
+    {
+      "title": "Weave · Archive",
+      "folder": "archive-truchet-maze-v4-weave"
+    }
+  ],
+  "Circuit Board": [
+    {
+      "title": "Glitched",
+      "folder": "circuit-board-glitched"
+    },
+    {
+      "title": "Dense · Archive",
+      "folder": "archive-circuit-board-v1-dense"
+    },
+    {
+      "title": "Sparse · Archive",
+      "folder": "archive-circuit-board-v2-sparse"
+    },
+    {
+      "title": "Chip Core · Archive",
+      "folder": "archive-circuit-board-v3-chip-core"
+    },
+    {
+      "title": "Glitched · Archive",
+      "folder": "archive-circuit-board-v4-glitched"
+    }
+  ],
+  "Nebula Storm": [
+    {
+      "title": "Pillars",
+      "folder": "nebula-storm-pillars"
+    },
+    {
+      "title": "Swirl",
+      "folder": "nebula-storm-swirl"
+    },
+    {
+      "title": "Supernova",
+      "folder": "nebula-storm-supernova"
+    },
+    {
+      "title": "Dust Lanes",
+      "folder": "nebula-storm-dust-lanes"
+    },
+    {
+      "title": "Pillars · Archive",
+      "folder": "archive-nebula-storm-v1-pillars"
+    },
+    {
+      "title": "Swirl · Archive",
+      "folder": "archive-nebula-storm-v2-swirl"
+    },
+    {
+      "title": "Supernova · Archive",
+      "folder": "archive-nebula-storm-v3-supernova"
+    },
+    {
+      "title": "Dust Lanes · Archive",
+      "folder": "archive-nebula-storm-v4-dust-lanes"
+    }
+  ],
+  "Polyhedron Cage": [
+    {
+      "title": "Cube",
+      "folder": "polyhedron-cage-cube"
+    },
+    {
+      "title": "Octahedron",
+      "folder": "polyhedron-cage-octahedron"
+    },
+    {
+      "title": "Icosahedron",
+      "folder": "polyhedron-cage-icosahedron"
+    },
+    {
+      "title": "Nested",
+      "folder": "polyhedron-cage-nested"
+    },
+    {
+      "title": "Cube · Archive",
+      "folder": "archive-polyhedron-cage-v1-cube"
+    },
+    {
+      "title": "Octahedron · Archive",
+      "folder": "archive-polyhedron-cage-v2-octahedron"
+    },
+    {
+      "title": "Icosahedron · Archive",
+      "folder": "archive-polyhedron-cage-v3-icosahedron"
+    },
+    {
+      "title": "Nested · Archive",
+      "folder": "archive-polyhedron-cage-v4-nested"
+    }
+  ],
+  "Vortex Galaxy": [
+    {
+      "title": "Two Arms",
+      "folder": "vortex-galaxy-two-arms"
+    },
+    {
+      "title": "Four Arms",
+      "folder": "vortex-galaxy-four-arms"
+    },
+    {
+      "title": "Barred",
+      "folder": "vortex-galaxy-barred"
+    },
+    {
+      "title": "Collapsing",
+      "folder": "vortex-galaxy-collapsing"
+    },
+    {
+      "title": "Two Arms · Archive",
+      "folder": "archive-vortex-galaxy-v1-two-arms"
+    },
+    {
+      "title": "Four Arms · Archive",
+      "folder": "archive-vortex-galaxy-v2-four-arms"
+    },
+    {
+      "title": "Barred · Archive",
+      "folder": "archive-vortex-galaxy-v3-barred"
+    },
+    {
+      "title": "Collapsing · Archive",
+      "folder": "archive-vortex-galaxy-v4-collapsing"
+    },
+    {
+      "folder": "mixed-020-vortex-galaxy-four-arms",
+      "title": "Four Arms 20 · Mixed"
+    },
+    {
+      "folder": "mixed-043-vortex-galaxy-two-arms",
+      "title": "Two Arms 43 · Mixed"
+    },
+    {
+      "folder": "mixed-056-vortex-galaxy-ripple-core",
+      "title": "Ripple Core 56 · Mixed"
+    },
+    {
+      "folder": "mixed-061-vortex-galaxy-collapsing",
+      "title": "Collapsing 61 · Mixed"
+    },
+    {
+      "folder": "mixed-088-vortex-galaxy-four-arms",
+      "title": "Four Arms 88 · Mixed"
+    },
+    {
+      "folder": "mixed-111-vortex-galaxy-two-arms",
+      "title": "Two Arms 111 · Mixed"
+    },
+    {
+      "folder": "mixed-124-vortex-galaxy-ripple-core",
+      "title": "Ripple Core 124 · Mixed"
+    },
+    {
+      "folder": "mixed-129-vortex-galaxy-collapsing",
+      "title": "Collapsing 129 · Mixed"
+    }
+  ],
+  "Ink Smoke": [
+    {
+      "title": "Black Ink",
+      "folder": "ink-smoke-black-ink"
+    },
+    {
+      "title": "Neon Smoke",
+      "folder": "ink-smoke-neon-smoke"
+    },
+    {
+      "title": "Paint Drops",
+      "folder": "ink-smoke-paint-drops"
+    },
+    {
+      "title": "Reverse Suck-In",
+      "folder": "ink-smoke-reverse-suck-in"
+    },
+    {
+      "title": "Black Ink · Archive",
+      "folder": "archive-ink-smoke-v1-black-ink"
+    },
+    {
+      "title": "Neon Smoke · Archive",
+      "folder": "archive-ink-smoke-v2-neon-smoke"
+    },
+    {
+      "title": "Paint Drops · Archive",
+      "folder": "archive-ink-smoke-v3-paint-drops"
+    },
+    {
+      "title": "Reverse Suck-In · Archive",
+      "folder": "archive-ink-smoke-v4-reverse-suck-in"
+    },
+    {
+      "folder": "mixed-013-ink-smoke-paint",
+      "title": "Paint 13 · Mixed"
+    },
+    {
+      "folder": "mixed-052-ink-smoke-black-ink",
+      "title": "Black Ink 52 · Mixed"
+    },
+    {
+      "folder": "mixed-060-ink-smoke-neon-smoke",
+      "title": "Neon Smoke 60 · Mixed"
+    },
+    {
+      "folder": "mixed-063-ink-smoke-suck-in",
+      "title": "Suck-In 63 · Mixed"
+    },
+    {
+      "folder": "mixed-081-ink-smoke-paint",
+      "title": "Paint 81 · Mixed"
+    },
+    {
+      "folder": "mixed-120-ink-smoke-black-ink",
+      "title": "Black Ink 120 · Mixed"
+    },
+    {
+      "folder": "mixed-128-ink-smoke-neon-smoke",
+      "title": "Neon Smoke 128 · Mixed"
+    },
+    {
+      "folder": "mixed-131-ink-smoke-suck-in",
+      "title": "Suck-In 131 · Mixed"
+    },
+    {
+      "folder": "mixed-149-ink-smoke-paint",
+      "title": "Paint 149 · Mixed"
+    }
+  ],
+  "Infinite Mirror Room": [
+    {
+      "title": "Parallel Mirrors",
+      "folder": "infinite-mirror-room-parallel-mirrors"
+    },
+    {
+      "title": "Corner",
+      "folder": "infinite-mirror-room-corner"
+    },
+    {
+      "title": "Hall of Squares",
+      "folder": "infinite-mirror-room-hall-of-squares"
+    },
+    {
+      "title": "Rotating",
+      "folder": "infinite-mirror-room-rotating"
+    },
+    {
+      "title": "Parallel Mirrors · Archive",
+      "folder": "archive-infinite-mirror-room-v1-parallel-mirrors"
+    },
+    {
+      "title": "Corner · Archive",
+      "folder": "archive-infinite-mirror-room-v2-corner"
+    },
+    {
+      "title": "Hall of Squares · Archive",
+      "folder": "archive-infinite-mirror-room-v3-hall-of-squares"
+    },
+    {
+      "title": "Rotating · Archive",
+      "folder": "archive-infinite-mirror-room-v4-rotating"
+    },
+    {
+      "folder": "mixed-014-infinite-mirror-room-rotating",
+      "title": "Rotating 14 · Mixed"
+    },
+    {
+      "folder": "mixed-027-infinite-mirror-room-parallel",
+      "title": "Parallel 27 · Mixed"
+    },
+    {
+      "folder": "mixed-039-infinite-mirror-room-corner",
+      "title": "Corner 39 · Mixed"
+    },
+    {
+      "folder": "mixed-044-infinite-mirror-room-hall-of-squares",
+      "title": "Hall of Squares 44 · Mixed"
+    },
+    {
+      "folder": "mixed-082-infinite-mirror-room-rotating",
+      "title": "Rotating 82 · Mixed"
+    },
+    {
+      "folder": "mixed-095-infinite-mirror-room-parallel",
+      "title": "Parallel 95 · Mixed"
+    },
+    {
+      "folder": "mixed-107-infinite-mirror-room-corner",
+      "title": "Corner 107 · Mixed"
+    },
+    {
+      "folder": "mixed-112-infinite-mirror-room-hall-of-squares",
+      "title": "Hall of Squares 112 · Mixed"
+    },
+    {
+      "folder": "mixed-150-infinite-mirror-room-rotating",
+      "title": "Rotating 150 · Mixed"
+    }
+  ],
+  "Droste Recursion": [
+    {
+      "title": "Straight Zoom",
+      "folder": "droste-recursion-straight-zoom"
+    },
+    {
+      "title": "Log Spiral",
+      "folder": "droste-recursion-log-spiral"
+    },
+    {
+      "title": "Square",
+      "folder": "droste-recursion-square"
+    },
+    {
+      "title": "Twin",
+      "folder": "droste-recursion-twin"
+    },
+    {
+      "title": "Straight Zoom · Archive",
+      "folder": "archive-droste-recursion-v1-straight-zoom"
+    },
+    {
+      "title": "Log-Spiral · Archive",
+      "folder": "archive-droste-recursion-v2-log-spiral"
+    },
+    {
+      "title": "Square · Archive",
+      "folder": "archive-droste-recursion-v3-square"
+    },
+    {
+      "title": "Twin · Archive",
+      "folder": "archive-droste-recursion-v4-twin"
+    },
+    {
+      "folder": "mixed-011-droste-recursion-square",
+      "title": "Square 11 · Mixed"
+    },
+    {
+      "folder": "mixed-025-droste-recursion-twin",
+      "title": "Twin 25 · Mixed"
+    },
+    {
+      "folder": "mixed-037-droste-recursion-straight-zoom",
+      "title": "Straight Zoom 37 · Mixed"
+    },
+    {
+      "folder": "mixed-053-droste-recursion-log-spiral",
+      "title": "Log-Spiral 53 · Mixed"
+    },
+    {
+      "folder": "mixed-079-droste-recursion-square",
+      "title": "Square 79 · Mixed"
+    },
+    {
+      "folder": "mixed-093-droste-recursion-twin",
+      "title": "Twin 93 · Mixed"
+    },
+    {
+      "folder": "mixed-105-droste-recursion-straight-zoom",
+      "title": "Straight Zoom 105 · Mixed"
+    },
+    {
+      "folder": "mixed-121-droste-recursion-log-spiral",
+      "title": "Log-Spiral 121 · Mixed"
+    },
+    {
+      "folder": "mixed-147-droste-recursion-square",
+      "title": "Square 147 · Mixed"
+    }
+  ],
+  "Sound Terrain": [
+    {
+      "title": "Wireframe",
+      "folder": "sound-terrain-wireframe"
+    },
+    {
+      "title": "Solid",
+      "folder": "sound-terrain-solid"
+    },
+    {
+      "title": "Canyon",
+      "folder": "sound-terrain-canyon"
+    },
+    {
+      "title": "Ocean Swell",
+      "folder": "sound-terrain-ocean-swell"
+    },
+    {
+      "title": "Wireframe · Archive",
+      "folder": "archive-sound-terrain-v1-wireframe"
+    },
+    {
+      "title": "Solid · Archive",
+      "folder": "archive-sound-terrain-v2-solid"
+    },
+    {
+      "title": "Canyon · Archive",
+      "folder": "archive-sound-terrain-v3-canyon"
+    },
+    {
+      "title": "Ocean Swell · Archive",
+      "folder": "archive-sound-terrain-v4-ocean-swell"
+    }
+  ],
+  "Tesseract Lines": [
+    {
+      "title": "Hypercube",
+      "folder": "tesseract-lines-hypercube"
+    },
+    {
+      "title": "24-Cell",
+      "folder": "tesseract-lines-24-cell"
+    },
+    {
+      "title": "Slice",
+      "folder": "tesseract-lines-slice"
+    },
+    {
+      "title": "Glow Trails",
+      "folder": "tesseract-lines-glow-trails"
+    },
+    {
+      "title": "Hypercube · Archive",
+      "folder": "archive-tesseract-lines-v1-hypercube"
+    },
+    {
+      "title": "Nested Hypercubes · Archive",
+      "folder": "archive-tesseract-lines-v2-nested-hypercubes"
+    },
+    {
+      "title": "Vertex Sprites · Archive",
+      "folder": "archive-tesseract-lines-v3-vertex-sprites"
+    },
+    {
+      "title": "Mirror Fold · Archive",
+      "folder": "archive-tesseract-lines-v4-mirror-fold"
+    }
+  ],
+  "CRT Overdrive": [
+    {
+      "title": "Clean",
+      "folder": "crt-overdrive-clean"
+    },
+    {
+      "title": "VHS",
+      "folder": "crt-overdrive-vhs"
+    },
+    {
+      "title": "Broken Tube",
+      "folder": "crt-overdrive-broken-tube"
+    },
+    {
+      "title": "Phosphor Trails",
+      "folder": "crt-overdrive-phosphor-trails"
+    },
+    {
+      "title": "Clean · Archive",
+      "folder": "archive-crt-overdrive-v1-clean"
+    },
+    {
+      "title": "VHS · Archive",
+      "folder": "archive-crt-overdrive-v2-vhs"
+    },
+    {
+      "title": "Broken Tube · Archive",
+      "folder": "archive-crt-overdrive-v3-broken-tube"
+    },
+    {
+      "title": "Phosphor Trails · Archive",
+      "folder": "archive-crt-overdrive-v4-phosphor-trails"
+    },
+    {
+      "folder": "mixed-030-crt-overdrive-hot-tube",
+      "title": "Hot Tube 30 · Mixed"
+    },
+    {
+      "folder": "mixed-033-crt-overdrive-clean",
+      "title": "Clean 33 · Mixed"
+    },
+    {
+      "folder": "mixed-048-crt-overdrive-vhs",
+      "title": "VHS 48 · Mixed"
+    },
+    {
+      "folder": "mixed-049-crt-overdrive-trails",
+      "title": "Trails 49 · Mixed"
+    },
+    {
+      "folder": "mixed-098-crt-overdrive-hot-tube",
+      "title": "Hot Tube 98 · Mixed"
+    },
+    {
+      "folder": "mixed-101-crt-overdrive-clean",
+      "title": "Clean 101 · Mixed"
+    },
+    {
+      "folder": "mixed-116-crt-overdrive-vhs",
+      "title": "VHS 116 · Mixed"
+    },
+    {
+      "folder": "mixed-117-crt-overdrive-trails",
+      "title": "Trails 117 · Mixed"
+    }
+  ],
+  "Halftone Pop": [
+    {
+      "title": "Round",
+      "folder": "halftone-pop-round"
+    },
+    {
+      "title": "Line",
+      "folder": "halftone-pop-line"
+    },
+    {
+      "title": "Cross",
+      "folder": "halftone-pop-cross"
+    },
+    {
+      "title": "Colour Separated",
+      "folder": "halftone-pop-colour-separated"
+    },
+    {
+      "title": "Round · Archive",
+      "folder": "archive-halftone-pop-v1-round"
+    },
+    {
+      "title": "Line · Archive",
+      "folder": "archive-halftone-pop-v2-line"
+    },
+    {
+      "title": "Cross · Archive",
+      "folder": "archive-halftone-pop-v3-cross"
+    },
+    {
+      "title": "RGB Separated · Archive",
+      "folder": "archive-halftone-pop-v4-rgb-separated"
+    },
+    {
+      "folder": "mixed-017-halftone-pop-coarse",
+      "title": "Coarse 17 · Mixed"
+    },
+    {
+      "folder": "mixed-024-halftone-pop-spin",
+      "title": "Spin 24 · Mixed"
+    },
+    {
+      "folder": "mixed-032-halftone-pop-medium",
+      "title": "Medium 32 · Mixed"
+    },
+    {
+      "folder": "mixed-046-halftone-pop-fine",
+      "title": "Fine 46 · Mixed"
+    },
+    {
+      "folder": "mixed-085-halftone-pop-coarse",
+      "title": "Coarse 85 · Mixed"
+    },
+    {
+      "folder": "mixed-092-halftone-pop-spin",
+      "title": "Spin 92 · Mixed"
+    },
+    {
+      "folder": "mixed-100-halftone-pop-medium",
+      "title": "Medium 100 · Mixed"
+    },
+    {
+      "folder": "mixed-114-halftone-pop-fine",
+      "title": "Fine 114 · Mixed"
+    }
+  ],
+  "Prism Refraction": [
+    {
+      "title": "Single Prism",
+      "folder": "prism-refraction-single-prism"
+    },
+    {
+      "title": "Grid",
+      "folder": "prism-refraction-grid"
+    },
+    {
+      "title": "Spinning",
+      "folder": "prism-refraction-spinning"
+    },
+    {
+      "title": "Radial",
+      "folder": "prism-refraction-radial"
+    },
+    {
+      "title": "Single Prism · Archive",
+      "folder": "archive-prism-refraction-v1-single-prism"
+    },
+    {
+      "title": "Grid · Archive",
+      "folder": "archive-prism-refraction-v2-grid"
+    },
+    {
+      "title": "Spinning · Archive",
+      "folder": "archive-prism-refraction-v3-spinning"
+    },
+    {
+      "title": "Radial · Archive",
+      "folder": "archive-prism-refraction-v4-radial"
+    }
+  ],
+  "Data Rain": [
+    {
+      "title": "Angled",
+      "folder": "data-rain-angled"
+    },
+    {
+      "title": "Radial",
+      "folder": "data-rain-radial"
+    },
+    {
+      "title": "Reverse",
+      "folder": "data-rain-reverse"
+    },
+    {
+      "title": "Vertical · Archive",
+      "folder": "archive-data-rain-v1-vertical"
+    },
+    {
+      "title": "Angled · Archive",
+      "folder": "archive-data-rain-v2-angled"
+    },
+    {
+      "title": "Radial · Archive",
+      "folder": "archive-data-rain-v3-radial"
+    },
+    {
+      "title": "Reverse · Archive",
+      "folder": "archive-data-rain-v4-reverse"
+    }
+  ],
+  "Flow Lines": [
+    {
+      "title": "Dense",
+      "folder": "flow-lines-dense"
+    },
+    {
+      "title": "Sparse",
+      "folder": "flow-lines-sparse"
+    },
+    {
+      "title": "Orbital",
+      "folder": "flow-lines-orbital"
+    },
+    {
+      "title": "Chaotic",
+      "folder": "flow-lines-chaotic"
+    },
+    {
+      "title": "Dense · Archive",
+      "folder": "archive-flow-lines-v1-dense"
+    },
+    {
+      "title": "Sparse · Archive",
+      "folder": "archive-flow-lines-v2-sparse"
+    },
+    {
+      "title": "Orbital · Archive",
+      "folder": "archive-flow-lines-v3-orbital"
+    },
+    {
+      "title": "Chaotic · Archive",
+      "folder": "archive-flow-lines-v4-chaotic"
+    }
+  ],
+  "Coral Growth": [
+    {
+      "title": "Fine",
+      "folder": "coral-growth-fine"
+    },
+    {
+      "title": "Thick",
+      "folder": "coral-growth-thick"
+    },
+    {
+      "title": "Bioluminescent",
+      "folder": "coral-growth-bioluminescent"
+    },
+    {
+      "title": "Fractal",
+      "folder": "coral-growth-fractal"
+    },
+    {
+      "title": "Fine · Archive",
+      "folder": "archive-coral-growth-v1-fine"
+    },
+    {
+      "title": "Thick · Archive",
+      "folder": "archive-coral-growth-v2-thick"
+    },
+    {
+      "title": "Bioluminescent · Archive",
+      "folder": "archive-coral-growth-v3-bioluminescent"
+    },
+    {
+      "title": "Fractal · Archive",
+      "folder": "archive-coral-growth-v4-fractal"
+    }
+  ],
+  "Marbling": [
+    {
+      "title": "Classic",
+      "folder": "marbling-classic"
+    },
+    {
+      "title": "Combed",
+      "folder": "marbling-combed"
+    },
+    {
+      "title": "Spiral",
+      "folder": "marbling-spiral"
+    },
+    {
+      "title": "Shattered",
+      "folder": "marbling-shattered"
+    },
+    {
+      "title": "Classic · Archive",
+      "folder": "archive-marbling-v1-classic"
+    },
+    {
+      "title": "Combed · Archive",
+      "folder": "archive-marbling-v2-combed"
+    },
+    {
+      "title": "Spiral · Archive",
+      "folder": "archive-marbling-v3-spiral"
+    },
+    {
+      "title": "Shattered · Archive",
+      "folder": "archive-marbling-v4-shattered"
+    },
+    {
+      "folder": "mixed-002-marbling-combed",
+      "title": "Combed 2 · Mixed"
+    },
+    {
+      "folder": "mixed-003-marbling-shattered",
+      "title": "Shattered 3 · Mixed"
+    },
+    {
+      "folder": "mixed-010-marbling-classic",
+      "title": "Classic 10 · Mixed"
+    },
+    {
+      "folder": "mixed-029-marbling-spiral",
+      "title": "Spiral 29 · Mixed"
+    },
+    {
+      "folder": "mixed-070-marbling-combed",
+      "title": "Combed 70 · Mixed"
+    },
+    {
+      "folder": "mixed-071-marbling-shattered",
+      "title": "Shattered 71 · Mixed"
+    },
+    {
+      "folder": "mixed-078-marbling-classic",
+      "title": "Classic 78 · Mixed"
+    },
+    {
+      "folder": "mixed-097-marbling-spiral",
+      "title": "Spiral 97 · Mixed"
+    },
+    {
+      "folder": "mixed-138-marbling-combed",
+      "title": "Combed 138 · Mixed"
+    },
+    {
+      "folder": "mixed-139-marbling-shattered",
+      "title": "Shattered 139 · Mixed"
+    },
+    {
+      "folder": "mixed-146-marbling-classic",
+      "title": "Classic 146 · Mixed"
+    }
+  ],
+  "Sunburst Rays": [
+    {
+      "title": "Rising",
+      "folder": "sunburst-rays-rising"
+    },
+    {
+      "title": "Setting",
+      "folder": "sunburst-rays-setting"
+    },
+    {
+      "title": "Strobing",
+      "folder": "sunburst-rays-strobing"
+    },
+    {
+      "title": "Split",
+      "folder": "sunburst-rays-split"
+    },
+    {
+      "title": "Rising · Archive",
+      "folder": "archive-sunburst-rays-v1-rising"
+    },
+    {
+      "title": "Setting · Archive",
+      "folder": "archive-sunburst-rays-v2-setting"
+    },
+    {
+      "title": "Strobing · Archive",
+      "folder": "archive-sunburst-rays-v3-strobing"
+    },
+    {
+      "title": "Split · Archive",
+      "folder": "archive-sunburst-rays-v4-split"
+    }
+  ],
+  "EQ Tower Wall": [
+    {
+      "title": "Orthographic",
+      "folder": "eq-tower-wall-orthographic"
+    },
+    {
+      "title": "Perspective",
+      "folder": "eq-tower-wall-perspective"
+    },
+    {
+      "title": "Circular",
+      "folder": "eq-tower-wall-circular"
+    },
+    {
+      "title": "Mirror Floor",
+      "folder": "eq-tower-wall-mirror-floor"
+    },
+    {
+      "title": "Orthographic · Archive",
+      "folder": "archive-eq-tower-wall-v1-orthographic"
+    },
+    {
+      "title": "Perspective · Archive",
+      "folder": "archive-eq-tower-wall-v2-perspective"
+    },
+    {
+      "title": "Circular · Archive",
+      "folder": "archive-eq-tower-wall-v3-circular"
+    },
+    {
+      "title": "Mirror Floor · Archive",
+      "folder": "archive-eq-tower-wall-v4-mirror-floor"
+    }
+  ],
+  "Orbit Rings": [
+    {
+      "title": "Three Rings",
+      "folder": "orbit-rings-three-rings"
+    },
+    {
+      "title": "Seven Rings",
+      "folder": "orbit-rings-seven-rings"
+    },
+    {
+      "title": "Tilted",
+      "folder": "orbit-rings-tilted"
+    },
+    {
+      "title": "Exploding",
+      "folder": "orbit-rings-exploding"
+    },
+    {
+      "title": "Three Rings · Archive",
+      "folder": "archive-orbit-rings-v1-three-rings"
+    },
+    {
+      "title": "Seven Rings · Archive",
+      "folder": "archive-orbit-rings-v2-seven-rings"
+    },
+    {
+      "title": "Tilted · Archive",
+      "folder": "archive-orbit-rings-v3-tilted"
+    },
+    {
+      "title": "Exploding · Archive",
+      "folder": "archive-orbit-rings-v4-exploding"
+    }
+  ],
+  "Mandala Spirograph": [
+    {
+      "title": "Epicycloid",
+      "folder": "mandala-spirograph-epicycloid"
+    },
+    {
+      "title": "Hypotrochoid",
+      "folder": "mandala-spirograph-hypotrochoid"
+    },
+    {
+      "title": "Dense",
+      "folder": "mandala-spirograph-dense"
+    },
+    {
+      "title": "Floral",
+      "folder": "mandala-spirograph-floral"
+    },
+    {
+      "title": "Epicycloid · Archive",
+      "folder": "archive-mandala-spirograph-v1-epicycloid"
+    },
+    {
+      "title": "Hypotrochoid · Archive",
+      "folder": "archive-mandala-spirograph-v2-hypotrochoid"
+    },
+    {
+      "title": "Dense Rose · Archive",
+      "folder": "archive-mandala-spirograph-v3-dense-rose"
+    },
+    {
+      "title": "Floral · Archive",
+      "folder": "archive-mandala-spirograph-v4-floral"
+    },
+    {
+      "folder": "mixed-035-mandala-spirograph-8-fold",
+      "title": "8-Fold 35 · Mixed"
+    },
+    {
+      "folder": "mixed-036-mandala-spirograph-12-fold",
+      "title": "12-Fold 36 · Mixed"
+    },
+    {
+      "folder": "mixed-055-mandala-spirograph-6-fold",
+      "title": "6-Fold 55 · Mixed"
+    },
+    {
+      "folder": "mixed-068-mandala-spirograph-16-fold",
+      "title": "16-Fold 68 · Mixed"
+    },
+    {
+      "folder": "mixed-103-mandala-spirograph-8-fold",
+      "title": "8-Fold 103 · Mixed"
+    },
+    {
+      "folder": "mixed-104-mandala-spirograph-12-fold",
+      "title": "12-Fold 104 · Mixed"
+    },
+    {
+      "folder": "mixed-123-mandala-spirograph-6-fold",
+      "title": "6-Fold 123 · Mixed"
+    },
+    {
+      "folder": "mixed-136-mandala-spirograph-16-fold",
+      "title": "16-Fold 136 · Mixed"
+    }
+  ],
+  "Torus Knot Tubes": [
+    {
+      "title": "Trefoil",
+      "folder": "torus-knot-tubes-trefoil"
+    },
+    {
+      "title": "(2,5) Knot",
+      "folder": "torus-knot-tubes-2-5-knot"
+    },
+    {
+      "title": "Twin Tubes",
+      "folder": "torus-knot-tubes-twin-tubes"
+    },
+    {
+      "title": "Unravelling",
+      "folder": "torus-knot-tubes-unravelling"
+    },
+    {
+      "title": "Trefoil · Archive",
+      "folder": "archive-torus-knot-tubes-v1-trefoil"
+    },
+    {
+      "title": "Five-Point Knot · Archive",
+      "folder": "archive-torus-knot-tubes-v2-five-point-knot"
+    },
+    {
+      "title": "Twin Tubes · Archive",
+      "folder": "archive-torus-knot-tubes-v3-twin-tubes"
+    },
+    {
+      "title": "Unravelling · Archive",
+      "folder": "archive-torus-knot-tubes-v4-unravelling"
+    }
+  ],
+  "Cellular Grid": [
+    {
+      "title": "Rule 30",
+      "folder": "cellular-grid-rule-30"
+    },
+    {
+      "title": "Crystalline",
+      "folder": "cellular-grid-crystalline"
+    },
+    {
+      "title": "Life · Archive",
+      "folder": "archive-cellular-grid-v1-life"
+    },
+    {
+      "title": "Rule 30 · Archive",
+      "folder": "archive-cellular-grid-v2-rule-30"
+    },
+    {
+      "title": "Maze · Archive",
+      "folder": "archive-cellular-grid-v3-maze"
+    },
+    {
+      "title": "Crystalline · Archive",
+      "folder": "archive-cellular-grid-v4-crystalline"
+    }
+  ],
+  "Black Hole Lens": [
+    {
+      "title": "Static",
+      "folder": "black-hole-lens-static"
+    },
+    {
+      "title": "Orbiting",
+      "folder": "black-hole-lens-orbiting"
+    },
+    {
+      "title": "Merging",
+      "folder": "black-hole-lens-merging"
+    },
+    {
+      "title": "Jet",
+      "folder": "black-hole-lens-jet"
+    },
+    {
+      "title": "Static · Archive",
+      "folder": "archive-black-hole-lens-v1-static"
+    },
+    {
+      "title": "Orbiting · Archive",
+      "folder": "archive-black-hole-lens-v2-orbiting"
+    },
+    {
+      "title": "Merging · Archive",
+      "folder": "archive-black-hole-lens-v3-merging"
+    },
+    {
+      "title": "Jet · Archive",
+      "folder": "archive-black-hole-lens-v4-jet"
+    }
+  ],
+  "Ocean Surface": [
+    {
+      "title": "Calm Swell",
+      "folder": "ocean-surface-calm-swell"
+    },
+    {
+      "title": "Storm",
+      "folder": "ocean-surface-storm"
+    },
+    {
+      "title": "Neon Night",
+      "folder": "ocean-surface-neon-night"
+    },
+    {
+      "title": "Tsunami",
+      "folder": "ocean-surface-tsunami"
+    },
+    {
+      "title": "Calm Swell · Archive",
+      "folder": "archive-ocean-surface-v1-calm-swell"
+    },
+    {
+      "title": "Storm · Archive",
+      "folder": "archive-ocean-surface-v2-storm"
+    },
+    {
+      "title": "Neon Night · Archive",
+      "folder": "archive-ocean-surface-v3-neon-night"
+    },
+    {
+      "title": "Tsunami · Archive",
+      "folder": "archive-ocean-surface-v4-tsunami"
+    }
+  ],
+  "Screenprint Layers": [
+    {
+      "title": "Two Colour",
+      "folder": "screenprint-layers-two-colour"
+    },
+    {
+      "title": "Four Colour",
+      "folder": "screenprint-layers-four-colour"
+    },
+    {
+      "title": "Torn Edge",
+      "folder": "screenprint-layers-torn-edge"
+    },
+    {
+      "title": "Glitch Overprint",
+      "folder": "screenprint-layers-glitch-overprint"
+    },
+    {
+      "title": "Two Colour · Archive",
+      "folder": "archive-screenprint-layers-v1-two-colour"
+    },
+    {
+      "title": "Four Colour · Archive",
+      "folder": "archive-screenprint-layers-v2-four-colour"
+    },
+    {
+      "title": "Torn Edge · Archive",
+      "folder": "archive-screenprint-layers-v3-torn-edge"
+    },
+    {
+      "title": "Glitch Overprint · Archive",
+      "folder": "archive-screenprint-layers-v4-glitch-overprint"
+    }
+  ],
+  "Neon Outline": [
+    {
+      "title": "Thin",
+      "folder": "neon-outline-thin"
+    },
+    {
+      "title": "Thick",
+      "folder": "neon-outline-thick"
+    },
+    {
+      "title": "Dashed",
+      "folder": "neon-outline-dashed"
+    },
+    {
+      "title": "Echo Trails",
+      "folder": "neon-outline-echo-trails"
+    },
+    {
+      "title": "Thin · Archive",
+      "folder": "archive-neon-outline-v1-thin"
+    },
+    {
+      "title": "Thick · Archive",
+      "folder": "archive-neon-outline-v2-thick"
+    },
+    {
+      "title": "Dashed · Archive",
+      "folder": "archive-neon-outline-v3-dashed"
+    },
+    {
+      "title": "Echo Trails · Archive",
+      "folder": "archive-neon-outline-v4-echo-trails"
+    },
+    {
+      "folder": "mixed-006-neon-outline-tiled",
+      "title": "Tiled 6 · Mixed"
+    },
+    {
+      "folder": "mixed-031-neon-outline-thick",
+      "title": "Thick 31 · Mixed"
+    },
+    {
+      "folder": "mixed-047-neon-outline-thin",
+      "title": "Thin 47 · Mixed"
+    },
+    {
+      "folder": "mixed-051-neon-outline-echo",
+      "title": "Echo 51 · Mixed"
+    },
+    {
+      "folder": "mixed-074-neon-outline-tiled",
+      "title": "Tiled 74 · Mixed"
+    },
+    {
+      "folder": "mixed-099-neon-outline-thick",
+      "title": "Thick 99 · Mixed"
+    },
+    {
+      "folder": "mixed-115-neon-outline-thin",
+      "title": "Thin 115 · Mixed"
+    },
+    {
+      "folder": "mixed-119-neon-outline-echo",
+      "title": "Echo 119 · Mixed"
+    },
+    {
+      "folder": "mixed-142-neon-outline-tiled",
+      "title": "Tiled 142 · Mixed"
+    }
+  ],
+  "Volumetric Beams": [
+    {
+      "title": "Fan Sweep",
+      "folder": "volumetric-beams-fan-sweep"
+    },
+    {
+      "title": "Criss-Cross",
+      "folder": "volumetric-beams-criss-cross"
+    },
+    {
+      "title": "Strobe Wall",
+      "folder": "volumetric-beams-strobe-wall"
+    },
+    {
+      "title": "Ceiling Grid",
+      "folder": "volumetric-beams-ceiling-grid"
+    },
+    {
+      "title": "Fan Sweep · Archive",
+      "folder": "archive-volumetric-beams-v1-fan-sweep"
+    },
+    {
+      "title": "Criss-Cross · Archive",
+      "folder": "archive-volumetric-beams-v2-criss-cross"
+    },
+    {
+      "title": "Strobe Wall · Archive",
+      "folder": "archive-volumetric-beams-v3-strobe-wall"
+    },
+    {
+      "title": "Ceiling Grid · Archive",
+      "folder": "archive-volumetric-beams-v4-ceiling-grid"
+    }
+  ],
+  "Abyssal Observatory": [
+    {
+      "title": "Abyssal Observatory",
+      "folder": "abyssal-observatory"
+    }
+  ],
+  "Braided Loom": [
+    {
+      "title": "Tubular Sleeve",
+      "folder": "65-braided-loom-02-tubular-sleeve"
+    }
+  ],
+  "Clock Escapement": [
+    {
+      "title": "Lever Escapement",
+      "folder": "84-clock-escapement-01-lever-escapement"
+    }
+  ],
+  "Cryogenic Fracture": [
+    {
+      "title": "Frozen Cylinder",
+      "folder": "69-cryogenic-fracture-02-frozen-cylinder"
+    }
+  ],
+  "Elevator Shaft Atlas": [
+    {
+      "title": "Diagonal Funicular",
+      "folder": "56-elevator-shaft-atlas-04-diagonal-funicular"
+    }
+  ],
+  "Enamel Firing": [
+    {
+      "title": "Inlaid Discs",
+      "folder": "62-enamel-firing-04-inlaid-discs"
+    }
+  ],
+  "Glacial Erratics": [
+    {
+      "title": "Balanced Erratic",
+      "folder": "80-glacial-erratics-01-balanced-erratic"
+    }
+  ],
+  "Hot Glass Workshop": [
+    {
+      "title": "Blown Vessel",
+      "folder": "61-hot-glass-workshop-01-blown-vessel"
+    },
+    {
+      "title": "Drawn Rods",
+      "folder": "61-hot-glass-workshop-04-drawn-rods"
+    }
+  ],
+  "Kelp Tether Grove": [
+    {
+      "title": "Underwater Passage",
+      "folder": "91-kelp-tether-grove-04-underwater-passage"
+    }
+  ],
+  "Pneumatic Dispatch": [
+    {
+      "title": "Vertical Drop",
+      "folder": "57-pneumatic-dispatch-03-vertical-drop"
+    },
+    {
+      "title": "Transparent Carousel",
+      "folder": "57-pneumatic-dispatch-04-transparent-carousel"
+    }
+  ],
+  "Raking Light Survey": [
+    {
+      "title": "Tabletop Survey",
+      "folder": "90-raking-light-survey-01-tabletop-survey"
+    }
+  ],
+  "Soap Film Frame": [
+    {
+      "title": "Single Film",
+      "folder": "68-soap-film-frame-01-single-film"
+    },
+    {
+      "title": "Twisted Frame",
+      "folder": "68-soap-film-frame-03-twisted-frame"
+    },
+    {
+      "title": "Rupturing Chambers",
+      "folder": "68-soap-film-frame-04-rupturing-chambers"
+    }
+  ],
+  "Spore Pressure Pods": [
+    {
+      "title": "Radial Release",
+      "folder": "95-spore-pressure-pods-04-radial-release"
+    }
+  ],
+  "Switchyard Insulators": [
+    {
+      "title": "Fence of Discs",
+      "folder": "58-switchyard-insulators-01-fence-of-discs"
+    },
+    {
+      "title": "Crossbar Bay",
+      "folder": "58-switchyard-insulators-03-crossbar-bay"
+    }
+  ],
+  "Wax Seal Foundry": [
+    {
+      "title": "Desk Seal",
+      "folder": "66-wax-seal-foundry-01-desk-seal"
+    }
+  ],
+  "Orbital Space Station": [
+    {
+      "title": "Ring Habitat",
+      "folder": "51-orbital-space-station-01-ring-habitat"
+    },
+    {
+      "title": "Docking Hub",
+      "folder": "51-orbital-space-station-02-docking-hub"
+    },
+    {
+      "title": "Torus Truss",
+      "folder": "51-orbital-space-station-03-torus-truss"
+    },
+    {
+      "title": "Zero-G Core",
+      "folder": "51-orbital-space-station-04-zero-g-core"
+    }
+  ],
+  "Brutalist Megalith Hall": [
+    {
+      "title": "Colonnade",
+      "folder": "52-brutalist-megalith-hall-01-colonnade"
+    },
+    {
+      "title": "Sunken Atrium",
+      "folder": "52-brutalist-megalith-hall-02-sunken-atrium"
+    },
+    {
+      "title": "Suspended Slabs",
+      "folder": "52-brutalist-megalith-hall-03-suspended-slabs"
+    },
+    {
+      "title": "Stepped Ziggurat",
+      "folder": "52-brutalist-megalith-hall-04-stepped-ziggurat"
+    }
+  ],
+  "Cyber Tunnel Matrix": [
+    {
+      "title": "Square Conduit",
+      "folder": "53-cyber-tunnel-matrix-01-square-conduit"
+    },
+    {
+      "title": "Hex Bore",
+      "folder": "53-cyber-tunnel-matrix-02-hex-bore"
+    },
+    {
+      "title": "Ribbed Vault",
+      "folder": "53-cyber-tunnel-matrix-03-ribbed-vault"
+    },
+    {
+      "title": "Twisting Shaft",
+      "folder": "53-cyber-tunnel-matrix-04-twisting-shaft"
+    }
+  ],
+  "Dyson Sphere Lattice": [
+    {
+      "title": "Meridian Cage",
+      "folder": "54-dyson-sphere-lattice-01-meridian-cage"
+    },
+    {
+      "title": "Hex Shell",
+      "folder": "54-dyson-sphere-lattice-02-hex-shell"
+    },
+    {
+      "title": "Broken Panels",
+      "folder": "54-dyson-sphere-lattice-03-broken-panels"
+    },
+    {
+      "title": "Twin Shells",
+      "folder": "54-dyson-sphere-lattice-04-twin-shells"
+    }
+  ],
+  "Neon City Flyover": [
+    {
+      "title": "Downtown Grid",
+      "folder": "55-neon-city-flyover-01-downtown-grid"
+    },
+    {
+      "title": "Spire District",
+      "folder": "55-neon-city-flyover-02-spire-district"
+    },
+    {
+      "title": "Elevated Bridges",
+      "folder": "55-neon-city-flyover-03-elevated-bridges"
+    },
+    {
+      "title": "Inverted Skyline",
+      "folder": "55-neon-city-flyover-04-inverted-skyline"
+    }
+  ],
+  "Dyson Bridge Span": [
+    {
+      "title": "Cable Stay",
+      "folder": "56-dyson-bridge-span-01-cable-stay"
+    },
+    {
+      "title": "Arch Span",
+      "folder": "56-dyson-bridge-span-02-arch-span"
+    },
+    {
+      "title": "Double Deck",
+      "folder": "56-dyson-bridge-span-03-double-deck"
+    },
+    {
+      "title": "Shattered Span",
+      "folder": "56-dyson-bridge-span-04-shattered-span"
+    }
+  ],
+  "Temple of Arches": [
+    {
+      "title": "Pointed Nave",
+      "folder": "57-temple-of-arches-01-pointed-nave"
+    },
+    {
+      "title": "Round Cloister",
+      "folder": "57-temple-of-arches-02-round-cloister"
+    },
+    {
+      "title": "Intersecting Vaults",
+      "folder": "57-temple-of-arches-03-intersecting-vaults"
+    },
+    {
+      "title": "Floating Ruin",
+      "folder": "57-temple-of-arches-04-floating-ruin"
+    }
+  ],
+  "Reactor Core Chamber": [
+    {
+      "title": "Tokamak Torus",
+      "folder": "58-reactor-core-chamber-01-tokamak-torus"
+    },
+    {
+      "title": "Vertical Shaft",
+      "folder": "58-reactor-core-chamber-02-vertical-shaft"
+    },
+    {
+      "title": "Spherical Cage",
+      "folder": "58-reactor-core-chamber-03-spherical-cage"
+    },
+    {
+      "title": "Meltdown Surge",
+      "folder": "58-reactor-core-chamber-04-meltdown-surge"
+    }
+  ],
+  "Escher Stairwell": [
+    {
+      "title": "Ascending Loops",
+      "folder": "59-escher-stairwell-01-ascending-loops"
+    },
+    {
+      "title": "Cross Bridges",
+      "folder": "59-escher-stairwell-02-cross-bridges"
+    },
+    {
+      "title": "Inverted Towers",
+      "folder": "59-escher-stairwell-03-inverted-towers"
+    },
+    {
+      "title": "Spiral Steps",
+      "folder": "59-escher-stairwell-04-spiral-steps"
+    }
+  ],
+  "Hexagonal Hangar": [
+    {
+      "title": "Iris Doors",
+      "folder": "60-hexagonal-hangar-01-iris-doors"
+    },
+    {
+      "title": "Bulkhead Corridor",
+      "folder": "60-hexagonal-hangar-02-bulkhead-corridor"
+    },
+    {
+      "title": "Split Gates",
+      "folder": "60-hexagonal-hangar-03-split-gates"
+    },
+    {
+      "title": "Cargo Stacks",
+      "folder": "60-hexagonal-hangar-04-cargo-stacks"
+    }
+  ],
+  "Mirror Pyramid Plaza": [
+    {
+      "title": "Great Pyramid",
+      "folder": "61-mirror-pyramid-plaza-01-great-pyramid"
+    },
+    {
+      "title": "Twin Obelisks",
+      "folder": "61-mirror-pyramid-plaza-02-twin-obelisks"
+    },
+    {
+      "title": "Stepped Temple",
+      "folder": "61-mirror-pyramid-plaza-03-stepped-temple"
+    },
+    {
+      "title": "Floating Apex",
+      "folder": "61-mirror-pyramid-plaza-04-floating-apex"
+    }
+  ],
+  "Suspended Monorail": [
+    {
+      "title": "Sinuous Track",
+      "folder": "62-suspended-monorail-01-sinuous-track"
+    },
+    {
+      "title": "Twin Rails",
+      "folder": "62-suspended-monorail-02-twin-rails"
+    },
+    {
+      "title": "Corkscrew Loop",
+      "folder": "62-suspended-monorail-03-corkscrew-loop"
+    },
+    {
+      "title": "Sky Viaduct",
+      "folder": "62-suspended-monorail-04-sky-viaduct"
+    }
+  ],
+  "Menger Sponge Dive": [
+    {
+      "title": "Classic Menger",
+      "folder": "63-menger-sponge-dive-01-classic-menger"
+    },
+    {
+      "title": "Rotated Sponge",
+      "folder": "63-menger-sponge-dive-02-rotated-sponge"
+    },
+    {
+      "title": "Hollow Cross",
+      "folder": "63-menger-sponge-dive-03-hollow-cross"
+    },
+    {
+      "title": "Beat-Breathing Cube",
+      "folder": "63-menger-sponge-dive-04-beat-breathing-cube"
+    }
+  ],
+  "Gyroid Minimal Surface": [
+    {
+      "title": "Smooth Gyroid",
+      "folder": "64-gyroid-minimal-surface-01-smooth-gyroid"
+    },
+    {
+      "title": "Double Wall",
+      "folder": "64-gyroid-minimal-surface-02-double-wall"
+    },
+    {
+      "title": "Twisted Lattice",
+      "folder": "64-gyroid-minimal-surface-03-twisted-lattice"
+    },
+    {
+      "title": "Foam Cavern",
+      "folder": "64-gyroid-minimal-surface-04-foam-cavern"
+    }
+  ],
+  "Apollonian Sphere Packing": [
+    {
+      "title": "Classic Packing",
+      "folder": "65-apollonian-sphere-packing-01-classic-packing"
+    },
+    {
+      "title": "Hollow Shells",
+      "folder": "65-apollonian-sphere-packing-02-hollow-shells"
+    },
+    {
+      "title": "Torus Inversion",
+      "folder": "65-apollonian-sphere-packing-03-torus-inversion"
+    },
+    {
+      "title": "Crystal Foam",
+      "folder": "65-apollonian-sphere-packing-04-crystal-foam"
+    }
+  ],
+  "Sierpinski Tetrahedron": [
+    {
+      "title": "Pyramid",
+      "folder": "66-sierpinski-tetrahedron-01-pyramid"
+    },
+    {
+      "title": "Inverted Void",
+      "folder": "66-sierpinski-tetrahedron-02-inverted-void"
+    },
+    {
+      "title": "Twisted Spire",
+      "folder": "66-sierpinski-tetrahedron-03-twisted-spire"
+    },
+    {
+      "title": "Floating Clusters",
+      "folder": "66-sierpinski-tetrahedron-04-floating-clusters"
+    }
+  ],
+  "Helical DNA Tower": [
+    {
+      "title": "Double Helix",
+      "folder": "67-helical-dna-tower-01-double-helix"
+    },
+    {
+      "title": "Triple Strand",
+      "folder": "67-helical-dna-tower-02-triple-strand"
+    },
+    {
+      "title": "Ribbon Ladder",
+      "folder": "67-helical-dna-tower-03-ribbon-ladder"
+    },
+    {
+      "title": "Unzipping",
+      "folder": "67-helical-dna-tower-04-unzipping"
+    }
+  ],
+  "Kinetic Mobius Loop": [
+    {
+      "title": "Single Twist",
+      "folder": "68-kinetic-mobius-loop-01-single-twist"
+    },
+    {
+      "title": "Triple Twist",
+      "folder": "68-kinetic-mobius-loop-02-triple-twist"
+    },
+    {
+      "title": "Segmented Band",
+      "folder": "68-kinetic-mobius-loop-03-segmented-band"
+    },
+    {
+      "title": "Split Rail",
+      "folder": "68-kinetic-mobius-loop-04-split-rail"
+    }
+  ],
+  "Platonic Array": [
+    {
+      "title": "Octa Lattice",
+      "folder": "69-platonic-array-01-octa-lattice"
+    },
+    {
+      "title": "Cube Matrix",
+      "folder": "69-platonic-array-02-cube-matrix"
+    },
+    {
+      "title": "Morphing Solids",
+      "folder": "69-platonic-array-03-morphing-solids"
+    },
+    {
+      "title": "Pulsing Grid",
+      "folder": "69-platonic-array-04-pulsing-grid"
+    }
+  ],
+  "Mandelbulb Slice": [
+    {
+      "title": "Power 8 Classic",
+      "folder": "70-mandelbulb-slice-01-power-8-classic"
+    },
+    {
+      "title": "Power 5",
+      "folder": "70-mandelbulb-slice-02-power-5"
+    },
+    {
+      "title": "Hollowed Core",
+      "folder": "70-mandelbulb-slice-03-hollowed-core"
+    },
+    {
+      "title": "Pulsing Spikes",
+      "folder": "70-mandelbulb-slice-04-pulsing-spikes"
+    }
+  ],
+  "Catenoid Funnel": [
+    {
+      "title": "Smooth Throat",
+      "folder": "71-catenoid-funnel-01-smooth-throat"
+    },
+    {
+      "title": "Ribbed Funnel",
+      "folder": "71-catenoid-funnel-02-ribbed-funnel"
+    },
+    {
+      "title": "Twin Bells",
+      "folder": "71-catenoid-funnel-03-twin-bells"
+    },
+    {
+      "title": "Warping Throat",
+      "folder": "71-catenoid-funnel-04-warping-throat"
+    }
+  ],
+  "Gearwork Vault": [
+    {
+      "title": "Planetary Gears",
+      "folder": "72-gearwork-vault-01-planetary-gears"
+    },
+    {
+      "title": "Wall of Cogs",
+      "folder": "72-gearwork-vault-02-wall-of-cogs"
+    },
+    {
+      "title": "Bevel Tunnel",
+      "folder": "72-gearwork-vault-03-bevel-tunnel"
+    },
+    {
+      "title": "Clockwork Core",
+      "folder": "72-gearwork-vault-04-clockwork-core"
+    }
+  ],
+  "Ribbed Torus Interior": [
+    {
+      "title": "Smooth Ring",
+      "folder": "73-ribbed-torus-interior-01-smooth-ring"
+    },
+    {
+      "title": "Ribbed Tube",
+      "folder": "73-ribbed-torus-interior-02-ribbed-tube"
+    },
+    {
+      "title": "Spiral Grooves",
+      "folder": "73-ribbed-torus-interior-03-spiral-grooves"
+    },
+    {
+      "title": "Segmented Hull",
+      "folder": "73-ribbed-torus-interior-04-segmented-hull"
+    }
+  ],
+  "Kinetic Cube Wall": [
+    {
+      "title": "Wave Pistons",
+      "folder": "74-kinetic-cube-wall-01-wave-pistons"
+    },
+    {
+      "title": "Ripple Matrix",
+      "folder": "74-kinetic-cube-wall-02-ripple-matrix"
+    },
+    {
+      "title": "Checker Steps",
+      "folder": "74-kinetic-cube-wall-03-checker-steps"
+    },
+    {
+      "title": "Exploding Tiles",
+      "folder": "74-kinetic-cube-wall-04-exploding-tiles"
+    }
+  ],
+  "Hyperbolic Saddle Grid": [
+    {
+      "title": "Saddle Field",
+      "folder": "75-hyperbolic-saddle-grid-01-saddle-field"
+    },
+    {
+      "title": "Twisted Saddles",
+      "folder": "75-hyperbolic-saddle-grid-02-twisted-saddles"
+    },
+    {
+      "title": "Nested Shells",
+      "folder": "75-hyperbolic-saddle-grid-03-nested-shells"
+    },
+    {
+      "title": "Arching Waves",
+      "folder": "75-hyperbolic-saddle-grid-04-arching-waves"
+    }
+  ],
+  "Knot Sculpture Garden": [
+    {
+      "title": "Trefoil Centerpiece",
+      "folder": "76-knot-sculpture-garden-01-trefoil-centerpiece"
+    },
+    {
+      "title": "Linked Rings",
+      "folder": "76-knot-sculpture-garden-02-linked-rings"
+    },
+    {
+      "title": "Spring Coil",
+      "folder": "76-knot-sculpture-garden-03-spring-coil"
+    },
+    {
+      "title": "Crown Loop",
+      "folder": "76-knot-sculpture-garden-04-crown-loop"
+    }
+  ],
+  "Alpine Ridge Flythrough": [
+    {
+      "title": "High Peaks",
+      "folder": "77-alpine-ridge-flythrough-01-high-peaks"
+    },
+    {
+      "title": "Twin Valleys",
+      "folder": "77-alpine-ridge-flythrough-02-twin-valleys"
+    },
+    {
+      "title": "Volcanic Caldera",
+      "folder": "77-alpine-ridge-flythrough-03-volcanic-caldera"
+    },
+    {
+      "title": "Glacier Pass",
+      "folder": "77-alpine-ridge-flythrough-04-glacier-pass"
+    }
+  ],
+  "Bioluminescent Cavern": [
+    {
+      "title": "Stalactite Hall",
+      "folder": "78-bioluminescent-cavern-01-stalactite-hall"
+    },
+    {
+      "title": "Crystal Grotto",
+      "folder": "78-bioluminescent-cavern-02-crystal-grotto"
+    },
+    {
+      "title": "Lava Tube",
+      "folder": "78-bioluminescent-cavern-03-lava-tube"
+    },
+    {
+      "title": "Submerged Vault",
+      "folder": "78-bioluminescent-cavern-04-submerged-vault"
+    }
+  ],
+  "Desert Dune Sea": [
+    {
+      "title": "Star Dunes",
+      "folder": "79-desert-dune-sea-01-star-dunes"
+    },
+    {
+      "title": "Crescent Ridges",
+      "folder": "79-desert-dune-sea-02-crescent-ridges"
+    },
+    {
+      "title": "Red Canyon",
+      "folder": "79-desert-dune-sea-03-red-canyon"
+    },
+    {
+      "title": "Moonlit Sands",
+      "folder": "79-desert-dune-sea-04-moonlit-sands"
+    }
+  ],
+  "Crystal Geode Interior": [
+    {
+      "title": "Quartz Cluster",
+      "folder": "80-crystal-geode-interior-01-quartz-cluster"
+    },
+    {
+      "title": "Amethyst Cave",
+      "folder": "80-crystal-geode-interior-02-amethyst-cave"
+    },
+    {
+      "title": "Floating Shards",
+      "folder": "80-crystal-geode-interior-03-floating-shards"
+    },
+    {
+      "title": "Prism Chamber",
+      "folder": "80-crystal-geode-interior-04-prism-chamber"
+    }
+  ],
+  "Floating Sky Islands": [
+    {
+      "title": "Single Citadel",
+      "folder": "81-floating-sky-islands-01-single-citadel"
+    },
+    {
+      "title": "Archipelago",
+      "folder": "81-floating-sky-islands-02-archipelago"
+    },
+    {
+      "title": "Chain Bridges",
+      "folder": "81-floating-sky-islands-03-chain-bridges"
+    },
+    {
+      "title": "Shattered Isles",
+      "folder": "81-floating-sky-islands-04-shattered-isles"
+    }
+  ],
+  "Iceberg Strait": [
+    {
+      "title": "Glacier Field",
+      "folder": "82-iceberg-strait-01-glacier-field"
+    },
+    {
+      "title": "Ice Arch",
+      "folder": "82-iceberg-strait-02-ice-arch"
+    },
+    {
+      "title": "Arctic Canyon",
+      "folder": "82-iceberg-strait-03-arctic-canyon"
+    },
+    {
+      "title": "Melting Spires",
+      "folder": "82-iceberg-strait-04-melting-spires"
+    }
+  ],
+  "Asteroid Belt Run": [
+    {
+      "title": "Dense Belt",
+      "folder": "83-asteroid-belt-run-01-dense-belt"
+    },
+    {
+      "title": "Hollow Crater",
+      "folder": "83-asteroid-belt-run-02-hollow-crater"
+    },
+    {
+      "title": "Ring Debris",
+      "folder": "83-asteroid-belt-run-03-ring-debris"
+    },
+    {
+      "title": "Twin Planetoids",
+      "folder": "83-asteroid-belt-run-04-twin-planetoids"
+    }
+  ],
+  "Alien Mushroom Grove": [
+    {
+      "title": "Canopy Grove",
+      "folder": "84-alien-mushroom-grove-01-canopy-grove"
+    },
+    {
+      "title": "Spore Rings",
+      "folder": "84-alien-mushroom-grove-02-spore-rings"
+    },
+    {
+      "title": "Tall Stalks",
+      "folder": "84-alien-mushroom-grove-03-tall-stalks"
+    },
+    {
+      "title": "Biolume Forest",
+      "folder": "84-alien-mushroom-grove-04-biolume-forest"
+    }
+  ],
+  "Volcanic Rift": [
+    {
+      "title": "Magma Trench",
+      "folder": "85-volcanic-rift-01-magma-trench"
+    },
+    {
+      "title": "Caldera Rim",
+      "folder": "85-volcanic-rift-02-caldera-rim"
+    },
+    {
+      "title": "Basalt Columns",
+      "folder": "85-volcanic-rift-03-basalt-columns"
+    },
+    {
+      "title": "Eruption Vent",
+      "folder": "85-volcanic-rift-04-eruption-vent"
+    }
+  ],
+  "Waterfall Gorge": [
+    {
+      "title": "Twin Falls",
+      "folder": "86-waterfall-gorge-01-twin-falls"
+    },
+    {
+      "title": "Stepped Cascades",
+      "folder": "86-waterfall-gorge-02-stepped-cascades"
+    },
+    {
+      "title": "Mist Chasm",
+      "folder": "86-waterfall-gorge-03-mist-chasm"
+    },
+    {
+      "title": "Frozen Falls",
+      "folder": "86-waterfall-gorge-04-frozen-falls"
+    }
+  ],
+  "Coral Reef Trench": [
+    {
+      "title": "Reef Canyon",
+      "folder": "87-coral-reef-trench-01-reef-canyon"
+    },
+    {
+      "title": "Staghorn Spires",
+      "folder": "87-coral-reef-trench-02-staghorn-spires"
+    },
+    {
+      "title": "Anemone Bowl",
+      "folder": "87-coral-reef-trench-03-anemone-bowl"
+    },
+    {
+      "title": "Deep Trench",
+      "folder": "87-coral-reef-trench-04-deep-trench"
+    }
+  ],
+  "Ringed Gas Giant": [
+    {
+      "title": "Equatorial Rings",
+      "folder": "88-ringed-gas-giant-01-equatorial-rings"
+    },
+    {
+      "title": "Polar Vortex",
+      "folder": "88-ringed-gas-giant-02-polar-vortex"
+    },
+    {
+      "title": "Broken Ring",
+      "folder": "88-ringed-gas-giant-03-broken-ring"
+    },
+    {
+      "title": "Twin Moons",
+      "folder": "88-ringed-gas-giant-04-twin-moons"
+    }
+  ],
+  "Infinite Ball Pit": [
+    {
+      "title": "Uniform Grid",
+      "folder": "89-infinite-ball-pit-01-uniform-grid"
+    },
+    {
+      "title": "Wave Field",
+      "folder": "89-infinite-ball-pit-02-wave-field"
+    },
+    {
+      "title": "Size Cascade",
+      "folder": "89-infinite-ball-pit-03-size-cascade"
+    },
+    {
+      "title": "Hollow Bubbles",
+      "folder": "89-infinite-ball-pit-04-hollow-bubbles"
+    }
+  ],
+  "Folding Origami Plane": [
+    {
+      "title": "Miura Fold",
+      "folder": "90-folding-origami-plane-01-miura-fold"
+    },
+    {
+      "title": "Accordion",
+      "folder": "90-folding-origami-plane-02-accordion"
+    },
+    {
+      "title": "Radial Pleats",
+      "folder": "90-folding-origami-plane-03-radial-pleats"
+    },
+    {
+      "title": "Flying Cranes",
+      "folder": "90-folding-origami-plane-04-flying-cranes"
+    }
+  ],
+  "Neon Ring Slalom": [
+    {
+      "title": "Circular Slalom",
+      "folder": "91-neon-ring-slalom-01-circular-slalom"
+    },
+    {
+      "title": "Square Gates",
+      "folder": "91-neon-ring-slalom-02-square-gates"
+    },
+    {
+      "title": "Hex Portals",
+      "folder": "91-neon-ring-slalom-03-hex-portals"
+    },
+    {
+      "title": "Spiral Course",
+      "folder": "91-neon-ring-slalom-04-spiral-course"
+    }
+  ],
+  "Glass Capsule Array": [
+    {
+      "title": "Vertical Pods",
+      "folder": "92-glass-capsule-array-01-vertical-pods"
+    },
+    {
+      "title": "Tumbling Pills",
+      "folder": "92-glass-capsule-array-02-tumbling-pills"
+    },
+    {
+      "title": "Helix Pods",
+      "folder": "92-glass-capsule-array-03-helix-pods"
+    },
+    {
+      "title": "Grid Swarm",
+      "folder": "92-glass-capsule-array-04-grid-swarm"
+    }
+  ],
+  "Volumetric Cloud Tunnel": [
+    {
+      "title": "Storm Tunnel",
+      "folder": "93-volumetric-cloud-tunnel-01-storm-tunnel"
+    },
+    {
+      "title": "Sunset Clouds",
+      "folder": "93-volumetric-cloud-tunnel-02-sunset-clouds"
+    },
+    {
+      "title": "Aurora Tube",
+      "folder": "93-volumetric-cloud-tunnel-03-aurora-tube"
+    },
+    {
+      "title": "Vortex Eye",
+      "folder": "93-volumetric-cloud-tunnel-04-vortex-eye"
+    }
+  ],
+  "Magnetic Field Spikes": [
+    {
+      "title": "Single Ferro",
+      "folder": "94-magnetic-field-spikes-01-single-ferro"
+    },
+    {
+      "title": "Twin Poles",
+      "folder": "94-magnetic-field-spikes-02-twin-poles"
+    },
+    {
+      "title": "Spike Wall",
+      "folder": "94-magnetic-field-spikes-03-spike-wall"
+    },
+    {
+      "title": "Crown Burst",
+      "folder": "94-magnetic-field-spikes-04-crown-burst"
+    }
+  ],
+  "Pendulum Wave Array": [
+    {
+      "title": "Linear Wave",
+      "folder": "95-pendulum-wave-array-01-linear-wave"
+    },
+    {
+      "title": "Double Row",
+      "folder": "95-pendulum-wave-array-02-double-row"
+    },
+    {
+      "title": "Circular Array",
+      "folder": "95-pendulum-wave-array-03-circular-array"
+    },
+    {
+      "title": "Spiral Pendulum",
+      "folder": "95-pendulum-wave-array-04-spiral-pendulum"
+    }
+  ],
+  "Acoustic Dome": [
+    {
+      "title": "Ribbed Dome",
+      "folder": "96-acoustic-dome-01-ribbed-dome"
+    },
+    {
+      "title": "Hex Shell",
+      "folder": "96-acoustic-dome-02-hex-shell"
+    },
+    {
+      "title": "Concentric Vault",
+      "folder": "96-acoustic-dome-03-concentric-vault"
+    },
+    {
+      "title": "Open Rotunda",
+      "folder": "96-acoustic-dome-04-open-rotunda"
+    }
+  ],
+  "Kaleido 3D Mirror": [
+    {
+      "title": "Octahedral Fold",
+      "folder": "97-kaleido-3d-mirror-01-octahedral-fold"
+    },
+    {
+      "title": "Cubic KIFS",
+      "folder": "97-kaleido-3d-mirror-02-cubic-kifs"
+    },
+    {
+      "title": "Cross Fold",
+      "folder": "97-kaleido-3d-mirror-03-cross-fold"
+    },
+    {
+      "title": "Prism Vault",
+      "folder": "97-kaleido-3d-mirror-04-prism-vault"
+    }
+  ],
+  "Data Cube Matrix": [
+    {
+      "title": "Voxel Stream",
+      "folder": "98-data-cube-matrix-01-voxel-stream"
+    },
+    {
+      "title": "Hollow Frame",
+      "folder": "98-data-cube-matrix-02-hollow-frame"
+    },
+    {
+      "title": "Cluster Core",
+      "folder": "98-data-cube-matrix-03-cluster-core"
+    },
+    {
+      "title": "Exploding Matrix",
+      "folder": "98-data-cube-matrix-04-exploding-matrix"
+    }
+  ],
+  "Horizon Torii Gates": [
+    {
+      "title": "Straight Path",
+      "folder": "99-horizon-torii-gates-01-straight-path"
+    },
+    {
+      "title": "Curving Trail",
+      "folder": "99-horizon-torii-gates-02-curving-trail"
+    },
+    {
+      "title": "Ascending Steps",
+      "folder": "99-horizon-torii-gates-03-ascending-steps"
+    },
+    {
+      "title": "Mirror Lake",
+      "folder": "99-horizon-torii-gates-04-mirror-lake"
+    }
+  ],
+  "Singularity Core": [
+    {
+      "title": "Accretion Funnel",
+      "folder": "100-singularity-core-01-accretion-funnel"
+    },
+    {
+      "title": "Photon Cage",
+      "folder": "100-singularity-core-02-photon-cage"
+    },
+    {
+      "title": "Twin Jets",
+      "folder": "100-singularity-core-03-twin-jets"
+    },
+    {
+      "title": "Event Horizon",
+      "folder": "100-singularity-core-04-event-horizon"
+    }
+  ],
+  "Kintsugi Fracture": [
+    {
+      "title": "Gold Seams",
+      "folder": "101-kintsugi-fracture-01-gold-seams"
+    },
+    {
+      "title": "Celadon Crack",
+      "folder": "101-kintsugi-fracture-02-celadon-crack"
+    },
+    {
+      "title": "Obsidian Kiln",
+      "folder": "101-kintsugi-fracture-03-obsidian-kiln"
+    },
+    {
+      "title": "Liquid Join",
+      "folder": "101-kintsugi-fracture-04-liquid-join"
+    }
+  ],
+  "Astrolabe Clockwork": [
+    {
+      "title": "Ecliptic",
+      "folder": "102-astrolabe-clockwork-01-ecliptic"
+    },
+    {
+      "title": "Planisphere",
+      "folder": "102-astrolabe-clockwork-02-planisphere"
+    },
+    {
+      "title": "Zodiac Wheel",
+      "folder": "102-astrolabe-clockwork-03-zodiac-wheel"
+    },
+    {
+      "title": "Armillary",
+      "folder": "102-astrolabe-clockwork-04-armillary"
+    }
+  ],
+  "Chladni Resonance": [
+    {
+      "title": "Harmonic 3-5",
+      "folder": "103-chladni-resonance-01-harmonic-3-5"
+    },
+    {
+      "title": "Octave Cross",
+      "folder": "103-chladni-resonance-02-octave-cross"
+    },
+    {
+      "title": "Radial Plate",
+      "folder": "103-chladni-resonance-03-radial-plate"
+    },
+    {
+      "title": "Sand Scatter",
+      "folder": "103-chladni-resonance-04-sand-scatter"
+    }
+  ],
+  "Biomorphic Radiolaria": [
+    {
+      "title": "Glass Dome",
+      "folder": "104-biomorphic-radiolaria-01-glass-dome"
+    },
+    {
+      "title": "Spined Cage",
+      "folder": "104-biomorphic-radiolaria-02-spined-cage"
+    },
+    {
+      "title": "Twin Skeletons",
+      "folder": "104-biomorphic-radiolaria-03-twin-skeletons"
+    },
+    {
+      "title": "Sinking Plankton",
+      "folder": "104-biomorphic-radiolaria-04-sinking-plankton"
+    }
+  ],
+  "Stained Glass Rose": [
+    {
+      "title": "Cathedral Rose",
+      "folder": "105-stained-glass-rose-01-cathedral-rose"
+    },
+    {
+      "title": "Lancet Arcade",
+      "folder": "105-stained-glass-rose-02-lancet-arcade"
+    },
+    {
+      "title": "Kaleidic Foil",
+      "folder": "105-stained-glass-rose-03-kaleidic-foil"
+    },
+    {
+      "title": "Moonlight Nave",
+      "folder": "105-stained-glass-rose-04-moonlight-nave"
+    }
+  ],
+  "Ferromagnetic Ribbons": [
+    {
+      "title": "Dipole Loop",
+      "folder": "106-ferromagnetic-ribbons-01-dipole-loop"
+    },
+    {
+      "title": "Quadrupole",
+      "folder": "106-ferromagnetic-ribbons-02-quadrupole"
+    },
+    {
+      "title": "Solar Flare",
+      "folder": "106-ferromagnetic-ribbons-03-solar-flare"
+    },
+    {
+      "title": "Flux Curtain",
+      "folder": "106-ferromagnetic-ribbons-04-flux-curtain"
+    }
+  ],
+  "Tape Loop Echo": [
+    {
+      "title": "Dual Reel",
+      "folder": "107-tape-loop-echo-01-dual-reel"
+    },
+    {
+      "title": "Cassette Window",
+      "folder": "107-tape-loop-echo-02-cassette-window"
+    },
+    {
+      "title": "Tangled Loop",
+      "folder": "107-tape-loop-echo-03-tangled-loop"
+    },
+    {
+      "title": "Flutter Decay",
+      "folder": "107-tape-loop-echo-04-flutter-decay"
+    }
+  ],
+  "Paper Cut Diorama": [
+    {
+      "title": "Forest Canopy",
+      "folder": "108-paper-cut-diorama-01-forest-canopy"
+    },
+    {
+      "title": "Mountain Stages",
+      "folder": "108-paper-cut-diorama-02-mountain-stages"
+    },
+    {
+      "title": "City Theatre",
+      "folder": "108-paper-cut-diorama-03-city-theatre"
+    },
+    {
+      "title": "Moonlit Arch",
+      "folder": "108-paper-cut-diorama-04-moonlit-arch"
+    }
+  ],
+  "Soap Film Iridescence": [
+    {
+      "title": "Stretched Frame",
+      "folder": "109-soap-film-iridescence-01-stretched-frame"
+    },
+    {
+      "title": "Floating Bubble",
+      "folder": "109-soap-film-iridescence-02-floating-bubble"
+    },
+    {
+      "title": "Foam Junction",
+      "folder": "109-soap-film-iridescence-03-foam-junction"
+    },
+    {
+      "title": "Popping Film",
+      "folder": "109-soap-film-iridescence-04-popping-film"
+    }
+  ],
+  "Sundial Shadow Play": [
+    {
+      "title": "Plaza Gnomon",
+      "folder": "110-sundial-shadow-play-01-plaza-gnomon"
+    },
+    {
+      "title": "Arc Dial",
+      "folder": "110-sundial-shadow-play-02-arc-dial"
+    },
+    {
+      "title": "Obelisk Sweep",
+      "folder": "110-sundial-shadow-play-03-obelisk-sweep"
+    },
+    {
+      "title": "Eclipse Noon",
+      "folder": "110-sundial-shadow-play-04-eclipse-noon"
+    }
+  ],
+  "Lissajous Loom": [
+    {
+      "title": "Plain Weave",
+      "folder": "111-lissajous-loom-01-plain-weave"
+    },
+    {
+      "title": "Twill Diagonal",
+      "folder": "111-lissajous-loom-02-twill-diagonal"
+    },
+    {
+      "title": "Jacquard Wave",
+      "folder": "111-lissajous-loom-03-jacquard-wave"
+    },
+    {
+      "title": "Unstrung",
+      "folder": "111-lissajous-loom-04-unstrung"
+    }
+  ],
+  "Abyssal Jellyfish": [
+    {
+      "title": "Moon Jelly",
+      "folder": "112-abyssal-jellyfish-01-moon-jelly"
+    },
+    {
+      "title": "Lion Mane",
+      "folder": "112-abyssal-jellyfish-02-lion-mane"
+    },
+    {
+      "title": "Comb Pulse",
+      "folder": "112-abyssal-jellyfish-03-comb-pulse"
+    },
+    {
+      "title": "Deep Swarm",
+      "folder": "112-abyssal-jellyfish-04-deep-swarm"
+    }
+  ],
+  "Kinetic Pendulum Wall": [
+    {
+      "title": "Single Trace",
+      "folder": "113-kinetic-pendulum-wall-01-single-trace"
+    },
+    {
+      "title": "Twin Phase",
+      "folder": "113-kinetic-pendulum-wall-02-twin-phase"
+    },
+    {
+      "title": "Damped Rose",
+      "folder": "113-kinetic-pendulum-wall-03-damped-rose"
+    },
+    {
+      "title": "Chaos Swing",
+      "folder": "113-kinetic-pendulum-wall-04-chaos-swing"
+    }
+  ],
+  "Caustic Pool Floor": [
+    {
+      "title": "Turquoise Tile",
+      "folder": "114-caustic-pool-floor-01-turquoise-tile"
+    },
+    {
+      "title": "Deep Reef",
+      "folder": "114-caustic-pool-floor-02-deep-reef"
+    },
+    {
+      "title": "Sunset Shallows",
+      "folder": "114-caustic-pool-floor-03-sunset-shallows"
+    },
+    {
+      "title": "Rain Ripples",
+      "folder": "114-caustic-pool-floor-04-rain-ripples"
+    }
+  ],
+  "Origami Lotus Bloom": [
+    {
+      "title": "Single Blossom",
+      "folder": "115-origami-lotus-bloom-01-single-blossom"
+    },
+    {
+      "title": "Twin Tiers",
+      "folder": "115-origami-lotus-bloom-02-twin-tiers"
+    },
+    {
+      "title": "Spinning Crown",
+      "folder": "115-origami-lotus-bloom-03-spinning-crown"
+    },
+    {
+      "title": "Floating Pond",
+      "folder": "115-origami-lotus-bloom-04-floating-pond"
+    }
+  ],
+  "Doppler Radar Sweep": [
+    {
+      "title": "Green Scope",
+      "folder": "116-doppler-radar-sweep-01-green-scope"
+    },
+    {
+      "title": "Amber Sonar",
+      "folder": "116-doppler-radar-sweep-02-amber-sonar"
+    },
+    {
+      "title": "Tactical Grid",
+      "folder": "116-doppler-radar-sweep-03-tactical-grid"
+    },
+    {
+      "title": "Storm Front",
+      "folder": "116-doppler-radar-sweep-04-storm-front"
+    }
+  ],
+  "Kinetic Wind Sculptures": [
+    {
+      "title": "Pinwheel Wall",
+      "folder": "117-kinetic-wind-sculptures-01-pinwheel-wall"
+    },
+    {
+      "title": "Helix Blades",
+      "folder": "117-kinetic-wind-sculptures-02-helix-blades"
+    },
+    {
+      "title": "Sails",
+      "folder": "117-kinetic-wind-sculptures-03-sails"
+    },
+    {
+      "title": "Turbine Array",
+      "folder": "117-kinetic-wind-sculptures-04-turbine-array"
+    }
+  ],
+  "Alchemical Sigils": [
+    {
+      "title": "Solar Seal",
+      "folder": "118-alchemical-sigils-01-solar-seal"
+    },
+    {
+      "title": "Lunar Ring",
+      "folder": "118-alchemical-sigils-02-lunar-ring"
+    },
+    {
+      "title": "Transmutation",
+      "folder": "118-alchemical-sigils-03-transmutation"
+    },
+    {
+      "title": "Astral Compass",
+      "folder": "118-alchemical-sigils-04-astral-compass"
+    }
+  ],
+  "Rain on Neon Glass": [
+    {
+      "title": "Downpour",
+      "folder": "119-rain-on-neon-glass-01-downpour"
+    },
+    {
+      "title": "Light Drizzle",
+      "folder": "119-rain-on-neon-glass-02-light-drizzle"
+    },
+    {
+      "title": "Fast Cruise",
+      "folder": "119-rain-on-neon-glass-03-fast-cruise"
+    },
+    {
+      "title": "Red Tail-Lights",
+      "folder": "119-rain-on-neon-glass-04-red-tail-lights"
+    }
+  ],
+  "Thermographic Aura": [
+    {
+      "title": "Ironbow",
+      "folder": "120-thermographic-aura-01-ironbow"
+    },
+    {
+      "title": "Arctic Heat",
+      "folder": "120-thermographic-aura-02-arctic-heat"
+    },
+    {
+      "title": "White Hot",
+      "folder": "120-thermographic-aura-03-white-hot"
+    },
+    {
+      "title": "Plasma Scan",
+      "folder": "120-thermographic-aura-04-plasma-scan"
+    }
+  ],
+  "Bamboo Wind Chimes": [
+    {
+      "title": "Porch Row",
+      "folder": "121-bamboo-wind-chimes-01-porch-row"
+    },
+    {
+      "title": "Spiral Chime",
+      "folder": "121-bamboo-wind-chimes-02-spiral-chime"
+    },
+    {
+      "title": "Forest Grove",
+      "folder": "121-bamboo-wind-chimes-03-forest-grove"
+    },
+    {
+      "title": "Gong Ring",
+      "folder": "121-bamboo-wind-chimes-04-gong-ring"
+    }
+  ],
+  "Mobius Escapement": [
+    {
+      "title": "Tourbillon",
+      "folder": "122-mobius-escapement-01-tourbillon"
+    },
+    {
+      "title": "Twin Escapement",
+      "folder": "122-mobius-escapement-02-twin-escapement"
+    },
+    {
+      "title": "Skeleton Dial",
+      "folder": "122-mobius-escapement-03-skeleton-dial"
+    },
+    {
+      "title": "Chronograph",
+      "folder": "122-mobius-escapement-04-chronograph"
+    }
+  ],
+  "Polar Aurora Curtain": [
+    {
+      "title": "Emerald Ribbon",
+      "folder": "123-polar-aurora-curtain-01-emerald-ribbon"
+    },
+    {
+      "title": "Crimson Storm",
+      "folder": "123-polar-aurora-curtain-02-crimson-storm"
+    },
+    {
+      "title": "Crown Zenith",
+      "folder": "123-polar-aurora-curtain-03-crown-zenith"
+    },
+    {
+      "title": "Twin Arcs",
+      "folder": "123-polar-aurora-curtain-04-twin-arcs"
+    }
+  ],
+  "Glass Bead Curtain": [
+    {
+      "title": "Bead Screen",
+      "folder": "124-glass-bead-curtain-01-bead-screen"
+    },
+    {
+      "title": "Swaying Strands",
+      "folder": "124-glass-bead-curtain-02-swaying-strands"
+    },
+    {
+      "title": "Prism Beads",
+      "folder": "124-glass-bead-curtain-03-prism-beads"
+    },
+    {
+      "title": "Rain Curtains",
+      "folder": "124-glass-bead-curtain-04-rain-curtains"
+    }
+  ],
+  "Acoustic Levitation": [
+    {
+      "title": "Standing Column",
+      "folder": "125-acoustic-levitation-01-standing-column"
+    },
+    {
+      "title": "Node Lattice",
+      "folder": "125-acoustic-levitation-02-node-lattice"
+    },
+    {
+      "title": "Orbiting Drops",
+      "folder": "125-acoustic-levitation-03-orbiting-drops"
+    },
+    {
+      "title": "Shock Pop",
+      "folder": "125-acoustic-levitation-04-shock-pop"
+    }
+  ],
+  "Terracotta Relief": [
+    {
+      "title": "Sun Medallion",
+      "folder": "126-terracotta-relief-01-sun-medallion"
+    },
+    {
+      "title": "Wave Frieze",
+      "folder": "126-terracotta-relief-02-wave-frieze"
+    },
+    {
+      "title": "Labyrinth Slab",
+      "folder": "126-terracotta-relief-03-labyrinth-slab"
+    },
+    {
+      "title": "Kiln Fired",
+      "folder": "126-terracotta-relief-04-kiln-fired"
+    }
+  ],
+  "Phase-Shift Lattice": [
+    {
+      "title": "Wave Grid",
+      "folder": "127-phase-shift-lattice-01-wave-grid"
+    },
+    {
+      "title": "Twisted Truss",
+      "folder": "127-phase-shift-lattice-02-twisted-truss"
+    },
+    {
+      "title": "Cubic Ripple",
+      "folder": "127-phase-shift-lattice-03-cubic-ripple"
+    },
+    {
+      "title": "Elastic Cage",
+      "folder": "127-phase-shift-lattice-04-elastic-cage"
+    }
+  ],
+  "Firefly Meadow": [
+    {
+      "title": "Dusk Meadow",
+      "folder": "128-firefly-meadow-01-dusk-meadow"
+    },
+    {
+      "title": "Blue Ghost",
+      "folder": "128-firefly-meadow-02-blue-ghost"
+    },
+    {
+      "title": "Swarm Vortex",
+      "folder": "128-firefly-meadow-03-swarm-vortex"
+    },
+    {
+      "title": "Lantern Drift",
+      "folder": "128-firefly-meadow-04-lantern-drift"
+    }
+  ],
+  "X-Ray Blueprint": [
+    {
+      "title": "Cyanotype",
+      "folder": "129-x-ray-blueprint-01-cyanotype"
+    },
+    {
+      "title": "Medical Scan",
+      "folder": "129-x-ray-blueprint-02-medical-scan"
+    },
+    {
+      "title": "Wire Cutaway",
+      "folder": "129-x-ray-blueprint-03-wire-cutaway"
+    },
+    {
+      "title": "Thermal X-Ray",
+      "folder": "129-x-ray-blueprint-04-thermal-x-ray"
+    }
+  ],
+  "Suminagashi Ripples": [
+    {
+      "title": "Ink Pond",
+      "folder": "130-suminagashi-ripples-01-ink-pond"
+    },
+    {
+      "title": "Gold Leaf",
+      "folder": "130-suminagashi-ripples-02-gold-leaf"
+    },
+    {
+      "title": "Dual Drops",
+      "folder": "130-suminagashi-ripples-03-dual-drops"
+    },
+    {
+      "title": "Wind Sweep",
+      "folder": "130-suminagashi-ripples-04-wind-sweep"
+    }
+  ],
+  "Diffraction Grating": [
+    {
+      "title": "Disc Sheen",
+      "folder": "131-diffraction-grating-01-disc-sheen"
+    },
+    {
+      "title": "Feather Scale",
+      "folder": "131-diffraction-grating-02-feather-scale"
+    },
+    {
+      "title": "Linear Grating",
+      "folder": "131-diffraction-grating-03-linear-grating"
+    },
+    {
+      "title": "Cross Blaze",
+      "folder": "131-diffraction-grating-04-cross-blaze"
+    }
+  ],
+  "Shadow Puppet Theater": [
+    {
+      "title": "Lantern Show",
+      "folder": "132-shadow-puppet-theater-01-lantern-show"
+    },
+    {
+      "title": "Crane Dance",
+      "folder": "132-shadow-puppet-theater-02-crane-dance"
+    },
+    {
+      "title": "Gear Puppets",
+      "folder": "132-shadow-puppet-theater-03-gear-puppets"
+    },
+    {
+      "title": "Dual Screens",
+      "folder": "132-shadow-puppet-theater-04-dual-screens"
+    }
+  ],
+  "Biolume Tidepool": [
+    {
+      "title": "Shoreline Break",
+      "folder": "133-biolume-tidepool-01-shoreline-break"
+    },
+    {
+      "title": "Swirl Pool",
+      "folder": "133-biolume-tidepool-02-swirl-pool"
+    },
+    {
+      "title": "Deep Bloom",
+      "folder": "133-biolume-tidepool-03-deep-bloom"
+    },
+    {
+      "title": "Foam Lace",
+      "folder": "133-biolume-tidepool-04-foam-lace"
+    }
+  ],
+  "Penrose Tiling Glow": [
+    {
+      "title": "Five-Fold Grid",
+      "folder": "134-penrose-tiling-glow-01-five-fold-grid"
+    },
+    {
+      "title": "Star Rosettes",
+      "folder": "134-penrose-tiling-glow-02-star-rosettes"
+    },
+    {
+      "title": "Golden Bands",
+      "folder": "134-penrose-tiling-glow-03-golden-bands"
+    },
+    {
+      "title": "Quasi-Crystal",
+      "folder": "134-penrose-tiling-glow-04-quasi-crystal"
+    }
+  ],
+  "Liquid Amber Fossil": [
+    {
+      "title": "Honey Cube",
+      "folder": "135-liquid-amber-fossil-01-honey-cube"
+    },
+    {
+      "title": "Inclusions",
+      "folder": "135-liquid-amber-fossil-02-inclusions"
+    },
+    {
+      "title": "Swirl Resin",
+      "folder": "135-liquid-amber-fossil-03-swirl-resin"
+    },
+    {
+      "title": "Sunlit Slab",
+      "folder": "135-liquid-amber-fossil-04-sunlit-slab"
+    }
+  ],
+  "Resonant Bell Harmonics": [
+    {
+      "title": "Temple Bell",
+      "folder": "136-resonant-bell-harmonics-01-temple-bell"
+    },
+    {
+      "title": "Singing Bowl",
+      "folder": "136-resonant-bell-harmonics-02-singing-bowl"
+    },
+    {
+      "title": "Chime Array",
+      "folder": "136-resonant-bell-harmonics-03-chime-array"
+    },
+    {
+      "title": "Harmonic Split",
+      "folder": "136-resonant-bell-harmonics-04-harmonic-split"
+    }
+  ],
+  "Retro Oscilloscope Vector": [
+    {
+      "title": "Lissajous Scope",
+      "folder": "137-retro-oscilloscope-vector-01-lissajous-scope"
+    },
+    {
+      "title": "Spiral Beam",
+      "folder": "137-retro-oscilloscope-vector-02-spiral-beam"
+    },
+    {
+      "title": "Star Polygon",
+      "folder": "137-retro-oscilloscope-vector-03-star-polygon"
+    },
+    {
+      "title": "Beat Vector",
+      "folder": "137-retro-oscilloscope-vector-04-beat-vector"
+    }
+  ],
+  "Glacial Ice Cave": [
+    {
+      "title": "Azure Vault",
+      "folder": "138-glacial-ice-cave-01-azure-vault"
+    },
+    {
+      "title": "Blue Crevasse",
+      "folder": "138-glacial-ice-cave-02-blue-crevasse"
+    },
+    {
+      "title": "Frozen Waterfall",
+      "folder": "138-glacial-ice-cave-03-frozen-waterfall"
+    },
+    {
+      "title": "Sunbeam Hole",
+      "folder": "138-glacial-ice-cave-04-sunbeam-hole"
+    }
+  ],
+  "Kinetic Domino Cascade": [
+    {
+      "title": "Serpent Path",
+      "folder": "139-kinetic-domino-cascade-01-serpent-path"
+    },
+    {
+      "title": "Spiral Fall",
+      "folder": "139-kinetic-domino-cascade-02-spiral-fall"
+    },
+    {
+      "title": "Double Row",
+      "folder": "139-kinetic-domino-cascade-03-double-row"
+    },
+    {
+      "title": "Standing Reset",
+      "folder": "139-kinetic-domino-cascade-04-standing-reset"
+    }
+  ],
+  "Botanical Phyllotaxis": [
+    {
+      "title": "Sunflower",
+      "folder": "140-botanical-phyllotaxis-01-sunflower"
+    },
+    {
+      "title": "Pinecone",
+      "folder": "140-botanical-phyllotaxis-02-pinecone"
+    },
+    {
+      "title": "Romanesco",
+      "folder": "140-botanical-phyllotaxis-03-romanesco"
+    },
+    {
+      "title": "Lotus Spiral",
+      "folder": "140-botanical-phyllotaxis-04-lotus-spiral"
+    }
+  ],
+  "Brass Telegraph Sparks": [
+    {
+      "title": "Spark Gap",
+      "folder": "141-brass-telegraph-sparks-01-spark-gap"
+    },
+    {
+      "title": "Tesla Coil",
+      "folder": "141-brass-telegraph-sparks-02-tesla-coil"
+    },
+    {
+      "title": "Twin Electrodes",
+      "folder": "141-brass-telegraph-sparks-03-twin-electrodes"
+    },
+    {
+      "title": "Arc Array",
+      "folder": "141-brass-telegraph-sparks-04-arc-array"
+    }
+  ],
+  "Paper Lantern Festival": [
+    {
+      "title": "Sky Ascent",
+      "folder": "142-paper-lantern-festival-01-sky-ascent"
+    },
+    {
+      "title": "River Float",
+      "folder": "142-paper-lantern-festival-02-river-float"
+    },
+    {
+      "title": "Dense Swarm",
+      "folder": "142-paper-lantern-festival-03-dense-swarm"
+    },
+    {
+      "title": "Crimson Night",
+      "folder": "142-paper-lantern-festival-04-crimson-night"
+    }
+  ],
+  "Hyperbolic Escher Disc": [
+    {
+      "title": "Poincare Tessellation",
+      "folder": "143-hyperbolic-escher-disc-01-poincare-tessellation"
+    },
+    {
+      "title": "Spinning Web",
+      "folder": "143-hyperbolic-escher-disc-02-spinning-web"
+    },
+    {
+      "title": "Mobius Shift",
+      "folder": "143-hyperbolic-escher-disc-03-mobius-shift"
+    },
+    {
+      "title": "Boundary Bloom",
+      "folder": "143-hyperbolic-escher-disc-04-boundary-bloom"
+    }
+  ],
+  "Velvet Curtain Stage": [
+    {
+      "title": "Crimson Velvet",
+      "folder": "144-velvet-curtain-stage-01-crimson-velvet"
+    },
+    {
+      "title": "Midnight Silk",
+      "folder": "144-velvet-curtain-stage-02-midnight-silk"
+    },
+    {
+      "title": "Gold Fringe",
+      "folder": "144-velvet-curtain-stage-03-gold-fringe"
+    },
+    {
+      "title": "Parting Reveal",
+      "folder": "144-velvet-curtain-stage-04-parting-reveal"
+    }
+  ],
+  "Kinetic Mirror Mobile": [
+    {
+      "title": "Balanced Arms",
+      "folder": "145-kinetic-mirror-mobile-01-balanced-arms"
+    },
+    {
+      "title": "Spiral Mobile",
+      "folder": "145-kinetic-mirror-mobile-02-spiral-mobile"
+    },
+    {
+      "title": "Prism Discs",
+      "folder": "145-kinetic-mirror-mobile-03-prism-discs"
+    },
+    {
+      "title": "Wind Gust",
+      "folder": "145-kinetic-mirror-mobile-04-wind-gust"
+    }
+  ],
+  "Crystallizing Frost": [
+    {
+      "title": "Fern Frost",
+      "folder": "146-crystallizing-frost-01-fern-frost"
+    },
+    {
+      "title": "Hex Ice",
+      "folder": "146-crystallizing-frost-02-hex-ice"
+    },
+    {
+      "title": "Frozen Glass",
+      "folder": "146-crystallizing-frost-03-frozen-glass"
+    },
+    {
+      "title": "Thaw & Freeze",
+      "folder": "146-crystallizing-frost-04-thaw-freeze"
+    }
+  ],
+  "Cosmic Loom Web": [
+    {
+      "title": "Cosmic Filaments",
+      "folder": "147-cosmic-loom-web-01-cosmic-filaments"
+    },
+    {
+      "title": "Cluster Nodes",
+      "folder": "147-cosmic-loom-web-02-cluster-nodes"
+    },
+    {
+      "title": "Void Bubbles",
+      "folder": "147-cosmic-loom-web-03-void-bubbles"
+    },
+    {
+      "title": "Pulse Web",
+      "folder": "147-cosmic-loom-web-04-pulse-web"
+    }
+  ],
+  "Ceramic Glaze Crackle": [
+    {
+      "title": "Celadon Pool",
+      "folder": "148-ceramic-glaze-crackle-01-celadon-pool"
+    },
+    {
+      "title": "Raku Copper",
+      "folder": "148-ceramic-glaze-crackle-02-raku-copper"
+    },
+    {
+      "title": "Cobalt Slip",
+      "folder": "148-ceramic-glaze-crackle-03-cobalt-slip"
+    },
+    {
+      "title": "Ash Glaze",
+      "folder": "148-ceramic-glaze-crackle-04-ash-glaze"
+    }
+  ],
+  "Acoustic Sand Pendulum": [
+    {
+      "title": "Single Mound",
+      "folder": "149-acoustic-sand-pendulum-01-single-mound"
+    },
+    {
+      "title": "Figure-8",
+      "folder": "149-acoustic-sand-pendulum-02-figure-8"
+    },
+    {
+      "title": "Star Sand",
+      "folder": "149-acoustic-sand-pendulum-03-star-sand"
+    },
+    {
+      "title": "Wind Erase",
+      "folder": "149-acoustic-sand-pendulum-04-wind-erase"
+    }
+  ],
+  "Lucid Horizon Dream": [
+    {
+      "title": "Pastel Mirror",
+      "folder": "150-lucid-horizon-dream-01-pastel-mirror"
+    },
+    {
+      "title": "Glass Monoliths",
+      "folder": "150-lucid-horizon-dream-02-glass-monoliths"
+    },
+    {
+      "title": "Inverted Tide",
+      "folder": "150-lucid-horizon-dream-03-inverted-tide"
+    },
+    {
+      "title": "Twilight Dream",
+      "folder": "150-lucid-horizon-dream-04-twilight-dream"
     }
   ]
 }

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 123,
+    "family_name": "Polar Aurora Curtain",
+    "variant_number": 1,
+    "variant_title": "Emerald Ribbon",
+    "shader_path": "01-emerald-ribbon/main.glsl",
+    "descriptor_path": "01-emerald-ribbon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 123,
+    "family_name": "Polar Aurora Curtain",
+    "variant_number": 2,
+    "variant_title": "Crimson Storm",
+    "shader_path": "02-crimson-storm/main.glsl",
+    "descriptor_path": "02-crimson-storm/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 123,
+    "family_name": "Polar Aurora Curtain",
+    "variant_number": 3,
+    "variant_title": "Crown Zenith",
+    "shader_path": "03-crown-zenith/main.glsl",
+    "descriptor_path": "03-crown-zenith/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 123,
+    "family_name": "Polar Aurora Curtain",
+    "variant_number": 4,
+    "variant_title": "Twin Arcs",
+    "shader_path": "04-twin-arcs/main.glsl",
+    "descriptor_path": "04-twin-arcs/scene.json",
+    "verification": "unverified"
+  }
+]

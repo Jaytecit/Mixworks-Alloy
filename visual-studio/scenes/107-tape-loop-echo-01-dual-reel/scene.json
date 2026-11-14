@@ -1,0 +1,47 @@
+{
+  "TITLE": "Tape Loop Echo / Dual Reel",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneTapeDeflection",
+      "TYPE": "slider",
+      "LABEL": "Tape deflection",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.65,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneTapeBrightness",
+      "TYPE": "slider",
+      "LABEL": "Tape brightness",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.6,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "TITLE": "Nebula Storm / Pillars",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneCloudDensity",
+      "TYPE": "slider",
+      "LABEL": "Cloud density",
+      "DEFAULT": 1.0,
+      "MIN": 0.35,
+      "MAX": 1.6,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneDustContrast",
+      "TYPE": "slider",
+      "LABEL": "Dust contrast",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.6,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

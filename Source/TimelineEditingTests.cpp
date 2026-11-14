@@ -2,6 +2,7 @@
 #include "Beatmatch.h"
 #include <cmath>
 #include <limits>
+#include <thread>
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -1297,11 +1298,47 @@ void runRippleTests(const std::function<void(bool, const juce::String&)>& check,
     auto owned = std::make_unique<Workstation>(false); auto& ui = *owned; ui.stopTimer(); ui.setSize(1920, 1080);
     ui.engine.project = base; ui.engine.library = {media}; ui.selectedClip = removeId; ui.selectTrack(base.clips[1].track); ui.engine.position = 10; ui.refresh();
     ui.clipClipboard = base.clips[0]; const auto clipboardId = ui.clipClipboard->id;
+    const auto normalRate = ui.engine.sampleRate.load();
+    ui.engine.sampleRate = 0;
+    ui.editingRipple.onClick();
+    check(json(ui.engine.project) == json(base) && ui.engine.position == 10 && ui.selectedClip == removeId
+        && ui.undoHistory.empty() && ui.redoHistory.empty() && !ui.dirty && ui.status.contains("clock is unavailable"),
+        "failed Ripple Delete preparation leaves document, playhead, selection and both history stacks intact");
+    ui.engine.sampleRate = normalRate;
     ui.editingRipple.onClick();
     check(json(ui.engine.project) == json(ripple) && ui.undoHistory.size() == 1 && ui.engine.position == 8 && ui.clipClipboard->id == clipboardId,
         "Editing ripple uses the canonical transaction, folds the playhead, preserves clipboard and creates exactly one Undo");
     ui.undo(false); check(json(ui.engine.project) == json(base), "Undo restores complete ripple source/effects/automation/tempo/labels/pairs");
     ui.undo(true); check(json(ui.engine.project) == json(ripple), "Redo restores complete ripple document");
+    {
+        // A device callback during candidate preparation advances the original
+        // cursor. Publish the translated current cursor, then verify its PCM.
+        ui.engine.project = base; ui.engine.prepareClipProcessing(); ui.engine.sampleRate = 8000;
+        ui.engine.position = 10; ui.engine.playing = true;
+        auto candidate = ripple;
+        auto seek = ui.engine.prepareEditSeek(candidate, [](double t) { return t - 2; });
+        juce::AudioBuffer<float> before(2,128), after(2,128), expected(2,128);
+        const auto misses = ui.engine.callbackDiagnostics.snapshot().lockMisses;
+        auto render = [&](juce::AudioBuffer<float>& buffer)
+        {
+            std::thread callback([&] { ui.engine.audioDeviceIOCallbackWithContext(nullptr,0,buffer.getArrayOfWritePointers(),2,128,{}); });
+            callback.join();
+        };
+        render(before);
+        const auto published = ui.engine.commitSeek(std::move(seek), &candidate);
+        const double at = ui.engine.position.load();
+        wet->resetPlugins(); wet->position = at; wet->render(expected,128,at,midi);
+        render(after);
+        float error = 0;
+        for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 128; ++i)
+            error = std::max(error, std::abs(expected.getSample(ch,i) - after.getSample(ch,i)));
+        check(published.wasOk() && json(candidate) == json(base) && json(ui.engine.project) == json(ripple)
+            && std::abs(at - 8.016) < 1.e-9 && std::abs(ui.engine.position - 8.032) < 1.e-9 && ui.engine.playing
+            && before.getMagnitude(0,128) > .001f && after.getMagnitude(0,128) > .001f && error < 1.e-6f
+            && ui.engine.callbackDiagnostics.snapshot().lockMisses == misses,
+            "prepared time splice follows the advancing original cursor and publishes matching nonzero callback PCM / error " + juce::String(error,9));
+        ui.engine.playing = false; ui.engine.sampleRate = normalRate;
+    }
     ui.engine.project = base; ui.undoHistory.clear(); ui.selectedClip = removeId;
     ui.menuItemSelected(90, 3); check(json(ui.engine.project) == json(base), "ripple top-level command rejects an unrelated menu owner");
     ui.menuItemSelected(90, 1); check(json(ui.engine.project) == json(ripple) && ui.undoHistory.size() == 1, "Edit menu shares the canonical ripple transaction");

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 121,
+    "family_name": "Bamboo Wind Chimes",
+    "variant_number": 1,
+    "variant_title": "Porch Row",
+    "shader_path": "01-porch-row/main.glsl",
+    "descriptor_path": "01-porch-row/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 121,
+    "family_name": "Bamboo Wind Chimes",
+    "variant_number": 2,
+    "variant_title": "Spiral Chime",
+    "shader_path": "02-spiral-chime/main.glsl",
+    "descriptor_path": "02-spiral-chime/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 121,
+    "family_name": "Bamboo Wind Chimes",
+    "variant_number": 3,
+    "variant_title": "Forest Grove",
+    "shader_path": "03-forest-grove/main.glsl",
+    "descriptor_path": "03-forest-grove/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 121,
+    "family_name": "Bamboo Wind Chimes",
+    "variant_number": 4,
+    "variant_title": "Gong Ring",
+    "shader_path": "04-gong-ring/main.glsl",
+    "descriptor_path": "04-gong-ring/scene.json",
+    "verification": "unverified"
+  }
+]

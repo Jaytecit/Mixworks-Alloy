@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 147,
+    "family_name": "Cosmic Loom Web",
+    "variant_number": 1,
+    "variant_title": "Cosmic Filaments",
+    "shader_path": "01-cosmic-filaments/main.glsl",
+    "descriptor_path": "01-cosmic-filaments/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 147,
+    "family_name": "Cosmic Loom Web",
+    "variant_number": 2,
+    "variant_title": "Cluster Nodes",
+    "shader_path": "02-cluster-nodes/main.glsl",
+    "descriptor_path": "02-cluster-nodes/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 147,
+    "family_name": "Cosmic Loom Web",
+    "variant_number": 3,
+    "variant_title": "Void Bubbles",
+    "shader_path": "03-void-bubbles/main.glsl",
+    "descriptor_path": "03-void-bubbles/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 147,
+    "family_name": "Cosmic Loom Web",
+    "variant_number": 4,
+    "variant_title": "Pulse Web",
+    "shader_path": "04-pulse-web/main.glsl",
+    "descriptor_path": "04-pulse-web/scene.json",
+    "verification": "unverified"
+  }
+]

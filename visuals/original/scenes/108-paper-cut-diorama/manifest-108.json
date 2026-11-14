@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 108,
+    "family_name": "Paper Cut Diorama",
+    "variant_number": 1,
+    "variant_title": "Forest Canopy",
+    "shader_path": "01-forest-canopy/main.glsl",
+    "descriptor_path": "01-forest-canopy/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 108,
+    "family_name": "Paper Cut Diorama",
+    "variant_number": 2,
+    "variant_title": "Mountain Stages",
+    "shader_path": "02-mountain-stages/main.glsl",
+    "descriptor_path": "02-mountain-stages/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 108,
+    "family_name": "Paper Cut Diorama",
+    "variant_number": 3,
+    "variant_title": "City Theatre",
+    "shader_path": "03-city-theatre/main.glsl",
+    "descriptor_path": "03-city-theatre/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 108,
+    "family_name": "Paper Cut Diorama",
+    "variant_number": 4,
+    "variant_title": "Moonlit Arch",
+    "shader_path": "04-moonlit-arch/main.glsl",
+    "descriptor_path": "04-moonlit-arch/scene.json",
+    "verification": "unverified"
+  }
+]

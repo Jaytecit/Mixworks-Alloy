@@ -69,6 +69,13 @@ void runTrackOwnershipTests(const std::function<void(bool, const juce::String&)>
         const auto group = ui.engine.project;
         ui.selectedClip = group.clips[1].id; const auto address = ui.engine.pluginAddress(0, 0, 0);
         check(address && ui.engine.ensurePluginAutomation(*address), "effect automation can be created from a middle piece"); if (!address) return;
+        auto* parameter = ui.engine.pluginChain(0)[0]->processor->getParameters()[0];
+        const float manual = ui.engine.project.manualValue(*address);
+        ui.remember();
+        parameter->setValue(manual < .5f ? .95f : .05f);
+        ui.undo(false);
+        check(std::abs(parameter->getValue() - manual) < 1.e-6f && ui.engine.project.curve(*address) && !ui.engine.project.curve(*address)->active(),
+              "normal Undo restores the real shared VST parameter's inactive-lane manual value");
         auto* curve = ui.engine.project.curve(*address); curve->enabled = true; curve->setPoint(0, .25f); curve->setPoint(.7, 1);
         auto firstAddress = *address; firstAddress.clipId = group.clips[0].id;
         auto lastAddress = *address; lastAddress.clipId = group.clips[2].id;

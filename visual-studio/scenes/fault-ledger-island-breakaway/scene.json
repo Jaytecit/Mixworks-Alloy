@@ -1,9 +1,0 @@
-{
-  "TITLE": "Fault Ledger / Island Breakaway",
-  "MEDIA": [{"WRAP": "clamp"}],
-  "CONTROLS": [
-    {"NAME": "motion", "TYPE": "slider speed", "LABEL": "Motion rate", "DEFAULT": 0.67, "MIN": 0, "MAX": 1.8, "UI_GROUP": "Scene"},
-    {"NAME": "response", "TYPE": "slider", "LABEL": "Music response", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Scene"},
-    {"NAME": "imprint", "TYPE": "slider", "LABEL": "Fragment lift", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Nested", "DESCRIPTION": "Samples the artwork in separate rock fragments and carries them away from their beds."}
-  ]
-}

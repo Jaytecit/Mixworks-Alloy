@@ -6,6 +6,7 @@
 #include "StudioAudioLink.h"
 #include <set>
 #include "AppWindow.h"
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #if JUCE_WINDOWS
@@ -46,16 +47,54 @@ juce::var sceneActor(const VisualSceneClip& scene, double time, double beats = 0
     value->setProperty("motionTime",visualMotionTime(scene,time));
     value->setProperty("time", time); return juce::var(value);
 }
-juce::var studioActors(const std::vector<VisualSceneClip>& clips, double position, const TempoMap& clock)
+void studioActors(juce::DynamicObject& frame, const std::vector<VisualSceneClip>& clips, double position,
+                  const TempoMap& clock, const VisualOverrides& overrides)
 {
     static constexpr const char* layerNames[] {"background", "milk", "shader", "sprite"};
     auto* layers = new juce::DynamicObject();
+    auto* blends = new juce::DynamicObject();
+    std::array<const VisualSceneClip*, 4> current {};
     const double beat = clock.beatsAt(position);
+    const auto actor = [&](const VisualSceneClip& clip)
+    {
+        auto value = sceneActor(clip, position - clip.start + clip.offset, beat - clock.beatsAt(clip.start));
+        auto* audio = new juce::DynamicObject();
+        for (const auto& [name, curve] : clip.automation)
+            if (curve.audioSource.isNotEmpty())
+            {
+                auto* response = new juce::DynamicObject();
+                response->setProperty("source", curve.audioSource); response->setProperty("amount", curve.audioAmount);
+                audio->setProperty(name, juce::var(response));
+            }
+        value.getDynamicObject()->setProperty("audio", juce::var(audio));
+        value.getDynamicObject()->setProperty("held", visualControlsToJson(StudioWorkspace::overridesFor(clip, overrides)));
+        return value;
+    };
     for (const auto& clip : clips)
         if (clip.start <= position && position < clip.end() && !clip.scene.startsWith("original/"))
-            layers->setProperty(layerNames[(size_t)visualLayer(clip.scene)],
-                sceneActor(clip, position - clip.start + clip.offset, beat - clock.beatsAt(clip.start)));
-    return juce::var(layers);
+        {
+            const auto layer = (size_t)visualLayer(clip.scene);
+            if (const auto* outgoing = current[layer]; outgoing && (layer == 1 || layer == 2))
+            {
+                const auto fraction = juce::jlimit(0., 1., (position - clip.start) / (outgoing->end() - clip.start));
+                if (clip.transition == "cut")
+                {
+                    if (fraction < clip.pivot) continue;
+                }
+                else
+                {
+                    auto* blend = new juce::DynamicObject();
+                    blend->setProperty("outgoing", actor(*outgoing)); blend->setProperty("preset", clip.transition);
+                    blend->setProperty("fraction", fraction); blend->setProperty("pivot", clip.pivot);
+                    blends->setProperty(layerNames[layer], juce::var(blend));
+                }
+            }
+            current[layer] = &clip;
+        }
+    for (size_t layer = 0; layer < current.size(); ++layer)
+        if (current[layer]) layers->setProperty(layerNames[layer], actor(*current[layer]));
+    frame.setProperty("studioLayers", juce::var(layers));
+    frame.setProperty("studioBlends", juce::var(blends));
 }
 juce::var studioUpcoming(const std::vector<VisualSceneClip>& clips, double position, const TempoMap& clock)
 {
@@ -164,27 +203,31 @@ void SceneLane::recordPreviewPaint() { recordScenePaint(*this); }
 class SceneRenderWorker final : public juce::Thread
 {
 public:
-    SceneRenderWorker(Engine& source, int size, juce::String folder)
+    SceneRenderWorker(Engine& source, int size, juce::String folder, juce::File studio = {})
         : Thread("Alloy visual renderer"), engine(source), feed(source.visualSpectrum), width(size), height(size*9/16),
-          spriteFolder(std::move(folder)) { startThread(juce::Thread::Priority::normal); }
+          spriteFolder(std::move(folder)), studioMailbox(std::move(studio)) { startThread(juce::Thread::Priority::normal); }
     ~SceneRenderWorker() override { signalThreadShouldExit(); notify(); stopThread(5000); }
-    void submit(juce::var value, const std::vector<VisualSceneClip>& scenes, const TempoMap& clock)
+    void submit(juce::var value, const std::vector<VisualSceneClip>& scenes, const TempoMap& clock,
+                const VisualOverrides& overrides = {})
     {
         const juce::ScopedLock guard(mutex);
-        request=std::move(value); timeline=scenes; tempo=clock; ++revision; notify();
+        request=std::move(value); timeline=scenes; tempo=clock; manual=overrides; ++revision; notify();
     }
     void result(juce::Image& frame, juce::var& facts, juce::String& text)
     { const juce::ScopedLock guard(mutex); frame = image; facts = metadata; text = message; }
     int renderWidth() const { return width; }
     const juce::String& renderSpriteFolder() const { return spriteFolder; }
+    const juce::File& studioFolder() const { return studioMailbox; }
 private:
     Engine& engine;
     SpectrumFeed& feed;
     const int width, height;
     const juce::String spriteFolder;
+    const juce::File studioMailbox;
     juce::CriticalSection mutex;
     juce::var request, metadata;
     std::vector<VisualSceneClip> timeline;
+    VisualOverrides manual;
     TempoMap tempo;
     juce::Image image;
     juce::String message {"Starting visual renderer..."};
@@ -197,6 +240,18 @@ private:
     std::array<float, 2048> pcm {};
     VisualKickDetector kicks;
     double rate = 44100;
+    // Fixed-size slots retain a short history for paced playback. Each
+    // slot starts with an aligned sequence word, followed by width and height.
+    static constexpr size_t studioPreviewSlots = 6;
+    static constexpr size_t studioPreviewHeader = 16;
+    static constexpr size_t studioPreviewPixels = 640 * 360 * 4;
+    static constexpr size_t studioPreviewStride = studioPreviewHeader + studioPreviewPixels;
+    static_assert(sizeof(void*) == 8 && studioPreviewStride % alignof(juce::uint64) == 0,
+                  "The Studio mailbox requires aligned 64-bit sequence stores");
+    std::unique_ptr<juce::MemoryMappedFile> studioPreview;
+    juce::uint64 studioPreviewSequence = 0;
+    juce::uint64 studioPreviewGeneration = 0;
+    bool studioPreviewPlaying = false;
     bool drain()
     {
         const int count = feed.read(left.data(), right.data(), rates.data(), SpectrumFeed::capacity, clocks.data());
@@ -219,6 +274,54 @@ private:
         auto* failure = new juce::DynamicObject(); failure->setProperty("ok", false); failure->setProperty("error", text);
         const juce::ScopedLock guard(mutex); message = text; image = {}; metadata = juce::var(failure);
     }
+    void openStudioPreview()
+    {
+        if (studioMailbox == juce::File()) return;
+        const auto file = studioMailbox.getChildFile("preview.frames");
+        constexpr auto bytes = sizeof(juce::uint64) + studioPreviewSlots * studioPreviewStride;
+        if (!file.existsAsFile())
+        {
+            // Publish the name only after the mapping has its full size.
+            juce::TemporaryFile temp(file);
+            {
+                juce::FileOutputStream stream(temp.getFile());
+                if (!stream.openedOk() || !stream.writeRepeatedByte(0, bytes)) return;
+            }
+            if (!temp.getFile().replaceFileIn(file)) return;
+        }
+        if (file.getSize() != (juce::int64)bytes) return;
+        studioPreview = std::make_unique<juce::MemoryMappedFile>(file, juce::MemoryMappedFile::readWrite);
+        if (const auto* data = studioPreview->getData())
+            std::memcpy(&studioPreviewSequence, data, sizeof(studioPreviewSequence));
+    }
+    void publishStudioPreview(const void* pixels, size_t pixelBytes, int frameWidth, int frameHeight,
+                              juce::uint64 generation, bool playing)
+    {
+        if (!studioPreview || !studioPreview->getData() || pixelBytes > studioPreviewPixels) return;
+        auto* data = static_cast<char*>(studioPreview->getData());
+        if (generation != studioPreviewGeneration || playing != studioPreviewPlaying)
+        {
+            // Skip the old slots on seeks and transport changes. The reader
+            // detects the sequence gap and displays the new position directly.
+            studioPreviewSequence += studioPreviewSlots;
+            studioPreviewGeneration = generation;
+            studioPreviewPlaying = playing;
+        }
+        const auto sequence = ++studioPreviewSequence;
+        auto* slot = data + sizeof(sequence) + (sequence % studioPreviewSlots) * studioPreviewStride;
+        // An overlapping copy in Studio is discarded if either sequence read
+        // observes this invalid marker or the next completed frame instead.
+        auto* slotSequence = reinterpret_cast<volatile juce::uint64*>(slot);
+        *slotSequence = 0;
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        const juce::uint32 dimensions[] { (juce::uint32)frameWidth, (juce::uint32)frameHeight };
+        std::memcpy(slot + sizeof(sequence), dimensions, sizeof(dimensions));
+        if (pixelBytes != 0) std::memcpy(slot + studioPreviewHeader, pixels, pixelBytes);
+        std::atomic_thread_fence(std::memory_order_release);
+        *slotSequence = sequence;
+        std::atomic_thread_fence(std::memory_order_release);
+        *reinterpret_cast<volatile juce::uint64*>(data) = sequence;
+    }
     bool read(juce::StreamingSocket& socket, void* data, int bytes)
     {
         int done = 0; const auto deadline = juce::Time::getMillisecondCounterHiRes() + 60000;
@@ -235,6 +338,7 @@ private:
     void run() override
     {
         juce::ScopedNoDenormals noDenormals;
+        openStudioPreview();
         const auto python = rendererRoot().getSiblingFile("visual-python").getChildFile("python.exe");
         if (!python.existsAsFile() || !workerScript().existsAsFile() || !sceneInstall().isDirectory())
         { fail("Visual renderer unavailable. Keep the scene runtime with this application; including its visual-python folder."); return; }
@@ -254,6 +358,7 @@ private:
         arguments.add("--original");
         arguments.add("--milkdrop-library"); arguments.add(milkDropLibraryRoot().getFullPathName());
         if(spriteFolder.isNotEmpty()) { arguments.add("--sprite-folder"); arguments.add(spriteFolder); }
+        if (studioMailbox != juce::File()) { arguments.add("--studio-mailbox"); arguments.add(studioMailbox.getFullPathName()); }
         bool started = child.start(arguments, 0);
         if (!started) fail("Could not start the visual renderer.");
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000;
@@ -264,6 +369,7 @@ private:
             juce::uint64 sent = 0;
             juce::var control;
             std::vector<VisualSceneClip> renderScenes;
+            VisualOverrides renderOverrides;
             TempoMap renderClock;
             double nextFrame = 0, lastRequest = 0;
             while (!threadShouldExit() && child.isRunning())
@@ -274,7 +380,7 @@ private:
                 if(now-nextFrame>interval) nextFrame=now;
                 nextFrame+=interval;
                 { const juce::ScopedLock guard(mutex); if (sent != revision)
-                    { sent=revision; control=request.clone(); renderScenes=timeline; renderClock=tempo; } }
+                    { sent=revision; control=request.clone(); renderScenes=timeline; renderClock=tempo; renderOverrides=manual; } }
                 if (control.isVoid()) { wait(25); continue; }
                 // UI publishes immutable scene/control snapshots. The renderer
                 // samples the device's actual atomic clock on its own schedule;
@@ -285,7 +391,7 @@ private:
                 auto next=control.clone(); auto* frameObject=next.getDynamicObject();
                 if (control["studioLayers"].isObject())
                 {
-                    frameObject->setProperty("studioLayers", studioActors(renderScenes, position, renderClock));
+                    studioActors(*frameObject, renderScenes, position, renderClock, renderOverrides);
                     frameObject->setProperty("preload", studioUpcoming(renderScenes, position, renderClock));
                 }
                 else
@@ -345,21 +451,32 @@ private:
                 juce::Image frame;
                 if(imageSize)
                 {
-                    if (!facts["width"].isInt() || !facts["height"].isInt() || (int)facts["width"]!=width || (int)facts["height"]!=height || facts["pixelFormat"].toString()!="bgra8-bottom-up"
-                        || imageSize!=(unsigned int)(width*height*4)) { fail("Invalid visual pixel layout or size."); break; }
-                    frame=juce::Image(juce::Image::ARGB,width,height,false);
+                    const int frameWidth = (int)facts["width"], frameHeight = (int)facts["height"];
+                    const bool validSize = next["studioLayers"].isObject()
+                        ? frameWidth > 0 && frameWidth <= width && frameHeight > 0 && frameHeight <= height
+                        : frameWidth == width && frameHeight == height;
+                    if (!facts["width"].isInt() || !facts["height"].isInt() || !validSize || facts["pixelFormat"].toString()!="bgra8-bottom-up"
+                        || imageSize!=(unsigned int)(frameWidth*frameHeight*4)) { fail("Invalid visual pixel layout or size."); break; }
+                    frame=juce::Image(juce::Image::ARGB,frameWidth,frameHeight,false);
                     juce::Image::BitmapData bitmap(frame,juce::Image::BitmapData::writeOnly);
                     const auto* raw=static_cast<const juce::uint8*>(pixels.getData());
-                    for(int y=0;y<height;++y)
+                    for(int y=0;y<frameHeight;++y)
                     {
-                        const auto* row=raw+(height-1-y)*width*4;
+                        const auto* row=raw+(frameHeight-1-y)*frameWidth*4;
                         if constexpr(juce::PixelARGB::indexB==0 && juce::PixelARGB::indexG==1 && juce::PixelARGB::indexR==2 && juce::PixelARGB::indexA==3)
-                            std::memcpy(bitmap.getLinePointer(y),row,(size_t)width*4);
-                        else for(int x=0;x<width;++x) bitmap.setPixelColour(x,y,juce::Colour(row[x*4+2],row[x*4+1],row[x*4],row[x*4+3]));
+                            std::memcpy(bitmap.getLinePointer(y),row,(size_t)frameWidth*4);
+                        else for(int x=0;x<frameWidth;++x) bitmap.setPixelColour(x,y,juce::Colour(row[x*4+2],row[x*4+1],row[x*4],row[x*4+3]));
                     }
                 }
                 if (!facts.isObject() || !facts["ok"].isBool() || ((bool)facts["ok"] && !(bool)facts["empty"] && !(bool)facts["initialised"] && !(bool)facts["presented"] && !frame.isValid()))
                 { fail("Visual renderer returned an invalid frame."); break; }
+                if ((bool)facts["ok"] && generation == engine.visualClockRevision.load())
+                {
+                    if (frame.isValid())
+                        publishStudioPreview(pixels.getData(), imageSize, (int)facts["width"], (int)facts["height"], generation, playing);
+                    else if ((bool)facts["empty"])
+                        publishStudioPreview(nullptr, 0, 0, 0, generation, playing);
+                }
                 const juce::ScopedLock guard(mutex);
                 // Startup intentionally discards its initial clock/PCM. Permit
                 // the current paused request once more after readiness.
@@ -1042,12 +1159,12 @@ const VisualSceneClip* SceneLane::selectedVisual() const
     return found == clips.end() ? nullptr : &*found;
 }
 void SceneLane::setStudioWorkspace(StudioWorkspace* studio) { studioWorkspace = studio; }
-bool SceneLane::placeStudio(const juce::String& key, const juce::String& title, double start, double length)
+bool SceneLane::placeStudio(const juce::String& key, const juce::String& title, double start, double length, bool snap)
 {
     if (owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) return false;
     auto clips = owner.engine.project.visualScenes;
     const auto grid = owner.engine.project.gridClock();
-    start = grid.snap(std::max(0., start), owner.engine.project.snap, owner.engine.project.snapStep());
+    start = grid.snap(std::max(0., start), snap && owner.engine.project.snap, owner.engine.project.snapStep());
     if (length <= 0) length = grid.timeAtBeat(grid.beatsAt(start) + 32.) - start;
     const auto layer = visualLayer(key);
     for (const auto& clip : clips)
@@ -1132,11 +1249,11 @@ bool SceneLane::setImage(const juce::String& path)
 
 double SceneLane::at(float x, bool snap) const
 {
-    const double t = std::max(0., studioWorkspace ? (x - 113) / studioScale + studioStart
+    const double t = std::max(0., studioWorkspace ? (x - studioGutter) / studioScale + studioStart
         : (x + owner.viewport.getViewPositionX()) / owner.timeline.pixelsPerSecond);
     return owner.engine.project.gridClock().snap(t, snap && owner.engine.project.snap, owner.engine.project.snapStep());
 }
-double SceneLane::studioX(double seconds) const { return 113 + (seconds - studioStart) * studioScale; }
+double SceneLane::studioX(double seconds) const { return studioGutter + (seconds - studioStart) * studioScale; }
 juce::Rectangle<float> SceneLane::bounds(const VisualSceneClip& c) const
 {
     if (studioWorkspace)
@@ -1186,22 +1303,27 @@ bool SceneLane::place(const juce::String& key, double start, int preset)
 }
 bool SceneLane::replaceScene(const juce::String& id, const juce::String& key, int preset)
 {
-    if(owner.busy || owner.engine.exporting) { owner.setStatus("Finish preparation or export before replacing a scene."); return false; }
     const auto entry=std::find_if(scenes.begin(),scenes.end(),[&](const auto& e){return e.key==key;});
     if(entry==scenes.end()) { owner.setStatus("This scene is no longer available. Choose another scene; the visual lane was kept."); return false; }
-    if(isMilkDropKey(key) && !milkDropRendererAvailable()) { owner.setStatus("MilkDrop rendering is unavailable in this candidate. The selected scene was kept."); return false; }
-    if(preset < -1 || preset >= (int)entry->presets.size()) { owner.setStatus("Choose an available look for the replacement scene."); return false; }
+    return replaceScene(id, *entry, preset);
+}
+bool SceneLane::replaceScene(const juce::String& id, const VisualSceneEntry& entry, int preset)
+{
+    if(owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) { owner.setStatus("Finish preparation, export or recording before replacing a scene."); return false; }
+    if(visualLayer(entry.key) == VisualLayer::milk && !milkDropRendererAvailable()) { owner.setStatus("MilkDrop rendering is unavailable in this build."); return false; }
+    if(preset < -1 || preset >= (int)entry.presets.size()) { owner.setStatus("Choose an available look for the replacement scene."); return false; }
     auto next=owner.engine.project.visualScenes;
     auto clip=std::find_if(next.begin(),next.end(),[&](const auto& c){return c.id==id;});
     if(clip==next.end()) { owner.setStatus("The selected scene was removed. Select a timeline scene and open Replace again."); return false; }
-    clip->scene=key; clip->title=entry->title; clip->style=entry->style; clip->offset=0; clip->controls.clear(); clip->automation.clear();
-    if(preset>=0) clip->controls=entry->presets[(size_t)preset].controls;
-    for(const auto& [name,spec]:entry->controlSpecs) clip->controls.emplace(name,spec.initial);
-    if(validateVisualScenes(next).failed()) { owner.setStatus("The replacement is invalid. The visual lane was kept."); return false; }
+    clip->scene=entry.key; clip->title=entry.title; clip->style=entry.style; clip->offset=0; clip->controls.clear(); clip->automation.clear();
+    if(preset>=0) clip->controls=entry.presets[(size_t)preset].controls;
+    for(const auto& [name,spec]:entry.controlSpecs) clip->controls.emplace(name,spec.initial);
+    if(const auto valid=validateVisualScenes(next); valid.failed()) { owner.setStatus(valid.getErrorMessage()); return false; }
     owner.remember();
     { const juce::ScopedLock guard(owner.engine.lock); owner.engine.project.visualScenes=std::move(next); }
     selection=id; owner.selectedClip.clear(); owner.engine.selectedClip.clear(); owner.refresh(); repaint();
-    owner.setStatus("Replaced scene with "+entry->title+". Placement, duration, joins and shared image kept; scene controls/animation reset. Programme transport kept.");
+    if(studioWorkspace) studioWorkspace->focusFromLane(id);
+    owner.setStatus("Replaced scene with "+entry.title+". Timing and joins kept. Scene controls and animation reset.");
     return true;
 }
 bool SceneLane::change(const juce::String& id, double start, double length, double offset, bool remember)
@@ -1221,11 +1343,18 @@ void SceneLane::removeSelected()
 {
     if (owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) return;
     auto next = owner.engine.project.visualScenes; const auto n = next.size();
-    next.erase(std::remove_if(next.begin(), next.end(), [&](const auto& c) { return c.id == selection; }), next.end()); if (n == next.size()) return;
-    owner.remember(); { const juce::ScopedLock guard(owner.engine.lock); owner.engine.project.visualScenes = std::move(next); } selection.clear(); owner.refresh(); repaint();
+    next.erase(std::remove_if(next.begin(), next.end(), [&](const auto& c)
+        { return c.id == selection || (selectedClips.count(selection) && selectedClips.count(c.id)); }), next.end());
+    if (n == next.size()) return;
+    owner.remember(); { const juce::ScopedLock guard(owner.engine.lock); owner.engine.project.visualScenes = std::move(next); }
+    selection.clear(); selectedClips.clear();
+    if (studioWorkspace) studioWorkspace->focusFromLane(selection);
+    owner.refresh(); repaint();
 }
 void SceneLane::duplicateSelected()
 {
+    if (selectedClips.size()>1 && selectedClips.count(selection))
+    { owner.setStatus("Select one visual clip to duplicate it."); return; }
     const auto selected = std::find_if(owner.engine.project.visualScenes.begin(), owner.engine.project.visualScenes.end(), [&](const auto& c) { return c.id == selection; });
     if (selected == owner.engine.project.visualScenes.end() || owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) return;
     auto next = owner.engine.project.visualScenes; auto copy = *selected; copy.id = juce::Uuid().toString(); copy.start = copy.end(); next.push_back(copy);
@@ -1293,7 +1422,7 @@ void SceneLane::paintStudio(juce::Graphics& g)
         g.setColour(accents[(size_t)i]); g.drawText(names[i], 7, top, 101, (int)row, juce::Justification::centredLeft, true);
     }
     const juce::Graphics::ScopedSaveState saved(g);
-    g.reduceClipRegion(getLocalBounds().withTrimmedLeft(113));
+    g.reduceClipRegion(getLocalBounds().withTrimmedLeft(studioGutter));
     const double stride = studioScale < 6 ? 32. : studioScale < 15 ? 16. : 4.;
     double beat = std::ceil(grid.beatsAt(studioStart) / stride) * stride;
     for (int i = 0; i < 512; ++i, beat += stride)
@@ -1308,14 +1437,15 @@ void SceneLane::paintStudio(juce::Graphics& g)
         const auto box = bounds(clip);
         if (!box.intersects(getLocalBounds().toFloat())) continue;
         const auto tint = accents[(size_t)visualLayer(clip.scene)];
-        const bool selected = selection == clip.id && owner.selectedClip.isEmpty();
+        const bool selected = owner.selectedClip.isEmpty()
+            && (selection == clip.id || (selectedClips.count(selection) && selectedClips.count(clip.id)));
         g.setColour(tint.withAlpha(selected ? .39f : .21f)); g.fillRoundedRectangle(box.reduced(1.f), 3.f);
         g.setColour(tint.withAlpha(selected ? 1.f : .5f)); g.drawRoundedRectangle(box.reduced(1.f), 3.f, 1.f);
         g.setColour(colour::text);
         g.drawText(clip.title, box.getIntersection(getLocalBounds().toFloat()).reduced(6.f, 0.f).toNearestInt(),
                    juce::Justification::centredLeft, true);
         const auto curve = clip.automation.find(studioParameter);
-        if (selected && curve != clip.automation.end())
+        if (selected && selection == clip.id && curve != clip.automation.end())
         {
             juce::Path line;
             const auto y = [&](double value) { return box.getBottom() - 3.f - (float)value * std::max(1.f, box.getHeight() - 6.f); };
@@ -1323,14 +1453,17 @@ void SceneLane::paintStudio(juce::Graphics& g)
             if (curve->second.cycle)
             {
                 const auto firstBeat = grid.beatsAt(clip.start);
-                const auto firstX = std::max(113, (int)box.getX()), lastX = std::min(getWidth(), (int)box.getRight());
+                const auto firstX = std::max(studioGutter, (int)box.getX()), lastX = std::min(getWidth(), (int)box.getRight());
                 for (int x = firstX; x <= lastX; x += 2)
                 {
-                    const auto v = visualCycleAt(grid.beatsAt(studioStart + (x - 113) / studioScale) - firstBeat);
+                    const auto v = visualCycleAt(grid.beatsAt(studioStart + (x - studioGutter) / studioScale) - firstBeat, curve->second);
                     if (x == firstX) line.startNewSubPath((float)x, y(v)); else line.lineTo((float)x, y(v));
                 }
             }
-            else for (const auto& point : curve->second.points)
+            if (!line.isEmpty()) g.strokePath(line, juce::PathStrokeType(1.f));
+            line.clear();
+            if (curve->second.cycle) g.setColour(colour::text.withAlpha(.45f));
+            for (const auto& point : curve->second.points)
             {
                 const auto x = box.getX() + (float)point.at * box.getWidth();
                 if (line.isEmpty()) line.startNewSubPath(x, y(point.value)); else line.lineTo(x, y(point.value));
@@ -1339,11 +1472,66 @@ void SceneLane::paintStudio(juce::Graphics& g)
             g.strokePath(line, juce::PathStrokeType(1.f));
         }
     }
+    std::array<const VisualSceneClip*, 4> previous {};
+    for (const auto& clip : owner.engine.project.visualScenes)
+    {
+        const auto layer = (size_t)visualLayer(clip.scene);
+        const auto* outgoing = std::exchange(previous[layer], &clip);
+        if ((layer != 1 && layer != 2) || !outgoing || outgoing->end() < clip.start - 1.e-7) continue;
+        const auto left = (float)studioX(clip.start), right = (float)studioX(outgoing->end());
+        const auto box = bounds(clip);
+        const juce::Rectangle<float> strip(left - 3.f, box.getBottom() - 13.f, std::max(7.f, right - left + 6.f), 13.f);
+        if (!strip.intersects(getLocalBounds().toFloat())) continue;
+        g.setColour(colour::orange.withAlpha(.55f)); g.fillRoundedRectangle(strip, 2.f);
+        g.setColour(colour::orange); g.drawVerticalLine((int)left, strip.getY(), strip.getBottom());
+        g.drawVerticalLine((int)right, strip.getY(), strip.getBottom());
+        const auto& presets = studioTransitions();
+        const auto preset = std::find_if(presets.begin(), presets.end(), [&](const auto& item) { return item.first == clip.transition; });
+        g.setColour(colour::text); g.setFont(10.f);
+        if (strip.getWidth() >= 36.f && preset != presets.end())
+            g.drawText(preset->second, strip.toNearestInt().reduced(4, 0), juce::Justification::centred, true);
+    }
     g.setColour(colour::orange); g.drawVerticalLine((int)studioX(owner.engine.position.load()), 0, (float)getHeight());
+    if (!selectionBox.isEmpty())
+    {
+        g.setColour(colour::focus.withAlpha(.18f)); g.fillRect(selectionBox);
+        g.setColour(colour::focus); g.drawRect(selectionBox,1.f);
+    }
+}
+
+const VisualSceneClip* SceneLane::previousStudioClip(const VisualSceneClip& clip) const
+{
+    const VisualSceneClip* previous = nullptr;
+    for (const auto& candidate : owner.engine.project.visualScenes)
+    {
+        if (candidate.id == clip.id) break;
+        if (visualLayer(candidate.scene) == visualLayer(clip.scene)) previous = &candidate;
+    }
+    return previous;
+}
+
+bool SceneLane::editStudioTransition(const juce::String& from, const juce::String& to, const juce::String& preset,
+                                     double start, double end, bool remember)
+{
+    if (owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) return false;
+    auto clips = owner.engine.project.visualScenes;
+    const auto outgoing = std::find_if(clips.begin(), clips.end(), [&](const auto& clip) { return clip.id == from; });
+    const auto incoming = std::find_if(clips.begin(), clips.end(), [&](const auto& clip) { return clip.id == to; });
+    if (outgoing == clips.end() || incoming == clips.end() || start > end || incoming->start > outgoing->end() + 1.e-7
+        || start < outgoing->start || end > incoming->end() || !validVisualTransition(preset)) return false;
+    if (incoming->start == start && outgoing->end() == end && incoming->transition == preset) return false;
+    const auto last = incoming->end();
+    outgoing->length = end - outgoing->start;
+    incoming->start = start; incoming->length = last - start; incoming->transition = preset;
+    std::stable_sort(clips.begin(), clips.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
+    if (validateVisualScenes(clips).failed()) return false;
+    if (remember) owner.remember();
+    { const juce::ScopedLock guard(owner.engine.lock); owner.engine.project.visualScenes = std::move(clips); }
+    owner.dirty = true; repaint(); return true;
 }
 const VisualSceneClip* SceneLane::hit(juce::Point<float> point) const
 {
-    if (studioWorkspace && point.x < 113) return nullptr;
+    if (studioWorkspace && point.x < studioGutter) return nullptr;
     for (const auto& c : owner.engine.project.visualScenes)
         if (c.id == selection && bounds(c).contains(point) && (point.x < bounds(c).getX() + 8 || point.x > bounds(c).getRight() - 8)) return &c;
     for (auto it=owner.engine.project.visualScenes.rbegin();it!=owner.engine.project.visualScenes.rend();++it)
@@ -1353,34 +1541,115 @@ const VisualSceneClip* SceneLane::hit(juce::Point<float> point) const
 void SceneLane::mouseDown(const juce::MouseEvent& e)
 {
     dragOriginal.reset();
+    transitionOutgoing.reset(); transitionEdge = 0;
+    groupStarts.clear(); selectionOrigin.reset(); selectionBox={};
+    dragRemembered=false;
+    if (studioWorkspace && !e.mods.isPopupMenu() && !e.mods.isCtrlDown() && !e.mods.isShiftDown()) grabKeyboardFocus();
+    if (studioWorkspace && e.x >= studioGutter && e.y >= 18 && !e.mods.isCtrlDown() && !e.mods.isShiftDown())
+    {
+        const auto& clips = owner.engine.project.visualScenes;
+        std::array<const VisualSceneClip*, 4> previous {};
+        for (const auto& clip : clips)
+        {
+            const auto layer = (size_t)visualLayer(clip.scene);
+            const auto* outgoing = std::exchange(previous[layer], &clip);
+            if ((layer != 1 && layer != 2) || !outgoing || outgoing->end() < clip.start - 1.e-7) continue;
+            const auto box = bounds(clip);
+            const double left = studioX(clip.start), right = studioX(outgoing->end());
+            if (e.y < box.getBottom() - 13.f || e.y >= box.getBottom() || e.x < left - 5. || e.x > right + 5.) continue;
+            if (e.mods.isPopupMenu())
+            {
+                juce::PopupMenu menu;
+                const auto& presets = studioTransitions();
+                for (size_t i = 0; i < presets.size(); ++i)
+                    menu.addItem((int)i + 1, presets[i].second, true, clip.transition == presets[i].first);
+                menu.showMenuAsync(juce::PopupMenu::Options(),
+                    [safe = juce::Component::SafePointer<SceneLane>(this), from = outgoing->id, to = clip.id](int choice)
+                    {
+                        if (!safe || choice <= 0 || choice > (int)studioTransitions().size()) return;
+                        const auto* incoming = safe->studioWorkspace->clipFor(to);
+                        const auto* previous = incoming ? safe->previousStudioClip(*incoming) : nullptr;
+                        if (!previous || previous->id != from) return;
+                        const auto& preset = studioTransitions()[(size_t)choice - 1].first;
+                        double begin = incoming->start, end = previous->end();
+                        if (preset != "cut" && end - begin < .05)
+                        {
+                            const auto grid = safe->owner.engine.project.gridClock();
+                            const auto beat = grid.beatsAt(begin);
+                            begin = std::max(grid.timeAtBeat(beat - 1.), (previous->start + begin) * .5);
+                            end = std::min(grid.timeAtBeat(beat + 1.), (end + incoming->end()) * .5);
+                        }
+                        if (safe->editStudioTransition(from, to, preset, begin, end, true)) safe->owner.refresh();
+                    });
+                return;
+            }
+            dragOriginal = clip; transitionOutgoing = *outgoing; dragX = e.position.x;
+            transitionEdge = right - left < 2. ? 3 : std::abs(e.x - left) <= 6. ? -1 : std::abs(e.x - right) <= 6. ? 1 : 3;
+            return;
+        }
+    }
     if (const auto* scene=hit(e.position)) dragOriginal=*scene;
-    if (studioWorkspace && dragOriginal && selection == dragOriginal->id && (e.mods.isCtrlDown() || e.mods.isShiftDown()))
+    const bool group = studioWorkspace && dragOriginal && selectedClips.size()>1
+        && selectedClips.count(selection) && selectedClips.count(dragOriginal->id);
+    if (studioWorkspace && !group && dragOriginal && selection == dragOriginal->id
+        && (e.mods.isShiftDown() || (e.mods.isCtrlDown() && !studioParameter.isEmpty())))
     {
         const auto box = bounds(*dragOriginal);
         studioWorkspace->editPoint(at(e.position.x, true), juce::jlimit(0., 1., (double)(box.getBottom() - e.position.y) / box.getHeight()), e.mods.isShiftDown());
         dragOriginal.reset(); return;
     }
     owner.clearEditSelection(); owner.selectedClip.clear(); owner.engine.selectedClip.clear();
+    if (!group) selectedClips.clear();
     grabKeyboardFocus(); selection = dragOriginal ? dragOriginal->id : juce::String();
+    if (studioWorkspace) studioWorkspace->focusFromLane(selection);
     owner.refresh(); repaint();
     if (studioWorkspace)
     {
-        if (!dragOriginal && e.x >= 113) { owner.engine.seek(at(e.position.x, !e.mods.isAltDown())); return; }
+        if ((!dragOriginal || e.mods.isCommandDown()) && e.x>=studioGutter && e.y>=18 && !e.mods.isPopupMenu())
+        { selectionOrigin=e.position; dragOriginal.reset(); return; }
+        if (!dragOriginal && e.x>=studioGutter && !e.mods.isPopupMenu()) { owner.engine.seek(at(e.position.x,!e.mods.isAltDown())); return; }
         if (dragOriginal && e.mods.isPopupMenu())
         {
             juce::PopupMenu menu;
-            menu.addItem(1, "Duplicate clip"); menu.addItem(2, "Remove clip");
+            if (!group) menu.addItem(1, "Duplicate clip");
+            menu.addItem(2, group ? "Remove selected clips" : "Remove clip");
+            const auto layer = visualLayer(dragOriginal->scene);
+            juce::StringArray parameters;
+            juce::PopupMenu automation;
+            if (!group)
+            {
+                automation.addItem(10, "Hide automation", studioParameter.isNotEmpty());
+                for (const auto& [name, spec] : studioWorkspace->controlsFor(*dragOriginal))
+                {
+                    parameters.add(name);
+                    automation.addItem(100 + parameters.size(), spec.label, true, studioParameter == name);
+                }
+                menu.addSubMenu("Draw automation", automation);
+            }
+            if (!group && (layer == VisualLayer::shader || layer == VisualLayer::milk))
+            {
+                menu.addSeparator();
+                menu.addItem(3, "Replace with GLSL scene...");
+                menu.addItem(4, "Replace with MilkDrop...");
+            }
             menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
-                [safe = juce::Component::SafePointer<SceneLane>(this), id = selection](int answer)
+                [safe = juce::Component::SafePointer<SceneLane>(this), id = selection, parameters](int answer)
                 {
                     if (!safe || safe->selection != id) return;
                     if (answer == 1) safe->duplicateSelected();
                     if (answer == 2) safe->removeSelected();
+                    if (answer == 3 || answer == 4)
+                        safe->studioWorkspace->pick(answer == 3 ? VisualLayer::shader : VisualLayer::milk, 0., id);
+                    if (answer == 10 || answer > 100)
+                    { safe->studioParameter = answer == 10 ? juce::String() : parameters[answer - 101]; safe->repaint(); }
                 });
             return;
         }
         dragX = e.position.x; dragRemembered = false; dragEdge = 0;
-        if (dragOriginal) { const auto box = bounds(*dragOriginal); dragEdge = e.x < box.getX() + 7 ? -1 : e.x > box.getRight() - 7 ? 1 : 0; }
+        if (group)
+            for (const auto& clip : owner.engine.project.visualScenes)
+                if (selectedClips.count(clip.id)) groupStarts.emplace_back(clip.id,clip.start);
+        if (dragOriginal && !group) { const auto box = bounds(*dragOriginal); dragEdge = e.x < box.getX() + 7 ? -1 : e.x > box.getRight() - 7 ? 1 : 0; }
         return;
     }
     if (e.mods.isPopupMenu() && selection.isNotEmpty())
@@ -1439,20 +1708,76 @@ void SceneLane::mouseDown(const juce::MouseEvent& e)
 }
 void SceneLane::mouseDrag(const juce::MouseEvent& e)
 {
-    if (!dragOriginal || !e.mouseWasDraggedSinceMouseDown()) return;
+    if (!e.mouseWasDraggedSinceMouseDown()) return;
+    if (selectionOrigin)
+    {
+        const auto origin = *selectionOrigin;
+        selectionBox=juce::Rectangle<float>(origin,e.position).getIntersection(getLocalBounds().withTrimmedLeft(studioGutter).toFloat());
+        selectedClips.clear(); selection.clear();
+        for (const auto& clip : owner.engine.project.visualScenes)
+            if (bounds(clip).intersects(selectionBox))
+            { if (selection.isEmpty()) selection=clip.id; selectedClips.insert(clip.id); }
+        repaint(); return;
+    }
+    if (!dragOriginal) return;
     auto c = *dragOriginal; const double delta = (e.position.x - dragX) / (studioWorkspace ? studioScale : owner.timeline.pixelsPerSecond);
     const auto grid = owner.engine.project.gridClock(); const bool snap = owner.engine.project.snap && !e.mods.isAltDown();
+    if (transitionOutgoing)
+    {
+        double begin = c.start, end = transitionOutgoing->end();
+        const auto moved = [&](double time) { return grid.snap(std::max(0., time + delta), snap, owner.engine.project.snapStep()); };
+        if (transitionEdge == 3) { end += moved(begin) - begin; begin = moved(begin); }
+        if (transitionEdge == -1) begin = std::min(end, moved(begin));
+        if (transitionEdge == 1) end = std::max(begin, moved(end));
+        if (editStudioTransition(transitionOutgoing->id, c.id, c.transition, begin, end, !dragRemembered)) dragRemembered = true;
+        return;
+    }
+    if (!groupStarts.empty())
+    {
+        if (owner.busy || owner.engine.exporting || owner.engine.capturingPerformance()) return;
+        const auto earliest=std::min_element(groupStarts.begin(),groupStarts.end(),[](const auto& a,const auto& b) { return a.second<b.second; });
+        const double shift=std::max(-earliest->second,grid.snap(c.start+delta,snap,owner.engine.project.snapStep())-c.start);
+        auto next=owner.engine.project.visualScenes;
+        bool changed=false;
+        for (const auto& [id,start] : groupStarts)
+        {
+            auto found=std::find_if(next.begin(),next.end(),[&](const auto& clip) { return clip.id==id; });
+            if (found==next.end()) return;
+            changed |= found->start!=start+shift; found->start=start+shift;
+        }
+        std::stable_sort(next.begin(),next.end(),[](const auto& a,const auto& b) { return a.start<b.start; });
+        if (!changed || validateVisualScenes(next).failed()) return;
+        if (!dragRemembered) owner.remember();
+        { const juce::ScopedLock guard(owner.engine.lock); owner.engine.project.visualScenes=std::move(next); }
+        dragRemembered=true; owner.dirty=true; repaint(); return;
+    }
     if (dragEdge == 0) c.start = grid.snap(std::max(0., c.start + delta), snap, owner.engine.project.snapStep());
     else if (dragEdge == 1) c.length = grid.snap(c.end() + delta, snap, owner.engine.project.snapStep()) - c.start;
     else { const double start = grid.snap(std::max(0., c.start + delta), snap, owner.engine.project.snapStep()); c.offset += start - c.start; c.length -= start - c.start; c.start = start; }
     if (change(c.id, c.start, c.length, c.offset, !dragRemembered)) dragRemembered = true;
 }
-void SceneLane::mouseUp(const juce::MouseEvent&) { dragOriginal.reset(); if (dragRemembered) owner.refresh(); }
+void SceneLane::mouseUp(const juce::MouseEvent& e)
+{
+    if (selectionOrigin)
+    {
+        if (!e.mouseWasDraggedSinceMouseDown() && selectedClips.empty() && !hit(e.position))
+            owner.engine.seek(at(e.position.x,!e.mods.isAltDown()));
+        studioWorkspace->focusFromLane(selection);
+        selectionOrigin.reset(); selectionBox={}; owner.refresh(); repaint();
+    }
+    dragOriginal.reset(); transitionOutgoing.reset(); groupStarts.clear();
+    if (dragRemembered) owner.refresh();
+}
 void SceneLane::mouseMove(const juce::MouseEvent& e)
 {
     if (const auto* c=hit(e.position))
-    { setTooltip(c->title + ": " + juce::String(c->start, 2) + " to " + juce::String(c->end(), 2) + " seconds. Move to overlap another scene for a blend; drag edges to trim."); return; }
-    setTooltip("Drag a scene here from Visuals / scenes, or double-click to open the library.");
+    {
+        const auto hint = studioWorkspace && selectedClips.size()>1 && selectedClips.count(selection) && selectedClips.count(c->id)
+            ? "Drag to move the selection. Press Delete to remove it." : "Drag the body to move or an edge to trim.";
+        setTooltip(c->title + ": " + juce::String(c->start, 2) + " to " + juce::String(c->end(), 2) + " seconds. " + hint); return;
+    }
+    setTooltip(studioWorkspace ? "Right-click a clip to choose Draw automation. Ctrl-click sets a point. Shift-click removes it. Right-click a join to choose a preset or drag its handles to change timing."
+                              : "Drag a scene here from Visuals / scenes, or double-click to open the library.");
 }
 void SceneLane::mouseDoubleClick(const juce::MouseEvent& e)
 {
@@ -1460,7 +1785,7 @@ void SceneLane::mouseDoubleClick(const juce::MouseEvent& e)
     if (!hit(e.position))
     {
         const auto layer = juce::jlimit(0, 3, (int)((e.y - 18) * 4 / std::max(1, getHeight() - 18)));
-        studioWorkspace->pick((VisualLayer)layer, e.x < 113 ? owner.engine.position.load() : at(e.position.x, true));
+        studioWorkspace->pick((VisualLayer)layer, e.x < studioGutter ? owner.engine.position.load() : at(e.position.x, true));
     }
 }
 bool SceneLane::keyPressed(const juce::KeyPress& key)
@@ -1474,6 +1799,7 @@ bool SceneLane::keyPressed(const juce::KeyPress& key)
             auto selected = std::find_if(clips.begin(), clips.end(), [&](const auto& c) { return c.id == selection; });
             int index = selected == clips.end() ? 0 : (int)std::distance(clips.begin(), selected) + (key == juce::KeyPress::leftKey ? -1 : 1);
             selection = clips[(size_t)juce::jlimit(0, (int)clips.size() - 1, index)].id;
+            selectedClips.clear();
             owner.clearEditSelection(); owner.selectedClip.clear(); owner.engine.selectedClip.clear(); owner.refresh(); repaint();
         }
         return true;
@@ -1515,14 +1841,14 @@ void SceneLane::timerCallback()
     const auto previousPreview=preview;
     const auto previousStatus=previewStatus;
     repaint();
-    if (studioWorkspace && (studioWorkspace->isShowing() || studioWorkspace->outputShowing()))
+    if (studioWorkspace && studioWorkspace->outputShowing() && !owner.engine.project.visualScenes.empty())
     {
         constexpr int width = 640;
-        if (worker && worker->renderWidth() != width) { worker.reset(); preview = {}; }
+        if (worker && worker->studioFolder() != studioWorkspace->sessionFolder()) { worker.reset(); preview = {}; }
         if (!worker)
         {
             owner.engine.visualSpectrum.discardAvailable();
-            worker = std::make_unique<SceneRenderWorker>(owner.engine, width, juce::String());
+            worker = std::make_unique<SceneRenderWorker>(owner.engine, width, juce::String(), studioWorkspace->sessionFolder());
             owner.engine.visualSpectrum.enabled = true;
         }
         const auto grid = owner.engine.project.gridClock();
@@ -1530,7 +1856,8 @@ void SceneLane::timerCallback()
         auto* request = new juce::DynamicObject();
         request->setProperty("generation", generation);
         request->setProperty("studioLayers", juce::var(new juce::DynamicObject()));
-        worker->submit(juce::var(request), owner.engine.project.visualScenes, grid);
+        request->setProperty("studioOutput", studioWorkspace->outputView());
+        worker->submit(juce::var(request), owner.engine.project.visualScenes, grid, owner.engine.project.visualOverrides);
         juce::Image frame; juce::var facts; juce::String text;
         worker->result(frame, facts, text);
         if ((juce::int64)facts["generation"] == generation && facts.isObject() && (bool)facts["ok"] && !(bool)facts["initialised"])
@@ -1542,12 +1869,13 @@ void SceneLane::timerCallback()
         studioWorkspace->update();
         return;
     }
+    if (studioWorkspace) studioWorkspace->update();
     if(browserContent) browserContent->updateOutput();
     if (!browserContent || !browserContent->needsLiveRenderer())
     { if (worker) { owner.engine.visualSpectrum.enabled = false; worker.reset(); preview = {}; previewFacts = juce::var(); } return; }
     const int width=previewWidth(owner);
     const auto& spriteFolder=browserContent->currentSpriteFolder();
-    if (worker && (worker->renderWidth()!=width || worker->renderSpriteFolder()!=spriteFolder))
+    if (worker && (worker->renderWidth()!=width || worker->renderSpriteFolder()!=spriteFolder || worker->studioFolder() != juce::File()))
     { owner.engine.visualSpectrum.enabled=false; worker.reset(); preview={}; previewFacts=juce::var(); }
     if (!worker) { owner.engine.visualSpectrum.discardAvailable(); worker = std::make_unique<SceneRenderWorker>(owner.engine,width,spriteFolder); owner.engine.visualSpectrum.enabled = true; }
     const double position = owner.engine.position.load();

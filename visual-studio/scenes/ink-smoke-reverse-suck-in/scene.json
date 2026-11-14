@@ -1,0 +1,47 @@
+{
+  "TITLE": "Ink Smoke / Reverse Suck-In",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneInkDensity",
+      "TYPE": "slider",
+      "LABEL": "Ink density",
+      "DEFAULT": 1.0,
+      "MIN": 0.4,
+      "MAX": 1.5,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "scenePlumeSpread",
+      "TYPE": "slider",
+      "LABEL": "Plume spread",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.75,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

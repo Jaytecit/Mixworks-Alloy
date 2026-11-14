@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 111,
+    "family_name": "Lissajous Loom",
+    "variant_number": 1,
+    "variant_title": "Plain Weave",
+    "shader_path": "01-plain-weave/main.glsl",
+    "descriptor_path": "01-plain-weave/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 111,
+    "family_name": "Lissajous Loom",
+    "variant_number": 2,
+    "variant_title": "Twill Diagonal",
+    "shader_path": "02-twill-diagonal/main.glsl",
+    "descriptor_path": "02-twill-diagonal/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 111,
+    "family_name": "Lissajous Loom",
+    "variant_number": 3,
+    "variant_title": "Jacquard Wave",
+    "shader_path": "03-jacquard-wave/main.glsl",
+    "descriptor_path": "03-jacquard-wave/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 111,
+    "family_name": "Lissajous Loom",
+    "variant_number": 4,
+    "variant_title": "Unstrung",
+    "shader_path": "04-unstrung/main.glsl",
+    "descriptor_path": "04-unstrung/scene.json",
+    "verification": "unverified"
+  }
+]

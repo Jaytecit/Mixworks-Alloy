@@ -320,12 +320,22 @@ void runStemTests(const std::function<void(bool, const juce::String&)>& check, c
     }
     Project ordered; auto a = c, b = c, d = c; b.id = juce::Uuid().toString(); d.id = juce::Uuid().toString();
     a.start = 30; b.start = 0; d.start = 60; b.track = 1; d.track = 2; ordered.clips = {a,d,b};
+    check(prepareOrderedTimeline(ordered).error.contains("share one mixer"),"Blend refuses split pieces with one shared fader");
+    // The chronological test models three independently placed copies of one
+    // source. Give each its own controls, as normal placement does.
+    for (auto& clip : ordered.clips) clip.effects = makeClipEffects();
     const auto mixed = prepareOrderedTimeline(ordered);
     check(mixed.error.isEmpty() && mixed.project.clips.size() == 3 && mixed.project.clips[0].id == b.id && mixed.project.clips[1].id == a.id && mixed.project.clips[2].id == d.id,
         "Mix timeline preserves chronological order rather than insertion-vector order: " + mixed.error);
     if (mixed.error.isEmpty())
     {
-        check(mixed.project.transitionLinks.size() == 2 && mixed.project.clips[1].controls.automation[0].active(), "short tracks fall back to editable crossfades");
+        const auto& middle=mixed.project.clips[1]; const auto& controls=mixed.project.effectSettings(middle);
+        const auto* entrance=mixed.project.transitionFor(middle.id);
+        const auto frame=entrance ? mixed.project.transitionRange(*entrance) : juce::Range<double>{};
+        const AutomationAddress address{middle.track,AutomationTarget::volume,{},{},middle.id};
+        const auto at=[&](double x) { return controls.automation[0].valueAt(mixed.project.automationTime(address,frame.getStart()+x*frame.getLength()),controls.gainDb); };
+        check(entrance && mixed.project.transitionLinks.size() == 2 && controls.automation[0].active() && at(.75)>at(.25),
+            "short stem tracks retain an editable, rising entrance fade in their authoritative effect controls");
         auto locked = mixed.project; locked.transitionLinks[0].locked = true;
         check(prepareOrderedTimeline(locked).error.isNotEmpty(), "Mix timeline refuses locked transitions");
     }

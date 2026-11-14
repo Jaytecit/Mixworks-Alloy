@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 137,
+    "family_name": "Retro Oscilloscope Vector",
+    "variant_number": 1,
+    "variant_title": "Lissajous Scope",
+    "shader_path": "01-lissajous-scope/main.glsl",
+    "descriptor_path": "01-lissajous-scope/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 137,
+    "family_name": "Retro Oscilloscope Vector",
+    "variant_number": 2,
+    "variant_title": "Spiral Beam",
+    "shader_path": "02-spiral-beam/main.glsl",
+    "descriptor_path": "02-spiral-beam/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 137,
+    "family_name": "Retro Oscilloscope Vector",
+    "variant_number": 3,
+    "variant_title": "Star Polygon",
+    "shader_path": "03-star-polygon/main.glsl",
+    "descriptor_path": "03-star-polygon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 137,
+    "family_name": "Retro Oscilloscope Vector",
+    "variant_number": 4,
+    "variant_title": "Beat Vector",
+    "shader_path": "04-beat-vector/main.glsl",
+    "descriptor_path": "04-beat-vector/scene.json",
+    "verification": "unverified"
+  }
+]

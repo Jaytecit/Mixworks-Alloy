@@ -72,7 +72,7 @@ bool Workstation::persistSourceSectionDefaults(const std::shared_ptr<Media>& sou
     if (error.isNotEmpty()) { setStatus("Section edit was not saved. " + error); return false; }
     publishSourceSectionDefaults(source,sections); return true;
 }
-bool Workstation::persistSourceSectionHistory(const Project& target)
+bool Workstation::persistSourceSectionHistory(const Project& target, const std::function<bool()>& publish)
 {
     struct Change { std::shared_ptr<Media> media; SourceSections old, next; };
     std::set<juce::String> keys; for (const auto& pair : engine.project.sourceSectionEdits) keys.insert(pair.first);
@@ -97,20 +97,29 @@ bool Workstation::persistSourceSectionHistory(const Project& target)
         { setStatus("Saved source sections changed in another window or cannot be read. Undo kept the current data."); return false; }
         changes.push_back({source,before,after});
     }
-    for (size_t i = 0; i < changes.size(); ++i)
+    size_t written = 0;
+    juce::String error;
+    for (; written < changes.size(); ++written)
     {
-        const auto& change = changes[i];
-        const auto error = writeSourceSectionRecord(change.media->file,change.media->analysisSource,change.media->sourceModified,change.old,change.next);
-        if (error.isEmpty()) continue;
-        juce::String rollbackError;
-        while (i > 0)
-        {
-            const auto& done = changes[--i]; const auto restored = writeSourceSectionRecord(done.media->file,done.media->analysisSource,done.media->sourceModified,done.next,done.old);
-            if (restored.isNotEmpty()) rollbackError += " " + restored;
-        }
-        setStatus("Undo could not save track section defaults. " + error + (rollbackError.isNotEmpty() ? " Earlier records could not all be restored:" + rollbackError : juce::String())); return false;
+        const auto& change = changes[written];
+        error = writeSourceSectionRecord(change.media->file,change.media->analysisSource,change.media->sourceModified,change.old,change.next);
+        if (error.isNotEmpty()) break;
     }
-    for (const auto& change : changes) publishSourceSectionDefaults(change.media,change.next);
-    return true;
+    if (error.isEmpty() && publish())
+    {
+        for (const auto& change : changes) publishSourceSectionDefaults(change.media,change.next);
+        return true;
+    }
+    juce::String rollbackError;
+    while (written > 0)
+    {
+        const auto& done = changes[--written];
+        const auto restored = writeSourceSectionRecord(done.media->file,done.media->analysisSource,done.media->sourceModified,done.next,done.old);
+        if (restored.isNotEmpty()) rollbackError += " " + restored;
+    }
+    if (error.isNotEmpty() || rollbackError.isNotEmpty())
+        setStatus((error.isNotEmpty() ? "Undo could not save track section defaults. " + error : status)
+            + (rollbackError.isNotEmpty() ? " Earlier records could not all be restored:" + rollbackError : juce::String()));
+    return false;
 }
 }

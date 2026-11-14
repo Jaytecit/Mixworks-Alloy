@@ -1,0 +1,47 @@
+{
+  "TITLE": "Thermographic Aura / White Hot",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneHeatGain",
+      "TYPE": "slider",
+      "LABEL": "Heat gain",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 1.5,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneAuraSpread",
+      "TYPE": "slider",
+      "LABEL": "Aura spread",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 1.65,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

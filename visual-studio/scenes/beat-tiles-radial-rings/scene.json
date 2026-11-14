@@ -1,0 +1,56 @@
+{
+  "TITLE": "Beat Tiles - Radial Rings",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "tileDensity",
+      "TYPE": "slider",
+      "LABEL": "Tile density",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "ringSpacing",
+      "TYPE": "slider",
+      "LABEL": "Ring spacing",
+      "DEFAULT": 1.0,
+      "MIN": 0.55,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "artworkImprint",
+      "TYPE": "slider",
+      "LABEL": "Artwork imprint",
+      "DEFAULT": 1.0,
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ]
+}

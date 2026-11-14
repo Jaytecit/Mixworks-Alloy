@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 146,
+    "family_name": "Crystallizing Frost",
+    "variant_number": 1,
+    "variant_title": "Fern Frost",
+    "shader_path": "01-fern-frost/main.glsl",
+    "descriptor_path": "01-fern-frost/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 146,
+    "family_name": "Crystallizing Frost",
+    "variant_number": 2,
+    "variant_title": "Hex Ice",
+    "shader_path": "02-hex-ice/main.glsl",
+    "descriptor_path": "02-hex-ice/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 146,
+    "family_name": "Crystallizing Frost",
+    "variant_number": 3,
+    "variant_title": "Frozen Glass",
+    "shader_path": "03-frozen-glass/main.glsl",
+    "descriptor_path": "03-frozen-glass/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 146,
+    "family_name": "Crystallizing Frost",
+    "variant_number": 4,
+    "variant_title": "Thaw & Freeze",
+    "shader_path": "04-thaw-freeze/main.glsl",
+    "descriptor_path": "04-thaw-freeze/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 112,
+    "family_name": "Abyssal Jellyfish",
+    "variant_number": 1,
+    "variant_title": "Moon Jelly",
+    "shader_path": "01-moon-jelly/main.glsl",
+    "descriptor_path": "01-moon-jelly/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 112,
+    "family_name": "Abyssal Jellyfish",
+    "variant_number": 2,
+    "variant_title": "Lion Mane",
+    "shader_path": "02-lion-mane/main.glsl",
+    "descriptor_path": "02-lion-mane/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 112,
+    "family_name": "Abyssal Jellyfish",
+    "variant_number": 3,
+    "variant_title": "Comb Pulse",
+    "shader_path": "03-comb-pulse/main.glsl",
+    "descriptor_path": "03-comb-pulse/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 112,
+    "family_name": "Abyssal Jellyfish",
+    "variant_number": 4,
+    "variant_title": "Deep Swarm",
+    "shader_path": "04-deep-swarm/main.glsl",
+    "descriptor_path": "04-deep-swarm/scene.json",
+    "verification": "unverified"
+  }
+]

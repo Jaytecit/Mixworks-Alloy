@@ -1,9 +1,0 @@
-{
-  "TITLE": "Fault Ledger / Terrace Ratchet",
-  "MEDIA": [{"WRAP": "clamp"}],
-  "CONTROLS": [
-    {"NAME": "motion", "TYPE": "slider speed", "LABEL": "Motion rate", "DEFAULT": 0.59, "MIN": 0, "MAX": 1.8, "UI_GROUP": "Scene"},
-    {"NAME": "response", "TYPE": "slider", "LABEL": "Music response", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Scene"},
-    {"NAME": "imprint", "TYPE": "slider", "LABEL": "Stamp depth", "DEFAULT": 1, "MIN": 0, "MAX": 2, "UI_GROUP": "Nested", "DESCRIPTION": "Repeats the artwork as a staggered row of cut impressions on moving terraces."}
-  ]
-}

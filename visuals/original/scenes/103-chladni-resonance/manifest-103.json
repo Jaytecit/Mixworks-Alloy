@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 103,
+    "family_name": "Chladni Resonance",
+    "variant_number": 1,
+    "variant_title": "Harmonic 3-5",
+    "shader_path": "01-harmonic-3-5/main.glsl",
+    "descriptor_path": "01-harmonic-3-5/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 103,
+    "family_name": "Chladni Resonance",
+    "variant_number": 2,
+    "variant_title": "Octave Cross",
+    "shader_path": "02-octave-cross/main.glsl",
+    "descriptor_path": "02-octave-cross/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 103,
+    "family_name": "Chladni Resonance",
+    "variant_number": 3,
+    "variant_title": "Radial Plate",
+    "shader_path": "03-radial-plate/main.glsl",
+    "descriptor_path": "03-radial-plate/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 103,
+    "family_name": "Chladni Resonance",
+    "variant_number": 4,
+    "variant_title": "Sand Scatter",
+    "shader_path": "04-sand-scatter/main.glsl",
+    "descriptor_path": "04-sand-scatter/scene.json",
+    "verification": "unverified"
+  }
+]

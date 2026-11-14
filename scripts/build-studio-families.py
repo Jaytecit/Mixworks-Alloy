@@ -153,20 +153,25 @@ def main():
     treatment_source = (AUTHORING / "nested-treatments.glsl").read_text(encoding="utf-8")
     common, *sections = treatment_source.split("// @treatment ")
     shaders = dict(section.split("\n", 1) for section in sections)
-    catalog = {"Studio originals": [{"title": title, "folder": folder} for title, folder in ORIGINALS.items()]}
+    originals = [{"title": title, "folder": folder} for title, folder in ORIGINALS.items()
+                 if (SCENES / folder / "main.glsl").is_file()]
+    catalog = {"Studio originals": originals} if originals else {}
     assets = {}
     for family in read_json(AUTHORING / "families.json"):
-        if "existing" in family:
+        if "kept" in family:
+            entries = family["kept"]
+        elif "existing" in family:
             entries = [family["anchor"], *family["existing"]]
         else:
             entries, generated = make_siblings(family, common, shaders)
             assets.update(generated)
-        catalog[family["title"]] = entries
+        if entries:
+            catalog[family["title"]] = entries
     assets[STUDIO / "scene-library.json"] = json_text(catalog)
     for path, source in assets.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source, encoding="utf-8", newline="\n")
-    print(f"Materialised {len(catalog) - 1} Studio scene families and {len(assets) - 1} sibling assets.")
+    print(f"Materialised {len(catalog) - int(bool(originals))} Studio scene families and {len(assets) - 1} sibling assets.")
 
 
 if __name__ == "__main__":

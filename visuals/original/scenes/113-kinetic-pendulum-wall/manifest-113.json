@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 113,
+    "family_name": "Kinetic Pendulum Wall",
+    "variant_number": 1,
+    "variant_title": "Single Trace",
+    "shader_path": "01-single-trace/main.glsl",
+    "descriptor_path": "01-single-trace/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 113,
+    "family_name": "Kinetic Pendulum Wall",
+    "variant_number": 2,
+    "variant_title": "Twin Phase",
+    "shader_path": "02-twin-phase/main.glsl",
+    "descriptor_path": "02-twin-phase/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 113,
+    "family_name": "Kinetic Pendulum Wall",
+    "variant_number": 3,
+    "variant_title": "Damped Rose",
+    "shader_path": "03-damped-rose/main.glsl",
+    "descriptor_path": "03-damped-rose/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 113,
+    "family_name": "Kinetic Pendulum Wall",
+    "variant_number": 4,
+    "variant_title": "Chaos Swing",
+    "shader_path": "04-chaos-swing/main.glsl",
+    "descriptor_path": "04-chaos-swing/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 66,
+    "family_name": "Sierpinski Tetrahedron",
+    "variant_number": 1,
+    "variant_title": "Pyramid",
+    "shader_path": "01-pyramid/main.glsl",
+    "descriptor_path": "01-pyramid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 66,
+    "family_name": "Sierpinski Tetrahedron",
+    "variant_number": 2,
+    "variant_title": "Inverted Void",
+    "shader_path": "02-inverted-void/main.glsl",
+    "descriptor_path": "02-inverted-void/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 66,
+    "family_name": "Sierpinski Tetrahedron",
+    "variant_number": 3,
+    "variant_title": "Twisted Spire",
+    "shader_path": "03-twisted-spire/main.glsl",
+    "descriptor_path": "03-twisted-spire/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 66,
+    "family_name": "Sierpinski Tetrahedron",
+    "variant_number": 4,
+    "variant_title": "Floating Clusters",
+    "shader_path": "04-floating-clusters/main.glsl",
+    "descriptor_path": "04-floating-clusters/scene.json",
+    "verification": "unverified"
+  }
+]

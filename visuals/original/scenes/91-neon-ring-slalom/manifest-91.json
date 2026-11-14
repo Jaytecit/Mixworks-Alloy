@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 91,
+    "family_name": "Neon Ring Slalom",
+    "variant_number": 1,
+    "variant_title": "Circular Slalom",
+    "shader_path": "01-circular-slalom/main.glsl",
+    "descriptor_path": "01-circular-slalom/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 91,
+    "family_name": "Neon Ring Slalom",
+    "variant_number": 2,
+    "variant_title": "Square Gates",
+    "shader_path": "02-square-gates/main.glsl",
+    "descriptor_path": "02-square-gates/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 91,
+    "family_name": "Neon Ring Slalom",
+    "variant_number": 3,
+    "variant_title": "Hex Portals",
+    "shader_path": "03-hex-portals/main.glsl",
+    "descriptor_path": "03-hex-portals/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 91,
+    "family_name": "Neon Ring Slalom",
+    "variant_number": 4,
+    "variant_title": "Spiral Course",
+    "shader_path": "04-spiral-course/main.glsl",
+    "descriptor_path": "04-spiral-course/scene.json",
+    "verification": "unverified"
+  }
+]

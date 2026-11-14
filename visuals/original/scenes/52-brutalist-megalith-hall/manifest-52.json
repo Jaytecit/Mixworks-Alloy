@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 52,
+    "family_name": "Brutalist Megalith Hall",
+    "variant_number": 1,
+    "variant_title": "Colonnade",
+    "shader_path": "01-colonnade/main.glsl",
+    "descriptor_path": "01-colonnade/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 52,
+    "family_name": "Brutalist Megalith Hall",
+    "variant_number": 2,
+    "variant_title": "Sunken Atrium",
+    "shader_path": "02-sunken-atrium/main.glsl",
+    "descriptor_path": "02-sunken-atrium/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 52,
+    "family_name": "Brutalist Megalith Hall",
+    "variant_number": 3,
+    "variant_title": "Suspended Slabs",
+    "shader_path": "03-suspended-slabs/main.glsl",
+    "descriptor_path": "03-suspended-slabs/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 52,
+    "family_name": "Brutalist Megalith Hall",
+    "variant_number": 4,
+    "variant_title": "Stepped Ziggurat",
+    "shader_path": "04-stepped-ziggurat/main.glsl",
+    "descriptor_path": "04-stepped-ziggurat/scene.json",
+    "verification": "unverified"
+  }
+]

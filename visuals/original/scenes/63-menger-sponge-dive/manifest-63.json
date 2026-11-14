@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 63,
+    "family_name": "Menger Sponge Dive",
+    "variant_number": 1,
+    "variant_title": "Classic Menger",
+    "shader_path": "01-classic-menger/main.glsl",
+    "descriptor_path": "01-classic-menger/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 63,
+    "family_name": "Menger Sponge Dive",
+    "variant_number": 2,
+    "variant_title": "Rotated Sponge",
+    "shader_path": "02-rotated-sponge/main.glsl",
+    "descriptor_path": "02-rotated-sponge/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 63,
+    "family_name": "Menger Sponge Dive",
+    "variant_number": 3,
+    "variant_title": "Hollow Cross",
+    "shader_path": "03-hollow-cross/main.glsl",
+    "descriptor_path": "03-hollow-cross/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 63,
+    "family_name": "Menger Sponge Dive",
+    "variant_number": 4,
+    "variant_title": "Beat-Breathing Cube",
+    "shader_path": "04-beat-breathing-cube/main.glsl",
+    "descriptor_path": "04-beat-breathing-cube/scene.json",
+    "verification": "unverified"
+  }
+]

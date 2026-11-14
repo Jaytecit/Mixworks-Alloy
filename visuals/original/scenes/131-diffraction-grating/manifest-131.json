@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 131,
+    "family_name": "Diffraction Grating",
+    "variant_number": 1,
+    "variant_title": "Disc Sheen",
+    "shader_path": "01-disc-sheen/main.glsl",
+    "descriptor_path": "01-disc-sheen/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 131,
+    "family_name": "Diffraction Grating",
+    "variant_number": 2,
+    "variant_title": "Feather Scale",
+    "shader_path": "02-feather-scale/main.glsl",
+    "descriptor_path": "02-feather-scale/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 131,
+    "family_name": "Diffraction Grating",
+    "variant_number": 3,
+    "variant_title": "Linear Grating",
+    "shader_path": "03-linear-grating/main.glsl",
+    "descriptor_path": "03-linear-grating/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 131,
+    "family_name": "Diffraction Grating",
+    "variant_number": 4,
+    "variant_title": "Cross Blaze",
+    "shader_path": "04-cross-blaze/main.glsl",
+    "descriptor_path": "04-cross-blaze/scene.json",
+    "verification": "unverified"
+  }
+]

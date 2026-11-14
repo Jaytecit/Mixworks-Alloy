@@ -1,0 +1,47 @@
+{
+  "TITLE": "Biomorphic Radiolaria / Glass Dome",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "cameraSweep",
+      "TYPE": "slider",
+      "LABEL": "Camera sweep",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneSkeletonThickness",
+      "TYPE": "slider",
+      "LABEL": "Skeleton thickness",
+      "DEFAULT": 1.0,
+      "MIN": 0.5,
+      "MAX": 1.6,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

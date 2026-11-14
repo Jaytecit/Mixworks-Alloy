@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 65,
+    "family_name": "Apollonian Sphere Packing",
+    "variant_number": 1,
+    "variant_title": "Classic Packing",
+    "shader_path": "01-classic-packing/main.glsl",
+    "descriptor_path": "01-classic-packing/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 65,
+    "family_name": "Apollonian Sphere Packing",
+    "variant_number": 2,
+    "variant_title": "Hollow Shells",
+    "shader_path": "02-hollow-shells/main.glsl",
+    "descriptor_path": "02-hollow-shells/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 65,
+    "family_name": "Apollonian Sphere Packing",
+    "variant_number": 3,
+    "variant_title": "Torus Inversion",
+    "shader_path": "03-torus-inversion/main.glsl",
+    "descriptor_path": "03-torus-inversion/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 65,
+    "family_name": "Apollonian Sphere Packing",
+    "variant_number": 4,
+    "variant_title": "Crystal Foam",
+    "shader_path": "04-crystal-foam/main.glsl",
+    "descriptor_path": "04-crystal-foam/scene.json",
+    "verification": "unverified"
+  }
+]

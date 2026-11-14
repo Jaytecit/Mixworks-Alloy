@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 138,
+    "family_name": "Glacial Ice Cave",
+    "variant_number": 1,
+    "variant_title": "Azure Vault",
+    "shader_path": "01-azure-vault/main.glsl",
+    "descriptor_path": "01-azure-vault/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 138,
+    "family_name": "Glacial Ice Cave",
+    "variant_number": 2,
+    "variant_title": "Blue Crevasse",
+    "shader_path": "02-blue-crevasse/main.glsl",
+    "descriptor_path": "02-blue-crevasse/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 138,
+    "family_name": "Glacial Ice Cave",
+    "variant_number": 3,
+    "variant_title": "Frozen Waterfall",
+    "shader_path": "03-frozen-waterfall/main.glsl",
+    "descriptor_path": "03-frozen-waterfall/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 138,
+    "family_name": "Glacial Ice Cave",
+    "variant_number": 4,
+    "variant_title": "Sunbeam Hole",
+    "shader_path": "04-sunbeam-hole/main.glsl",
+    "descriptor_path": "04-sunbeam-hole/scene.json",
+    "verification": "unverified"
+  }
+]

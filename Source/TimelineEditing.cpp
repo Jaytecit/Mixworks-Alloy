@@ -12,6 +12,8 @@ juce::String Workstation::timelineActionUnavailable(TimelineAction action,double
     const auto* clip=engine.project.clipFor(selectedClip);
     const bool copy=action==TimelineAction::copy || action==TimelineAction::cut;
     const bool paste=action==TimelineAction::paste;
+    if (paste && track >= layout.visibleLaneCount) return "Choose a visible audio lane before pasting.";
+    const bool closingTime=action==TimelineAction::rippleDelete || action==TimelineAction::closeGap;
     const bool range=action==TimelineAction::repeatSelection || action==TimelineAction::cropSelection
         || action==TimelineAction::replaceSelection || action==TimelineAction::unlinkSelection
         || (editSelection.multiple() && (copy || action==TimelineAction::remove)) || (paste && editClipboard.has_value());
@@ -24,8 +26,10 @@ juce::String Workstation::timelineActionUnavailable(TimelineAction action,double
         || action==TimelineAction::split || action==TimelineAction::reverse || action==TimelineAction::rippleDelete
         || action==TimelineAction::closeGap || action==TimelineAction::loopStart || action==TimelineAction::loopEnd || action==TimelineAction::configureLoop;
     if(!structural)return {};
-    if (range || paste || copy || action==TimelineAction::split || action==TimelineAction::remove || action==TimelineAction::removePiece)
+    if (closingTime || range || paste || copy || action==TimelineAction::split || action==TimelineAction::remove || action==TimelineAction::removePiece)
         if (const auto why=structuralEditUnavailable();why.isNotEmpty()) return why;
+    if (closingTime && (engine.replayingTake() || engine.automationRecordMode!=AutomationRecordMode::read))
+        return "End take playback and choose Read before closing time.";
     if(pendingTempo>0 || tempoPreparationPending || !timelineLoads.empty() || engine.project.hasPendingPlacement())
         return "Wait for track and tempo preparation to finish, then try this edit again.";
     if(paste && !editClipboard && !clipClipboard)return "Copy audio first, then choose where to paste it.";
@@ -275,7 +279,8 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
     }
     if (performSelectionAction(action, time, track)) return;
     if (action >= TimelineAction::curveRead && engine.exporting) return;
-    auto* clip = currentClip(); selectTrack(track);
+    auto* clip = currentClip();
+    if (action != TimelineAction::rippleDelete && action != TimelineAction::closeGap) selectTrack(track);
     switch (action)
     {
         case TimelineAction::unlinkSelection:
@@ -306,29 +311,26 @@ void Workstation::performTimelineAction(TimelineAction action, double time, int 
         case TimelineAction::rippleDelete: case TimelineAction::closeGap:
         {
             if (!clip) return;
-            if (pendingTempo > 0 || tempoPreparationPending || engine.project.hasPendingPlacement())
-            { setStatus("Wait for preparation before closing time."); return; }
-            const juce::ScopedLock guard(engine.lock);
-            if (engine.recordingAutomation() || engine.automationRecordMode != AutomationRecordMode::read)
-            { setStatus("Choose Read and finish automation recording before closing time."); return; }
+            auto candidate = projectEditSnapshot(true);
             const bool removing = action == TimelineAction::rippleDelete;
             const auto id = clip->id;
             const double end = removing ? clip->end() : clip->start;
             double begin = removing ? clip->start : 0;
-            if (!removing) for (const auto& other : engine.project.clips)
+            if (!removing) for (const auto& other : candidate.clips)
                 if (other.id != id && other.start < end) begin = std::max(begin, other.end());
             if (end <= begin) { setStatus("There is no empty gap before this segment across all lanes."); return; }
-            auto candidate = engine.project;
             const auto result = candidate.closeTimeRange(begin, end, removing ? id : juce::String());
             if (result.failed()) { setStatus(result.getErrorMessage()); return; }
-            remember(); // Ends rehearsal before capturing the transport position.
-            const double position = engine.position.load();
-            engine.project = std::move(candidate);
-            engine.commitSeek(engine.prepareSeek(position < begin ? position : position < end ? begin : begin + (position - end)));
+            auto seek = engine.prepareEditSeek(candidate, [begin, end](double position)
+            { return position < begin ? position : begin + std::max(0., position - end); });
+            const auto published = engine.commitSeek(std::move(seek), &candidate);
+            if (published.failed()) { setStatus(published.getErrorMessage()); return; }
+            recordEditHistory(std::move(candidate));
+            clearEditSelection();
             timeline.selectAutomationPoint({}, -1); tempoStrip.selectedTempoPoint = -1;
             selectedTransition.clear(); loopStartClip.clear();
             if (removing) selectedClip.clear();
-            refresh(); setStatus((removing ? "Segment ripple-deleted. " : "Gap closed. ") + juce::String(end - begin, 3)
+            selectTrack(track); setStatus((removing ? "Segment ripple-deleted. " : "Gap closed. ") + juce::String(end - begin, 3)
                 + " seconds removed across all lanes; later segments, linked pairs and session markers/automation moved together. Undo restores the mix.");
             return;
         }

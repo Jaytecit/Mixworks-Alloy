@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 114,
+    "family_name": "Caustic Pool Floor",
+    "variant_number": 1,
+    "variant_title": "Turquoise Tile",
+    "shader_path": "01-turquoise-tile/main.glsl",
+    "descriptor_path": "01-turquoise-tile/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 114,
+    "family_name": "Caustic Pool Floor",
+    "variant_number": 2,
+    "variant_title": "Deep Reef",
+    "shader_path": "02-deep-reef/main.glsl",
+    "descriptor_path": "02-deep-reef/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 114,
+    "family_name": "Caustic Pool Floor",
+    "variant_number": 3,
+    "variant_title": "Sunset Shallows",
+    "shader_path": "03-sunset-shallows/main.glsl",
+    "descriptor_path": "03-sunset-shallows/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 114,
+    "family_name": "Caustic Pool Floor",
+    "variant_number": 4,
+    "variant_title": "Rain Ripples",
+    "shader_path": "04-rain-ripples/main.glsl",
+    "descriptor_path": "04-rain-ripples/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 83,
+    "family_name": "Asteroid Belt Run",
+    "variant_number": 1,
+    "variant_title": "Dense Belt",
+    "shader_path": "01-dense-belt/main.glsl",
+    "descriptor_path": "01-dense-belt/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 83,
+    "family_name": "Asteroid Belt Run",
+    "variant_number": 2,
+    "variant_title": "Hollow Crater",
+    "shader_path": "02-hollow-crater/main.glsl",
+    "descriptor_path": "02-hollow-crater/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 83,
+    "family_name": "Asteroid Belt Run",
+    "variant_number": 3,
+    "variant_title": "Ring Debris",
+    "shader_path": "03-ring-debris/main.glsl",
+    "descriptor_path": "03-ring-debris/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 83,
+    "family_name": "Asteroid Belt Run",
+    "variant_number": 4,
+    "variant_title": "Twin Planetoids",
+    "shader_path": "04-twin-planetoids/main.glsl",
+    "descriptor_path": "04-twin-planetoids/scene.json",
+    "verification": "unverified"
+  }
+]

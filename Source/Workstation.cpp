@@ -480,6 +480,7 @@ void ImportProgressView::requestStop()
 }
 Timeline::Timeline(Workstation& w) : owner(w)
 {
+    setOpaque(true);
     setWantsKeyboardFocus(true);
     setFocusContainerType(FocusContainerType::focusContainer);
     setTitle("Timeline segments, transitions and automation");
@@ -507,16 +508,17 @@ int Timeline::laneTop(int track) const { int top = 0; for (int i = 0; i < track;
 int Timeline::laneSize(int track) const
 {
     std::array<bool, trackCount> expanded {};
-    for (const auto& c : owner.engine.project.clips) if (c.stems && c.stemsExpanded) expanded[(size_t) c.track] = true;
+    if (track >= contentLaneCount()) return 0;
+    for (const auto& c : owner.engine.project.clips) if (c.track < contentLaneCount() && c.stems && c.stemsExpanded) expanded[(size_t) c.track] = true;
     std::array<int, trackCount> sizes {}; int needed = 0, spare = 0;
-    for (int i = 0; i < trackCount; ++i)
+    for (int i = 0; i < contentLaneCount(); ++i)
     {
         sizes[(size_t) i] = owner.layout.laneSize(i);
         if (expanded[(size_t) i]) { needed += std::max(0, 224 - sizes[(size_t) i]); sizes[(size_t) i] = std::max(224, sizes[(size_t) i]); }
         else spare += std::max(0, sizes[(size_t) i] - WorkspaceLayout::minimumLaneHeight);
     }
     int remaining = std::min(needed, spare);
-    for (int i = 0; i < trackCount; ++i) if (!expanded[(size_t) i])
+    for (int i = 0; i < contentLaneCount(); ++i) if (!expanded[(size_t) i])
     {
         const int available = std::max(0, sizes[(size_t) i] - WorkspaceLayout::minimumLaneHeight);
         const int reduction = spare > 0 ? remaining * available / spare : 0;
@@ -526,17 +528,17 @@ int Timeline::laneSize(int track) const
 }
 int Timeline::contentLaneCount() const
 {
-    return trackCount;
+    return owner.layout.visibleLaneCount;
 }
 int Timeline::trackAt(float y) const
 {
-    for (int i = 0; i < trackCount; ++i) if (y < laneTop(i + 1)) return i;
-    return trackCount - 1;
+    for (int i = 0; i < contentLaneCount(); ++i) if (y < laneTop(i + 1)) return i;
+    return contentLaneCount() - 1;
 }
 float Timeline::laneY(int track, float y) const { return laneTop(track) + y * (laneSize(track) - curveToolsReserve(track)) / laneHeight; }
 int Timeline::dividerAt(float y) const
 {
-    for (int i = 0; i < trackCount; ++i) if (std::abs(y - (laneTop(i + 1) - 1)) <= 3) return i;
+    for (int i = 0; i < contentLaneCount(); ++i) if (std::abs(y - (laneTop(i + 1) - 1)) <= 3) return i;
     return -1;
 }
 bool Timeline::automationUsesGain(AutomationTarget target) const
@@ -592,8 +594,9 @@ bool Timeline::hasGeneratedAutomation(const AutomationAddress& address) const
 float Timeline::automationDisplayValue(const AutomationAddress& address, double time, float manual, const TransitionPlayback* compiled) const
 {
     const int band = (int) address.target;
+    if (address.stem >= 0 || band < 0 || band >= 4) return manual;
     const auto* clip = owner.engine.project.clipFor(address.clipId);
-    if (address.stem >= 0 || !clip || band < 0 || band >= 4 || !hasGeneratedAutomation(address)) return manual;
+    if (!clip || (!compiled && !hasGeneratedAutomation(address))) return manual;
     // An end handle represents the last audible value, before the clip's
     // exclusive playback boundary. Reading the silent exterior corrupts edits.
     const double sampleTime = time == clip->end() ? std::nextafter(time, clip->start) : time;
@@ -639,7 +642,7 @@ std::optional<std::pair<AutomationAddress, int>> Timeline::automationPointAt(juc
     const int track = trackAt(position.y);
     std::optional<std::pair<AutomationAddress, int>> found;
     float nearest = 12;
-    for (const auto& address : visibleAutomationAddresses(track))
+    for (const auto& address : displayedAutomationAddresses(track))
     {
         if (!automationNodesVisible(address)) continue;
         const auto curve = automationViewCurve(address); if (laneSize(track) < 55) continue;
@@ -659,33 +662,59 @@ juce::Rectangle<float> Timeline::offscreenAnchorBounds(const Clip& clip, bool in
 {
     const auto view = getLocalArea(&owner.viewport,owner.viewport.getLocalBounds()).toFloat()
         .withWidth((float)owner.viewport.getMaximumVisibleWidth());
+    if (clip.end() * pixelsPerSecond < view.getX() || clip.start * pixelsPerSecond >= view.getRight()) return {};
     const auto bounds = clipBounds(clip);
     const double local = clip.transitionTime(intro);
     if (local < 0 || local > clip.length || !bounds.intersects(view) || view.getWidth() < 100 || bounds.getHeight() < 65) return {};
     const float x = (float)((clip.start + local)*pixelsPerSecond);
-    if (x >= view.getX()+7 && x <= view.getRight()-7) return {};
-    const bool left = x < view.getX()+7;
     const float other = (float)((clip.start+clip.transitionTime(!intro))*pixelsPerSecond);
+    const bool inside = x >= view.getX()+7 && x <= view.getRight()-7;
+    if (inside && std::abs(x - other) < 14.f && clip.id == owner.selectedClip)
+    {
+        const auto start = juce::jlimit(view.getX()+6, view.getRight()-88, std::min(x, other));
+        return {start + (intro ? 0.f : 41.f), bounds.getY()+43, 38, 17};
+    }
+    if (inside) return {};
+    const bool left = x < view.getX()+7;
     const bool sameEdge = left ? other < view.getX()+7 : other > view.getRight()-7;
     const float separate = !intro && sameEdge ? 41.f : 0.f;
     return {left ? view.getX()+6+separate : view.getRight()-44-separate, bounds.getY()+43,38,17};
 }
-std::optional<std::pair<juce::String, bool>> Timeline::anchorAt(juce::Point<float> position) const
+std::optional<std::pair<juce::String, bool>> Timeline::anchorAt(juce::Point<float> position, bool handlesOnly) const
 {
     if (owner.busy || owner.tempoPreparationPending || owner.engine.project.hasPendingPlacement()) return {};
+    std::optional<std::pair<juce::String, bool>> nearest;
+    double distance = 8.;
     for (auto it = owner.engine.project.clips.rbegin(); it != owner.engine.project.clips.rend(); ++it)
     {
         const auto bounds = clipBounds(*it);
-        if (position.y < bounds.getY() || position.y > bounds.getBottom() || !it->media->hasPlayback()) continue;
+        if (bounds.isEmpty() || position.y < bounds.getY() || position.y > bounds.getBottom() || !it->media->hasPlayback()) continue;
         for (const bool intro : {true, false})
         {
             if (offscreenAnchorBounds(*it,intro).contains(position)) return {{it->id,intro}};
+            if (handlesOnly && position.y > bounds.getY() + 8) continue;
             const double local = it->transitionTime(intro);
             if (local < 0 || local > it->length) continue;
-            if (std::abs(position.x - (it->start + local) * pixelsPerSecond) <= 7) return {{it->id, intro}};
+            const double delta = std::abs(position.x - (it->start + local) * pixelsPerSecond);
+            if (delta <= 7 && delta < distance) { nearest = {{it->id, intro}}; distance = delta; }
         }
     }
-    return {};
+    return nearest;
+}
+bool Timeline::beginAnchorDrag(const juce::MouseEvent& e, bool handlesOnly)
+{
+    if (e.mods.isPopupMenu() || (handlesOnly && (e.mods.isCtrlDown() || e.mods.isShiftDown()))) return false;
+    const auto anchor = anchorAt(e.position, handlesOnly);
+    if (!anchor) return false;
+    const auto* clip = owner.engine.project.clipFor(anchor->first);
+    if (!clip) return false;
+    owner.selectedClip = clip->id;
+    dragging = clip->id; draggingIntro = anchor->second;
+    anchorDrag = owner.engine.project; origin = e.getPosition();
+    dragStart = clip->start + clip->transitionTime(draggingIntro);
+    owner.selectTrack(clip->track);
+    setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+    return true;
 }
 void Timeline::mouseMove(const juce::MouseEvent& event)
 {
@@ -736,11 +765,11 @@ void Timeline::mouseMove(const juce::MouseEvent& event)
 }
 juce::Rectangle<float> Timeline::clipBounds(const Clip& c) const
 {
+    if (c.track >= contentLaneCount()) return {};
     return { (float) (c.start * pixelsPerSecond), (float) laneTop(c.track) + std::min(7.f, laneSize(c.track) * .1f), std::max(3.0f, (float) (c.length * pixelsPerSecond)), (float) laneSize(c.track) - curveToolsReserve(c.track) - 2 * std::min(7.f, laneSize(c.track) * .1f) };
 }
-void Timeline::updateSize()
+void Timeline::updateGeometry()
 {
-    const juce::ScopedValueSetter<bool> viewGuard(owner.programmaticTimelineView, true);
     double end = owner.engine.project.audibleEnd();
     if (owner.layout.followPlayhead) end = std::max(end, owner.engine.position.load());
     if (!owner.engine.project.tempo.points.empty()) end = std::max(end, owner.engine.project.tempo.points.back().time);
@@ -752,25 +781,42 @@ void Timeline::updateSize()
     const int contentHeight = laneTop(contentLaneCount());
     owner.viewport.setScrollBarsShown(contentHeight > owner.viewport.getHeight(), false, true, true);
     setSize(std::max(owner.viewport.getWidth(), (int) width), contentHeight);
+}
+void Timeline::refreshViewportItems()
+{
     owner.layoutTrackHeaders();
+    layoutMovementLocks();
     refreshCurveTools();
-    refreshMovementLocks();
     refreshAccessibleItems();
     owner.timelineRuler.refreshAccessibleMarkers();
     owner.tempoStrip.refreshAccessibleMarkers();
     owner.timelineRuler.repaint(); owner.timelineOverview.repaint();
     repaint();
 }
+void Timeline::updateSize()
+{
+    const juce::ScopedValueSetter<bool> viewGuard(owner.programmaticTimelineView, true);
+    const juce::ScopedValueSetter<bool> sizeGuard(resizingTimeline, true);
+    updateGeometry();
+    refreshMovementLocks();
+    refreshViewportItems();
+}
 void Timeline::zoomAt(double factor, double timelineX)
 {
     const juce::ScopedValueSetter<bool> viewGuard(owner.programmaticTimelineView, true);
     const double time = timelineX / pixelsPerSecond;
     const double screenX = timelineX - owner.viewport.getViewPositionX();
-    pixelsPerSecond = juce::jlimit(0.1, WorkspaceLayout::maximumTimelineZoom, pixelsPerSecond * factor);
+    const auto scale = juce::jlimit(0.1, WorkspaceLayout::maximumTimelineZoom, pixelsPerSecond * factor);
+    if (scale == pixelsPerSecond) return;
+    pixelsPerSecond = scale;
     const int y = owner.viewport.getViewPositionY();
-    updateSize();
-    owner.viewport.setViewPosition((int) std::round(time * pixelsPerSecond - screenX), y);
-    owner.followPlayheadIntoView();
+    {
+        const juce::ScopedValueSetter<bool> sizeGuard(resizingTimeline, true);
+        updateGeometry();
+        owner.viewport.setViewPosition((int) std::round(time * pixelsPerSecond - screenX), y);
+        owner.followPlayheadIntoView();
+    }
+    refreshViewportItems();
 }
 void Timeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
@@ -789,7 +835,10 @@ void Timeline::paint(juce::Graphics& g)
 {
     g.fillAll(colour::background);
     const auto& p = owner.engine.project;
-    auto visible = getLocalArea(&owner.viewport, owner.viewport.getLocalBounds());
+    const auto view = owner.viewport.getViewArea();
+    const auto visible = view.getIntersection(g.getClipBounds());
+    if (visible.isEmpty()) return;
+    const auto damage = visible.toFloat();
     const TempoMap grid = p.gridClock();
     int stride = 1; double fastest = p.bpm;
     for (const auto& point : grid.points) fastest = std::max(fastest, point.bpm);
@@ -807,6 +856,7 @@ void Timeline::paint(juce::Graphics& g)
                 (float) (grid.timeAtBeat(beat + 16) * pixelsPerSecond) - x, (float) getHeight()); }
         }
     const auto first = (int64_t) std::floor(grid.beatsAt(visible.getX() / pixelsPerSecond) / stride);
+    const auto zeroBeat = grid.beatsAt(0);
     if (p.tempo.origin > 0)
     {
         const int zeroX = Clip::gridPixel(p.tempo.origin, pixelsPerSecond);
@@ -819,7 +869,7 @@ void Timeline::paint(juce::Graphics& g)
     struct BeatGuide { double beat; int x; }; std::vector<BeatGuide> guides;
     for (int64_t n = first;; ++n)
     {
-        const auto beat = n * stride; if (beat < grid.beatsAt(0) - 1e-8) continue;
+        const auto beat = n * stride; if (beat < zeroBeat - 1e-8) continue;
         const double time = grid.timeAtBeat((double) beat);
         const int x = Clip::gridPixel(time, pixelsPerSecond); if (x >= visible.getRight()) break;
         guides.push_back({(double) beat, x});
@@ -833,7 +883,7 @@ void Timeline::paint(juce::Graphics& g)
         const double firstBeat = std::floor(grid.beatsAt(visible.getX() / pixelsPerSecond) / subdivision) * subdivision;
         for (double beat = firstBeat;; beat += subdivision)
         {
-            if (beat < grid.beatsAt(0) - 1e-8) continue;
+            if (beat < zeroBeat - 1e-8) continue;
             const int x = Clip::gridPixel(grid.timeAtBeat(beat), pixelsPerSecond); if (x >= visible.getRight()) break;
             if (std::abs(beat - std::round(beat)) < 1e-8) continue;
             guides.push_back({beat, x});
@@ -841,11 +891,12 @@ void Timeline::paint(juce::Graphics& g)
             g.drawVerticalLine(x, 0, (float) getHeight());
         }
     }
-    for (int i = 0; i < trackCount; ++i) { g.setColour(colour::border); g.drawHorizontalLine(laneTop(i + 1) - 1, (float) visible.getX(), (float) visible.getRight()); }
+    for (int i = 0; i < contentLaneCount(); ++i) { g.setColour(colour::border); g.drawHorizontalLine(laneTop(i + 1) - 1, (float) visible.getX(), (float) visible.getRight()); }
     const double forgeTime = owner.engine.position.load();
     const float forgeX = (float) Clip::gridPixel(forgeTime, pixelsPerSecond);
     const bool forgeMotion = owner.forgeMotionAllowed() && owner.engine.playing && !owner.engine.gridAudition.active()
         && !owner.engine.rehearsalActive();
+    bool waveformPending = false;
     const bool anySolo = std::any_of(p.tracks.begin(), p.tracks.end(), [](const auto& t) { return t.solo; });
     auto forgeEligible = [&](const Clip& c)
     {
@@ -859,14 +910,15 @@ void Timeline::paint(juce::Graphics& g)
         && std::count_if(p.clips.begin(), p.clips.end(), forgeEligible) >= 2;
     for (const auto& c : p.clips)
     {
-        const auto r = clipBounds(c); if (!r.intersects(visible.toFloat())) continue;
+        const auto r = clipBounds(c); if (!r.intersects(damage)) continue;
         const auto accent = colour::tracks[(size_t) c.track];
         if (laneSize(c.track) < 30) { g.setColour(accent.withAlpha(.7f)); g.fillRect(r.withHeight(std::min(2.f, r.getHeight()))); continue; }
         const bool selected = c.id == owner.selectedClip || owner.editSelection.contains(c.id);
         g.setColour(accent.withAlpha(selected ? 0.13f : 0.055f)); g.fillRoundedRectangle(r, 5);
         g.setColour(accent.withAlpha(selected ? 1.0f : 0.6f)); g.drawRoundedRectangle(r.reduced(0.5f), 5, selected ? 2.0f : 1.0f);
         juce::Graphics::ScopedSaveState save(g); g.reduceClipRegion(r.toNearestInt());
-        const int left = std::max(visible.getX(), (int) r.getX()), right = std::min(visible.getRight(), (int) r.getRight());
+        const int left = std::max(visible.getX() - 2, (int) r.getX()), right = std::min(visible.getRight() + 2, (int) r.getRight());
+        const int titleLeft = std::max(view.getX(), (int) r.getX()), titleRight = std::min(view.getRight(), (int) r.getRight());
         const bool linkedPiece = std::any_of(owner.engine.project.transitionLinks.begin(), owner.engine.project.transitionLinks.end(),
             [&](const auto& link) { return link.incoming == c.id; });
         g.setFont(juce::FontOptions(12).withStyle("Bold")); g.setColour(colour::text); g.drawText(c.media->name
@@ -874,10 +926,10 @@ void Timeline::paint(juce::Graphics& g)
             + (!c.media->playbackError.isEmpty() ? " [audio unavailable]" : !c.media->hasPlayback() ? (c.media->sourceDetailsPending ? " [reading duration / preparing audio]" : " [preparing audio]") : "")
             + (c.pendingPlacement == PendingPlacement::failed ? " [tempo failed; retry Beatmatch]" : c.pendingPlacement != PendingPlacement::none ? " [matching tempo]" : "")
             + (c.reversed ? " [reverse]" : "") + (c.loopSpan > 0 ? " [loop]" : "") + "  " + owner.keyText(*c.media)
-            + (c.media->bpm() > 0 ? "  / " + wholeBpmText(c.media->bpm()) + " BPM / " + (c.media->manualBpm <= 0 && (c.media->analysis.variableTempo || c.media->analysis.tempoConfidence < 0.2) ? "beat grid needs review" : c.firstDownbeatTime() >= 0 ? (c.media->manualBeatOrigin >= 0 ? "4/4" : c.media->analysis.downbeatOrigin < 0 ? "4/4 best guess" : "4/4 inferred") : "downbeat unknown") : ""), r.withLeft((float) left + (c.stems ? 120.f : 0.f) + (linkedPiece ? 76.f : 0.f)).withRight((float) right).withTrimmedRight(28).reduced(8, 3).removeFromTop(18), juce::Justification::left);
+            + (c.media->bpm() > 0 ? "  / " + wholeBpmText(c.media->bpm()) + " BPM / " + (c.media->manualBpm <= 0 && (c.media->analysis.variableTempo || c.media->analysis.tempoConfidence < 0.2) ? "beat grid needs review" : c.firstDownbeatTime() >= 0 ? (c.media->manualBeatOrigin >= 0 ? "4/4" : c.media->analysis.downbeatOrigin < 0 ? "4/4 best guess" : "4/4 inferred") : "downbeat unknown") : ""), r.withLeft((float) titleLeft + (c.stems ? 120.f : 0.f) + (linkedPiece ? 76.f : 0.f)).withRight((float) titleRight).withTrimmedRight(28).reduced(8, 3).removeFromTop(18), juce::Justification::left);
         const float baseline = r.getBottom() - 5, height = std::max(1.f, r.getHeight() - 32);
         std::vector<WaveformRange> levels; levels.reserve((size_t) std::max(0, right - left));
-        bool waveformPending = false;
+        bool clipWaveformPending = false;
         float ceiling = 1;
         for (const float peak : c.media->peaks) ceiling = std::max(ceiling, peak);
         for (int x = left; x < right; ++x)
@@ -887,7 +939,7 @@ void Timeline::paint(juce::Graphics& g)
             // interval at its left edge, which makes an onset lead its tick.
             const double local = (x - 0.5) / pixelsPerSecond - c.start;
             const auto level = c.waveformRange(local, local + 1 / pixelsPerSecond);
-            waveformPending = waveformPending || !level.ready;
+            clipWaveformPending = clipWaveformPending || !level.ready;
             levels.push_back(level); ceiling = std::max(ceiling, level.peak);
         }
         const int mode = owner.waveformMode.getSelectedId();
@@ -904,8 +956,9 @@ void Timeline::paint(juce::Graphics& g)
         }
         waveform.lineTo((float) right, baseline); waveform.closeSubPath();
         body.lineTo((float) right, baseline); body.closeSubPath();
-        if (waveformPending)
+        if (clipWaveformPending)
         {
+            waveformPending |= !(c.media->original && c.media->original->failed());
             g.setColour(colour::muted); g.setFont(juce::FontOptions(11));
             g.drawText(c.media->original && c.media->original->failed() ? "Waveform unavailable" : "Loading waveform detail...",
                        r.withTop(r.getY() + 22).withHeight(18).reduced(8, 0), juce::Justification::left);
@@ -1003,15 +1056,6 @@ void Timeline::paint(juce::Graphics& g)
             juce::Path handle; handle.addTriangle(x - 5, r.getY(), x + 5, r.getY(), x, r.getY() + 7);
             handle.addTriangle(x - 4, baseline, x + 4, baseline, x, baseline - 6); g.fillPath(handle);
             if (c.id == owner.selectedClip) { g.setFont(juce::FontOptions(9)); g.drawText(isIntro ? "IN" : "OUT", (int) x + 5, (int) r.getY() + 20, 26, 12, juce::Justification::left); }
-            const auto proxy = offscreenAnchorBounds(c,isIntro);
-            if (!proxy.isEmpty())
-            {
-                g.setColour(colour::panel); g.fillRoundedRectangle(proxy,3);
-                g.setColour(colour::orange); g.drawRoundedRectangle(proxy,3,1);
-                const bool left = x < proxy.getCentreX();
-                g.setFont(juce::FontOptions(9).withStyle("Bold"));
-                g.drawText((left ? "< " : "") + juce::String(isIntro ? "IN" : "OUT") + (left ? "" : " >"),proxy,juce::Justification::centred);
-            }
         }
         if (c.id == owner.loopStartClip)
         {
@@ -1022,22 +1066,21 @@ void Timeline::paint(juce::Graphics& g)
     }
     {
         for (int track = 0; track < trackCount; ++track)
-        for (const auto& address : visibleAutomationAddresses(track))
+        for (const auto& address : displayedAutomationAddresses(track))
         {
-            if (laneSize(track) < 30) continue;
-            const auto curve = automationViewCurve(address);
+            if (laneSize(track) < 30 || !automationVisible(address)) continue;
+            const auto* curve = p.curve(address);
             const auto bounds = p.automationBounds(address);
             const double begin = std::max(bounds.getStart(), visible.getX() / pixelsPerSecond);
             const double end = std::min(bounds.getEnd(), visible.getRight() / pixelsPerSecond);
             if (end <= begin) continue;
             const int target = (int) address.target;
             const bool combined = hasGeneratedAutomation(address);
-            if (!automationVisible(address)) continue;
             const auto line = automationPath(address, begin, end);
             const std::array<juce::Colour, 4> bands {juce::Colour(0xffffad70), juce::Colour(0xffe4d15b), juce::Colour(0xff76c7ef), juce::Colour(0xffd3a3ef)};
             const auto accent = target < 4 ? bands[(size_t) target] : juce::Colour::fromHSV(0.08f + target * 0.115f, 0.65f, 0.95f, 1.0f);
             const bool selected = automationNodesVisible(address);
-            g.setColour(accent.withAlpha(selected ? 1.f : curve.active() || combined ? .65f : .3f));
+            g.setColour(accent.withAlpha(selected ? 1.f : (curve && curve->active()) || combined ? .65f : .3f));
             g.strokePath(line, juce::PathStrokeType(selected ? 2.2f : 1.4f));
 
         }
@@ -1045,14 +1088,29 @@ void Timeline::paint(juce::Graphics& g)
     if (p.clips.empty() && owner.automationLane() < 0)
     {
         g.setColour(colour::muted); g.setFont(juce::FontOptions(16));
-        g.drawText("Add a song", visible.withY(160).withHeight(30), juce::Justification::centred);
+        g.drawText("Add a song", view.withY(160).withHeight(30), juce::Justification::centred);
 
     }
     for (const auto& marker : p.labels) {
         g.setColour(colour::text.withAlpha(.25f));
         g.drawVerticalLine(Clip::gridPixel(marker.time, pixelsPerSecond), 0, (float) getHeight());
     }
-    paintTransitions(g); paintAudioSlipHandles(g); paintSectionFlags(g); paintHotcues(g);
+    paintManualTransitionAreas(g); paintTransitions(g); paintAudioSlipHandles(g); paintSectionFlags(g); paintHotcues(g);
+    for (const auto& clip : p.clips)
+    {
+        if (!clipBounds(clip).intersects(damage)) continue;
+        for (const bool intro : {true, false})
+        {
+            const auto proxy = offscreenAnchorBounds(clip, intro);
+            if (proxy.isEmpty() || !proxy.intersects(visible.toFloat())) continue;
+            const auto x = (clip.start + clip.transitionTime(intro)) * pixelsPerSecond;
+            g.setColour(colour::panel); g.fillRoundedRectangle(proxy, 3);
+            g.setColour(colour::orange); g.drawRoundedRectangle(proxy, 3, 1);
+            g.setFont(juce::FontOptions(9).withStyle("Bold"));
+            g.drawText((x < view.getX()+7 ? "< " : "") + juce::String(intro ? "IN" : "OUT")
+                + (x > view.getRight()-7 ? " >" : ""), proxy, juce::Justification::centred);
+        }
+    }
     if (owner.timelineRuler.alignmentGuide)
     {
         const float x=(float)(*owner.timelineRuler.alignmentGuide*pixelsPerSecond);
@@ -1070,15 +1128,51 @@ void Timeline::paint(juce::Graphics& g)
     paintEditSelection(g);
     paintAutomationNodes(g);
     paintAutomationCaption(g);
+    if (visible == view || waveformPending) pendingWaveformPaint = waveformPending;
+}
+void Timeline::paintManualTransitionAreas(juce::Graphics& g)
+{
+    const auto& project = owner.engine.project;
+    const auto visible = g.getClipBounds().toFloat();
+    const auto paintArea = [&](const Clip& clip, double begin, double end)
+    {
+        begin = std::max(begin, clip.start);
+        end = std::min(end, clip.end());
+        if (end <= begin) return;
+        const auto body = clipBounds(clip).withTrimmedTop(41).withTrimmedBottom(5);
+        const auto area = body.withLeft((float) (begin * pixelsPerSecond)).withRight((float) (end * pixelsPerSecond));
+        if (area.isEmpty() || !area.intersects(visible)) return;
+        g.setColour(colour::orange.withAlpha(.10f)); g.fillRect(area);
+        g.setColour(colour::orange.withAlpha(.7f)); g.drawRect(area, 1.f);
+    };
+    for (auto it = project.clips.begin(); it != project.clips.end(); ++it)
+    {
+        const auto& outgoing = *it;
+        if (!outgoing.manualTransitionArea || !outgoing.outroAnchor || outgoing.pendingPlacement != PendingPlacement::none) continue;
+        const double start = outgoing.start + outgoing.transitionTime(false), end = outgoing.end();
+        if (end <= start || end * pixelsPerSecond <= visible.getX() || start * pixelsPerSecond >= visible.getRight()) continue;
+        paintArea(outgoing, start, end);
+        const auto link = std::find_if(project.transitionLinks.begin(), project.transitionLinks.end(),
+            [&](const auto& candidate) { return candidate.outgoing == outgoing.id; });
+        const auto* incoming = link == project.transitionLinks.end()
+            ? (std::next(it) == project.clips.end() ? nullptr : &*std::next(it)) : project.clipFor(link->incoming);
+        if (incoming && incoming->pendingPlacement == PendingPlacement::none
+            && (link != project.transitionLinks.end() || incoming->start >= outgoing.start))
+            paintArea(*incoming, std::max(start, incoming->start + incoming->transitionTime(true)), end);
+    }
 }
 juce::Rectangle<float> Timeline::transitionBounds(const Project::TransitionLink& link) const
 {
     const auto& p = owner.engine.project; const auto* out = p.clipFor(link.outgoing); const auto* in = p.clipFor(link.incoming);
-    if (!out || !in || laneSize(out->track) < 55 || laneSize(in->track) < 55) return {};
-    const auto range = p.transitionRange(link);
+    return out && in ? transitionBounds(link, *out, *in, Project::transitionRange(link, *out, *in)) : juce::Rectangle<float>();
+}
+juce::Rectangle<float> Timeline::transitionBounds(const Project::TransitionLink& link, const Clip& out, const Clip& in,
+                                                 juce::Range<double> range) const
+{
+    if (laneSize(out.track) < 55 || laneSize(in.track) < 55) return {};
     const float x = (float) (range.getStart() * pixelsPerSecond), right = (float) (range.getEnd() * pixelsPerSecond);
-    const float top = laneY(std::min(out->track, in->track), 26);
-    const int lastTrack = std::max(out->track, in->track);
+    const float top = laneY(std::min(out.track, in.track), 26);
+    const int lastTrack = std::max(out.track, in.track);
     return {x, top, std::max(link.presetOwner.isEmpty() ? 24.f : 1.f, right - x), (float) laneTop(lastTrack + 1) - curveToolsReserve(lastTrack) - top - 8};
 }
 juce::Rectangle<float> Timeline::transitionSongBounds(const Project::TransitionLink& link, bool outgoing) const
@@ -1099,12 +1193,24 @@ double Timeline::transitionReference(const Project& p, const std::pair<juce::Str
 std::optional<std::pair<juce::String, Project::TransitionEdit>> Timeline::transitionAt(juce::Point<float> point) const
 {
     if (owner.engine.project.hasPendingPlacement()) return {};
-    const auto& links = owner.engine.project.transitionLinks;
+    const auto& p = owner.engine.project;
+    const auto& links = p.transitionLinks;
+    std::map<juce::String, const Clip*> clips;
+    for (const auto& clip : p.clips) clips.emplace(clip.id, &clip);
     for (auto it = links.rbegin(); it != links.rend(); ++it)
     {
-        const auto box = transitionBounds(*it); if (box.isEmpty()) continue;
-        if (transitionSongBounds(*it, true).contains(point)) return {{it->incoming, Project::TransitionEdit::moveOutgoing}};
-        if (transitionSongBounds(*it, false).contains(point)) return {{it->incoming, Project::TransitionEdit::moveIncoming}};
+        const auto out = clips.find(it->outgoing), in = clips.find(it->incoming);
+        if (out == clips.end() || in == clips.end()) continue;
+        const auto box = transitionBounds(*it, *out->second, *in->second, Project::transitionRange(*it, *out->second, *in->second));
+        if (box.isEmpty()) continue;
+        if (it->presetOwner.isEmpty())
+        {
+            const auto outgoing = clipFooterBounds(*out->second), incoming = clipFooterBounds(*in->second);
+            if (!outgoing.isEmpty() && outgoing.toFloat().withTrimmedLeft(26.f).withWidth(22).reduced(0, 2).contains(point))
+                return {{it->incoming, Project::TransitionEdit::moveOutgoing}};
+            if (!incoming.isEmpty() && incoming.toFloat().withWidth(22).reduced(0, 2).contains(point))
+                return {{it->incoming, Project::TransitionEdit::moveIncoming}};
+        }
         if (point.y < box.getY() || point.y > box.getY() + 18) continue;
         if (std::abs(point.x - box.getRight()) < 5) return {{it->incoming, Project::TransitionEdit::resizeEnd}};
         if (it->presetOwner.isEmpty() && std::abs(point.x - box.getX()) < 5) return {{it->incoming, Project::TransitionEdit::resizeStart}};
@@ -1115,12 +1221,19 @@ std::optional<std::pair<juce::String, Project::TransitionEdit>> Timeline::transi
 void Timeline::paintTransitions(juce::Graphics& g)
 {
     const auto& p = owner.engine.project;
-    const auto visible = g.getClipBounds();
+    const auto visible = owner.viewport.getViewArea().toFloat();
+    const auto damage = g.getClipBounds().toFloat();
     const TempoMap clock = p.gridClock();
-    const auto pulse = AlloyLookAndFeel::fourCountPulse(clock.beatsAt(owner.engine.position.load()), owner.engine.playing.load(), AlloyLookAndFeel::motionAllowed());
+    const auto pulse = AlloyLookAndFeel::fourCountPulse(clock.beatsAt(owner.engine.position.load()), owner.engine.playing.load(), owner.forgeMotionAllowed());
+    std::map<juce::String, const Clip*> clips;
+    for (const auto& clip : p.clips) clips.emplace(clip.id, &clip);
     for (const auto& link : p.transitionLinks)
     {
-        const auto box = transitionBounds(link); if (box.isEmpty() || !box.expanded(4).intersects(visible.toFloat())) continue;
+        const auto out = clips.find(link.outgoing), in = clips.find(link.incoming);
+        if (out == clips.end() || in == clips.end()) continue;
+        const auto range = Project::transitionRange(link, *out->second, *in->second);
+        const auto box = transitionBounds(link, *out->second, *in->second, range);
+        if (box.isEmpty() || !box.expanded(4).intersects(damage)) continue;
         const bool selected = owner.selectedTransition == link.incoming;
         if (link.alignmentOnly)
         {
@@ -1128,7 +1241,7 @@ void Timeline::paintTransitions(juce::Graphics& g)
             g.setColour(colour::panel); g.fillRect(header);
             g.setColour(selected ? colour::focus : colour::muted); g.drawRect(header,1);
             g.setFont(juce::FontOptions(10));
-            g.drawText("OUT/IN  |  No preset",header.getIntersection(visible.toFloat()).reduced(5,0),juce::Justification::centredLeft,true);
+            g.drawText("OUT/IN  |  No preset",header.getIntersection(visible).reduced(5,0),juce::Justification::centredLeft,true);
             continue;
         }
         const auto accent = colour::moltenOrange.interpolatedWith(colour::moltenCore, .1f + pulse.heat * .2f);
@@ -1147,9 +1260,8 @@ void Timeline::paintTransitions(juce::Graphics& g)
         if (link.presetOwner.isEmpty()) g.fillRect(box.getX(), box.getY() + 4, 3.f, 10.f);
         const float handleWidth = std::min(box.getWidth(),link.presetOwner.isEmpty() ? 3.f : 5.f);
         g.fillRect(box.getRight()-handleWidth,box.getY()+4,handleWidth,10.f);
-        const auto range = p.transitionRange(link);
         const double beats = clock.beatsAt(range.getEnd()) - clock.beatsAt(range.getStart());
-        auto title = header.getIntersection(visible.toFloat()).reduced(6, 0);
+        auto title = header.getIntersection(visible).reduced(6, 0);
         g.setFont(juce::FontOptions(10).withStyle("Bold"));
         if (link.presetName.isEmpty() && title.getWidth() >= 110)
         {
@@ -1200,7 +1312,6 @@ int Timeline::labelAt(juce::Point<float> position) const
 }
 void Timeline::mouseDown(const juce::MouseEvent& e)
 {
-    if (!owner.busy && !owner.engine.exporting && stemMouseDown(e)) return;
     finishSectionGesture(true); // A lost mouse-up must not abandon an unsaved preview.
     owner.correctionFromLibrary = false;
     if (e.y >= 0 && !e.mods.isPopupMenu() && (resizingLane = dividerAt(e.position.y)) >= 0)
@@ -1211,6 +1322,8 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
     curveBendDrag.reset();
     cutAmountDrag.reset();
     selectedSection.reset(); hotcueGesture.reset(); selectedHotcue.reset();
+    if (beginAnchorDrag(e, true)) return;
+    if (stemMouseDown(e)) return;
     if (beginEdgeTrim(e)) return;
     if (beginEditSelection(e)) return;
     if (beginCutAmount(e)) return;
@@ -1255,15 +1368,7 @@ void Timeline::mouseDown(const juce::MouseEvent& e)
         }
         owner.setStatus("Transition selected. Right-click its header for tools. Drag the frame, corners or I/O handles to adjust."); return;
     }
-    if (!e.mods.isPopupMenu() && !automationPointAt(e.position)) if (const auto anchor = anchorAt(e.position))
-    {
-        owner.selectedClip = anchor->first;
-        const auto* clip = owner.currentClip(); if (!clip) return;
-        owner.selectTrack(clip->track); dragging = clip->id; draggingIntro = anchor->second;
-        anchorDrag = owner.engine.project; origin = e.getPosition();
-        dragStart = clip->start + clip->transitionTime(draggingIntro); owner.refresh();
-        setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return;
-    }
+    if (!automationPointAt(e.position) && beginAnchorDrag(e, false)) return;
     if (e.mods.isPopupMenu() && !automationPointAt(e.position))
     {
         const auto anchor = juce::Rectangle<int>(1, 1).withPosition(e.getScreenPosition());
@@ -1371,13 +1476,17 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         if (selected == candidate.clips.end() || !current) return;
         const auto& existing = owner.engine.project.clips;
         if (std::equal(candidate.clips.begin(), candidate.clips.end(), existing.begin(), existing.end(), [](const auto& a, const auto& b)
-            { return a.start == b.start && a.introAnchor == b.introAnchor && a.outroAnchor == b.outroAnchor; })) return;
+            { return a.start == b.start && a.introAnchor == b.introAnchor && a.outroAnchor == b.outroAnchor && a.manualTransitionArea == b.manualTransitionArea; })) return;
         if (!moved) { owner.remember(); moved = true; }
         { const juce::ScopedLock guard(owner.engine.lock); const auto applied = owner.engine.project.applyPlacements(candidate);
           if (applied.failed()) { owner.setStatus(applied.getErrorMessage()); return; } }
         updateSize(); owner.tempoStrip.repaint();
-        owner.setStatus(draggingIntro ? "IN source adjusted beneath the fixed OUT join. Previous track kept in place."
-            : "OUT adjusted in this track. The next IN and its locked followers remain aligned; this track stays put."); return;
+        const bool linked = std::any_of(owner.engine.project.transitionLinks.begin(), owner.engine.project.transitionLinks.end(),
+            [&](const auto& link) { return draggingIntro ? link.incoming == dragging : link.outgoing == dragging; });
+        if (draggingIntro) owner.setStatus(linked ? "IN source adjusted beneath the fixed OUT join." : "IN marker adjusted.");
+        else owner.setStatus(linked ? "Transition area updated from OUT. The next IN stays aligned."
+                                    : "Transition area marked from OUT to the end of this track.");
+        return;
     }
     if (draggingLabel.isNotEmpty() && !owner.busy)
     {
@@ -1446,6 +1555,9 @@ void Timeline::mouseDrag(const juce::MouseEvent& e)
         {
             const auto result = candidate.moveClipGroup({dragging},dragging,start,track,candidate.snap && !e.mods.isAltDown() && e.x!=origin.x);
             if (result.failed()) { owner.setStatus(result.getErrorMessage()); return; }
+            if (track != c->track && std::any_of(candidate.clips.begin(), candidate.clips.end(), [&](const auto& clip)
+                { return clip.track >= contentLaneCount() && clip.track != owner.engine.project.clipFor(clip.id)->track; }))
+            { owner.setStatus("The locked group needs more visible audio lanes to move here."); return; }
         }
         if (!moved) { owner.remember(); moved = true; }
         const auto applied = owner.engine.project.applyPlacements(candidate);
@@ -2078,13 +2190,18 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
     transitionLength.onChange = [this] { transitionIndex = transitionLength.getSelectedId() - 1; };
     transitionPreset.addItem("None", 1); transitionPreset.addItem("Bass swap", 2); transitionPreset.addItem("Crossfade", 3);
     transitionPreset.setSelectedId(3, juce::dontSendNotification); transitionPreset.setTitle("New transition preset");
-    transitionPreset.setTooltip("Preset for Add Transition and Auto Arrange. None creates an editable frame without changing audio. Bass swap and Crossfade place editable nodes.");
-    beatmatchButton.setButtonText("Auto Arrange"); beatmatchButton.setTitle("Auto Arrange timeline");
-    beatmatchButton.setTooltip("Auto Arrange the songs already on the timeline in their current time order. Try section blends; use a crossfade when no suitable section transition fits. Undo restores the arrangement.");
-    beatmatchButton.onClick = [this] { if (canAutoArrange()) prepareTempo(engine.project, true, true, 0, true); else setStatus("Pause playback, unlock transitions and wait for preparation before mixing the timeline."); };
+    transitionPreset.setTooltip("Preset for Add Transition and Auto Arrange using my settings. None creates an editable frame without changing audio. Bass swap and Crossfade place editable nodes.");
+    beatmatchButton.setButtonText("Blend timeline tracks"); beatmatchButton.setTitle("Blend timeline tracks");
+    beatmatchButton.setTooltip("Blend the tracks already on the timeline, keeping their order. Choose nearby passages and coordinate level and bass handovers. Undo restores the arrangement.");
+    beatmatchButton.onClick = [this] { if (canAutoArrange()) prepareTempo(engine.project, true, true, 0, true); else setStatus("Pause playback, finish any take, unlock transitions and wait for preparation before mixing the timeline."); };
     addAndMakeVisible(followButton); followButton.setClickingTogglesState(true);
     followButton.setTitle("Follow playhead");
     followButton.setTooltip("Keep the playhead in view during playback and seeking. Pan the timeline manually to turn Follow off. Saved for this workspace.");
+    audioLanes.setComponentID("timeline-audio-lanes"); audioLanes.setTitle("Visible audio lanes");
+    audioLanes.setTooltip("Show two, three or four audio lanes. Hidden tracks stay in the mix and continue playing.");
+    for (int count = 2; count <= trackCount; ++count) audioLanes.addItem(juce::String(count) + " audio lanes", count);
+    audioLanes.onChange = [this] { setVisibleAudioLanes(audioLanes.getSelectedId()); };
+    addAndMakeVisible(audioLanes);
     followButton.onClick = [this] { setFollowPlayhead(followButton.getToggleState()); };
     initialiseShortcuts();
     slider(masterSlider, -60, 12, 0.1, " dB"); masterSlider.setValue(-3, juce::dontSendNotification); masterSlider.setTooltip("Master output gain; lower this if the peak meter turns red.");
@@ -2165,6 +2282,7 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
         if (settingsWindow) if (auto* content = dynamic_cast<MidiSettings*>(settingsWindow->getContentComponent())) content->updateText();
     };
     if (openAudioDevice) { auto deviceError = engine.startDevice(); if (deviceError.isNotEmpty()) status = "Audio device: " + deviceError; }
+    if (openAudioDevice && !sceneLane->shareStudioAudio(true)) status = "Could not start the local Visual Studio audio link.";
     addChildComponent(importProgress);
     importProgress.cancel.onClick = [this]
     {
@@ -2215,7 +2333,7 @@ Workstation::Workstation(bool openAudioDevice) : status("Ready"), timeline(*this
         const int x = viewport.getViewPositionX();
         if (x != lastTimelineViewX && !programmaticTimelineView) setFollowPlayhead(false);
         lastTimelineViewX = x;
-        layoutTrackHeaders(); timeline.refreshCurveTools(); timeline.refreshAccessibleItems(); timelineRuler.refreshAccessibleMarkers(); tempoStrip.refreshAccessibleMarkers(); timelineRuler.repaint(); timelineOverview.repaint();
+        if (!timeline.resizingTimeline) timeline.refreshViewportItems();
     };
     nextMusicScan = juce::Time::getMillisecondCounterHiRes() + 2000;
     initialiseAttract();
@@ -2271,7 +2389,6 @@ void Workstation::timerCallback()
     tickMasterEmblem();
     if (workspaceDirty && juce::Time::getMillisecondCounterHiRes() - workspaceChangedAt > 700) saveWorkspacePreferences();
     tickLibraryCatalogue(); tickMusicScan(); refreshMusicScanStatus(); tickRecovery();
-    layoutTrackHeaders();
     engine.serviceScheduledPause();
     engine.serviceLiveHotcues();
     engine.flushMidiControls();
@@ -2293,9 +2410,34 @@ void Workstation::timerCallback()
         tempoSlider.setValue(displayedTempo(), juce::dontSendNotification);
     }
     followPlayheadIntoView();
-    timeLabel.setText(timeText(engine.position - engine.project.tempo.origin), juce::dontSendNotification); playButton.setButtonText(engine.playing ? "Pause" : "Play");
-    playButton.getProperties().set("alloyActive", engine.playing.load()); playButton.repaint();
-    timeline.repaint(); timelineRuler.repaint(); timelineOverview.repaint(); tempoStrip.repaint(); for (auto& s : strips) s->repaint(); refreshAttractLights(); repaint();
+    const double position = engine.position.load();
+    const bool playing = engine.playing.load();
+    timeLabel.setText(timeText(position - engine.project.tempo.origin), juce::dontSendNotification);
+    if (playing != lastPaintedPlaying)
+    {
+        playButton.setButtonText(playing ? "Pause" : "Play");
+        playButton.getProperties().set("alloyActive", playing);
+        playButton.repaint();
+    }
+    if (position != lastPaintedPosition || playing != lastPaintedPlaying || engine.recordingAutomation() || timeline.pendingWaveformPaint)
+    {
+        if ((forgeMotionAllowed() && (playing || lastPaintedPlaying)) || engine.recordingAutomation() || timeline.pendingWaveformPaint)
+            timeline.repaint(viewport.getViewArea());
+        else
+            for (double time : {position, lastPaintedPosition})
+            {
+                const auto area = viewport.getViewArea();
+                const auto x = Clip::gridPixel(time, timeline.pixelsPerSecond);
+                timeline.repaint(area.getIntersection({x - 2, area.getY(), 5, area.getHeight()}));
+            }
+        timelineRuler.repaint(); timelineOverview.repaint();
+    }
+    lastPaintedPosition = position;
+    lastPaintedPlaying = playing;
+    for (auto& s : strips) s->repaint();
+    refreshAttractLights();
+    repaint(layout.peakPanel);
+    repaint(layout.master.withTrimmedTop(70).withHeight(30));
 }
 void Workstation::advancePeakMeter()
 {
@@ -2332,7 +2474,7 @@ void Workstation::refreshStatusAccess()
     lastStatusAccessText = text; lastStatusAccessAt = now;
     if (auto* handler = statusAccess.getAccessibilityHandler()) handler->notifyAccessibilityEvent(juce::AccessibilityEvent::titleChanged);
 }
-void Workstation::setStatus(const juce::String& s) { status = s; refreshStatusAccess(); repaint(); }
+void Workstation::setStatus(const juce::String& s) { status = s; refreshStatusAccess(); repaint(layout.status); }
 void Workstation::setBusy(bool value)
 {
     if (value) { stopMusicScan(); engine.endTransitionRehearsal(); }
@@ -2356,22 +2498,26 @@ void Workstation::remember(bool deferTakePublication)
 {
     if (engine.capturingPerformance())
     {
-        const auto base=(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0));
-        undoHistory.push_back(editHistorySnapshot(engine));
-        if(undoHistory.size()>base+100)undoHistory.erase(undoHistory.begin()+(ptrdiff_t)base);
-        redoHistory.clear(); if (!deferTakePublication) engine.performanceProjectPending=true; dirty=true; return;
+        recordEditHistory(editHistorySnapshot(engine));
+        if (!deferTakePublication) engine.performanceProjectPending=true;
+        return;
     }
     engine.cancelPreparedLaunch();
     clearEditSelection();
     engine.endTransitionRehearsal();
-    auto snapshot = projectEditSnapshot();
+    recordEditHistory(projectEditSnapshot());
+}
+void Workstation::recordEditHistory(Project snapshot)
+{
+    const auto base = engine.capturingPerformance() ? (size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0)) : 0;
     // Grow/prune history and retire redo resources after releasing the render lock.
     undoHistory.push_back(std::move(snapshot));
-    if (undoHistory.size() > 100) undoHistory.erase(undoHistory.begin());
+    if (undoHistory.size() > base + 100) undoHistory.erase(undoHistory.begin() + (ptrdiff_t)base);
     redoHistory.clear(); dirty = true;
 }
-Project Workstation::projectEditSnapshot()
+Project Workstation::projectEditSnapshot(bool omitActiveTake)
 {
+    if (omitActiveTake && engine.capturingPerformance()) return editHistorySnapshot(engine);
     const juce::ScopedLock guard(engine.lock); return engine.project;
 }
 juce::String Workstation::structuralEditUnavailable() const
@@ -2395,6 +2541,22 @@ juce::String Workstation::structuralEditDocument(const Project& project)
     if (auto* object = value.getDynamicObject()) object->removeProperty("performanceTakes");
     return juce::JSON::toString(value, juce::JSON::FormatOptions().withMaxDecimalPlaces(17));
 }
+juce::String Workstation::prepareStructuralAudio(const Project& candidate)
+{
+    if (!engine.playing) return {};
+    const double at = engine.position.load(), rate = engine.sampleRate.load();
+    const int frames = engine.preparedBlockSize();
+    if (!std::isfinite(rate) || rate <= 0 || frames <= 0) return "The audio clock is unavailable. Mix and playback kept.";
+    const juce::String failure = "Could not prepare edited audio. Check the source and try again. Mix and playback kept.";
+    try
+    {
+        for (const auto& clip : candidate.clips)
+            if (!clip.media || !requestOriginalClip(clip,at,.25,1.+frames/rate,true)) return failure;
+    }
+    catch (const std::exception&) { return failure; }
+    if (std::abs(engine.position.load()-at) > .5) return "Playback advanced while preparing the edit. Try again. Mix kept.";
+    return {};
+}
 bool Workstation::publishStructuralEdit(Project candidate, const juce::String& expectedDocument)
 {
     if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return false; }
@@ -2404,22 +2566,7 @@ bool Workstation::publishStructuralEdit(Project candidate, const juce::String& e
     if (protectedEdit.failed()) { setStatus(protectedEdit.getErrorMessage()); return false; }
     // Model preparation does not dispatch UI messages. Callback take events may
     // still arrive; retain those at publication instead of copying them back.
-    if (engine.playing)
-    {
-        const double at = engine.position.load(), rate = engine.sampleRate.load();
-        const int frames = engine.preparedBlockSize();
-        if (!std::isfinite(rate) || rate <= 0 || frames <= 0) { setStatus("The audio clock is unavailable. Mix and playback kept."); return false; }
-        try
-        {
-            for (const auto& clip : candidate.clips)
-                if (!clip.media || !requestOriginalClip(clip,at,.25,1.+frames/rate,true))
-                { setStatus("Could not prepare edited audio. Check the source and try again. Mix and playback kept."); return false; }
-        }
-        catch (const std::exception&)
-        { setStatus("Could not prepare edited audio. Check the source and try again. Mix and playback kept."); return false; }
-        if (std::abs(engine.position.load()-at) > .5)
-        { setStatus("Playback advanced while preparing the edit. Try again. Mix kept."); return false; }
-    }
+    if (const auto why = prepareStructuralAudio(candidate); why.isNotEmpty()) { setStatus(why); return false; }
     if (const auto why = structuralEditUnavailable(); why.isNotEmpty()) { setStatus(why); return false; }
     if (expectedDocument.isNotEmpty() && expectedDocument != structuralEditDocument(projectEditSnapshot()))
     { setStatus("Mix changed while preparing this edit. Try again. Current mix kept."); return false; }
@@ -2436,6 +2583,8 @@ bool Workstation::publishStructuralEdit(Project candidate, const juce::String& e
 void Workstation::undo(bool redo)
 {
     if (busy) return;
+    if (engine.exporting || engine.replayingTake() || engine.seekPending || engine.programmeLaunchPending() || engine.rehearsalActive())
+    { setStatus("Finish export, playback preparation or the current audition before using Undo or Redo."); return; }
     if(engine.capturingPerformance())
     {
         const auto base=(size_t)std::max(0,(int)getProperties().getWithDefault("liveUndoBase",0));
@@ -2459,40 +2608,59 @@ void Workstation::undo(bool redo)
         return;
     }
 
-    clearEditSelection();
     timeline.finishSectionGesture(true);
-    engine.endTransitionRehearsal();
-    afterTimelineAudio = {};
-    pendingTempo = 0; tempoPreparationPending = false; tempoEditBaseline.reset(); tempoStrip.selectedTempoPoint = -1;
-    engine.setAutomationRecordMode(AutomationRecordMode::read);
     auto& source = redo ? redoHistory : undoHistory; auto& dest = redo ? undoHistory : redoHistory; if (source.empty()) return;
-    if (!persistSourceSectionHistory(source.back())) return;
-    timeline.selectAutomationPoint({}, -1);
-    {
-    const juce::ScopedLock guard(engine.lock);
+    auto candidate = source.back();
     // Plugin insert edits are outside arrangement undo; keep their current control ownership too.
-    auto currentTracks = engine.project.tracks;
     std::map<juce::String, std::array<PluginControl, 8>> currentClipControls;
-    for (const auto& clip : engine.project.clips) currentClipControls[effectsIdentity(clip.effects)] = engine.project.effectSettings(clip).pluginControls;
-    const double previousOrigin = engine.project.tempo.origin;
-    dest.push_back(engine.project); engine.project = std::move(source.back()); source.pop_back();
-    if (previousOrigin != engine.project.tempo.origin)
-        engine.commitSeek(engine.prepareSeek(std::max(0., engine.position.load() + engine.project.tempo.origin - previousOrigin)));
+    const auto& current = std::as_const(engine.project);
+    for (const auto& clip : current.clips) currentClipControls[effectsIdentity(clip.effects)] = current.effectSettings(clip).pluginControls;
+    const double originShift = candidate.tempo.origin - engine.project.tempo.origin;
     for (int i = 0; i < trackCount; ++i)
     {
-        auto& settings = engine.project.tracks[(size_t) i]; settings.pluginControls = currentTracks[(size_t) i].pluginControls;
+        auto& settings = candidate.tracks[(size_t) i]; settings.pluginControls = engine.project.tracks[(size_t) i].pluginControls;
         settings.pluginAutomation.erase(std::remove_if(settings.pluginAutomation.begin(), settings.pluginAutomation.end(), [&](const auto& lane)
         { return std::none_of(engine.plugins[(size_t) i].begin(), engine.plugins[(size_t) i].end(), [&](const auto& slot) { return slot->id == lane.slotId; }); }), settings.pluginAutomation.end());
     }
-    for (auto& clip : engine.project.clips)
+    for (auto& clip : candidate.clips)
     {
-        auto& settings = engine.project.effectSettings(clip);
-        if (auto current = currentClipControls.find(effectsIdentity(clip.effects)); current != currentClipControls.end()) settings.pluginControls = current->second;
+        auto& settings = candidate.effectSettings(clip);
+        if (const auto controls = currentClipControls.find(effectsIdentity(clip.effects)); controls != currentClipControls.end()) settings.pluginControls = controls->second;
         settings.pluginAutomation.erase(std::remove_if(settings.pluginAutomation.begin(), settings.pluginAutomation.end(), [&](const auto& lane)
         { return std::none_of(clip.effects->plugins.begin(), clip.effects->plugins.end(), [&](const auto& slot) { return slot->id == lane.slotId; }); }), settings.pluginAutomation.end());
     }
-    engine.restoreManualPluginValues(); engine.tempo = engine.project.bpm;
+    const auto manualValues = engine.manualPluginValues(candidate);
+    std::optional<Engine::PreparedSeek> seek;
+    if (originShift != 0)
+    {
+        seek.emplace(engine.prepareEditSeek(candidate, [originShift](double t) { return std::max(0., t + originShift); }));
+        if (seek->preparationError().isNotEmpty()) { setStatus(seek->preparationError()); return; }
     }
+    else if (const auto why = prepareStructuralAudio(candidate); why.isNotEmpty()) { setStatus(why); return; }
+    if (!persistSourceSectionHistory(candidate, [&]
+    {
+        if (seek)
+        {
+            const auto result = engine.commitSeek(std::move(*seek), &candidate, manualValues);
+            if (result.failed()) { setStatus(result.getErrorMessage()); return false; }
+        }
+        else
+        {
+            const juce::ScopedLock guard(engine.lock);
+            engine.setAutomationRecordMode(AutomationRecordMode::read);
+            std::swap(engine.project, candidate);
+            engine.tempo = engine.project.bpm;
+            engine.restoreManualPluginValues(manualValues);
+        }
+        return true;
+    })) return;
+    engine.setAutomationRecordMode(AutomationRecordMode::read);
+    source.pop_back(); dest.push_back(std::move(candidate));
+    clearEditSelection();
+    engine.endTransitionRehearsal();
+    afterTimelineAudio = {};
+    pendingTempo = 0; tempoPreparationPending = false; tempoEditBaseline.reset(); tempoStrip.selectedTempoPoint = -1;
+    timeline.selectAutomationPoint({}, -1);
     dirty = true; refresh();
     if (engine.project.hasPendingPlacement()) finishTimelineAudio();
 }

@@ -11,6 +11,8 @@ BG, PANEL, CARD, BORDER = "#15191d", "#20262b", "#2a3239", "#3b454e"
 TEXT, MUTED, COPPER, FOCUS = "#e7ebee", "#abb5be", "#d49a72", "#d5e9f5"
 TRACKS = (COPPER, "#80b2cf", "#9eb8a1", "#b5a3c5", "#c8b57a", "#7fbab7", "#cc949c", "#9baad1")
 FADER_LABELS = ("Bright", "Gamma", "Contr.", "Hue", "Satur.", "Sprite", "Scale", "Speed", "Master")
+LANE_LABELS = ("Background", "MilkDrop", "GLSL", "Sprite")
+SPRITE_ROUTES = (("overlay", "Overlay"), ("milk", "MilkDrop"), ("shader", "GLSL"))
 
 
 def axis_label(control, axis):
@@ -74,9 +76,7 @@ class Slot(tk.Frame):
     def reset(self):
         if self.target and self.view[-1]:
             section, control, axis = self.target
-            values = list(self.studio.settings(section)[control.name])
-            values[axis] = control.default[axis]
-            self.studio.set_control(section, control.name, values)
+            self.studio.reset_control(section, control, axis)
         self.drag = None
         return "break"
 
@@ -164,7 +164,7 @@ class LiveDeck(tk.Frame):
         self.bank_label.place(relwidth=1, height=19)
         studio.label(middle, "META / MEDIA  ·  FADERS", fg=COPPER, size=9,
                      weight="bold", anchor="w").place(relwidth=1, height=19)
-        studio.label(right, "TRANSPORT", fg=COPPER, size=9,
+        studio.label(right, "LANE / SPRITE ROUTE", fg=COPPER, size=9,
                      weight="bold", anchor="w").place(relwidth=1, height=19)
 
         self.wheels, self.assignments = [], []
@@ -194,16 +194,29 @@ class LiveDeck(tk.Frame):
             self.faders.append(fader)
             reset = self.button(middle, "Reset", fader.reset, size=7)
             self.cell(reset, i, 9, 143, 26)
-        for i, (text, action) in enumerate((
-            ("Home", studio.restart), ("MIDI", studio.midi_dialog), ("Undo", studio.undo),
-            ("Redo", lambda: studio.undo(redo=True)), ("Pause", studio.toggle),
-            ("Stop", lambda: studio.midi_event("stop", 1.)), ("Frame", studio.capture),
-            ("Rand.", lambda: studio.change_group("Scene", randomize=True))
-        )):
-            button = self.button(right, text, action, size=7)
-            self.cell(button, i % 4, 4, 66 + 38 * (i // 4), 34)
-            if i == 4:
-                self.play = button
+        self.lanes = []
+        for layer, label in enumerate(("Bkgd", *LANE_LABELS[1:])):
+            button = self.button(right, label, lambda i=layer: studio.select_lane(i), size=7)
+            self.cell(button, layer, 4, 66, 34)
+            self.lanes.append(button)
+        self.routes = {}
+        for index, (route, label) in enumerate(SPRITE_ROUTES):
+            button = self.button(right, label, lambda value=route: studio.route_sprite(value), size=7)
+            self.cell(button, index, 4, 104, 34)
+            self.routes[route] = button
+        self.follow = self.button(right, "Follow", lambda: studio.select_lane(None), size=7)
+        self.cell(self.follow, 3, 4, 104, 34)
+
+    def refresh_lane_controls(self):
+        layer, available_lanes, route, available_routes, following = self.studio.deck_selection()
+        for index, button in enumerate(self.lanes):
+            button.configure(state="normal" if index in available_lanes else "disabled",
+                             bg=COPPER if layer == index else CARD, fg=BG if layer == index else TEXT)
+        for name, button in self.routes.items():
+            selected = name == route
+            button.configure(state="normal" if name in available_routes else "disabled",
+                             bg=COPPER if selected else CARD, fg=BG if selected else TEXT)
+        self.follow.configure(bg=COPPER if following else CARD, fg=BG if following else TEXT)
 
     def cluster(self, start, width):
         frame = tk.Frame(self, bg=PANEL)
@@ -248,33 +261,34 @@ class LiveDeck(tk.Frame):
     def refresh(self):
         studio = self.studio
         pots, pads = studio.bank_pots(), studio.pad_controls()
-        scene_pots = bool(studio.pot_controls())
+        section = studio.pot_section()
+        has_pots = bool(studio.pot_controls())
         bank_count = studio.pot_bank_count()
         bank_text = f"   ·   BANK {studio.bank + 1} OF {bank_count}" if bank_count else ""
-        bank_title = "NESTED SPRITE POTS" if studio.bank == 1 and studio.has_nested_bank() else "SCENE POTS / PADS"
+        bank_title = "NESTED SPRITE POTS" if studio.bank == 1 and studio.has_nested_bank() else f"{section.upper()} POTS / PADS"
         self.bank_label.configure(text=bank_title + bank_text)
         for slot, (wheel, button) in enumerate(zip(self.wheels, self.assignments)):
             target = studio.wheel_targets[slot]
             if target:
                 name, axis = target
-                control = studio.engine.controls[name]
-                wheel.refresh(("Scene", control, axis))
+                control = studio.controls(section)[name]
+                wheel.refresh((section, control, axis))
                 button.configure(text=axis_label(control, axis))
             else:
                 wheel.refresh(None)
                 button.configure(text="Assign…")
-            button.configure(state="normal" if scene_pots else "disabled")
+            button.configure(state="normal" if has_pots else "disabled")
         for i, (pot, bank, pad) in enumerate(zip(self.pots, self.banks, self.pads)):
             pot.refresh(pots[i] if i < len(pots) else None)
             bank.configure(state="normal" if i < bank_count else "disabled",
                            bg=COPPER if i == studio.bank and pots else CARD,
                            fg=BG if i == studio.bank and pots else TEXT)
             control = pads[i] if i < len(pads) else None
-            active = control and control.kind == "toggle" and studio.engine.values[control.name] == control.high
+            active = control and control.kind == "toggle" and studio.settings(section)[control.name] == control.high
             pad.configure(text=control.label if control else "—",
-                          state="normal" if control and not studio.locked("Scene", control) else "disabled",
+                          state="normal" if control and not studio.locked(section, control) else "disabled",
                           bg=TRACKS[i] if active else CARD, fg=BG if active else TEXT)
         for fader, (section, name) in zip(self.faders, FADERS):
-            fader.refresh((section, studio.controls(section)[name], 0))
-        self.play.configure(text="Pause" if studio.running else "Play",
-                            bg=COPPER if studio.running else CARD, fg=BG if studio.running else TEXT)
+            control = studio.controls(section).get(name)
+            fader.refresh((section, control, 0) if control else None)
+        self.refresh_lane_controls()

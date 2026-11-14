@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 115,
+    "family_name": "Origami Lotus Bloom",
+    "variant_number": 1,
+    "variant_title": "Single Blossom",
+    "shader_path": "01-single-blossom/main.glsl",
+    "descriptor_path": "01-single-blossom/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 115,
+    "family_name": "Origami Lotus Bloom",
+    "variant_number": 2,
+    "variant_title": "Twin Tiers",
+    "shader_path": "02-twin-tiers/main.glsl",
+    "descriptor_path": "02-twin-tiers/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 115,
+    "family_name": "Origami Lotus Bloom",
+    "variant_number": 3,
+    "variant_title": "Spinning Crown",
+    "shader_path": "03-spinning-crown/main.glsl",
+    "descriptor_path": "03-spinning-crown/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 115,
+    "family_name": "Origami Lotus Bloom",
+    "variant_number": 4,
+    "variant_title": "Floating Pond",
+    "shader_path": "04-floating-pond/main.glsl",
+    "descriptor_path": "04-floating-pond/scene.json",
+    "verification": "unverified"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 116,
+    "family_name": "Doppler Radar Sweep",
+    "variant_number": 1,
+    "variant_title": "Green Scope",
+    "shader_path": "01-green-scope/main.glsl",
+    "descriptor_path": "01-green-scope/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 116,
+    "family_name": "Doppler Radar Sweep",
+    "variant_number": 2,
+    "variant_title": "Amber Sonar",
+    "shader_path": "02-amber-sonar/main.glsl",
+    "descriptor_path": "02-amber-sonar/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 116,
+    "family_name": "Doppler Radar Sweep",
+    "variant_number": 3,
+    "variant_title": "Tactical Grid",
+    "shader_path": "03-tactical-grid/main.glsl",
+    "descriptor_path": "03-tactical-grid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 116,
+    "family_name": "Doppler Radar Sweep",
+    "variant_number": 4,
+    "variant_title": "Storm Front",
+    "shader_path": "04-storm-front/main.glsl",
+    "descriptor_path": "04-storm-front/scene.json",
+    "verification": "unverified"
+  }
+]

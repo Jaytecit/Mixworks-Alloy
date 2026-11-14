@@ -76,7 +76,13 @@ void StudioAudioLink::run()
         bytes.writeFloat((float) ((clock >> 32) & 0xffffu) / 65536.f);
         for (int i = start; i < frames; ++i) bytes.writeFloat(pcm[(size_t) i]);
         if (socket.waitUntilReady(false, 0) == 1)
-            socket.write("127.0.0.1", destinationPort, packet.data(), (int) bytes.getDataSize());
+        {
+            const int connected = connectedPort.load(std::memory_order_relaxed);
+            if (destinationPort > 0)
+                socket.write("127.0.0.1", destinationPort, packet.data(), (int) bytes.getDataSize());
+            if (connected > 0 && connected != destinationPort)
+                socket.write("127.0.0.1", connected, packet.data(), (int) bytes.getDataSize());
+        }
     }
 }
 }

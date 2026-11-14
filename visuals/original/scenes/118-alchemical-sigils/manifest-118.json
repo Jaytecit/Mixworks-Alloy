@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 118,
+    "family_name": "Alchemical Sigils",
+    "variant_number": 1,
+    "variant_title": "Solar Seal",
+    "shader_path": "01-solar-seal/main.glsl",
+    "descriptor_path": "01-solar-seal/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 118,
+    "family_name": "Alchemical Sigils",
+    "variant_number": 2,
+    "variant_title": "Lunar Ring",
+    "shader_path": "02-lunar-ring/main.glsl",
+    "descriptor_path": "02-lunar-ring/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 118,
+    "family_name": "Alchemical Sigils",
+    "variant_number": 3,
+    "variant_title": "Transmutation",
+    "shader_path": "03-transmutation/main.glsl",
+    "descriptor_path": "03-transmutation/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 118,
+    "family_name": "Alchemical Sigils",
+    "variant_number": 4,
+    "variant_title": "Astral Compass",
+    "shader_path": "04-astral-compass/main.glsl",
+    "descriptor_path": "04-astral-compass/scene.json",
+    "verification": "unverified"
+  }
+]

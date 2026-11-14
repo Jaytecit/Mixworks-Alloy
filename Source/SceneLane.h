@@ -2,6 +2,7 @@
 #include "VisualScenes.h"
 #include "StudioAudioLink.h"
 #include <optional>
+#include <set>
 #include <juce_gui_extra/juce_gui_extra.h>
 
 namespace mixworks
@@ -21,13 +22,14 @@ public:
     void showBrowser(bool replaceSelection = false);
     bool shareStudioAudio(bool enabled, int receiverPort = StudioAudioLink::port);
     bool studioAudioShared() const { return studioAudio != nullptr; }
+    void connectStudioAudio(int port) { if (studioAudio) studioAudio->setConnectedPort(port); }
     bool replaceScene(const juce::String& id, const juce::String& scene, int preset = -1);
     void matchMix();
     bool setImage(const juce::String& path);
     bool importMilkDrop(const juce::File& source);
     bool linkMilkDrop(const juce::File& source);
     bool place(const juce::String& scene, double start, int preset = -1);
-    bool placeStudio(const juce::String& key, const juce::String& title, double start, double length = 0);
+    bool placeStudio(const juce::String& key, const juce::String& title, double start, double length = 0, bool snap = true);
     const VisualSceneClip* selectedVisual() const;
     void setStudioWorkspace(StudioWorkspace*);
     double studioScale = 12, studioStart = 0;
@@ -57,6 +59,7 @@ public:
     Workstation& owner;
 private:
     friend class StudioWorkspace;
+    static constexpr int studioGutter = 113;
     friend void runOriginalVisualTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runMilkDropTests(const std::function<void(bool, const juce::String&)>&, const juce::File&, const juce::File&);
     std::vector<VisualSceneEntry> scenes;
@@ -67,9 +70,18 @@ private:
     SceneBrowser* browserContent = nullptr;
     StudioWorkspace* studioWorkspace = nullptr;
     std::optional<VisualSceneClip> dragOriginal;
+    std::set<juce::String> selectedClips;
+    std::vector<std::pair<juce::String,double>> groupStarts;
+    std::optional<juce::Point<float>> selectionOrigin;
+    juce::Rectangle<float> selectionBox;
     int dragEdge = 0;
+    int transitionEdge = 0;
+    std::optional<VisualSceneClip> transitionOutgoing;
+    const VisualSceneClip* previousStudioClip(const VisualSceneClip&) const;
+    bool editStudioTransition(const juce::String&, const juce::String&, const juce::String&, double, double, bool);
     double dragX = 0, dropTime = -1;
     bool dragRemembered = false;
+    bool replaceScene(const juce::String& id, const VisualSceneEntry& entry, int preset = -1);
     juce::Rectangle<float> bounds(const VisualSceneClip&) const;
     double at(float x, bool snap) const;
     double studioX(double seconds) const;

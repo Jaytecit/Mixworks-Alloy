@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 77,
+    "family_name": "Alpine Ridge Flythrough",
+    "variant_number": 1,
+    "variant_title": "High Peaks",
+    "shader_path": "01-high-peaks/main.glsl",
+    "descriptor_path": "01-high-peaks/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 77,
+    "family_name": "Alpine Ridge Flythrough",
+    "variant_number": 2,
+    "variant_title": "Twin Valleys",
+    "shader_path": "02-twin-valleys/main.glsl",
+    "descriptor_path": "02-twin-valleys/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 77,
+    "family_name": "Alpine Ridge Flythrough",
+    "variant_number": 3,
+    "variant_title": "Volcanic Caldera",
+    "shader_path": "03-volcanic-caldera/main.glsl",
+    "descriptor_path": "03-volcanic-caldera/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 77,
+    "family_name": "Alpine Ridge Flythrough",
+    "variant_number": 4,
+    "variant_title": "Glacier Pass",
+    "shader_path": "04-glacier-pass/main.glsl",
+    "descriptor_path": "04-glacier-pass/scene.json",
+    "verification": "unverified"
+  }
+]

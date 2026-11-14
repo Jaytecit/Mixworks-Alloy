@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 132,
+    "family_name": "Shadow Puppet Theater",
+    "variant_number": 1,
+    "variant_title": "Lantern Show",
+    "shader_path": "01-lantern-show/main.glsl",
+    "descriptor_path": "01-lantern-show/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 132,
+    "family_name": "Shadow Puppet Theater",
+    "variant_number": 2,
+    "variant_title": "Crane Dance",
+    "shader_path": "02-crane-dance/main.glsl",
+    "descriptor_path": "02-crane-dance/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 132,
+    "family_name": "Shadow Puppet Theater",
+    "variant_number": 3,
+    "variant_title": "Gear Puppets",
+    "shader_path": "03-gear-puppets/main.glsl",
+    "descriptor_path": "03-gear-puppets/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 132,
+    "family_name": "Shadow Puppet Theater",
+    "variant_number": 4,
+    "variant_title": "Dual Screens",
+    "shader_path": "04-dual-screens/main.glsl",
+    "descriptor_path": "04-dual-screens/scene.json",
+    "verification": "unverified"
+  }
+]

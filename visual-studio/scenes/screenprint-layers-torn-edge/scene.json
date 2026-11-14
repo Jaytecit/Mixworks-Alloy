@@ -1,0 +1,47 @@
+{
+  "TITLE": "Screenprint Layers / Torn Edge",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneRegistrationOffset",
+      "TYPE": "slider",
+      "LABEL": "Registration offset",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneInkCoverage",
+      "TYPE": "slider",
+      "LABEL": "Ink coverage",
+      "DEFAULT": 1.0,
+      "MIN": 0.35,
+      "MAX": 1.2,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

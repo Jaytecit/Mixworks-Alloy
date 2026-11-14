@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 81,
+    "family_name": "Floating Sky Islands",
+    "variant_number": 1,
+    "variant_title": "Single Citadel",
+    "shader_path": "01-single-citadel/main.glsl",
+    "descriptor_path": "01-single-citadel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 81,
+    "family_name": "Floating Sky Islands",
+    "variant_number": 2,
+    "variant_title": "Archipelago",
+    "shader_path": "02-archipelago/main.glsl",
+    "descriptor_path": "02-archipelago/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 81,
+    "family_name": "Floating Sky Islands",
+    "variant_number": 3,
+    "variant_title": "Chain Bridges",
+    "shader_path": "03-chain-bridges/main.glsl",
+    "descriptor_path": "03-chain-bridges/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 81,
+    "family_name": "Floating Sky Islands",
+    "variant_number": 4,
+    "variant_title": "Shattered Isles",
+    "shader_path": "04-shattered-isles/main.glsl",
+    "descriptor_path": "04-shattered-isles/scene.json",
+    "verification": "unverified"
+  }
+]

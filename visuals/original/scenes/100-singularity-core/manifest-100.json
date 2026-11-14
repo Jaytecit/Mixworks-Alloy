@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 100,
+    "family_name": "Singularity Core",
+    "variant_number": 1,
+    "variant_title": "Accretion Funnel",
+    "shader_path": "01-accretion-funnel/main.glsl",
+    "descriptor_path": "01-accretion-funnel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 100,
+    "family_name": "Singularity Core",
+    "variant_number": 2,
+    "variant_title": "Photon Cage",
+    "shader_path": "02-photon-cage/main.glsl",
+    "descriptor_path": "02-photon-cage/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 100,
+    "family_name": "Singularity Core",
+    "variant_number": 3,
+    "variant_title": "Twin Jets",
+    "shader_path": "03-twin-jets/main.glsl",
+    "descriptor_path": "03-twin-jets/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 100,
+    "family_name": "Singularity Core",
+    "variant_number": 4,
+    "variant_title": "Event Horizon",
+    "shader_path": "04-event-horizon/main.glsl",
+    "descriptor_path": "04-event-horizon/scene.json",
+    "verification": "unverified"
+  }
+]

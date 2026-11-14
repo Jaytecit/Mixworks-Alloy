@@ -50,6 +50,8 @@ void runAudioSlipTests(const std::function<void(bool, const juce::String&)>& che
             && std::abs(join(in,b,true)-fixedJoin)<1.e-8 && in.clips[1].start!=fixture.clips[1].start && in.clips[2].start==fixture.clips[2].start,
             "IN changes the incoming source beneath fixed OUT without moving earlier or unrelated audio / "+inMove.getErrorMessage());
         check(std::abs(in.clips[1].sourceTimeAt(fixedJoin-in.clips[1].start)-.83)<1.e-7,"IN drag selects the snapped source point requested by the pointer");
+        check(out.clips[0].manualTransitionArea && in.clips[0].manualTransitionArea,
+            "manual IN and OUT both mark the outgoing tail without changing the placement of the outgoing audio");
         for(bool snap:{false,true})
         {
             auto p=fixture; const auto result=p.moveTransitionAnchor(a,false,2.647,snap);
@@ -82,9 +84,14 @@ void runAudioSlipTests(const std::function<void(bool, const juce::String&)>& che
                 "track pulse destination uses only project grid despite a closer off-grid neighbouring pulse / "+juce::String(division));
         }
         auto append=fixture; append.clips.resize(1); append.transitionLinks.clear();
+        const auto lone = append.moveTransitionAnchor(a, false, 2.75, false);
+        check(lone.wasOk() && append.clips[0].manualTransitionArea && std::abs(join(append,a,false)-2.75)<1.e-8,
+            "manual OUT marks an editable tail before an incoming clip exists");
+        const auto loneTrack = append;
         Clip added=fixture.clips[1]; added.start=4.17; added.introAnchor.reset(); added.outroAnchor.reset(); added.pendingPlacement=PendingPlacement::append; added.pendingAutoTransition=false; append.clips.push_back(added);
         const auto planned=planTempoMap(append,0,TransitionPreset::alignOnly,false);
-        check(planned.error.isEmpty() && std::abs(join(planned.project,a,false)-join(planned.project,b,true))<1.e-7 && planned.project.transitionFor(b),
+        check(planned.error.isEmpty() && std::abs(join(planned.project,a,false)-join(planned.project,b,true))<1.e-7 && planned.project.transitionFor(b)
+            && planned.project.clips[0].manualTransitionArea,
             "ordinary next-track append aligns IN to existing last OUT and retains explicit pair identity / "+planned.error);
         auto drop=append; drop.tempo.setPoint(0,120);
         auto incoming=std::make_shared<Media>();
@@ -138,6 +145,11 @@ void runAudioSlipTests(const std::function<void(bool, const juce::String&)>& che
         const auto earlierBefore=json(earlierClock);
         check(earlierClock.moveClip(b,7.5,false).failed() && json(earlierClock)==earlierBefore,
             "moving a captured playback clock into a different future ramp cannot create unreopenable geometry");
+        auto agreesLocally = ramped;
+        agreesLocally.tempo.setPoint(100, 144, false);
+        const auto localEdit = agreesLocally.moveTransitionAnchor(b, true, 2.9, false);
+        check(localEdit.wasOk() && std::abs(join(agreesLocally,b,true) - join(ramped,a,false)) < 1.e-7,
+            "a captured map that agrees at the new placement permits an unlocked IN drag / " + localEdit.getErrorMessage());
         const auto pcm=[](const Project& p,double at) {Engine e;e.sampleRate=8000;e.project=p;juce::AudioBuffer<float> audio(2,64);juce::MidiBuffer midi;e.render(audio,64,at,midi);return audio;};
         auto treated=fixture; treated.applyTransitionPreset(b,TransitionPreset::crossfade); treated.transitionLinks[0].muteOutside=true;
         auto kept=treated; const auto removed=kept.removeTransition(b,false); float keepError=0;
@@ -193,6 +205,101 @@ void runAudioSlipTests(const std::function<void(bool, const juce::String&)>& che
         const auto file=report.getSiblingFile("pair-movement.mixworks");const auto saved=ui.engine.saveProject(file);Engine reopened;const auto opened=saved.isEmpty()?reopened.restoreProject(file.loadFileAsString()):saved;
         check(saved.isEmpty() && opened.isEmpty() && reopened.project.transitionFor(b) && reopened.project.transitionFor(c)
             && reopened.project.transitionFor(b)->movementLocked && !reopened.project.transitionFor(c)->movementLocked,"actual source-backed save/reopen retains pair movement locks / "+opened);
+
+        const auto captureTimeline = [&](const juce::String& name)
+        {
+            auto stream = report.getSiblingFile(name).createOutputStream();
+            return stream && juce::PNGImageFormat().writeImageToStream(ui.createComponentSnapshot(ui.getLocalBounds()), *stream);
+        };
+        reset(loneTrack);
+        check(captureTimeline("manual-lone-out.png"), "capture the marked OUT tail before adding the next track");
+        reset(out);
+        check(captureTimeline("manual-paired-out.png"), "capture the marked transition area across a prepared pair");
+        const auto markedFile = report.getSiblingFile("manual-area.mixworks");
+        const auto markedSaved = ui.engine.saveProject(markedFile);
+        auto restored = std::make_unique<Engine>();
+        const auto markedOpened = markedSaved.isEmpty() ? restored->restoreProject(markedFile.loadFileAsString()) : markedSaved;
+        check(markedOpened.isEmpty() && restored->project.clips[0].manualTransitionArea
+            && std::abs(join(restored->project, a, false) - join(out, a, false)) < 1.e-8,
+            "source-backed save and reopen preserves the manual transition area and its anchor / " + markedOpened);
+
+        auto stale = fixture; stale.clips.resize(2); stale.transitionLinks.resize(1); stale.followTrackTempo = true;
+        stale.tempo.setPoint(0, 120); auto captured = stale.tempo; captured.setPoint(0, 118);
+        auto& outgoing = stale.clips[0]; auto& incomingClip = stale.clips[1];
+        outgoing.beatmatched = incomingClip.beatmatched = true;
+        outgoing.retime(outgoing.start, std::make_shared<const TempoMap>(stale.tempo));
+        incomingClip.retime(incomingClip.start, std::make_shared<const TempoMap>(captured));
+        outgoing.outroAnchor = outgoing.sourceElapsed(incomingClip.start - outgoing.start);
+        incomingClip.introAnchor = 0.; stale.transitionLinks[0].frame = std::array<double, 2>{*outgoing.outroAnchor, 4.};
+        const auto staleBefore = json(stale);
+        const double joinTime = incomingClip.start;
+        const auto refused = stale.moveTransitionAnchor(b, true, joinTime + .25, false);
+        check(refused.failed() && refused.getErrorMessage().contains("Sync playback clocks") && json(stale) == staleBefore,
+            "a mismatched captured playback clock refuses an unlocked IN edit with a safe recovery step");
+        reset(stale);
+        const auto staleFile = report.getSiblingFile("stale-clock.mixworks");
+        check(ui.engine.saveProject(staleFile).contains("Sync playback clocks") && !staleFile.exists(),
+            "Save refuses an unreadable clock mismatch before creating a file");
+        const auto oldFrame = stale.transitionRange(*stale.transitionFor(b));
+        ui.syncTransitionPlaybackClocks(b);
+        const auto& synced = ui.engine.project;
+        const auto syncedFrame = synced.transitionRange(*synced.transitionFor(b));
+        check(!synced.transitionHasStaleClock(b) && ui.undoHistory.size()==1
+            && synced.clips[1].start == incomingClip.start && synced.clips[1].length == incomingClip.length
+            && std::abs(syncedFrame.getStart()-oldFrame.getStart()) < 1.e-7 && std::abs(syncedFrame.getEnd()-oldFrame.getEnd()) < 1.e-7
+            && std::abs(join(synced,b,true)-joinTime) < 1.e-7
+            && std::abs(synced.clips[1].sourceTimeAt(1.) - incomingClip.sourceTimeAt(1.)) < 1.e-7,
+            "Sync playback clocks keeps placements and the join in one Undo");
+        ui.undo(false);
+        check(ui.engine.project.transitionHasStaleClock(b) && json(ui.engine.project) == staleBefore,
+            "Undo restores the original captured timing after a clock sync");
+        ui.undo(true);
+        const auto syncedSaved = ui.engine.saveProject(staleFile);
+        const auto recovered = syncedSaved.isEmpty() ? restored->restoreProject(staleFile.loadFileAsString()) : syncedSaved;
+        if (recovered.isEmpty())
+        {
+            const auto recoveredEdit = restored->project.moveTransitionAnchor(b, true, joinTime + .25, false);
+            check(recoveredEdit.wasOk() && std::abs(join(restored->project,a,false) - joinTime) < 1.e-7
+                && std::abs(join(restored->project,b,true) - joinTime) < 1.e-7,
+                "synced clocks survive Save and Open and an unlocked IN edit keeps the join / " + recoveredEdit.getErrorMessage());
+        }
+        else check(false, "open the saved stale-clock fixture / " + recovered);
+
+        for (const double zoom : {.1, 80., WorkspaceLayout::maximumTimelineZoom})
+        {
+            reset(fixture); ui.timeline.pixelsPerSecond = zoom; ui.timeline.updateSize();
+            ui.viewport.setViewPosition(std::max(0, (int) std::round(fixedJoin * zoom - 90)), 0);
+            auto* button = ui.timeline.movementLockButtons[b].get();
+            const auto bounds = ui.timeline.clipBounds(fixture.clips[1]);
+            const auto tab = ui.timeline.offscreenAnchorBounds(fixture.clips[1], true);
+            const auto handle = tab.isEmpty() ? juce::Point<float>((float)(fixedJoin * zoom), bounds.getY() + 3) : tab.getCentre();
+            const auto hit = ui.timeline.anchorAt(handle, true);
+            const bool separate = button && button->isVisible() && !button->getBounds().toFloat().contains(handle)
+                && hit && hit->first == b && hit->second;
+            if (button && button->isVisible()) button->onClick();
+            check(separate && ui.engine.project.transitionFor(b)->movementLocked,
+                "pair lock and IN each have an independent target at zoom " + juce::String(zoom));
+            if (button && button->isVisible()) button->onClick();
+            check(!ui.engine.project.transitionFor(b)->movementLocked, "the visible toggle unlocks the same pair at zoom " + juce::String(zoom));
+        }
+        ui.timeline.pixelsPerSecond = 80.; reset(out);
+        const auto completeMix = json(ui.engine.project);
+        for (const int count : {2, 3, 4})
+        {
+            ui.audioLanes.setSelectedId(count, juce::sendNotificationSync);
+            check(ui.timeline.contentLaneCount() == count && ui.strips[(size_t) (count-1)]->isVisible()
+                && (count == trackCount || !ui.strips[(size_t) count]->isVisible()) && json(ui.engine.project) == completeMix,
+                "visible audio lane selector preserves every placement at " + juce::String(count));
+        }
+        ui.audioLanes.setSelectedId(2, juce::sendNotificationSync);
+        check(captureTimeline("manual-two-lanes.png"), "capture the two-lane timeline while higher-lane tracks remain in the mix");
+        const auto countBefore = ui.engine.project.clips.size();
+        ui.insertTimelineMedia({media}, TimelinePlacement{2, 10.});
+        check(ui.engine.project.clips.size() == countBefore, "a hidden lane rejects new placement");
+        ui.insertTimelineMedia({media}, TimelinePlacement{1, 10.});
+        check(ui.engine.project.clips.size() == countBefore + 1 && ui.engine.project.clips.back().track == 1,
+            "the last visible audio lane accepts normal placement");
+        ui.audioLanes.setSelectedId(4, juce::sendNotificationSync);
         reset(treated);ui.selectTransition(b,false);ui.showToolPage(1);ui.refresh();ui.removeTransitionButton.onClick();
         auto* question=dynamic_cast<juce::AlertWindow*>(juce::Component::getCurrentlyModalComponent());
         check(question && question->getName()=="Remove transition?" && ui.removeTransitionButton.isEnabled(),"visible Remove transition opens explicit keep-mix/clear-treatment choices");

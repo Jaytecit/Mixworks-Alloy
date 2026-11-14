@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 82,
+    "family_name": "Iceberg Strait",
+    "variant_number": 1,
+    "variant_title": "Glacier Field",
+    "shader_path": "01-glacier-field/main.glsl",
+    "descriptor_path": "01-glacier-field/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 82,
+    "family_name": "Iceberg Strait",
+    "variant_number": 2,
+    "variant_title": "Ice Arch",
+    "shader_path": "02-ice-arch/main.glsl",
+    "descriptor_path": "02-ice-arch/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 82,
+    "family_name": "Iceberg Strait",
+    "variant_number": 3,
+    "variant_title": "Arctic Canyon",
+    "shader_path": "03-arctic-canyon/main.glsl",
+    "descriptor_path": "03-arctic-canyon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 82,
+    "family_name": "Iceberg Strait",
+    "variant_number": 4,
+    "variant_title": "Melting Spires",
+    "shader_path": "04-melting-spires/main.glsl",
+    "descriptor_path": "04-melting-spires/scene.json",
+    "verification": "unverified"
+  }
+]

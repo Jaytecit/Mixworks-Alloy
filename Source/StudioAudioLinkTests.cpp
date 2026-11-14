@@ -19,11 +19,14 @@ void runStudioAudioLinkTests(const std::function<void(bool, const juce::String&)
         }
         return false;
     };
-    check(menuItem(false) && !engine.studioSpectrum.enabled, "View offers the live master link with sharing off by default");
+    check(menuItem(false) && !engine.studioSpectrum.enabled, "An isolated workstation stays off the shared audio port until requested");
     juce::DatagramSocket receiver;
     const bool bound = receiver.bindToPort(0, "127.0.0.1");
     check(bound && lane.shareStudioAudio(true, receiver.getBoundPort()) && menuItem(true),
           "Enable the actual Alloy audio link on an isolated loopback port");
+    juce::DatagramSocket connected;
+    const bool connectedBound = connected.bindToPort(0, "127.0.0.1");
+    if (connectedBound) lane.connectStudioAudio(connected.getBoundPort());
     auto tone = std::make_shared<Media>();
     tone->sampleRate = 48000;
     tone->analysis.bpm = 128.5;
@@ -52,6 +55,16 @@ void runStudioAudioLinkTests(const std::function<void(bool, const juce::String&)
     check(sequence == 0 && std::string(magic, 4) == "MWV2" && match
           && juce::FloatVectorOperations::findMinAndMax(left.data(), frames).getLength() > .1f,
           "Loopback packet contains the exact post-master PCM produced by the live callback");
+    std::array<char, 28 + 1024 * sizeof(float)> connectedPacket {};
+    const int connectedSize = connectedBound && connected.waitUntilReady(true, 1000) == 1
+        ? connected.read(connectedPacket.data(), (int) connectedPacket.size(), false) : -1;
+    check(size > 0 && connectedSize == size && std::equal(packet.begin(), packet.begin() + size, connectedPacket.begin()),
+          "The full Studio's private loopback port receives the same master PCM and clock");
+    lane.connectStudioAudio(0);
+    render();
+    check(receiver.waitUntilReady(true, 1000) == 1 && receiver.read(packet.data(), (int)packet.size(), false) > 0
+          && connected.waitUntilReady(true, 60) == 0,
+          "Disconnecting linked Studio retains the standalone feed");
     check(!engine.visualSpectrum.enabled, "Standalone sharing needs no internal visual renderer");
     lane.shareStudioAudio(false);
     render();

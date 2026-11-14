@@ -485,6 +485,9 @@ bool Timeline::continueGroupMove(const juce::MouseEvent& e)
     auto candidate = gesture.baseline;
     const auto result = candidate.moveClipGroup(gesture.selection.clips, gesture.anchor, gesture.target, gesture.track, gesture.snapping);
     if (result.failed()) owner.setStatus(result.getErrorMessage());
+    else if (gesture.track != anchor->track && std::any_of(candidate.clips.begin(), candidate.clips.end(), [&](const auto& clip)
+        { return clip.track >= contentLaneCount() && clip.track != gesture.baseline.clipFor(clip.id)->track; }))
+        owner.setStatus("The group needs more visible audio lanes to move here.");
     else
     {
         const auto* movedAnchor = candidate.clipFor(gesture.anchor);
@@ -557,7 +560,7 @@ bool Workstation::performSelectionAction(TimelineAction action, double time, int
         for (auto c : fragment.clips)
         {
             c.track += track - fragment.lane;
-            if (c.track < 0 || c.track >= trackCount) return refuse("The selected group does not fit the destination lanes.");
+            if (c.track < 0 || c.track >= layout.visibleLaneCount) return refuse("The selected group does not fit the visible audio lanes.");
             if (!candidate.followTrackTempo && c.tempoMap) return refuse("Beatmatch a changing source map before pasting into a fixed-clock session.");
             if (!c.media || !c.media->hasPlayback() || c.media->sourceDetailsPending) return refuse("A copied source is unavailable.");
             const auto old = c.id; c.id = juce::Uuid().toString(); ids[old] = c.id;

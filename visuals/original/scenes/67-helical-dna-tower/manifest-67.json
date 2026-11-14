@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 67,
+    "family_name": "Helical DNA Tower",
+    "variant_number": 1,
+    "variant_title": "Double Helix",
+    "shader_path": "01-double-helix/main.glsl",
+    "descriptor_path": "01-double-helix/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 67,
+    "family_name": "Helical DNA Tower",
+    "variant_number": 2,
+    "variant_title": "Triple Strand",
+    "shader_path": "02-triple-strand/main.glsl",
+    "descriptor_path": "02-triple-strand/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 67,
+    "family_name": "Helical DNA Tower",
+    "variant_number": 3,
+    "variant_title": "Ribbon Ladder",
+    "shader_path": "03-ribbon-ladder/main.glsl",
+    "descriptor_path": "03-ribbon-ladder/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 67,
+    "family_name": "Helical DNA Tower",
+    "variant_number": 4,
+    "variant_title": "Unzipping",
+    "shader_path": "04-unzipping/main.glsl",
+    "descriptor_path": "04-unzipping/scene.json",
+    "verification": "unverified"
+  }
+]

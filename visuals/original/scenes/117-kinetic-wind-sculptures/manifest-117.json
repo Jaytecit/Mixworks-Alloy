@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 117,
+    "family_name": "Kinetic Wind Sculptures",
+    "variant_number": 1,
+    "variant_title": "Pinwheel Wall",
+    "shader_path": "01-pinwheel-wall/main.glsl",
+    "descriptor_path": "01-pinwheel-wall/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 117,
+    "family_name": "Kinetic Wind Sculptures",
+    "variant_number": 2,
+    "variant_title": "Helix Blades",
+    "shader_path": "02-helix-blades/main.glsl",
+    "descriptor_path": "02-helix-blades/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 117,
+    "family_name": "Kinetic Wind Sculptures",
+    "variant_number": 3,
+    "variant_title": "Sails",
+    "shader_path": "03-sails/main.glsl",
+    "descriptor_path": "03-sails/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 117,
+    "family_name": "Kinetic Wind Sculptures",
+    "variant_number": 4,
+    "variant_title": "Turbine Array",
+    "shader_path": "04-turbine-array/main.glsl",
+    "descriptor_path": "04-turbine-array/scene.json",
+    "verification": "unverified"
+  }
+]

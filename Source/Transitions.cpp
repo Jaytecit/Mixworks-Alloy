@@ -9,6 +9,11 @@ namespace mixworks
 {
 namespace
 {
+bool stalePlaybackClock(const Clip& clip, const TempoMap& map)
+{
+    return clip.beatmatched && clip.tempoMap && (clip.tempoMap->points != map.points
+        || clip.tempoMap->fallback != map.fallback || clip.tempoMap->origin != map.origin);
+}
 int bassPoint(const Project& project, const Clip& clip, double source)
 {
     const auto& points = project.effectSettings(clip).automation[(size_t) AutomationTarget::bass].points;
@@ -373,10 +378,14 @@ juce::Range<double> Project::transitionRange(const TransitionLink& link) const
 {
     const auto* out = clipFor(link.outgoing); const auto* in = clipFor(link.incoming);
     if (!out || !in) return {};
-    if (link.frame) return {out->start + out->localTimeForSource((*link.frame)[0]), out->start + out->localTimeForSource((*link.frame)[1])};
-    const double begin = out->start + out->transitionTime(false);
-    const auto envelope = out->envelope();
-    return {begin, std::max(begin, std::min(in->end(), out->start + envelope.outro + envelope.fadeOut))};
+    return transitionRange(link, *out, *in);
+}
+juce::Range<double> Project::transitionRange(const TransitionLink& link, const Clip& out, const Clip& in)
+{
+    if (link.frame) return {out.start + out.localTimeForSource((*link.frame)[0]), out.start + out.localTimeForSource((*link.frame)[1])};
+    const double begin = out.start + out.transitionTime(false);
+    const auto envelope = out.envelope();
+    return {begin, std::max(begin, std::min(in.end(), out.start + envelope.outro + envelope.fadeOut))};
 }
 juce::Result Project::editTransition(const juce::String& incoming, TransitionEdit edit, double delta, bool snapping)
 {
@@ -808,8 +817,7 @@ juce::Result Project::moveClipGroup(const std::vector<juce::String>& ids, const 
         clip->track += lanes;
         if (!std::isfinite(clip->end()) || clip->start < 0 || clip->end() > 1.e9 || clip->track < 0 || clip->track >= trackCount)
             return juce::Result::fail("The complete group must fit inside the timeline and four mixer lanes.");
-        const bool capturedClockDiffers = retime
-            && (clip->tempoMap->points != tempo.points || clip->tempoMap->fallback != tempo.fallback);
+        const bool capturedClockDiffers = retime && stalePlaybackClock(*clip, tempo);
         if (clip->tempoMap && delta != 0 && (!retime || capturedClockDiffers))
         {
             // A rigid move keeps the local source clock. A musical move may
@@ -821,8 +829,9 @@ juce::Result Project::moveClipGroup(const std::vector<juce::String>& ids, const 
             auto agrees = [&](double local)
             {
                 const double a = originalStart + local, b = clip->start + local;
+                const double captured = clip->tempoMap->bpmAt(retime ? b : a);
                 return (retime || std::abs(clip->tempoMap->bpmAt(a) - clip->tempoMap->bpmAt(b)) < 1.e-9)
-                    && (!followTrackTempo || std::abs(clip->tempoMap->bpmAt(a) - tempo.bpmAt(b)) < 1.e-9);
+                    && (!followTrackTempo || std::abs(captured - tempo.bpmAt(b)) < 1.e-9);
             };
             std::set<double> boundaries {low, high};
             if (!retime)
@@ -832,7 +841,7 @@ juce::Result Project::moveClipGroup(const std::vector<juce::String>& ids, const 
             bool same = true; double previous = low;
             for (double local : boundaries)
             { same = same && agrees(local) && agrees((previous + local) / 2); previous = local; }
-            if (!same) return juce::Result::fail(retime ? "This track still uses an earlier playback clock. Reopen the mix before moving it into the new tempo curve."
+            if (!same) return juce::Result::fail(retime ? "Earlier playback clock. Pause and choose Sync playback clocks from the transition menu, then retry."
                 : "Group movement keeps source timing. Choose a destination with the same tempo curve.");
         }
         // Elastic streams use absolute programme time. Rebind the immutable
@@ -931,6 +940,51 @@ juce::Result Project::moveClipFollowing(const juce::String& id, double seconds, 
     *this = std::move(candidate); return juce::Result::ok();
 }
 
+bool Project::transitionHasStaleClock(const juce::String& incoming) const
+{
+    const auto* link = transitionFor(incoming);
+    if (!link || !followTrackTempo || tempo.points.empty()) return false;
+    const auto* out = clipFor(link->outgoing);
+    const auto* in = clipFor(incoming);
+    return (out && stalePlaybackClock(*out, tempo)) || (in && stalePlaybackClock(*in, tempo));
+}
+
+juce::Result Project::syncTransitionPlaybackClocks(const juce::String& incoming)
+{
+    if (!transitionHasStaleClock(incoming)) return juce::Result::fail("This pair already uses the mix playback clock.");
+    if (hasPendingPlacement()) return juce::Result::fail("Wait for source and tempo preparation before syncing playback clocks.");
+    const auto* pair = transitionFor(incoming);
+    Project candidate = *this;
+    const auto map = std::make_shared<const TempoMap>(tempo);
+    for (const auto& id : {pair->outgoing, incoming})
+    {
+        auto* clip = candidate.clipFor(id);
+        if (!clip || !clip->media || !clip->media->hasPlayback()) return juce::Result::fail("Both tracks need ready audio to sync playback clocks.");
+        if (!stalePlaybackClock(*clip, tempo)) continue;
+        if (clipTransitionLocked(id)) return juce::Result::fail("Turn off Protect edits for this track before syncing its playback clock.");
+        const auto before = *clip;
+        const double sourceBpm = 60 * (map->beatsAt(clip->end()) - map->beatsAt(clip->start)) / (clip->length * clip->rate);
+        if (!std::isfinite(sourceBpm) || sourceBpm <= 0 || sourceBpm > 8000.)
+            return juce::Result::fail("The shared clock cannot preserve this track's source span.");
+        clip->tempoMap = map;
+        clip->tempoSourceBpm = sourceBpm;
+        const auto remap = [&](double source) { return clip->sourceElapsed(before.localTimeForSource(source)); };
+        for (auto* anchor : {&clip->introAnchor, &clip->outroAnchor, &clip->fadeInAnchor, &clip->fadeOutAnchor})
+            if (*anchor) **anchor = remap(**anchor);
+        for (auto& link : candidate.transitionLinks)
+            if (link.outgoing == id && link.frame)
+                for (auto& marker : *link.frame) marker = remap(marker);
+        clip->prepared.reset(); clip->preparedOffset = 0;
+        clip->elasticPlayback = true;
+        clip->elasticSource = std::make_shared<const ElasticSource>(*clip);
+    }
+    if (const auto result = candidate.reconcileBassSwaps(); result.failed()) return result;
+    if (const auto result = candidate.validateTransitionLinks(); result.failed()) return result;
+    if (const auto result = validateTransitionLocks(candidate); result.failed()) return result;
+    *this = std::move(candidate);
+    return juce::Result::ok();
+}
+
 juce::Result Project::moveTransitionAnchor(const juce::String& id,bool intro,double time,bool snapping)
 {
     const auto* original=clipFor(id);
@@ -950,6 +1004,7 @@ juce::Result Project::moveTransitionAnchor(const juce::String& id,bool intro,dou
     if(pair==transitionLinks.end())
     {
         auto* clip=candidate.clipFor(id); (intro ? clip->introAnchor : clip->outroAnchor)=source;
+        if (!intro) clip->manualTransitionArea = true;
     }
     else if(intro)
     {
@@ -960,6 +1015,7 @@ juce::Result Project::moveTransitionAnchor(const juce::String& id,bool intro,dou
         const auto moved=candidate.moveClip(id,shifted.start,false); if(moved.failed())return moved;
         candidate.clipFor(id)->introAnchor=source;
         candidate.clipFor(pair->outgoing)->outroAnchor=outgoing->outroAnchor;
+        candidate.clipFor(pair->outgoing)->manualTransitionArea = true;
         for(auto& link:candidate.transitionLinks)if(link.incoming==id)link.frame=pair->frame;
     }
     else
@@ -970,6 +1026,7 @@ juce::Result Project::moveTransitionAnchor(const juce::String& id,bool intro,dou
         const auto aligned=shifted.alignIntroTo(target); if(aligned.failed())return aligned;
         const auto moved=candidate.moveClip(incoming->id,shifted.start,false); if(moved.failed())return moved;
         candidate.clipFor(id)->outroAnchor=source;
+        candidate.clipFor(id)->manualTransitionArea = true;
     }
     const auto swaps=candidate.reconcileBassSwaps(); if(swaps.failed())return swaps;
     const auto valid=candidate.validateTransitionLinks(); if(valid.failed())return valid;

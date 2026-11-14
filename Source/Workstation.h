@@ -234,6 +234,10 @@ private:
     Workstation& owner;
     std::set<juce::String> visibleHotcueClips, visibleSectionClips;
     std::vector<std::unique_ptr<TimelineAccessItem>> accessibleItems;
+    bool pendingWaveformPaint = false;
+    bool resizingTimeline = false;
+    void updateGeometry();
+    void refreshViewportItems();
     void refreshAccessibleItems();
     struct SectionFlag { juce::String clipId, key; int index = -1; double source = 0, time = 0; bool manual = false; juce::Rectangle<float> bounds; juce::String label; };
     std::optional<std::pair<juce::String, int>> selectedSection;
@@ -351,6 +355,7 @@ private:
     void paintAudioSlipHandles(juce::Graphics&);
     bool beginAudioSlip(const juce::MouseEvent&);
     void refreshMovementLocks();
+    void layoutMovementLocks();
     std::map<juce::String,std::unique_ptr<juce::TextButton>> movementLockButtons;
     bool continueAudioSlip(const juce::MouseEvent&);
     bool resetAudioSlip(juce::Point<float>);
@@ -361,6 +366,8 @@ private:
     bool continueSwapDrag(const juce::MouseEvent&);
     std::optional<std::pair<juce::String, Project::TransitionEdit>> transitionAt(juce::Point<float>) const;
     juce::Rectangle<float> transitionBounds(const Project::TransitionLink&) const;
+    juce::Rectangle<float> transitionBounds(const Project::TransitionLink&, const Clip& outgoing, const Clip& incoming,
+                                            juce::Range<double>) const;
     juce::Rectangle<float> transitionSongBounds(const Project::TransitionLink&, bool outgoing) const;
     void paintTransitions(juce::Graphics&);
     double transitionReference(const Project&, const std::pair<juce::String, Project::TransitionEdit>&) const;
@@ -399,7 +406,7 @@ private:
     void selectAutomationCurve(const AutomationAddress&);
     bool automationVisible(const AutomationAddress&) const;
     bool automationNodesVisible(const AutomationAddress&) const;
-    std::vector<AutomationAddress> visibleAutomationAddresses(int track) const;
+    std::vector<AutomationAddress> displayedAutomationAddresses(int track) const;
     AutomationCurve automationViewCurve(const AutomationAddress&) const;
     juce::Path automationPath(const AutomationAddress&, double begin, double end) const;
     std::optional<AutomationAddress> automationCurveAt(juce::Point<float>) const;
@@ -409,8 +416,10 @@ private:
     void paintAutomationCaption(juce::Graphics&);
     juce::String draggingLabel;
     int labelAt(juce::Point<float>) const;
-    std::optional<std::pair<juce::String, bool>> anchorAt(juce::Point<float>) const;
+    std::optional<std::pair<juce::String, bool>> anchorAt(juce::Point<float>, bool handlesOnly = false) const;
     juce::Rectangle<float> offscreenAnchorBounds(const Clip&, bool intro) const;
+    bool beginAnchorDrag(const juce::MouseEvent&, bool handlesOnly);
+    void paintManualTransitionAreas(juce::Graphics&);
     std::optional<std::pair<AutomationAddress, int>> automationPointAt(juce::Point<float>) const;
     friend void runTempoUiTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     friend void runFusionWorkflowTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
@@ -635,7 +644,9 @@ private:
     void refreshAutomationEditor(bool rebuildChoices = true);
     bool automationEditable(const AutomationAddress&) const;
     juce::AudioProcessorParameter* automationPluginParameter(const AutomationAddress&) const;
-    Project projectEditSnapshot();
+    Project projectEditSnapshot(bool omitActiveTake = false);
+    void recordEditHistory(Project);
+    juce::String prepareStructuralAudio(const Project&);
     juce::String structuralEditUnavailable() const;
     static juce::String structuralEditDocument(const Project&);
     bool publishStructuralEdit(Project, const juce::String& expectedDocument = {});
@@ -702,6 +713,7 @@ private:
     void chooseAddTransition(juce::Rectangle<int> anchor = {});
     void showNewTransitionDefaults(juce::Rectangle<int> anchor = {});
     void showTransitionMenu(const juce::String& incoming, juce::Rectangle<int> anchor);
+    void syncTransitionPlaybackClocks(const juce::String& incoming);
     void openTransitionEditor(const juce::String& incoming, bool rehearsal = false);
     void setTransitionProtection(bool);
     void setTransitionMuteOutside(bool);
@@ -762,7 +774,11 @@ private:
     TimelineViewport viewport;
     bool programmaticTimelineView = false;
     int lastTimelineViewX = 0;
+    double lastPaintedPosition = -1.;
+    bool lastPaintedPlaying = false;
     juce::TextButton followButton { "Follow playhead" };
+    juce::ComboBox audioLanes;
+    void setVisibleAudioLanes(int);
     void setFollowPlayhead(bool);
     void followPlayheadIntoView();
     juce::TextButton newButton { "New" }, openButton { "Open" }, saveButton { "Save" }, importButton { "+ Import audio" }, exportButton { "Export WAV" }, settingsButton { "Audio / MIDI" };
@@ -798,7 +814,7 @@ private:
     void showShortcuts(bool);
     void tickMasterEmblem();
     TransitionPreset selectedTransitionPreset() const { return (TransitionPreset) std::max(0, transitionPreset.getSelectedId() - 1); }
-    juce::TextButton beatmatchButton { "Auto Arrange timeline" };
+    juce::TextButton beatmatchButton { "Blend timeline tracks" };
     int transitionIndex = 5;
     double transitionOverlapBeats() const { constexpr double beats[] {0, 16, 32, 64, 128, 256}; return beats[transitionIndex]; }
     juce::ComboBox waveformMode;
@@ -919,7 +935,7 @@ private:
     void rememberSourceSectionBaseline(const std::shared_ptr<Media>&, const SourceSections&);
     bool persistSourceSectionDefaults(const std::shared_ptr<Media>&, const SourceSections&);
     void publishSourceSectionDefaults(const std::shared_ptr<Media>&, const SourceSections&);
-    bool persistSourceSectionHistory(const Project&);
+    bool persistSourceSectionHistory(const Project&, const std::function<bool()>& publish);
     void editSavedDownbeat(const juce::String&);
     friend class TimelineHeader;
     friend void runGridCorrectionTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);

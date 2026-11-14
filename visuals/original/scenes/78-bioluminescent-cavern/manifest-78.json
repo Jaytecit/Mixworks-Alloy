@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 78,
+    "family_name": "Bioluminescent Cavern",
+    "variant_number": 1,
+    "variant_title": "Stalactite Hall",
+    "shader_path": "01-stalactite-hall/main.glsl",
+    "descriptor_path": "01-stalactite-hall/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 78,
+    "family_name": "Bioluminescent Cavern",
+    "variant_number": 2,
+    "variant_title": "Crystal Grotto",
+    "shader_path": "02-crystal-grotto/main.glsl",
+    "descriptor_path": "02-crystal-grotto/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 78,
+    "family_name": "Bioluminescent Cavern",
+    "variant_number": 3,
+    "variant_title": "Lava Tube",
+    "shader_path": "03-lava-tube/main.glsl",
+    "descriptor_path": "03-lava-tube/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 78,
+    "family_name": "Bioluminescent Cavern",
+    "variant_number": 4,
+    "variant_title": "Submerged Vault",
+    "shader_path": "04-submerged-vault/main.glsl",
+    "descriptor_path": "04-submerged-vault/scene.json",
+    "verification": "unverified"
+  }
+]

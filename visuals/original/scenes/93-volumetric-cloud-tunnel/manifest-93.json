@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 93,
+    "family_name": "Volumetric Cloud Tunnel",
+    "variant_number": 1,
+    "variant_title": "Storm Tunnel",
+    "shader_path": "01-storm-tunnel/main.glsl",
+    "descriptor_path": "01-storm-tunnel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 93,
+    "family_name": "Volumetric Cloud Tunnel",
+    "variant_number": 2,
+    "variant_title": "Sunset Clouds",
+    "shader_path": "02-sunset-clouds/main.glsl",
+    "descriptor_path": "02-sunset-clouds/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 93,
+    "family_name": "Volumetric Cloud Tunnel",
+    "variant_number": 3,
+    "variant_title": "Aurora Tube",
+    "shader_path": "03-aurora-tube/main.glsl",
+    "descriptor_path": "03-aurora-tube/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 93,
+    "family_name": "Volumetric Cloud Tunnel",
+    "variant_number": 4,
+    "variant_title": "Vortex Eye",
+    "shader_path": "04-vortex-eye/main.glsl",
+    "descriptor_path": "04-vortex-eye/scene.json",
+    "verification": "unverified"
+  }
+]

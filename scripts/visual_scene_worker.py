@@ -52,6 +52,7 @@ def main():
     parser.add_argument('--original', action='store_true')
     parser.add_argument('--milkdrop-library', type=Path)
     parser.add_argument('--sprite-folder', type=Path)
+    parser.add_argument('--studio-mailbox', type=Path)
     args = parser.parse_args()
     # Bind locally before loading OpenGL; parent sees readiness or a startup error.
     with socket.socket() as server:
@@ -74,7 +75,9 @@ def main():
             try:
                 with connection.makefile('rb') as stream:
                     while True:
-                        if player and player.presenter:
+                        if player and studio_mode:
+                            player.poll()
+                        elif player and player.presenter:
                             player.presenter.poll()
                         if not select.select([connection], [], [], .02)[0]:
                             if player:
@@ -95,7 +98,7 @@ def main():
                         identity = tuple((a.get('clip'), a.get('scene'), a.get('revision'), json.dumps(a.get('controls', {}), sort_keys=True))
                                          for a in request.get('scenes', []) if isinstance(a, dict)) + (request.get('generation'), request.get('image'), request.get('transition'), json.dumps(request.get('views', []), sort_keys=True))
                         if requested_studio:
-                            identity += (json.dumps(request["studioLayers"], sort_keys=True),)
+                            identity += (json.dumps(request["studioLayers"], sort_keys=True), request.get('studioOutput'))
                         if identity == failed_identity:
                             send(connection, dict(ok=False, error=last_error))
                             continue
@@ -103,7 +106,8 @@ def main():
                             if player is None:
                                 if requested_studio:
                                     from studio_scene_player import StudioScenePlayer
-                                    player = StudioScenePlayer(args.install, (args.width, args.height), args.milkdrop_library)
+                                    player = StudioScenePlayer(args.install, (args.width, args.height), args.milkdrop_library,
+                                                               args.studio_mailbox)
                                 else:
                                     from original_scene_player import OriginalScenePlayer
                                     player = OriginalScenePlayer(args.renderer_root, args.install, args.width, args.height, args.owner_pid,

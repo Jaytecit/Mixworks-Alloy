@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 57,
+    "family_name": "Temple of Arches",
+    "variant_number": 1,
+    "variant_title": "Pointed Nave",
+    "shader_path": "01-pointed-nave/main.glsl",
+    "descriptor_path": "01-pointed-nave/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 57,
+    "family_name": "Temple of Arches",
+    "variant_number": 2,
+    "variant_title": "Round Cloister",
+    "shader_path": "02-round-cloister/main.glsl",
+    "descriptor_path": "02-round-cloister/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 57,
+    "family_name": "Temple of Arches",
+    "variant_number": 3,
+    "variant_title": "Intersecting Vaults",
+    "shader_path": "03-intersecting-vaults/main.glsl",
+    "descriptor_path": "03-intersecting-vaults/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 57,
+    "family_name": "Temple of Arches",
+    "variant_number": 4,
+    "variant_title": "Floating Ruin",
+    "shader_path": "04-floating-ruin/main.glsl",
+    "descriptor_path": "04-floating-ruin/scene.json",
+    "verification": "unverified"
+  }
+]

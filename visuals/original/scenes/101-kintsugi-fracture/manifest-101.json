@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 101,
+    "family_name": "Kintsugi Fracture",
+    "variant_number": 1,
+    "variant_title": "Gold Seams",
+    "shader_path": "01-gold-seams/main.glsl",
+    "descriptor_path": "01-gold-seams/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 101,
+    "family_name": "Kintsugi Fracture",
+    "variant_number": 2,
+    "variant_title": "Celadon Crack",
+    "shader_path": "02-celadon-crack/main.glsl",
+    "descriptor_path": "02-celadon-crack/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 101,
+    "family_name": "Kintsugi Fracture",
+    "variant_number": 3,
+    "variant_title": "Obsidian Kiln",
+    "shader_path": "03-obsidian-kiln/main.glsl",
+    "descriptor_path": "03-obsidian-kiln/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 101,
+    "family_name": "Kintsugi Fracture",
+    "variant_number": 4,
+    "variant_title": "Liquid Join",
+    "shader_path": "04-liquid-join/main.glsl",
+    "descriptor_path": "04-liquid-join/scene.json",
+    "verification": "unverified"
+  }
+]

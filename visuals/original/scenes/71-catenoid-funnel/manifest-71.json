@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 71,
+    "family_name": "Catenoid Funnel",
+    "variant_number": 1,
+    "variant_title": "Smooth Throat",
+    "shader_path": "01-smooth-throat/main.glsl",
+    "descriptor_path": "01-smooth-throat/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 71,
+    "family_name": "Catenoid Funnel",
+    "variant_number": 2,
+    "variant_title": "Ribbed Funnel",
+    "shader_path": "02-ribbed-funnel/main.glsl",
+    "descriptor_path": "02-ribbed-funnel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 71,
+    "family_name": "Catenoid Funnel",
+    "variant_number": 3,
+    "variant_title": "Twin Bells",
+    "shader_path": "03-twin-bells/main.glsl",
+    "descriptor_path": "03-twin-bells/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 71,
+    "family_name": "Catenoid Funnel",
+    "variant_number": 4,
+    "variant_title": "Warping Throat",
+    "shader_path": "04-warping-throat/main.glsl",
+    "descriptor_path": "04-warping-throat/scene.json",
+    "verification": "unverified"
+  }
+]

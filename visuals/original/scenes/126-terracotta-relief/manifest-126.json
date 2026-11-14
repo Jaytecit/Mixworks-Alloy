@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 126,
+    "family_name": "Terracotta Relief",
+    "variant_number": 1,
+    "variant_title": "Sun Medallion",
+    "shader_path": "01-sun-medallion/main.glsl",
+    "descriptor_path": "01-sun-medallion/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 126,
+    "family_name": "Terracotta Relief",
+    "variant_number": 2,
+    "variant_title": "Wave Frieze",
+    "shader_path": "02-wave-frieze/main.glsl",
+    "descriptor_path": "02-wave-frieze/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 126,
+    "family_name": "Terracotta Relief",
+    "variant_number": 3,
+    "variant_title": "Labyrinth Slab",
+    "shader_path": "03-labyrinth-slab/main.glsl",
+    "descriptor_path": "03-labyrinth-slab/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 126,
+    "family_name": "Terracotta Relief",
+    "variant_number": 4,
+    "variant_title": "Kiln Fired",
+    "shader_path": "04-kiln-fired/main.glsl",
+    "descriptor_path": "04-kiln-fired/scene.json",
+    "verification": "unverified"
+  }
+]

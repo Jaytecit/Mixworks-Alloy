@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 85,
+    "family_name": "Volcanic Rift",
+    "variant_number": 1,
+    "variant_title": "Magma Trench",
+    "shader_path": "01-magma-trench/main.glsl",
+    "descriptor_path": "01-magma-trench/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 85,
+    "family_name": "Volcanic Rift",
+    "variant_number": 2,
+    "variant_title": "Caldera Rim",
+    "shader_path": "02-caldera-rim/main.glsl",
+    "descriptor_path": "02-caldera-rim/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 85,
+    "family_name": "Volcanic Rift",
+    "variant_number": 3,
+    "variant_title": "Basalt Columns",
+    "shader_path": "03-basalt-columns/main.glsl",
+    "descriptor_path": "03-basalt-columns/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 85,
+    "family_name": "Volcanic Rift",
+    "variant_number": 4,
+    "variant_title": "Eruption Vent",
+    "shader_path": "04-eruption-vent/main.glsl",
+    "descriptor_path": "04-eruption-vent/scene.json",
+    "verification": "unverified"
+  }
+]

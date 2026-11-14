@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 106,
+    "family_name": "Ferromagnetic Ribbons",
+    "variant_number": 1,
+    "variant_title": "Dipole Loop",
+    "shader_path": "01-dipole-loop/main.glsl",
+    "descriptor_path": "01-dipole-loop/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 106,
+    "family_name": "Ferromagnetic Ribbons",
+    "variant_number": 2,
+    "variant_title": "Quadrupole",
+    "shader_path": "02-quadrupole/main.glsl",
+    "descriptor_path": "02-quadrupole/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 106,
+    "family_name": "Ferromagnetic Ribbons",
+    "variant_number": 3,
+    "variant_title": "Solar Flare",
+    "shader_path": "03-solar-flare/main.glsl",
+    "descriptor_path": "03-solar-flare/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 106,
+    "family_name": "Ferromagnetic Ribbons",
+    "variant_number": 4,
+    "variant_title": "Flux Curtain",
+    "shader_path": "04-flux-curtain/main.glsl",
+    "descriptor_path": "04-flux-curtain/scene.json",
+    "verification": "unverified"
+  }
+]

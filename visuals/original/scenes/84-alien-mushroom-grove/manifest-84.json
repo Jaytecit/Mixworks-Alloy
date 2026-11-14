@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 84,
+    "family_name": "Alien Mushroom Grove",
+    "variant_number": 1,
+    "variant_title": "Canopy Grove",
+    "shader_path": "01-canopy-grove/main.glsl",
+    "descriptor_path": "01-canopy-grove/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 84,
+    "family_name": "Alien Mushroom Grove",
+    "variant_number": 2,
+    "variant_title": "Spore Rings",
+    "shader_path": "02-spore-rings/main.glsl",
+    "descriptor_path": "02-spore-rings/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 84,
+    "family_name": "Alien Mushroom Grove",
+    "variant_number": 3,
+    "variant_title": "Tall Stalks",
+    "shader_path": "03-tall-stalks/main.glsl",
+    "descriptor_path": "03-tall-stalks/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 84,
+    "family_name": "Alien Mushroom Grove",
+    "variant_number": 4,
+    "variant_title": "Biolume Forest",
+    "shader_path": "04-biolume-forest/main.glsl",
+    "descriptor_path": "04-biolume-forest/scene.json",
+    "verification": "unverified"
+  }
+]

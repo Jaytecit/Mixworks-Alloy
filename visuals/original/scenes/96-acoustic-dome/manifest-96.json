@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 96,
+    "family_name": "Acoustic Dome",
+    "variant_number": 1,
+    "variant_title": "Ribbed Dome",
+    "shader_path": "01-ribbed-dome/main.glsl",
+    "descriptor_path": "01-ribbed-dome/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 96,
+    "family_name": "Acoustic Dome",
+    "variant_number": 2,
+    "variant_title": "Hex Shell",
+    "shader_path": "02-hex-shell/main.glsl",
+    "descriptor_path": "02-hex-shell/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 96,
+    "family_name": "Acoustic Dome",
+    "variant_number": 3,
+    "variant_title": "Concentric Vault",
+    "shader_path": "03-concentric-vault/main.glsl",
+    "descriptor_path": "03-concentric-vault/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 96,
+    "family_name": "Acoustic Dome",
+    "variant_number": 4,
+    "variant_title": "Open Rotunda",
+    "shader_path": "04-open-rotunda/main.glsl",
+    "descriptor_path": "04-open-rotunda/scene.json",
+    "verification": "unverified"
+  }
+]

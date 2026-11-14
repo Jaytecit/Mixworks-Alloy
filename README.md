@@ -1,10 +1,10 @@
 # Mixworks Alloy
 
-Current continuity: [handover](HANDOVER.md), [visual direction](docs/VISUAL-DIRECTION.md) and [3 November maintenance record](docs/MAINTENANCE-20261103.md).
+Current development follows the [handover](HANDOVER.md), [outstanding roadmap](FINISHING-PLAN.md) and [documentation index](docs/README.md).
 
 **Work-in-progress beta.** Official project: [Jaytecit/Mixworks-Alloy](https://github.com/Jaytecit/Mixworks-Alloy). Free for personal, non-commercial testing under the [Personal Beta Licence](LICENSE); commercial use, redistribution and rebranding require written permission. Original application rights are reserved; third-party licences remain applicable. **Public binary distribution is pending dependency clearance** described in [licensing](docs/LICENSING.md).
 
-A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Source: 0.55.68 beta.** It includes source-grid A/B/C correction, editable mixing workflows and an owned visual library of **204 scenes** (203 with six named looks, plus Jumping Techno Tunnel). Whole-image and refracting-glass treatments, musical geometry/particle motion, kaleidoscopes, colour cycling and live long blends follow the [current visual direction](docs/VISUAL-DIRECTION.md). See [handover](HANDOVER.md) for exact verification and readiness limits.
+A local Windows mixing workstation built with JUCE, SoundTouch and local Beat This! analysis. **Alloy 0.55.133 beta includes Visual Studio 0.1.33 and 1,000 bundled Studio GLSL scenes.** It supports source-grid correction, editable audio transitions and a music-driven visual timeline. Exact candidate identity and focused verification are in the [handover](HANDOVER.md).
 
 Run **Mixworks.cmd**, or the **Mixworks Alloy** desktop shortcut. They select the current immutable local bundle through `out/Launch.cmd`; [handover](HANDOVER.md) records its exact version/hash. The desktop shortcut uses the [Alloy launcher icon](design/alloy/alloy-launcher.ico). Keep adjacent runtime, model, notices and licences with each candidate. Updating the launcher does not restart an existing session. This local development preview is not a public binary release or complete qualification.
 
@@ -12,7 +12,7 @@ Run **Mixworks.cmd**, or the **Mixworks Alloy** desktop shortcut. They select th
 
 1. Import audio or enable background Music-folder scanning. Library search, artwork, sorting, note/Camelot keys and confidence labels describe stored evidence, not accuracy probabilities. Tools / Music scan reports separates per-file import errors from cache warnings. Valid source-bound analysis and prepared audio are reused. See [loading and analysis](docs/LOADING-AND-ANALYSIS.md) and [import reports](docs/IMPORT-SCAN.md).
 2. Check BPM, pulse timing and bar phase before relying on alignment. Constant-tempo 4/4 music is the detection priority; a kick alone does not identify beat one. Source review offers audition, fine BPM/key/downbeat correction, source-only save and explicit save/rebuild. Focused retries protect accepted/manual fields and retain SoundTouch evidence. See [timing limits](docs/RHYTHM-TIMING-REVIEW.md), [focused analysis](docs/FOCUSED-ANALYSIS.md) and [protected downbeat references](docs/DOWNBEAT-REFERENCES.md).
-3. Add tracks as independent timeline placements. Ordinary add/drop creates no transition. Use **Add Transition** for an eligible overlapping pair, or an explicit arranging command. Frames move/resize independently within shared audio, with optional outside muting. The four lanes support range/multiple selection, split, slip, reverse, loop, clipboard and ripple operations. See [timeline editing](docs/TIMELINE-EDITING.md), [range editing](docs/RANGE-EDITING.md) and [bar navigation](docs/BAR-NAVIGATION.md).
+3. Add tracks as independent timeline placements. Ordinary add/drop creates no transition. Use **Add Transition** for an eligible overlapping pair, or an explicit arranging command. Frames move/resize independently within shared audio, with optional outside muting. Audio lanes support range/multiple selection, split, slip, reverse, loop, clipboard and ripple operations. See [timeline editing](docs/TIMELINE-EDITING.md), [range editing](docs/RANGE-EDITING.md) and [bar navigation](docs/BAR-NAVIGATION.md).
 4. Select a transition for Volume/Bass/Mid/High treatments, swap gaps, filters, lock, A/B/C rehearsal and named presets. Section hints are measured suggestions, not semantic verse/chorus recognition. Add creates one automation node without invented empty-curve endpoints; only the selected node shows its value caption. Precise entry retains physical units. See [preset nodes](docs/PRESET-NODES.md), [transition presets](docs/TRANSITION-PRESETS.md), [filters](docs/TRANSITION-FILTERS.md) and [keyboard controls](docs/TRANSITION-KEYBOARD.md).
 5. Use Editing, lane controls, the Controller desk or mapped MIDI. Original-track controls and VST curves share one owner across split pieces and gaps; separate placements remain independent. Piece geometry/fades stay local. Read/Touch/Write and arming determine automation capture; Record/Perform captures a distinct take. See [live desk](docs/LIVE-DESK.md) and [mode workflow](docs/ARRANGE-RECORD-PERFORM-PLAN.md).
 6. Save a `.mixworks` session and export stereo PCM24 WAV with the selected ending/tail. Master processing, labels/tracklists, recovery and monitor mute are available. Monitor mute affects device monitoring, not the recorded/exported programme. See [mastering](docs/MASTERING.md), [export](docs/EXPORTING.md) and [recovery](docs/RECOVERY-AND-MONITORING.md).
@@ -29,9 +29,19 @@ Optional live master WAV captures programme after master processing and before m
 
 Auto Arrange creates or extends a mix using eligible source grids, known keys, adjacent harmonic compatibility, an 8% BPM bound, valid placement and no repeats. Choose a starting song for a new arrangement, count or approximate duration up to 180 minutes, and optional genre/energy preferences. With an existing mix the dialog defaults to **Extend current arrangement**; enter additional songs/minutes. Create new arrangement replaces the mix. Preparation/cancellation/failure keeps the current mix until a successful commit; one Undo restores it.
 
-Seven blend styles are available: **Balanced**, **Smooth**, **Bold**, **Use my settings**, **Constant power**, **Hard cuts only** and **DJ set (varied)**. Generated treatments are ordinary editable nodes. Balanced/Bold bass/filter treatments replace the default volume fade; Smooth or unsuitable evidence uses a plain fade. Section-aware defaults do not impose a universal 32/64-bar limit on explicit frames. Constant power does not normalise recordings or guarantee equal perceived loudness.
+Seven blend styles are available: **Balanced**, **Smooth**, **Bold**, **Use my settings**, **Constant power**, **Hard cuts only** and **DJ set (varied)**. Generated treatments are editable nodes. Balanced, Bold and DJ set can use measured bass and section changes to coordinate faders, EQ and filtering. Smooth uses a plain volume fade. Use **Blend timeline tracks** to apply the shared Balanced pair planner while retaining track order.
 
 **Energy direction** offers Unrestricted, Keep pace, Build energy and Wind down. Rhythm, rhythmic bass, transient dynamics and tempo guide soft preferences, allowing plateaus and necessary reversals. Recording RMS is not the activity score. Genre is also a soft preference; missing evidence and departures are reported. There is no automatic gain change, vocal/drop classifier or calibrated danceability claim. The planner is a bounded heuristic, not an exhaustive best-order search. Listen through results. See [Auto Arrange](docs/AUTO-ARRANGEMENT.md).
+
+## Visual Studio
+
+Open **View → Open Visual Studio** or use the button on the visual timeline.
+With empty lanes, Studio reacts to the live master and offers **Random scene**
+and **Random MilkDrop**. Add Background, MilkDrop, GLSL and Sprite clips to
+schedule a show. **Match Mix** creates an editable schedule from track handovers,
+section changes and measured energy or activity. Right-click a GLSL or MilkDrop
+clip to replace it at its existing time. Press **F11** to toggle fullscreen.
+[Visual timeline guide](docs/VISUAL-SCENES.md) · [Studio controls and authoring](visual-studio/README.md)
 
 ## Stems
 
@@ -41,7 +51,7 @@ Stems share the parent source clock, edits and tempo map. New placements can reu
 
 ## Workspace, audio and controllers
 
-All four lane controls remain visible. Overall timeline resizing divides height evenly within one pixel; individual lane edges adjust the current space and survive width-only changes. Editing/Controller/Transitions panels dock, collapse or detach; workspace preferences remain outside musical Undo. See [layout](docs/TIMELINE-LAYOUT-049.md) and [named workspaces](docs/WORKSPACE-LAYOUTS.md).
+Choose two, three or four visible audio lanes in the timeline toolbar. Hidden audio lanes still play. Overall timeline resizing divides the height evenly across visible lanes. Individual lane edges adjust the current space and survive width-only changes. Editing/Controller/Transitions panels dock, collapse or detach; workspace preferences remain outside musical Undo. See [layout](docs/TIMELINE-LAYOUT-049.md) and [named workspaces](docs/WORKSPACE-LAYOUTS.md).
 
 The toolbar BPM follows the arrangement map at the playhead. Later tracks added during playback get future source-BPM targets after the protected existing-audio/manual-marker horizon. Source review saves do not silently rebuild existing prepared clocks. Hotcues jump source time while the programme clock continues. See [hotcues](docs/HOTCUES.md).
 
@@ -53,7 +63,7 @@ View offers saved Popup hints, grid brightness, Attract lighting and Molten spar
 
 ## Qualification and limits
 
-The current [handover](HANDOVER.md) binds historical focused checks to exact candidates and records remaining imports. Auditing does not resume bulk recovery, reset analysed data, overwrite reviewed references, or restart a running session. Historical 60/90-minute fixtures and prior full receipts do not qualify this candidate. See [capacity](docs/SOURCE-CAPACITY.md) and the [audit status](docs/release-audit/STATUS.md).
+The [handover](HANDOVER.md) identifies the current launcher and links evidence for the Studio preview, visual timeline and recent audio workflows. The [13 November functional audit](docs/AUDIT-20261113.md) records wider application findings. Auditing does not resume bulk recovery, reset analysed data, overwrite reviewed references, or restart a running session. Historical 60/90-minute fixtures and prior full receipts do not qualify this candidate. See [capacity](docs/SOURCE-CAPACITY.md) and the [audit status](docs/release-audit/STATUS.md).
 
 General real-music beat/downbeat/key accuracy and performance/fidelity thresholds remain unresolved. Listening, physical FLkey/ASIO/private routing and clean-environment package acceptance need separate evidence. Variable-tempo source detection, other meters, compressed export, editable MIDI-note recording, sequencing, built-in synth, phone controller and audiovisual integrations are outside current implemented scope. Outstanding work is tracked in [the roadmap](FINISHING-PLAN.md).
 

@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 105,
+    "family_name": "Stained Glass Rose",
+    "variant_number": 1,
+    "variant_title": "Cathedral Rose",
+    "shader_path": "01-cathedral-rose/main.glsl",
+    "descriptor_path": "01-cathedral-rose/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 105,
+    "family_name": "Stained Glass Rose",
+    "variant_number": 2,
+    "variant_title": "Lancet Arcade",
+    "shader_path": "02-lancet-arcade/main.glsl",
+    "descriptor_path": "02-lancet-arcade/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 105,
+    "family_name": "Stained Glass Rose",
+    "variant_number": 3,
+    "variant_title": "Kaleidic Foil",
+    "shader_path": "03-kaleidic-foil/main.glsl",
+    "descriptor_path": "03-kaleidic-foil/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 105,
+    "family_name": "Stained Glass Rose",
+    "variant_number": 4,
+    "variant_title": "Moonlight Nave",
+    "shader_path": "04-moonlight-nave/main.glsl",
+    "descriptor_path": "04-moonlight-nave/scene.json",
+    "verification": "unverified"
+  }
+]

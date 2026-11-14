@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_core/juce_core.h>
+#include <array>
 #include <vector>
 #include <map>
 
@@ -9,11 +10,22 @@ enum class VisualSceneSource { originals=1, milkdrop=2, both=3 };
 VisualSceneSource visualSceneSourceFromId(int);
 juce::String visualSceneSourceName(VisualSceneSource);
 struct VisualControlPoint { double at=0, value=0; };
-struct VisualControlCurve { bool stepped=false; std::vector<VisualControlPoint> points; bool cycle=false; };
+struct VisualControlCurve
+{
+    bool stepped = false;
+    std::vector<VisualControlPoint> points;
+    bool cycle = false;
+    double cycleMin = 0., cycleMax = 1., cycleBars = 64.;
+    juce::String audioSource;
+    double audioAmount = .25;
+};
 struct VisualControlSpec { double initial=.5; int steps=0; juce::String label; };
+using VisualOverrides = std::map<juce::String, double>;
 enum class VisualLayer { background, milk, shader, sprite };
 VisualLayer visualLayer(const juce::String& key);
-double visualCycleAt(double elapsedBeats);
+double visualCycleAt(double elapsedBeats, const VisualControlCurve&);
+bool validVisualAudioSource(const juce::String&);
+const std::array<std::pair<juce::String, juce::String>, 3>& studioTransitions();
 struct VisualScenePreset
 {
     juce::String id, title;
@@ -59,6 +71,8 @@ VisualSceneFrame visualFrameAt(const std::vector<VisualSceneClip>&, double secon
 juce::Result validateVisualScenes(const std::vector<VisualSceneClip>&);
 juce::var visualScenesToJson(const std::vector<VisualSceneClip>&);
 juce::Result readVisualScenes(const juce::var&, std::vector<VisualSceneClip>&);
+juce::var visualOverridesToJson(const VisualOverrides&);
+juce::Result readVisualOverrides(const juce::var&, VisualOverrides&);
 struct Project;
 juce::Result arrangeVisualScenes(Project&, const std::vector<VisualSceneEntry>&, juce::Random&, VisualSceneSource = VisualSceneSource::originals);
 }

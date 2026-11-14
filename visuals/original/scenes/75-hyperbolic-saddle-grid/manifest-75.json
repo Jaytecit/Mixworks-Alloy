@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 75,
+    "family_name": "Hyperbolic Saddle Grid",
+    "variant_number": 1,
+    "variant_title": "Saddle Field",
+    "shader_path": "01-saddle-field/main.glsl",
+    "descriptor_path": "01-saddle-field/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 75,
+    "family_name": "Hyperbolic Saddle Grid",
+    "variant_number": 2,
+    "variant_title": "Twisted Saddles",
+    "shader_path": "02-twisted-saddles/main.glsl",
+    "descriptor_path": "02-twisted-saddles/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 75,
+    "family_name": "Hyperbolic Saddle Grid",
+    "variant_number": 3,
+    "variant_title": "Nested Shells",
+    "shader_path": "03-nested-shells/main.glsl",
+    "descriptor_path": "03-nested-shells/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 75,
+    "family_name": "Hyperbolic Saddle Grid",
+    "variant_number": 4,
+    "variant_title": "Arching Waves",
+    "shader_path": "04-arching-waves/main.glsl",
+    "descriptor_path": "04-arching-waves/scene.json",
+    "verification": "unverified"
+  }
+]

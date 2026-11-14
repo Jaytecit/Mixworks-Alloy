@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 145,
+    "family_name": "Kinetic Mirror Mobile",
+    "variant_number": 1,
+    "variant_title": "Balanced Arms",
+    "shader_path": "01-balanced-arms/main.glsl",
+    "descriptor_path": "01-balanced-arms/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 145,
+    "family_name": "Kinetic Mirror Mobile",
+    "variant_number": 2,
+    "variant_title": "Spiral Mobile",
+    "shader_path": "02-spiral-mobile/main.glsl",
+    "descriptor_path": "02-spiral-mobile/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 145,
+    "family_name": "Kinetic Mirror Mobile",
+    "variant_number": 3,
+    "variant_title": "Prism Discs",
+    "shader_path": "03-prism-discs/main.glsl",
+    "descriptor_path": "03-prism-discs/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 145,
+    "family_name": "Kinetic Mirror Mobile",
+    "variant_number": 4,
+    "variant_title": "Wind Gust",
+    "shader_path": "04-wind-gust/main.glsl",
+    "descriptor_path": "04-wind-gust/scene.json",
+    "verification": "unverified"
+  }
+]

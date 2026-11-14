@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 98,
+    "family_name": "Data Cube Matrix",
+    "variant_number": 1,
+    "variant_title": "Voxel Stream",
+    "shader_path": "01-voxel-stream/main.glsl",
+    "descriptor_path": "01-voxel-stream/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 98,
+    "family_name": "Data Cube Matrix",
+    "variant_number": 2,
+    "variant_title": "Hollow Frame",
+    "shader_path": "02-hollow-frame/main.glsl",
+    "descriptor_path": "02-hollow-frame/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 98,
+    "family_name": "Data Cube Matrix",
+    "variant_number": 3,
+    "variant_title": "Cluster Core",
+    "shader_path": "03-cluster-core/main.glsl",
+    "descriptor_path": "03-cluster-core/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 98,
+    "family_name": "Data Cube Matrix",
+    "variant_number": 4,
+    "variant_title": "Exploding Matrix",
+    "shader_path": "04-exploding-matrix/main.glsl",
+    "descriptor_path": "04-exploding-matrix/scene.json",
+    "verification": "unverified"
+  }
+]

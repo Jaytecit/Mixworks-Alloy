@@ -1,6 +1,6 @@
 # Alloy visual direction
 
-Current artistic direction, reconciled 4 November 2026. This document owns artistic direction;
+The 4 November artistic direction remains the guide for Alloy Originals.
 [HANDOVER](../HANDOVER.md) owns the current candidate and evidence. Earlier proof
 milestones and catalogue targets are historical, not instructions to restart work.
 
@@ -21,10 +21,10 @@ movement. A numerical pixel difference is not proof of musical quality.
 Prefer solid/geometric compositions in the direction of Dimensional Pulse over a
 particle-heavy show. Keep the retained shortlist. Variants, mirrors/kaleidoscopes,
 image choices and distinct palettes are welcome; disclose shared mechanisms and
-do not count named looks as independent scenes. The active library currently has
-204 scenes: 203 with six executable looks plus Jumping Techno Tunnel. Jay accepted the five examples
+do not count named looks as independent scenes. The 4 November Originals catalogue had
+204 scenes, including 203 with six executable looks and Jumping Techno Tunnel. Jay accepted the five examples
 and authorised the full eighty additions, now [implemented and ready for review](VISUAL-EIGHTY-20261103.md).
-The [catalogue](IMAGE-INSTRUMENTS.md) records ten families of eight.
+The [catalogue](IMAGE-INSTRUMENTS.md) records ten families of eight. The connected Studio catalogue and cue-driven show follow the [current visual timeline guide](VISUAL-SCENES.md).
 
 ## Images and materials
 

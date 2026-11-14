@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 148,
+    "family_name": "Ceramic Glaze Crackle",
+    "variant_number": 1,
+    "variant_title": "Celadon Pool",
+    "shader_path": "01-celadon-pool/main.glsl",
+    "descriptor_path": "01-celadon-pool/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 148,
+    "family_name": "Ceramic Glaze Crackle",
+    "variant_number": 2,
+    "variant_title": "Raku Copper",
+    "shader_path": "02-raku-copper/main.glsl",
+    "descriptor_path": "02-raku-copper/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 148,
+    "family_name": "Ceramic Glaze Crackle",
+    "variant_number": 3,
+    "variant_title": "Cobalt Slip",
+    "shader_path": "03-cobalt-slip/main.glsl",
+    "descriptor_path": "03-cobalt-slip/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 148,
+    "family_name": "Ceramic Glaze Crackle",
+    "variant_number": 4,
+    "variant_title": "Ash Glaze",
+    "shader_path": "04-ash-glaze/main.glsl",
+    "descriptor_path": "04-ash-glaze/scene.json",
+    "verification": "unverified"
+  }
+]

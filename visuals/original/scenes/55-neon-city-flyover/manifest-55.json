@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 55,
+    "family_name": "Neon City Flyover",
+    "variant_number": 1,
+    "variant_title": "Downtown Grid",
+    "shader_path": "01-downtown-grid/main.glsl",
+    "descriptor_path": "01-downtown-grid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 55,
+    "family_name": "Neon City Flyover",
+    "variant_number": 2,
+    "variant_title": "Spire District",
+    "shader_path": "02-spire-district/main.glsl",
+    "descriptor_path": "02-spire-district/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 55,
+    "family_name": "Neon City Flyover",
+    "variant_number": 3,
+    "variant_title": "Elevated Bridges",
+    "shader_path": "03-elevated-bridges/main.glsl",
+    "descriptor_path": "03-elevated-bridges/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 55,
+    "family_name": "Neon City Flyover",
+    "variant_number": 4,
+    "variant_title": "Inverted Skyline",
+    "shader_path": "04-inverted-skyline/main.glsl",
+    "descriptor_path": "04-inverted-skyline/scene.json",
+    "verification": "unverified"
+  }
+]

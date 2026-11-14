@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 143,
+    "family_name": "Hyperbolic Escher Disc",
+    "variant_number": 1,
+    "variant_title": "Poincare Tessellation",
+    "shader_path": "01-poincare-tessellation/main.glsl",
+    "descriptor_path": "01-poincare-tessellation/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 143,
+    "family_name": "Hyperbolic Escher Disc",
+    "variant_number": 2,
+    "variant_title": "Spinning Web",
+    "shader_path": "02-spinning-web/main.glsl",
+    "descriptor_path": "02-spinning-web/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 143,
+    "family_name": "Hyperbolic Escher Disc",
+    "variant_number": 3,
+    "variant_title": "Mobius Shift",
+    "shader_path": "03-mobius-shift/main.glsl",
+    "descriptor_path": "03-mobius-shift/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 143,
+    "family_name": "Hyperbolic Escher Disc",
+    "variant_number": 4,
+    "variant_title": "Boundary Bloom",
+    "shader_path": "04-boundary-bloom/main.glsl",
+    "descriptor_path": "04-boundary-bloom/scene.json",
+    "verification": "unverified"
+  }
+]

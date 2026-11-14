@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 69,
+    "family_name": "Platonic Array",
+    "variant_number": 1,
+    "variant_title": "Octa Lattice",
+    "shader_path": "01-octa-lattice/main.glsl",
+    "descriptor_path": "01-octa-lattice/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 69,
+    "family_name": "Platonic Array",
+    "variant_number": 2,
+    "variant_title": "Cube Matrix",
+    "shader_path": "02-cube-matrix/main.glsl",
+    "descriptor_path": "02-cube-matrix/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 69,
+    "family_name": "Platonic Array",
+    "variant_number": 3,
+    "variant_title": "Morphing Solids",
+    "shader_path": "03-morphing-solids/main.glsl",
+    "descriptor_path": "03-morphing-solids/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 69,
+    "family_name": "Platonic Array",
+    "variant_number": 4,
+    "variant_title": "Pulsing Grid",
+    "shader_path": "04-pulsing-grid/main.glsl",
+    "descriptor_path": "04-pulsing-grid/scene.json",
+    "verification": "unverified"
+  }
+]

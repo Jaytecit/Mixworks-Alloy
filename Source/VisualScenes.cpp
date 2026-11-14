@@ -19,8 +19,11 @@ bool originalKey(const juce::String& key)
 bool validKey(const juce::String& key)
 {
     const auto path = key.fromFirstOccurrenceOf("/", false, false);
+    const bool libraryImage = key.startsWith("studio-sprite/") || key.startsWith("studio-bg/");
     return originalKey(key) || isMilkDropKey(key) || key == "studio-milk/prism"
         || key == "studio-bg/copper" || key == "studio-sprite/circuit" || key == "studio-sprite/flare"
+        || (libraryImage && path.isNotEmpty() && path.length() <= 240
+            && !path.containsAnyOf("/\\:\r\n") && path != "." && path != ".." && path.containsChar('.'))
         || (key.startsWith("studio/") && path.isNotEmpty() && path.length() <= 64
             && path.containsOnly("abcdefghijklmnopqrstuvwxyz0123456789-"))
         || ((key.startsWith("sprite/") || key.startsWith("background/") || key.startsWith("glsl/"))
@@ -36,15 +39,48 @@ VisualLayer visualLayer(const juce::String& key)
     if (key.startsWith("sprite/") || key.startsWith("studio-sprite/")) return VisualLayer::sprite;
     return VisualLayer::shader;
 }
-double visualCycleAt(double elapsedBeats)
+double visualCycleAt(double elapsedBeats, const VisualControlCurve& curve)
 {
-    constexpr double leg = 128 * 4;
-    const auto phase = std::fmod(std::max(0., elapsedBeats), 2 * leg) / leg;
-    return 1. - std::abs(1. - phase);
+    const auto period = curve.cycleBars * 4.;
+    const auto phase = std::fmod(std::max(0., elapsedBeats), period) / period;
+    return curve.cycleMin + (curve.cycleMax - curve.cycleMin) * (1. - std::abs(1. - 2. * phase));
+}
+bool validVisualAudioSource(const juce::String& source)
+{
+    return source.isEmpty() || source == "bass" || source == "energy";
+}
+const std::array<std::pair<juce::String, juce::String>, 3>& studioTransitions()
+{
+    static const std::array<std::pair<juce::String, juce::String>, 3> presets {{
+        {"dissolve", "Dissolve"}, {"bass-handoff", "Bass Handoff"}, {"cut", "Downbeat Cut"}
+    }};
+    return presets;
 }
 bool validVisualTransition(const juce::String& value)
 {
-    return value == "feedback" || value == "dissolve" || value == "zoom" || value == "radial" || value == "sweep" || value == "cut" || value == "sweep-reverse";
+    return value == "feedback" || value == "dissolve" || value == "zoom" || value == "radial" || value == "sweep" || value == "cut" || value == "sweep-reverse" || value == "bass-handoff";
+}
+juce::var visualOverridesToJson(const VisualOverrides& overrides)
+{
+    auto* values = new juce::DynamicObject();
+    for (const auto& [key, value] : overrides) values->setProperty(key, value);
+    return juce::var(values);
+}
+juce::Result readVisualOverrides(const juce::var& value, VisualOverrides& destination)
+{
+    const auto* object = value.getDynamicObject();
+    if (!object || object->getProperties().size() > 4096) return juce::Result::fail("Invalid Studio overrides.");
+    VisualOverrides parsed;
+    for (const auto& property : object->getProperties())
+    {
+        const auto key = property.name.toString();
+        if (key.isEmpty() || key.length() > 8192 || !number(property.value)
+            || (double)property.value < 0. || (double)property.value > 1.)
+            return juce::Result::fail("Invalid Studio override value.");
+        parsed.emplace(key, (double)property.value);
+    }
+    destination = std::move(parsed);
+    return juce::Result::ok();
 }
 juce::var visualControlsToJson(const std::map<juce::String, double>& controls)
 {
@@ -172,7 +208,11 @@ juce::Result validateVisualScenes(const std::vector<VisualSceneClip>& clips)
         {
             if(name.isEmpty() || !name.containsOnly("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
                 || juce::CharacterFunctions::isDigit(name[0]) || curve.points.size()>64
-                || (curve.points.size()<2 && (!curve.cycle || !curve.points.empty())))
+                || curve.points.size() == 1 || !validVisualAudioSource(curve.audioSource)
+                || !std::isfinite(curve.audioAmount) || curve.audioAmount < 0. || curve.audioAmount > 1.
+                || !std::isfinite(curve.cycleBars) || curve.cycleBars < 1. || curve.cycleBars > 1024.
+                || !std::isfinite(curve.cycleMin) || !std::isfinite(curve.cycleMax)
+                || curve.cycleMin < 0. || curve.cycleMax > 1. || curve.cycleMin > curve.cycleMax)
                 return juce::Result::fail("Invalid visual automation curve.");
             double previous=-1;
             for(const auto& point:curve.points)
@@ -203,6 +243,9 @@ juce::var visualScenesToJson(const std::vector<VisualSceneClip>& clips)
         {
             auto* value=new juce::DynamicObject(); value->setProperty("stepped",curve.stepped);
             if (curve.cycle) value->setProperty("cycle", true);
+            value->setProperty("cycleMin", curve.cycleMin); value->setProperty("cycleMax", curve.cycleMax);
+            value->setProperty("cycleBars", curve.cycleBars);
+            value->setProperty("audioSource", curve.audioSource); value->setProperty("audioAmount", curve.audioAmount);
             juce::Array<juce::var> points;
             for(const auto& point:curve.points) points.add(juce::var(juce::Array<juce::var>{point.at,point.value}));
             value->setProperty("points",points);automation->setProperty(name,juce::var(value));
@@ -243,6 +286,16 @@ juce::Result readVisualScenes(const juce::var& value, std::vector<VisualSceneCli
                     || (!prop.value["cycle"].isVoid() && !prop.value["cycle"].isBool()))
                     return juce::Result::fail("Invalid visual automation points.");
                 VisualControlCurve curve;curve.stepped=(bool)prop.value["stepped"]; curve.cycle=(bool)prop.value["cycle"];
+                for (const auto* field : {"cycleMin", "cycleMax", "cycleBars", "audioAmount"})
+                    if (prop.value.hasProperty(field) && !number(prop.value[field]))
+                        return juce::Result::fail("Invalid visual automation range.");
+                if (prop.value.hasProperty("cycleMin")) curve.cycleMin = (double)prop.value["cycleMin"];
+                if (prop.value.hasProperty("cycleMax")) curve.cycleMax = (double)prop.value["cycleMax"];
+                if (prop.value.hasProperty("cycleBars")) curve.cycleBars = (double)prop.value["cycleBars"];
+                if (prop.value.hasProperty("audioAmount")) curve.audioAmount = (double)prop.value["audioAmount"];
+                if (prop.value.hasProperty("audioSource") && !prop.value["audioSource"].isString())
+                    return juce::Result::fail("Invalid visual audio source.");
+                curve.audioSource = prop.value["audioSource"].toString();
                 for(const auto& point:*points)
                 {
                     if(!point.isArray() || point.size()!=2 || !number(point[0]) || !number(point[1]))
@@ -264,7 +317,7 @@ std::map<juce::String,double> visualControlsAt(const VisualSceneClip& scene,doub
     const double at=juce::jlimit(0.,1.,(localTime-scene.offset)/std::max(.05,scene.length));
     for(const auto& [name,curve]:scene.automation)
     {
-        if(curve.cycle) { values[name]=visualCycleAt(elapsedBeats); continue; }
+        if(curve.cycle) { values[name]=visualCycleAt(elapsedBeats, curve); continue; }
         if(curve.points.empty()) continue;
         double value=curve.points.back().value;
         for(size_t i=1;i<curve.points.size();++i) if(at<curve.points[i].at)

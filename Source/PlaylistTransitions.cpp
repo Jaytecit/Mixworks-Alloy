@@ -1,5 +1,6 @@
 #include "Workstation.h"
 #include "EnergySections.h"
+#include "PresetNodes.h"
 #include <cmath>
 
 namespace mixworks
@@ -64,23 +65,48 @@ juce::Component* LibraryTable::refreshComponentForCell(int row, int column, bool
         else for (size_t i = 0; i < choices.size(); ++i)
             if (link->presetName == choices[i].name) { selected = 100 + (int)i; break; }
     }
-    else if (link && owner.engine.project.captureTransitionStyle(clip->id, style).wasOk())
+    else if (link)
     {
-        for (size_t i = 0; i < choices.size(); ++i) if (style == choices[i].style) { selected = 100 + (int) i; break; }
+        const auto& project = owner.engine.project;
+        const auto* outgoing = project.clipFor(link->outgoing);
+        const auto* incoming = project.clipFor(link->incoming);
+        TransitionStyle::Nodes captured;
+        if (outgoing && incoming && !project.hasPendingPlacement()
+            && capturePresetNodes(project, link->incoming, captured).wasOk())
+        {
+            style.nodes = std::move(captured);
+            for (size_t i = 0; i < choices.size(); ++i)
+                if (style == choices[i].style) { selected = 100 + (int) i; break; }
+        }
         if (!selected && style.nodes)
         {
             // Derive the label from the actual ordinary shape. There is no
             // hidden preset identity that survives an edit to its nodes.
+            Project pair;
+            pair.bpm = project.bpm;
+            pair.tempo = project.tempo;
+            pair.followTrackTempo = project.followTrackTempo;
+            pair.clips = {*outgoing, *incoming};
+            pair.transitionLinks = {*link};
+            for (auto& side : pair.clips)
+            {
+                const auto* original = project.clipFor(side.id);
+                side.controls = project.effectSettings(*original);
+                side.controls.automation = {};
+                const auto* effectOwner = project.effectOwner(*original);
+                if (effectOwner && effectOwner != original)
+                    side.effectOffset = project.automationTime({side.track, AutomationTarget::volume, {}, {}, side.id}, side.start);
+            }
+            auto& reference = pair.transitionLinks.front();
+            reference.bands = {}; reference.filter = {}; reference.bassSwap.reset();
             for (int preset = 0; preset < 3 && !selected; ++preset)
             {
-                Project expected = owner.engine.project;
-                for (auto& c : expected.clips) c.controls.automation = {};
-                for (auto& l : expected.transitionLinks) { l.bands = {}; l.filter = {}; l.bassSwap.reset(); }
-                TransitionStyle shape;
+                Project expected = pair;
+                TransitionStyle::Nodes shape;
                 if (expected.applyTransitionPreset(clip->id,(TransitionPreset) preset).wasOk()
-                    && expected.captureTransitionStyle(clip->id,shape).wasOk() && shape.nodes)
+                    && capturePresetNodes(expected,clip->id,shape).wasOk())
                 {
-                    auto actual = *style.nodes, wanted = *shape.nodes;
+                    auto actual = *style.nodes, wanted = std::move(shape);
                     for (int side = 0; side < 2; ++side) for (int target = 0; target < trackAutomationCount; ++target)
                     {
                         const auto* source = owner.engine.project.clipFor(side == 0 ? link->outgoing : link->incoming);
@@ -93,20 +119,6 @@ juce::Component* LibraryTable::refreshComponentForCell(int row, int column, bool
                     }
                     if (actual == wanted) selected = preset + 1;
                 }
-            }
-        }
-        if (!selected && !style.nodes && !style.bassPositions && !style.filter.active())
-        {
-            const auto matches = [&](std::array<double, 4> values)
-            { for (size_t i = 0; i < 4; ++i) if (std::abs(style.volume[i] - values[i]) > 1e-7) return false; return true; };
-            const bool unbanded = std::none_of(style.bands.begin(), style.bands.end(), [](const auto& b) { return b.has_value(); });
-            if (unbanded && matches({0, 1, 0, 1})) selected = 3;
-            else if (unbanded && matches({0, 0, 1, 1})) selected = 1;
-            else if (matches({0, 0, 1, 1}) && style.bands[1] && !style.bands[0] && !style.bands[2] && !style.bands[3])
-            {
-                const auto& bass = *style.bands[1];
-                if (bass.mode == TransitionBandMode::swap && bass.strength == 1 && bass.gapBeats == 0 && bass.bend == std::array<double, 2>{}
-                    && std::abs(bass.position - sectionSwapPosition(owner.engine.project, *link)) < 1.e-7) selected = 2;
             }
         }
     }

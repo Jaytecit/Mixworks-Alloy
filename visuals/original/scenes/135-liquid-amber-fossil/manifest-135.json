@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 135,
+    "family_name": "Liquid Amber Fossil",
+    "variant_number": 1,
+    "variant_title": "Honey Cube",
+    "shader_path": "01-honey-cube/main.glsl",
+    "descriptor_path": "01-honey-cube/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 135,
+    "family_name": "Liquid Amber Fossil",
+    "variant_number": 2,
+    "variant_title": "Inclusions",
+    "shader_path": "02-inclusions/main.glsl",
+    "descriptor_path": "02-inclusions/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 135,
+    "family_name": "Liquid Amber Fossil",
+    "variant_number": 3,
+    "variant_title": "Swirl Resin",
+    "shader_path": "03-swirl-resin/main.glsl",
+    "descriptor_path": "03-swirl-resin/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 135,
+    "family_name": "Liquid Amber Fossil",
+    "variant_number": 4,
+    "variant_title": "Sunlit Slab",
+    "shader_path": "04-sunlit-slab/main.glsl",
+    "descriptor_path": "04-sunlit-slab/scene.json",
+    "verification": "unverified"
+  }
+]

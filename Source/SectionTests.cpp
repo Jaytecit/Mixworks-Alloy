@@ -230,7 +230,7 @@ void runSectionFlagTests(const std::function<void(bool, const juce::String&)>& c
     ui.selectedAutomationTarget = (int) AutomationTarget::bass; ui.selectTrack(3); ui.refresh();
     ui.newSession();
     bool noCurves = true;
-    for (int lane = 0; lane < trackCount; ++lane) noCurves &= ui.timeline.visibleAutomationAddresses(lane).empty();
+    for (int lane = 0; lane < trackCount; ++lane) noCurves &= ui.timeline.displayedAutomationAddresses(lane).empty();
     check(ui.engine.project.clips.empty() && ui.automationLane() == -1 && noCurves && ui.undoHistory.empty()
         && ui.timeline.visibleHotcueClips.empty() && ui.timeline.visibleSectionClips.empty(),
         "New after Discard clears the selected bass view and marker visibility on all empty lanes");

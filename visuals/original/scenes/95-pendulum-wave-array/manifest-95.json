@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 95,
+    "family_name": "Pendulum Wave Array",
+    "variant_number": 1,
+    "variant_title": "Linear Wave",
+    "shader_path": "01-linear-wave/main.glsl",
+    "descriptor_path": "01-linear-wave/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 95,
+    "family_name": "Pendulum Wave Array",
+    "variant_number": 2,
+    "variant_title": "Double Row",
+    "shader_path": "02-double-row/main.glsl",
+    "descriptor_path": "02-double-row/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 95,
+    "family_name": "Pendulum Wave Array",
+    "variant_number": 3,
+    "variant_title": "Circular Array",
+    "shader_path": "03-circular-array/main.glsl",
+    "descriptor_path": "03-circular-array/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 95,
+    "family_name": "Pendulum Wave Array",
+    "variant_number": 4,
+    "variant_title": "Spiral Pendulum",
+    "shader_path": "04-spiral-pendulum/main.glsl",
+    "descriptor_path": "04-spiral-pendulum/scene.json",
+    "verification": "unverified"
+  }
+]

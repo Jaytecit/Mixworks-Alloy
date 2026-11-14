@@ -674,9 +674,26 @@ void Workstation::resizeLane(int lane, int height)
 }
 void Workstation::layoutTrackHeaders()
 {
-    for (int i = 0; i < trackCount; ++i) strips[(size_t) i]->setBounds(0, timeline.laneTop(i) - viewport.getViewPositionY(), trackHeaders.getWidth(), timeline.laneSize(i));
+    for (int i = 0; i < trackCount; ++i)
+    {
+        strips[(size_t) i]->setVisible(i < layout.visibleLaneCount);
+        strips[(size_t) i]->setBounds(0, timeline.laneTop(i) - viewport.getViewPositionY(), trackHeaders.getWidth(), timeline.laneSize(i));
+    }
     tempoStrip.setBounds(layout.tempo.withWidth(viewport.getViewWidth())); tempoStrip.repaint();
     timelineRuler.setBounds(layout.ruler.withWidth(viewport.getViewWidth()));
+}
+void Workstation::setVisibleAudioLanes(int count)
+{
+    if (count < 2 || count > trackCount || count == layout.visibleLaneCount) return;
+    layout.visibleLaneCount = count;
+    workspaceDirty = true; workspaceChangedAt = juce::Time::getMillisecondCounterHiRes();
+    clearEditSelection();
+    if (const auto* clip = currentClip(); clip && clip->track >= count) selectedClip.clear();
+    resized();
+    if (engine.selectedTrack >= count) selectTrack(count - 1); else refresh();
+    const bool occupied = std::any_of(engine.project.clips.begin(), engine.project.clips.end(),
+        [count](const auto& clip) { return clip.track >= count; });
+    setStatus(juce::String(count) + " audio lanes visible." + (occupied ? " Hidden tracks still play. Restore their lanes here to edit them." : ""));
 }
 void Workstation::showBrowserPage(int page)
 {
@@ -864,7 +881,7 @@ void Workstation::resized()
     const bool narrowToolbar = getWidth() < 1500;
     const int waveformWidth = narrowToolbar ? 112 : 174;
     const int settingsWidth = narrowToolbar ? 184 : 232;
-    const int actionBudget = toolbar.getWidth() - (settingsWidth - 120) - 100 - waveformWidth - 4 - 256 - 8 - (narrowToolbar ? 546 : 640);
+    const int actionBudget = toolbar.getWidth() - (settingsWidth - 120) - 152 - waveformWidth - 4 - 256 - 8 - (narrowToolbar ? 546 : 640);
     struct Action { juce::Component* control; int width; int priority; };
     const Action actions[] {{&newButton, 52, 1}, {&openButton, 58, 2}, {&saveButton, 58, 0}, {&importButton, 118, 0},
         {&exportButton, 102, 5}, {&undoButton, 54, 3}, {&redoButton, 54, 4}, {&splitButton, 52, 6}, {&duplicateButton, 82, 7}, {&removeButton, 70, 8}};
@@ -881,7 +898,7 @@ void Workstation::resized()
         if (action.control->isVisible()) button(*action.control, toolbar, action.width);
     }
     toolbar.removeFromLeft(8);
-    button(beatmatchButton, toolbar, 96); button(waveformMode, toolbar, waveformWidth);
+    button(beatmatchButton, toolbar, 148); button(waveformMode, toolbar, waveformWidth);
     settingsButton.setBounds(layout.toolbar.withLeft(layout.toolbar.getRight() - settingsWidth));
     autoArrangeButton.setBounds(settingsButton.getX() - 128, settingsButton.getY(), 120, settingsButton.getHeight());
     layout.transport = toolbar.withRight(autoArrangeButton.getX() - 8);
@@ -919,7 +936,9 @@ void Workstation::resized()
     const auto laneControls = layout.headers.withY(layout.ruler.getY()).withHeight(Timeline::rulerHeight);
     if (masterPanelButton) masterPanelButton->setBounds(laneControls.withSize(34, 34).translated(4, 5));
     auto laneTools = laneControls.withTrimmedLeft(42).reduced(2, 0);
-    followButton.setBounds(laneTools.withSizeKeepingCentre(laneTools.getWidth(), 26));
+    followButton.setBounds(laneTools.removeFromTop(23).reduced(0, 1));
+    audioLanes.setBounds(laneTools.reduced(0, 1));
+    audioLanes.setSelectedId(layout.visibleLaneCount, juce::dontSendNotification);
     auto master = layout.master.reduced(12, 8); masterLabel.setText("MASTER OUTPUT", juce::dontSendNotification); masterLabel.setBounds(master.removeFromTop(22)); master.removeFromTop(4); auto masterRow = master.removeFromTop(28); monitorMute.setBounds(masterRow.removeFromRight(66)); masterSlider.setBounds(masterRow);
     peakReset.setBounds(layout.peakPanel.reduced(10, 0).withY(layout.peakPanel.getY() + 9).withHeight(23));
     const bool tallMeter = layout.peakPanel.getHeight() >= 240 || layout.inspectorCollapsed;
@@ -978,9 +997,11 @@ void Workstation::setFollowPlayhead(bool enabled)
 void Workstation::followPlayheadIntoView()
 {
     if (!layout.followPlayhead || engine.exporting) return;
+    const double position = engine.position.load();
+    if (studioWorkspace) studioWorkspace->followPlayhead(position);
     const int width = viewport.getViewWidth();
     if (width <= 0) return;
-    const int x = Clip::gridPixel(engine.position.load(), timeline.pixelsPerSecond);
+    const int x = Clip::gridPixel(position, timeline.pixelsPerSecond);
     if (x >= timeline.getWidth()) timeline.updateSize();
     const int left = viewport.getViewPositionX();
     if (x >= left && x < left + width) return;

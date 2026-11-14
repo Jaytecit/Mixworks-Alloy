@@ -12,6 +12,7 @@ struct AutoArrangementOptions
 {
     juce::String startingId; // Empty: random when unrestricted, direction-aware otherwise.
     int trackCount = 10;
+    int laneCount = mixworks::trackCount;
     std::optional<double> targetSeconds;
     TransitionPreset preset = TransitionPreset::crossfade;
     double overlapBeats = 128;
@@ -29,9 +30,15 @@ struct AutoArrangementResult
     juce::String error, summary, stopReason;
     int eligibleTracks = 0;
     juce::StringArray decisions;
+    juce::String completionText(AutoTransitionStyle) const;
 };
+// Metadata-only timeline command. Retains order and authored source controls;
+// shares pair placement with library Auto Arrange. Audio refinement follows load.
+AutoArrangementResult planTimelineBlends(Project, const std::shared_ptr<std::atomic<bool>>& cancelled = {});
 juce::String normalizedAutoGenre(const juce::String&);
 bool autoArrangementEligible(const Media&);
 AutoArrangementResult planAutoArrangement(const std::vector<std::shared_ptr<Media>>&, const AutoArrangementOptions&,
                                          juce::Random&, const std::shared_ptr<std::atomic<bool>>& cancelled = {}, const Project* existing = nullptr);
+void applyAutoArrangementBass(AutoArrangementResult&, AutoTransitionStyle, size_t firstNewClip,
+                              juce::AudioFormatManager&, const std::shared_ptr<std::atomic<bool>>& cancelled = {});
 }

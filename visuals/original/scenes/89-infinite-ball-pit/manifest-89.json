@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 89,
+    "family_name": "Infinite Ball Pit",
+    "variant_number": 1,
+    "variant_title": "Uniform Grid",
+    "shader_path": "01-uniform-grid/main.glsl",
+    "descriptor_path": "01-uniform-grid/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 89,
+    "family_name": "Infinite Ball Pit",
+    "variant_number": 2,
+    "variant_title": "Wave Field",
+    "shader_path": "02-wave-field/main.glsl",
+    "descriptor_path": "02-wave-field/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 89,
+    "family_name": "Infinite Ball Pit",
+    "variant_number": 3,
+    "variant_title": "Size Cascade",
+    "shader_path": "03-size-cascade/main.glsl",
+    "descriptor_path": "03-size-cascade/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 89,
+    "family_name": "Infinite Ball Pit",
+    "variant_number": 4,
+    "variant_title": "Hollow Bubbles",
+    "shader_path": "04-hollow-bubbles/main.glsl",
+    "descriptor_path": "04-hollow-bubbles/scene.json",
+    "verification": "unverified"
+  }
+]

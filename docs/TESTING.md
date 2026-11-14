@@ -1,5 +1,16 @@
 # Proportionate testing
 
+13 November .118 passes **354 focused checks**: Auto Arrange202, stems80 and
+saved-mix comparison72. Both arrange commands share pair planning. Coverage
+includes nonzero incoming cues, generated ownership, authored controls,
+consecutive bass exchanges, repeat-Blend, current-format saves and real incoming
+PCM silent before IN and audible during the fade. Three old/new pairs were
+rendered and loudness matched. The actual timeline button, exact Undo,
+source-backed reopen, two-node bass curves and muted device playback also passed.
+This is scoped verification, with stress off; listening acceptance and a full
+regression remain open. Candidate failures and final identities are retained in
+[Handover](../HANDOVER.md) and `.local/pair1112`.
+
 11 November .96 passes **587 focused checks**: live103, bars34, ranges184,
 direct-range69, Unlink19, native-effects31, export57 and seek90. Actual live
 Duplicate and stopped range Crop/Undo/Redo/save/reopen also pass. Diagnostic .93,

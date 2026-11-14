@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 149,
+    "family_name": "Acoustic Sand Pendulum",
+    "variant_number": 1,
+    "variant_title": "Single Mound",
+    "shader_path": "01-single-mound/main.glsl",
+    "descriptor_path": "01-single-mound/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 149,
+    "family_name": "Acoustic Sand Pendulum",
+    "variant_number": 2,
+    "variant_title": "Figure-8",
+    "shader_path": "02-figure-8/main.glsl",
+    "descriptor_path": "02-figure-8/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 149,
+    "family_name": "Acoustic Sand Pendulum",
+    "variant_number": 3,
+    "variant_title": "Star Sand",
+    "shader_path": "03-star-sand/main.glsl",
+    "descriptor_path": "03-star-sand/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 149,
+    "family_name": "Acoustic Sand Pendulum",
+    "variant_number": 4,
+    "variant_title": "Wind Erase",
+    "shader_path": "04-wind-erase/main.glsl",
+    "descriptor_path": "04-wind-erase/scene.json",
+    "verification": "unverified"
+  }
+]

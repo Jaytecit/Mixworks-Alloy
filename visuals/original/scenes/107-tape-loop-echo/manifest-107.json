@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 107,
+    "family_name": "Tape Loop Echo",
+    "variant_number": 1,
+    "variant_title": "Dual Reel",
+    "shader_path": "01-dual-reel/main.glsl",
+    "descriptor_path": "01-dual-reel/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 107,
+    "family_name": "Tape Loop Echo",
+    "variant_number": 2,
+    "variant_title": "Cassette Window",
+    "shader_path": "02-cassette-window/main.glsl",
+    "descriptor_path": "02-cassette-window/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 107,
+    "family_name": "Tape Loop Echo",
+    "variant_number": 3,
+    "variant_title": "Tangled Loop",
+    "shader_path": "03-tangled-loop/main.glsl",
+    "descriptor_path": "03-tangled-loop/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 107,
+    "family_name": "Tape Loop Echo",
+    "variant_number": 4,
+    "variant_title": "Flutter Decay",
+    "shader_path": "04-flutter-decay/main.glsl",
+    "descriptor_path": "04-flutter-decay/scene.json",
+    "verification": "unverified"
+  }
+]

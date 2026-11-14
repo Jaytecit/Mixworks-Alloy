@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 53,
+    "family_name": "Cyber Tunnel Matrix",
+    "variant_number": 1,
+    "variant_title": "Square Conduit",
+    "shader_path": "01-square-conduit/main.glsl",
+    "descriptor_path": "01-square-conduit/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 53,
+    "family_name": "Cyber Tunnel Matrix",
+    "variant_number": 2,
+    "variant_title": "Hex Bore",
+    "shader_path": "02-hex-bore/main.glsl",
+    "descriptor_path": "02-hex-bore/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 53,
+    "family_name": "Cyber Tunnel Matrix",
+    "variant_number": 3,
+    "variant_title": "Ribbed Vault",
+    "shader_path": "03-ribbed-vault/main.glsl",
+    "descriptor_path": "03-ribbed-vault/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 53,
+    "family_name": "Cyber Tunnel Matrix",
+    "variant_number": 4,
+    "variant_title": "Twisting Shaft",
+    "shader_path": "04-twisting-shaft/main.glsl",
+    "descriptor_path": "04-twisting-shaft/scene.json",
+    "verification": "unverified"
+  }
+]

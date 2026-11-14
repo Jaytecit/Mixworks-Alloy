@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 87,
+    "family_name": "Coral Reef Trench",
+    "variant_number": 1,
+    "variant_title": "Reef Canyon",
+    "shader_path": "01-reef-canyon/main.glsl",
+    "descriptor_path": "01-reef-canyon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 87,
+    "family_name": "Coral Reef Trench",
+    "variant_number": 2,
+    "variant_title": "Staghorn Spires",
+    "shader_path": "02-staghorn-spires/main.glsl",
+    "descriptor_path": "02-staghorn-spires/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 87,
+    "family_name": "Coral Reef Trench",
+    "variant_number": 3,
+    "variant_title": "Anemone Bowl",
+    "shader_path": "03-anemone-bowl/main.glsl",
+    "descriptor_path": "03-anemone-bowl/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 87,
+    "family_name": "Coral Reef Trench",
+    "variant_number": 4,
+    "variant_title": "Deep Trench",
+    "shader_path": "04-deep-trench/main.glsl",
+    "descriptor_path": "04-deep-trench/scene.json",
+    "verification": "unverified"
+  }
+]

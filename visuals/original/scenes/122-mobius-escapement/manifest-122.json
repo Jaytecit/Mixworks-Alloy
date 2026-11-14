@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 122,
+    "family_name": "Mobius Escapement",
+    "variant_number": 1,
+    "variant_title": "Tourbillon",
+    "shader_path": "01-tourbillon/main.glsl",
+    "descriptor_path": "01-tourbillon/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 122,
+    "family_name": "Mobius Escapement",
+    "variant_number": 2,
+    "variant_title": "Twin Escapement",
+    "shader_path": "02-twin-escapement/main.glsl",
+    "descriptor_path": "02-twin-escapement/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 122,
+    "family_name": "Mobius Escapement",
+    "variant_number": 3,
+    "variant_title": "Skeleton Dial",
+    "shader_path": "03-skeleton-dial/main.glsl",
+    "descriptor_path": "03-skeleton-dial/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 122,
+    "family_name": "Mobius Escapement",
+    "variant_number": 4,
+    "variant_title": "Chronograph",
+    "shader_path": "04-chronograph/main.glsl",
+    "descriptor_path": "04-chronograph/scene.json",
+    "verification": "unverified"
+  }
+]

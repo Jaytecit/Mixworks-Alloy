@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 120,
+    "family_name": "Thermographic Aura",
+    "variant_number": 1,
+    "variant_title": "Ironbow",
+    "shader_path": "01-ironbow/main.glsl",
+    "descriptor_path": "01-ironbow/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 120,
+    "family_name": "Thermographic Aura",
+    "variant_number": 2,
+    "variant_title": "Arctic Heat",
+    "shader_path": "02-arctic-heat/main.glsl",
+    "descriptor_path": "02-arctic-heat/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 120,
+    "family_name": "Thermographic Aura",
+    "variant_number": 3,
+    "variant_title": "White Hot",
+    "shader_path": "03-white-hot/main.glsl",
+    "descriptor_path": "03-white-hot/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 120,
+    "family_name": "Thermographic Aura",
+    "variant_number": 4,
+    "variant_title": "Plasma Scan",
+    "shader_path": "04-plasma-scan/main.glsl",
+    "descriptor_path": "04-plasma-scan/scene.json",
+    "verification": "unverified"
+  }
+]

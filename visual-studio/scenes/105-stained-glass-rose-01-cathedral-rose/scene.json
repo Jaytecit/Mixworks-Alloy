@@ -1,0 +1,47 @@
+{
+  "TITLE": "Stained Glass Rose / Cathedral Rose",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneLeadWidth",
+      "TYPE": "slider",
+      "LABEL": "Lead width",
+      "DEFAULT": 1.0,
+      "MIN": 0.45,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneTransmissionGlow",
+      "TYPE": "slider",
+      "LABEL": "Transmission glow",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.7,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

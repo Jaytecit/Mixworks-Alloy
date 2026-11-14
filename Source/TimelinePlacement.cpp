@@ -117,7 +117,7 @@ void Workstation::addMedia(int index, std::optional<TimelinePlacement> placement
 }
 void Workstation::loadTimelineSources(std::vector<TimelineSource> sources, std::optional<TimelinePlacement> placement)
 {
-    if (busy || sources.empty() || (placement && (placement->track < 0 || placement->track >= trackCount || !std::isfinite(placement->time) || placement->time < 0))) return;
+    if (busy || sources.empty() || (placement && (placement->track < 0 || placement->track >= layout.visibleLaneCount || !std::isfinite(placement->time) || placement->time < 0))) return;
     std::vector<std::shared_ptr<Media>> media;
     for (const auto& source : sources)
     {
@@ -139,7 +139,7 @@ void Workstation::loadTimelineSources(std::vector<TimelineSource> sources, std::
 
 void Workstation::insertTimelineMedia(const std::vector<std::shared_ptr<Media>>& loaded, std::optional<TimelinePlacement> placement)
 {
-    if (loaded.empty()) return;
+    if (loaded.empty() || (placement && (placement->track < 0 || placement->track >= layout.visibleLaneCount))) return;
     const size_t first = engine.project.clips.size();
     remember();
     {
@@ -159,7 +159,7 @@ void Workstation::insertTimelineMedia(const std::vector<std::shared_ptr<Media>>&
             clip.awaitingSourceLength = media->sourceDetailsPending;
             if (pendingOrder) clip.pendingPredecessor = predecessor;
             pendingOrder = pendingOrder || media->sourceDetailsPending; predecessor = clip.id;
-            clip.track = placement ? placement->track : (int) engine.project.clips.size() % trackCount;
+            clip.track = placement ? placement->track : (int) engine.project.clips.size() % layout.visibleLaneCount;
             pendingStemDiscovery.insert(clip.id);
             time = clip.end(); selectedClip = clip.id; engine.project.clips.push_back(std::move(clip));
         }

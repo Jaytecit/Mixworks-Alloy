@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 51,
+    "family_name": "Orbital Space Station",
+    "variant_number": 1,
+    "variant_title": "Ring Habitat",
+    "shader_path": "01-ring-habitat/main.glsl",
+    "descriptor_path": "01-ring-habitat/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 51,
+    "family_name": "Orbital Space Station",
+    "variant_number": 2,
+    "variant_title": "Docking Hub",
+    "shader_path": "02-docking-hub/main.glsl",
+    "descriptor_path": "02-docking-hub/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 51,
+    "family_name": "Orbital Space Station",
+    "variant_number": 3,
+    "variant_title": "Torus Truss",
+    "shader_path": "03-torus-truss/main.glsl",
+    "descriptor_path": "03-torus-truss/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 51,
+    "family_name": "Orbital Space Station",
+    "variant_number": 4,
+    "variant_title": "Zero-G Core",
+    "shader_path": "04-zero-g-core/main.glsl",
+    "descriptor_path": "04-zero-g-core/scene.json",
+    "verification": "unverified"
+  }
+]

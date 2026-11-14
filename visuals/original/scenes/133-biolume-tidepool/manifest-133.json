@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 133,
+    "family_name": "Biolume Tidepool",
+    "variant_number": 1,
+    "variant_title": "Shoreline Break",
+    "shader_path": "01-shoreline-break/main.glsl",
+    "descriptor_path": "01-shoreline-break/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 133,
+    "family_name": "Biolume Tidepool",
+    "variant_number": 2,
+    "variant_title": "Swirl Pool",
+    "shader_path": "02-swirl-pool/main.glsl",
+    "descriptor_path": "02-swirl-pool/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 133,
+    "family_name": "Biolume Tidepool",
+    "variant_number": 3,
+    "variant_title": "Deep Bloom",
+    "shader_path": "03-deep-bloom/main.glsl",
+    "descriptor_path": "03-deep-bloom/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 133,
+    "family_name": "Biolume Tidepool",
+    "variant_number": 4,
+    "variant_title": "Foam Lace",
+    "shader_path": "04-foam-lace/main.glsl",
+    "descriptor_path": "04-foam-lace/scene.json",
+    "verification": "unverified"
+  }
+]

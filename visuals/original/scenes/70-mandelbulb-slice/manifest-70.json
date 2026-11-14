@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 70,
+    "family_name": "Mandelbulb Slice",
+    "variant_number": 1,
+    "variant_title": "Power 8 Classic",
+    "shader_path": "01-power-8-classic/main.glsl",
+    "descriptor_path": "01-power-8-classic/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 70,
+    "family_name": "Mandelbulb Slice",
+    "variant_number": 2,
+    "variant_title": "Power 5",
+    "shader_path": "02-power-5/main.glsl",
+    "descriptor_path": "02-power-5/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 70,
+    "family_name": "Mandelbulb Slice",
+    "variant_number": 3,
+    "variant_title": "Hollowed Core",
+    "shader_path": "03-hollowed-core/main.glsl",
+    "descriptor_path": "03-hollowed-core/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 70,
+    "family_name": "Mandelbulb Slice",
+    "variant_number": 4,
+    "variant_title": "Pulsing Spikes",
+    "shader_path": "04-pulsing-spikes/main.glsl",
+    "descriptor_path": "04-pulsing-spikes/scene.json",
+    "verification": "unverified"
+  }
+]

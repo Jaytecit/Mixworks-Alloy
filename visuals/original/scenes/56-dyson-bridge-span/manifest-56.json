@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 56,
+    "family_name": "Dyson Bridge Span",
+    "variant_number": 1,
+    "variant_title": "Cable Stay",
+    "shader_path": "01-cable-stay/main.glsl",
+    "descriptor_path": "01-cable-stay/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 56,
+    "family_name": "Dyson Bridge Span",
+    "variant_number": 2,
+    "variant_title": "Arch Span",
+    "shader_path": "02-arch-span/main.glsl",
+    "descriptor_path": "02-arch-span/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 56,
+    "family_name": "Dyson Bridge Span",
+    "variant_number": 3,
+    "variant_title": "Double Deck",
+    "shader_path": "03-double-deck/main.glsl",
+    "descriptor_path": "03-double-deck/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 56,
+    "family_name": "Dyson Bridge Span",
+    "variant_number": 4,
+    "variant_title": "Shattered Span",
+    "shader_path": "04-shattered-span/main.glsl",
+    "descriptor_path": "04-shattered-span/scene.json",
+    "verification": "unverified"
+  }
+]

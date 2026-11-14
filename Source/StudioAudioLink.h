@@ -10,6 +10,7 @@ public:
     StudioAudioLink(SpectrumFeed&, const std::atomic<juce::uint64>&);
     ~StudioAudioLink() override;
     bool start(int receiverPort = port);
+    void setConnectedPort(int value) { connectedPort.store(value, std::memory_order_relaxed); }
     static juce::uint64 encodeTempo(double detectedBpm, double mixBpm, double beat);
 private:
     void run() override;
@@ -17,5 +18,6 @@ private:
     const std::atomic<juce::uint64>& tempo;
     juce::DatagramSocket socket;
     int destinationPort = port;
+    std::atomic<int> connectedPort {0};
 };
 }

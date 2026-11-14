@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 130,
+    "family_name": "Suminagashi Ripples",
+    "variant_number": 1,
+    "variant_title": "Ink Pond",
+    "shader_path": "01-ink-pond/main.glsl",
+    "descriptor_path": "01-ink-pond/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 130,
+    "family_name": "Suminagashi Ripples",
+    "variant_number": 2,
+    "variant_title": "Gold Leaf",
+    "shader_path": "02-gold-leaf/main.glsl",
+    "descriptor_path": "02-gold-leaf/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 130,
+    "family_name": "Suminagashi Ripples",
+    "variant_number": 3,
+    "variant_title": "Dual Drops",
+    "shader_path": "03-dual-drops/main.glsl",
+    "descriptor_path": "03-dual-drops/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 130,
+    "family_name": "Suminagashi Ripples",
+    "variant_number": 4,
+    "variant_title": "Wind Sweep",
+    "shader_path": "04-wind-sweep/main.glsl",
+    "descriptor_path": "04-wind-sweep/scene.json",
+    "verification": "unverified"
+  }
+]

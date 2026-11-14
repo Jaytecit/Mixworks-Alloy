@@ -1,0 +1,56 @@
+{
+  "TITLE": "Wax Seal Foundry / Desk Seal",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "pressTravel",
+      "TYPE": "slider",
+      "LABEL": "Press travel",
+      "DEFAULT": 1,
+      "MIN": 0.3,
+      "MAX": 1.5,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "waxTranslucency",
+      "TYPE": "slider",
+      "LABEL": "Wax translucency",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Artwork strength",
+      "DEFAULT": 0.8,
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ]
+}

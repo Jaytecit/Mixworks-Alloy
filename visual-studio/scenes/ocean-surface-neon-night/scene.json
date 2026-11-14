@@ -1,0 +1,47 @@
+{
+  "TITLE": "Ocean Surface / Neon Night",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 2.0,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneSwellHeight",
+      "TYPE": "slider",
+      "LABEL": "Swell height",
+      "DEFAULT": 1.0,
+      "MIN": 0.4,
+      "MAX": 1.65,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "sceneReflectionStrength",
+      "TYPE": "slider",
+      "LABEL": "Reflection strength",
+      "DEFAULT": 1.0,
+      "MIN": 0.0,
+      "MAX": 1.35,
+      "UI_GROUP": "Scene"
+    }
+  ]
+}

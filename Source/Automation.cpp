@@ -30,13 +30,27 @@ bool Engine::ensurePluginAutomation(const AutomationAddress& address)
     if (!project.curve(address)) project.settings(address)->pluginAutomation.push_back({address.slotId, address.parameterId, parameter->getName(128), parameter->getValue(), {}});
     return true;
 }
-void Engine::restoreManualPluginValues()
+Engine::ManualPluginValues Engine::manualPluginValues(const Project& target) const
 {
-    const juce::ScopedLock guard(lock);
-    for (int track = 0; track < trackCount; ++track) for (const auto& lane : project.tracks[(size_t) track].pluginAutomation)
-        if (!lane.curve.active()) if (auto* parameter = parameterFor({track, AutomationTarget::plugin, lane.slotId, lane.parameterId})) parameter->setValueNotifyingHost(lane.manualValue);
-    for (const auto& c : project.clips) if (project.effectOwner(c) == &c) for (const auto& lane : project.effectSettings(c).pluginAutomation)
-        if (!lane.curve.active()) if (auto* parameter = parameterFor({c.track, AutomationTarget::plugin, lane.slotId, lane.parameterId, c.id})) parameter->setValueNotifyingHost(lane.manualValue);
+    ManualPluginValues values;
+    const auto collect = [&](const TrackSettings& settings, const auto& chain)
+    {
+        for (const auto& lane : settings.pluginAutomation)
+            if (!lane.curve.active())
+                for (const auto& slot : chain)
+                    if (slot->id == lane.slotId)
+                        if (const auto found = slot->parameters.find(lane.parameterId); found != slot->parameters.end())
+                            values.emplace_back(found->second, lane.manualValue);
+    };
+    for (size_t lane = 0; lane < target.tracks.size(); ++lane) collect(target.tracks[lane], plugins[lane]);
+    for (const auto& clip : target.clips)
+        if (target.effectOwner(clip) == &clip) collect(target.effectSettings(clip), clip.effects->plugins);
+    return values;
+}
+void Engine::restoreManualPluginValues(const ManualPluginValues& values)
+{
+    for (const auto& [parameter, value] : values)
+        if (parameter->getValue() != value) parameter->setValueNotifyingHost(value);
 }
 void Engine::removePlugin(int track, int insert)
 {

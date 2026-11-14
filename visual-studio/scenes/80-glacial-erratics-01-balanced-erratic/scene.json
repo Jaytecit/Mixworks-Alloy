@@ -1,0 +1,56 @@
+{
+  "TITLE": "Glacial Erratics / Balanced Erratic",
+  "MEDIA": [
+    {
+      "WRAP": "clamp",
+      "FILTER": "linear"
+    }
+  ],
+  "CONTROLS": [
+    {
+      "NAME": "motion",
+      "TYPE": "slider speed",
+      "LABEL": "Motion rate",
+      "DEFAULT": 0.75,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "response",
+      "TYPE": "slider",
+      "LABEL": "Music response",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "rockTilt",
+      "TYPE": "slider",
+      "LABEL": "Rock tilt",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 1.8,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "veinGlow",
+      "TYPE": "slider",
+      "LABEL": "Ice-vein glow",
+      "DEFAULT": 1,
+      "MIN": 0,
+      "MAX": 2,
+      "UI_GROUP": "Scene"
+    },
+    {
+      "NAME": "imprint",
+      "TYPE": "slider",
+      "LABEL": "Artwork strength",
+      "DEFAULT": 0.8,
+      "MIN": 0,
+      "MAX": 1,
+      "UI_GROUP": "Nested"
+    }
+  ]
+}

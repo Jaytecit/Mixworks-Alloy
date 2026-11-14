@@ -32,24 +32,24 @@ void WorkspaceLayout::update(int width, int height, bool performanceDocked, bool
     overview = {centreX, bodyTop, timelineWidth, 28};
     const int timelineY = overview.getBottom() + 2 + timeRulerHeight + labelHeight;
     const int bodyBudget = bodyBottom - timelineY - tempoStripHeight - 8;
-    const int controlledHeight = trackCount * minimumLaneHeight + timelineScrollbarThickness + visualLaneHeight;
+    const int controlledHeight = visibleLaneCount * minimumLaneHeight + timelineScrollbarThickness + visualLaneHeight;
     constexpr int compactDockHeight = 32 + 32 + 64; // Tabs, panel heading and a usable scrolling body below minimum window size.
     // Editing must reserve its complete workflow before applying the ordinary
     // lane minimum, otherwise smaller windows push the primary actions offscreen.
     const int deckHeight = !performanceDocked ? 32 : editingDocked
-        ? std::min(240, std::max(compactDockHeight, bodyBudget - trackCount * 40 - visualLaneHeight - timelineScrollbarThickness))
+        ? std::min(240, std::max(compactDockHeight, bodyBudget - visibleLaneCount * 40 - visualLaneHeight - timelineScrollbarThickness))
         : std::min(200, std::max(compactDockHeight, bodyBudget - controlledHeight));
     maximumTimelineHeight = std::max(1, bodyBudget - deckHeight);
     // Editing pages share a compact audio workflow; expand vertically for precise fields when wanted.
     // Other consoles retain their existing lane minimum. Musical clocks are untouched.
-    const int editingMinimum = std::max(trackCount * 24 + timelineScrollbarThickness + visualLaneHeight, bodyBudget - 400);
+    const int editingMinimum = std::max(visibleLaneCount * 24 + timelineScrollbarThickness + visualLaneHeight, bodyBudget - 400);
     minimumTimelineHeight = std::min(maximumTimelineHeight, editingDocked ? std::min(controlledHeight, editingMinimum) : controlledHeight);
     const int requestedHeight = preferredTimelineHeight > 0 ? preferredTimelineHeight
-        : performanceDocked ? trackCount * laneHeight + timelineScrollbarThickness + visualLaneHeight : maximumTimelineHeight;
+        : performanceDocked ? visibleLaneCount * laneHeight + timelineScrollbarThickness + visualLaneHeight : maximumTimelineHeight;
     const int timelineHeight = juce::jlimit(minimumTimelineHeight, maximumTimelineHeight, requestedHeight);
     // Overall height changes equalise lanes; lane-edge edits apply within that height.
     if (!timeline.isEmpty() && timelineHeight != timeline.getHeight() + visualLaneHeight) laneScale.fill(1);
-    defaultLaneHeight = std::max(1, (timelineHeight - visualLaneHeight - timelineScrollbarThickness) / trackCount);
+    defaultLaneHeight = std::max(1, (timelineHeight - visualLaneHeight - timelineScrollbarThickness) / visibleLaneCount);
     headers = {centreX, timelineY, headerWidth, timelineHeight}; timeline = {headers.getRight() + 4, timelineY, std::max(1, timelineWidth - headerWidth - 4), timelineHeight};
     visualHeader = headers.removeFromBottom(std::min(visualLaneHeight, headers.getHeight() / 2));
     visuals = timeline.removeFromBottom(visualHeader.getHeight());
@@ -65,15 +65,17 @@ void WorkspaceLayout::update(int width, int height, bool performanceDocked, bool
 }
 void WorkspaceLayout::fitLanes()
 {
-    const int budget = std::max(trackCount, timeline.getHeight() - timelineScrollbarThickness);
-    const int minimum = std::min(minimumLaneHeight, budget / trackCount);
-    const int extra = budget - trackCount * minimum;
-    double total = 0; for (auto weight : laneScale) total += weight;
+    fittedLanes.fill(0);
+    const int budget = std::max(visibleLaneCount, timeline.getHeight() - timelineScrollbarThickness);
+    const int minimum = std::min(minimumLaneHeight, budget / visibleLaneCount);
+    const int extra = budget - visibleLaneCount * minimum;
+    double total = 0;
+    for (int i = 0; i < visibleLaneCount; ++i) total += laneScale[(size_t) i];
     int used = 0; double cumulative = 0;
-    for (int i = 0; i < trackCount; ++i)
+    for (int i = 0; i < visibleLaneCount; ++i)
     {
-        cumulative += total > 0 ? laneScale[(size_t) i] / total : 1.0 / trackCount;
-        const int boundary = i == trackCount - 1 ? extra : (int) std::floor(extra * cumulative);
+        cumulative += total > 0 ? laneScale[(size_t) i] / total : 1.0 / visibleLaneCount;
+        const int boundary = i == visibleLaneCount - 1 ? extra : (int) std::floor(extra * cumulative);
         fittedLanes[(size_t) i] = minimum + boundary - used; used = boundary;
     }
 }
@@ -84,15 +86,15 @@ void WorkspaceLayout::resizeTimeline(int height)
 }
 void WorkspaceLayout::resizeLane(int track, int height)
 {
-    if (track < 0 || track >= trackCount) return;
-    const int budget = laneTop(trackCount), minimum = std::min(minimumLaneHeight, budget / trackCount);
-    const int extra = budget - minimum * trackCount;
+    if (track < 0 || track >= visibleLaneCount) return;
+    const int budget = laneTop(visibleLaneCount), minimum = std::min(minimumLaneHeight, budget / visibleLaneCount);
+    const int extra = budget - minimum * visibleLaneCount;
     if (extra <= 0) return;
-    const int wanted = juce::jlimit(minimum, budget - (trackCount - 1) * minimum, height) - minimum;
+    const int wanted = juce::jlimit(minimum, budget - (visibleLaneCount - 1) * minimum, height) - minimum;
     const int others = extra - (laneSize(track) - minimum);
-    for (int i = 0; i < trackCount; ++i)
+    for (int i = 0; i < visibleLaneCount; ++i)
         laneScale[(size_t) i] = i == track ? (double) wanted / extra
-            : (double) (extra - wanted) / extra * (others > 0 ? (double) (laneSize(i) - minimum) / others : 1.0 / (trackCount - 1));
+            : (double) (extra - wanted) / extra * (others > 0 ? (double) (laneSize(i) - minimum) / others : 1.0 / (visibleLaneCount - 1));
     fitLanes();
 }
 void WorkspaceLayout::resizePanel(bool left, int requestedWidth)
@@ -178,6 +180,7 @@ juce::Result validateLayoutDocument(const juce::var& doc)
 void decodeLayoutDocument(const juce::var& doc, WorkspaceLayout& layout)
 {
     layout.preferredLibraryWidth = (int) doc["libraryWidth"]; layout.preferredInspectorWidth = (int) doc["inspectorWidth"];
+    layout.visibleLaneCount = doc.hasProperty("visibleLanes") ? juce::jlimit(2, trackCount, (int) doc["visibleLanes"]) : trackCount;
     layout.monitorMuted = doc.hasProperty("monitorMuted") && (bool) doc["monitorMuted"];
     layout.inspectorCollapsed = doc.hasProperty("inspectorCollapsed") && (bool) doc["inspectorCollapsed"];
     layout.libraryCollapsed = doc.hasProperty("libraryCollapsed") && (bool) doc["libraryCollapsed"];

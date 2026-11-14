@@ -237,7 +237,9 @@ public:
     bool ensurePluginAutomation(const AutomationAddress&);
     juce::Optional<AutomationAddress> pluginAddress(int track, int insert, int parameter) const;
     void removePlugin(int track, int insert);
-    void restoreManualPluginValues();
+    using ManualPluginValues = std::vector<std::pair<juce::AudioProcessorParameter*, float>>;
+    ManualPluginValues manualPluginValues(const Project&) const;
+    static void restoreManualPluginValues(const ManualPluginValues&); // Caller serialises writes with rendering.
     float automationValue(const AutomationAddress&, double time) const;
     juce::Optional<MidiAction> learnAction;
     std::vector<MidiBinding> mappings;
@@ -257,14 +259,19 @@ public:
         int frames = 0;
         uint64_t request = 0, revision = 0;
         bool running = false;
+        std::function<double(double)> editPosition;
+        std::function<void()> onCommit;
         juce::String error;
     public:
         uint64_t windowsRendered() const { return renderer.windowsRendered(); }
+        const juce::String& preparationError() const { return error; }
     };
     PreparedSeek prepareSeek(double seconds); // Snapshot, then read/decode/stretch without holding lock.
-    juce::Result commitSeek(PreparedSeek); // Revalidate and swap; displaced streams retire after unlocking.
-    juce::Result queueSeek(double seconds); // One worker; newer requests supersede pending destinations.
-    juce::Result seek(double seconds);
+    PreparedSeek prepareEditSeek(const Project&, std::function<double(double)> positionMap);
+    // An edit publishes its replacement project and mapped cursor together.
+    juce::Result commitSeek(PreparedSeek, Project* replacement = nullptr, const ManualPluginValues& = {});
+    juce::Result queueSeek(double seconds, std::function<void()> onCommit = {}); // Newer requests supersede pending destinations.
+    juce::Result seek(double seconds, std::function<void()> onCommit = {});
     void resetPlugins(bool resetElastic = true);
     uint64_t elasticWindowsRendered() const { return elasticRenderer.windowsRendered(); } // Locked diagnostic reader.
     void prepareClipProcessing();
@@ -492,6 +499,7 @@ private:
     std::set<int> learnedControls;
     int blockSize = 512;
     bool attached = false;
+    friend void runHotcueTests(const std::function<void(bool, const juce::String&)>&, const juce::File&);
     void handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage&) override;
     void handleAsyncUpdate() override;
     void prepareBuffers(int size);

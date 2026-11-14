@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 92,
+    "family_name": "Glass Capsule Array",
+    "variant_number": 1,
+    "variant_title": "Vertical Pods",
+    "shader_path": "01-vertical-pods/main.glsl",
+    "descriptor_path": "01-vertical-pods/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 92,
+    "family_name": "Glass Capsule Array",
+    "variant_number": 2,
+    "variant_title": "Tumbling Pills",
+    "shader_path": "02-tumbling-pills/main.glsl",
+    "descriptor_path": "02-tumbling-pills/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 92,
+    "family_name": "Glass Capsule Array",
+    "variant_number": 3,
+    "variant_title": "Helix Pods",
+    "shader_path": "03-helix-pods/main.glsl",
+    "descriptor_path": "03-helix-pods/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 92,
+    "family_name": "Glass Capsule Array",
+    "variant_number": 4,
+    "variant_title": "Grid Swarm",
+    "shader_path": "04-grid-swarm/main.glsl",
+    "descriptor_path": "04-grid-swarm/scene.json",
+    "verification": "unverified"
+  }
+]

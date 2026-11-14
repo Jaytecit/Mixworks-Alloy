@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 125,
+    "family_name": "Acoustic Levitation",
+    "variant_number": 1,
+    "variant_title": "Standing Column",
+    "shader_path": "01-standing-column/main.glsl",
+    "descriptor_path": "01-standing-column/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 125,
+    "family_name": "Acoustic Levitation",
+    "variant_number": 2,
+    "variant_title": "Node Lattice",
+    "shader_path": "02-node-lattice/main.glsl",
+    "descriptor_path": "02-node-lattice/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 125,
+    "family_name": "Acoustic Levitation",
+    "variant_number": 3,
+    "variant_title": "Orbiting Drops",
+    "shader_path": "03-orbiting-drops/main.glsl",
+    "descriptor_path": "03-orbiting-drops/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 125,
+    "family_name": "Acoustic Levitation",
+    "variant_number": 4,
+    "variant_title": "Shock Pop",
+    "shader_path": "04-shock-pop/main.glsl",
+    "descriptor_path": "04-shock-pop/scene.json",
+    "verification": "unverified"
+  }
+]

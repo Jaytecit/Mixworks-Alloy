@@ -1,0 +1,38 @@
+[
+  {
+    "family_number": 99,
+    "family_name": "Horizon Torii Gates",
+    "variant_number": 1,
+    "variant_title": "Straight Path",
+    "shader_path": "01-straight-path/main.glsl",
+    "descriptor_path": "01-straight-path/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 99,
+    "family_name": "Horizon Torii Gates",
+    "variant_number": 2,
+    "variant_title": "Curving Trail",
+    "shader_path": "02-curving-trail/main.glsl",
+    "descriptor_path": "02-curving-trail/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 99,
+    "family_name": "Horizon Torii Gates",
+    "variant_number": 3,
+    "variant_title": "Ascending Steps",
+    "shader_path": "03-ascending-steps/main.glsl",
+    "descriptor_path": "03-ascending-steps/scene.json",
+    "verification": "unverified"
+  },
+  {
+    "family_number": 99,
+    "family_name": "Horizon Torii Gates",
+    "variant_number": 4,
+    "variant_title": "Mirror Lake",
+    "shader_path": "04-mirror-lake/main.glsl",
+    "descriptor_path": "04-mirror-lake/scene.json",
+    "verification": "unverified"
+  }
+]
