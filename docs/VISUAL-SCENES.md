@@ -19,7 +19,7 @@ while enabled. Turning it off reveals the keyframes again. The four **Swap**
 buttons select a different available background, MilkDrop preset, GLSL scene or
 sprite at the playhead. If the lane is empty there, the swap places a new clip.
 
-Current workflow reference for Alloy 0.55.133 and Visual Studio 0.1.33. [Visual direction](VISUAL-DIRECTION.md) describes
+Current workflow reference for Alloy 0.55.134 and Visual Studio 0.1.34. [Visual direction](VISUAL-DIRECTION.md) describes
 the intended experience; [HANDOVER](../HANDOVER.md) records the exact local build.
 Earlier visual experiments remain dated evidence in their individual reports.
 
@@ -36,8 +36,10 @@ start, length and join. Its scene controls and automation start from the
 replacement's defaults. A cross-lane replacement requires enough space in the
 destination lane. Undo restores the original clip. On 0.55.133 the active
 MilkDrop replacement and overlap refusal were verified in the desktop
-workflow. Native checks cover both renderers and placement before a clip
-becomes active. Desktop GLSL selection remains open in the [roadmap](../FINISHING-PLAN.md).
+workflow. On 0.55.134, Studio’s **Swap GLSL** replaced the active scene during
+playback and the edit survived save and reopen. Native checks cover replacement
+before a clip becomes active. Direct desktop GLSL selection remains open in the
+[roadmap](../FINISHING-PLAN.md).
 
 ## Alloy Originals library
 

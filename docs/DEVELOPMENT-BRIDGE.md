@@ -34,7 +34,7 @@ The build script uses one build worker, MSVC `/MP1` and below-normal priority,
 then restores its caller's environment and priority. Schedule the build at a useful checkpoint; do not overlap it with tests. Numeric
 RAM guards were removed; stop owned work only if actual responsiveness worsens.
 
-The launcher copies the executable to `root/bundle/Mixworks.exe` and hard-links the matching model/runtime on the same volume. It stages adjacent packaged visual resources when present. It records their SHA-256 identities in `evidence/bundle.json`; keep canonical linked assets intact. This permits rebuilding without replacing the running executable. A stopped root can restart with the **same** candidate; a different candidate requires a fresh root. Sessions are loaded explicitly with `open`, even after restarting an existing root.
+The launcher copies the executable to `root/bundle/Mixworks.exe` and hard-links the matching model/runtime on the same volume. It records their SHA-256 identities in `evidence/bundle.json`; keep canonical linked assets intact. This permits rebuilding without replacing the running executable. For Studio workflows, stage `original-visualiser-runtime`, `visual-python` and `visualiser-runtime` from the same trusted release beside the frozen executable, and retain their payload manifest. A stopped root can restart with the **same** candidate. Initialise a fresh root for a different candidate. Sessions are loaded explicitly with `open`, even after restarting an existing root.
 
 For arguments, prefer a JSON file to shell-escaped inline JSON. Example:
 

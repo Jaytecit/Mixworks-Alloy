@@ -1,5 +1,10 @@
 # Whole-project coverage and boundary map
 
+The 14 November discovery inventory includes the Studio application, native
+audio link and workspace, bundled visual resources and shared pair planner.
+The 97-rule acceptance ledger and its candidate-specific results remain in
+[current cases](inventory/current-cases.csv) and [audit status](STATUS.md).
+
 1 November ua01: discovery registries refreshed against current source, adding
 ear/retry tools, original-file streaming, clarity UI and visual runtime/planning.
 MW-V01–V03 extend the rule catalog to97. [Current cases](inventory/current-cases.csv)

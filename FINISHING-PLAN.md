@@ -19,9 +19,10 @@ three reviewed recordings is retained for W11.
 The two-point automatic fades have local verification. Jay deferred the track
 movement report while he continues making mixes and looks for a repeatable case.
 
-**Phase 2 has a verified local checkpoint on 0.55.133.** The desktop workflow
+**Phase 2 has verified local checkpoints on 0.55.133 and 0.55.134.** The desktop workflow
 covered active MilkDrop replacement, live random choices and fullscreen return
-with playback continuing. A 44-placement fixture covered the entire show and
+with playback continuing. Studio startup and **Swap GLSL** were verified on
+0.55.134. A 44-placement fixture covered the entire show and
 rendered sampled sections after save/reopen. Complete desktop GLSL replacement
 next, then judge variety and joins on a representative mix.
 
@@ -59,7 +60,7 @@ next, then judge variety and joins on a representative mix.
 
 | ID / status | Outstanding outcome | Evidence needed to close it |
 | --- | --- | --- |
-| W06 — MilkDrop desktop path verified | **Replace a selected visual scene directly.** On 0.55.133, active MilkDrop replacement via the context menu rendered during playback and survived source-backed save/reopen. Native checks cover active and future replacement, geometry, joins and Undo. | Complete the GLSL picker selection in the desktop workflow. |
+| W06 — MilkDrop picker and GLSL swap verified | **Replace a selected visual scene directly.** On 0.55.133, active MilkDrop replacement via the context menu rendered during playback and survived source-backed save/reopen. On 0.55.134, Studio’s Swap GLSL changed the active scene, kept its clip timing and preserved the edit on reopen. Native checks cover active and future replacement, joins and Undo. | Complete selection of a named bundled scene or local shader in the direct GLSL picker. Desktop automation reached both controls and failed at selection. |
 | W35 — locally verified | **Random live scenes and MilkDrop presets.** Both Live buttons rendered changing frames during playback on 0.55.133. The saved audio-only copy kept the same clips, links and empty visual lanes. Reopening the authored mix returned Studio to Timeline mode. | Local walkthrough and harness checks passed. |
 | W15 — fullscreen verified, artistic acceptance open | **Complete visual-show experience.** The 44-placement fixture verified continuous GLSL coverage and sampled GPU renders. On 0.55.133, fullscreen output at 1920 × 1080 returned via F11 while playback and animation continued. | Judge visual variety, joins and motif spacing on a real mix. Sustained performance belongs to W30 and the external NestDrop scan stays deferred to Phase 8. |
 

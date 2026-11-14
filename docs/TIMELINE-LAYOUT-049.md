@@ -1,10 +1,15 @@
-# Four lane timeline layout
+# Audio timeline layout
 
-Workflow reference; exact current candidate and verification limits are in [HANDOVER](../HANDOVER.md). All four lanes remain available; eight-lane and early-format instructions are historical. Current session format is41; legacy compatibility is not a development requirement.
+Choose two, three or four visible audio lanes in the timeline toolbar. Hidden
+lanes still play and become editable when shown again. See the
+[handover](../HANDOVER.md) for current verification.
 
 ## Resize and navigation
 
-The stretch grip below the tempo footer changes timeline height. Drag, use Up/Down (Shift for one pixel), or Home/double-click to reset. Overall height changes distribute space evenly across four lanes within one pixel. Individual lane-edge adjustments remain within the current height and survive width-only changes; the next overall resize equalizes shares.
+The stretch grip below the tempo footer changes timeline height. Drag, use Up/Down
+(Shift for one pixel), or Home/double-click to reset. Overall height changes
+distribute space evenly across the visible lanes. Individual lane-edge
+adjustments survive width-only changes. The next overall resize equalizes shares.
 
 The ruler, tempo footer and stereo PEAK panel follow the same geometry. Lower Editing/Controller/Transitions panels may collapse, resize or detach. Expanded stem rows share the available lane space. Docked compact Editing can reduce the timeline minimum to fit its controls; smaller/detached panels can scroll.
 
@@ -16,4 +21,4 @@ Both Library/Playlist and right inspector can fully collapse, with an edge grip/
 
 ## Historical evidence
 
-[Earlier layout narrative (archived)](MAINTENANCE-20261103.md) preserves 0.49/0.53/0.54.6 measurements. Current behavior supersedes its six-pixel/eight-lane/old-session guidance. Current qualification and remaining human display acceptance are in the [request register](REQUEST-STATUS-20261024.md).
+[Earlier layout narrative](MAINTENANCE-20261103.md) preserves 0.49/0.53/0.54.6 measurements. Remaining display acceptance is in the [roadmap](../FINISHING-PLAN.md).

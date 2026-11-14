@@ -1,6 +1,6 @@
 # Mixworks Visual Studio
 
-Alloy 0.55.133 ships Studio 0.1.33 and a shared catalogue of 1,000 GLSL scenes.
+Alloy 0.55.134 ships Studio 0.1.34 and a shared catalogue of 1,000 GLSL scenes.
 Open Studio from Alloy to follow the audio master and visual lanes. An empty
 visual timeline uses Live mode. An authored show uses Timeline mode, with a
 30 fps connected preview and **F11** fullscreen. See the

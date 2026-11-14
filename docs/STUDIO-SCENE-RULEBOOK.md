@@ -1,5 +1,8 @@
 # Visual Studio scene rulebook
 
+The scene requirements below describe the original expansion. For the current
+catalogue and authoring controls, see the [Studio guide](../visual-studio/README.md).
+
 Build 200 additional Studio scenes as **25 families of eight**. Each family has
 one anchor scene and seven siblings. The existing Studio scenes are comparison
 references and sit outside the count. Start from original Studio GLSL and

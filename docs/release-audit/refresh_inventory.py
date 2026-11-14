@@ -7,6 +7,7 @@ import io
 import json
 import re
 import subprocess
+from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -44,6 +45,8 @@ def classify(path):
     name = Path(path).stem
     if path.startswith('docs/') or path.endswith('.md'):
         return 'docs'
+    if path.startswith(('visual-studio/', 'visuals/')):
+        return 'visuals'
     if path.startswith('scripts/visual_') or path.startswith('scripts/verify_visual_'):
         return 'visuals'
     if path.startswith('scripts/') or path.startswith('tests/test_') or path in ('CMakeLists.txt', 'Mixworks.cmd', '.gitignore'):
@@ -58,7 +61,7 @@ def classify(path):
         return 'app'
     if name.startswith(('Stem',)):
         return 'stems'
-    if name.startswith(('AutoArrangement', 'EnergySections', 'SectionTests', 'RehearsalContext', 'TransitionRehearsal', 'TransitionStyles', 'MusicalEnergy')):
+    if name.startswith(('AutoArrangement', 'AutoPairComparison', 'EnergySections', 'SectionTests', 'RehearsalContext', 'TransitionRehearsal', 'TransitionStyles', 'MusicalEnergy')):
         return 'arrange'
     if name.startswith(('Performance', 'PrivatePreparation', 'MasterRecorder', 'Launch', 'LiveHotcue', 'LiveAutomation', 'Preroll')):
         return 'performance'
@@ -66,7 +69,7 @@ def classify(path):
         return 'midi'
     if name.startswith(('Analysis', 'Neural', 'Rhythm', 'GridCorrection', 'BeatGrid', 'MusicTests', 'TargetedAnalysis', 'DownbeatReferences', 'RealTrack', 'EarTool', 'HarmonyEar', 'KeyEar', 'RetryReview')):
         return 'analysis'
-    if name.startswith(('Visual', 'SceneLane')):
+    if name.startswith(('Visual', 'SceneLane', 'MilkDrop', 'Studio')):
         return 'visuals'
     if name.startswith(('Library', 'MusicScanner', 'Import')):
         return 'library'
@@ -76,9 +79,9 @@ def classify(path):
         return 'data'
     if name.startswith(('Engine', 'ElasticAudio', 'OriginalAudio', 'Mastering', 'Spectrum', 'PeakMeter', 'OutputPeaks', 'PluginLatency', 'Latency', 'EffectTail', 'SourceStreaming', 'PlaybackCache', 'LongSession')):
         return 'audio'
-    if name.startswith(('Tempo', 'Timeline', 'Transition', 'Beatmatch', 'Placement', 'Editing', 'TrackOwnership', 'Automation', 'AudioSlip', 'BarNavigation', 'ArrangementInsertion', 'EditSelection', 'PresetNode', 'Hotcue', 'SourceSection', 'SectionUI')):
+    if name.startswith(('Tempo', 'Timeline', 'Transition', 'Beatmatch', 'Placement', 'Editing', 'TrackOwnership', 'Automation', 'AudioSlip', 'BarNavigation', 'ArrangementInsertion', 'EditSelection', 'PresetNode', 'Hotcue', 'SourceSection', 'SectionUI', 'WaveformDetailCache')):
         return 'time'
-    if name.startswith(('Alloy', 'Workstation', 'Workspace', 'ToolPanel', 'Attract', 'UiClarity', 'UiMessages')):
+    if name.startswith(('Alloy', 'Workstation', 'Workspace', 'ToolPanel', 'Attract', 'UiClarity', 'UiMessages', 'TutorialMusic')):
         return 'ui'
     if name.startswith(('PromoControl', 'SelfTest', 'VerificationMetrics', 'FusionWorkflow')):
         return 'tooling'
@@ -110,9 +113,10 @@ def generate():
         if Path(path).suffix.lower() in ('.h', '.cpp', '.inc', '.cmake', '.py', '.ps1', '.json', '.md', '.txt', '.cmd'):
             content[path] = (ROOT / path).read_text(encoding='utf-8-sig', errors='replace') if (ROOT / path).exists() else ''
         includes[path] = re.findall(r'^\s*#include [<"]([^>"]+)', content.get(path, ''), re.M)
-    consumers = {}
-    for path in paths:
-        consumers[path] = [p for p, deps in includes.items() if Path(path).name in [Path(d).name for d in deps]]
+    consumers = defaultdict(list)
+    for path, dependencies in includes.items():
+        for name in sorted({Path(dependency).name for dependency in dependencies}):
+            consumers[name].append(path)
     files, controls, options = [], [], []
     site = re.compile(r'addItem\s*\(|addSubMenu\s*\(|add(Button|ComboBox|TextEditor|Slider)\s*\(|(?:TextButton|ToggleButton|ComboBox|TextEditor|Slider|AlloyDial|MidiKeyboardComponent)\b|setRange\s*\(|setButtonText\s*\(|setText\s*\(|setName\s*\(|\bon[A-Z]\w*\s*=|keyPressed\s*\(|keyStateChanged\s*\(|key\s*==|key\.(?:is|get)|mouse(?:Down|Up|Drag|WheelMove|DoubleClick)\s*\(|filesDropped\s*\(|itemDropped\s*\(|MidiActionKind::|createAccessibilityHandler\s*\(')
     for path in paths:
@@ -136,7 +140,7 @@ def generate():
         digest = '' if path.startswith('docs/release-audit/') else hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
         files.append(dict(path=path, sha256=digest, kind=kind, subsystem=group, purpose=purpose + ': ' + Path(path).name,
                           release_relation=relation, dependencies='; '.join(includes[path]) or 'see subsystem dependency map in COVERAGE.md',
-                          consumers='; '.join(consumers[path]) or ('CMakeLists.txt' if path in compiled else 'see COVERAGE.md / source registration / release review'),
+                          consumers='; '.join(consumers[Path(path).name]) or ('CMakeLists.txt' if path in compiled else 'see COVERAGE.md / source registration / release review'),
                           rules=rules + (' MW-R09' if is_test else ''), verification=method,
                           exclusion='vendor internals not line-certified; integration/provenance still required' if vendor else 'no audit exclusion; nonshipping role stated above'))
         if path.startswith('Source/') and not is_test and not vendor and Path(path).suffix in ('.cpp', '.h'):

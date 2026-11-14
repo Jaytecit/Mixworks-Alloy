@@ -2,7 +2,7 @@
 
 Current state: [handover](../HANDOVER.md), [app guide](../README.md),
 [visual direction](VISUAL-DIRECTION.md), [roadmap](../FINISHING-PLAN.md) and
-[verification](../VERIFICATION.md). Alloy 0.55.133 bundles Visual Studio 0.1.33
+[verification](../VERIFICATION.md). Alloy 0.55.134 bundles Visual Studio 0.1.34
 and 1,000 Studio GLSL scenes. The handover records the exact local activation
 and candidate hashes.
 [The roadmap](../FINISHING-PLAN.md) is the single outstanding-work queue;

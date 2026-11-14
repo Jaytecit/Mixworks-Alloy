@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Mixworks VERSION 0.55.133 LANGUAGES C CXX)
+project(Mixworks VERSION 0.55.134 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.local/deps/JUCE" CACHE PATH "JUCE 8 source directory")

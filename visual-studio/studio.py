@@ -37,7 +37,7 @@ if not (ROOT / "scene-library.json").is_file():
 sys.path.extend(map(str, (ROOT.parent, ROOT.parent / "scripts")))
 from milkdrop_catalogue import catalogue as milkdrop_catalogue
 
-VERSION = "0.1.33"
+VERSION = "0.1.34"
 WELL = "#121619"
 FAMILIES = {
     family: {scene["title"]: scene["folder"] for scene in scenes}
@@ -128,7 +128,8 @@ class Studio:
         self.control_build = None
         self.setup()
         self.initialise_preview()
-        self.listen_to_alloy()
+        if self.audio.mode != "Alloy live":
+            self.listen_to_alloy()
         self.root.after(10, self.tick)
 
     def initialise_preview(self):

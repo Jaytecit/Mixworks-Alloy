@@ -62,6 +62,7 @@ class AlloySession:
         self.folder = Path(folder)
         self.preview_map = None
         self.preview_stamp = 0
+        self.published_audio_port = None
 
     def signalled(self, name, consume=False):
         flag = self.folder / name
@@ -90,9 +91,21 @@ class AlloySession:
         raise RuntimeError("Alloy closed before Visual Studio connected.")
 
     def audio_port(self, port):
+        if port == self.published_audio_port:
+            return
+        destination = self.folder / "audio-port"
         temporary = self.folder / "audio-port.tmp"
         temporary.write_text(str(port), encoding="ascii")
-        os.replace(temporary, self.folder / "audio-port")
+        # JUCE may briefly hold the current file open without delete sharing.
+        for delay in (.01, .02, .04, None):
+            try:
+                os.replace(temporary, destination)
+                break
+            except PermissionError:
+                if os.name != "nt" or delay is None:
+                    raise
+                time.sleep(delay)
+        self.published_audio_port = port
 
     def send(self, **request):
         destination = self.folder / "requests" / f"{time.time_ns():020}-{uuid4().hex}.json"

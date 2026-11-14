@@ -41,7 +41,11 @@ The arranger uses central80% mean activity for its overall target and two halves
 
 New imports obtain profiles while PCM is available. Existing tracks are upgraded on the Auto Arrange worker when an energy direction or **DJ set (varied)** needs them. Progress says **Analysing rhythm, bass and dynamics**. Cancellation preserves the mix; completed compatible cache results can survive a later cancellation, but partial profiles are never published. Ordinary warm catalogue startup does not decode every old source merely to add features.
 
-Profiles are bound to the enclosing record's source identity and independently versioned. Missing/malformed/future supplementary data does not invalidate valid grids. An opaque newer supplement survives a same-source manual correction. Current detector analysis revision11 and session format53 are unchanged by supplementary activity analysis; no analysis/correction/arrangement/cache reset is required. The activity feature originally landed with session34/portable preset3; those are historical identities.
+Profiles are bound to the enclosing record's source identity and independently
+versioned. Valid grids remain usable with a missing, malformed or newer activity
+profile. An opaque newer supplement survives a same-source manual correction.
+Alloy 0.55.134 uses detector analysis revision 11 and session format 54.
+Supplementary activity analysis preserves existing analysis and corrections.
 
 ## Preferred genre
 

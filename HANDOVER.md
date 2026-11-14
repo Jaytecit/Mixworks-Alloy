@@ -2,15 +2,49 @@
 
 ## Current checkpoint
 
-The source and selected local launcher are Alloy 0.55.133 with Visual Studio
-0.1.33 and 1,000 indexed GLSL scenes. Use the [app guide](README.md) and
+The source and selected local launcher are Alloy 0.55.134 with Visual Studio
+0.1.34 and 1,000 indexed GLSL scenes. Use the [app guide](README.md) and
 [documentation index](docs/README.md) for current workflows. The records below
 retain the candidate and evidence for each earlier checkpoint.
 
-The [outstanding roadmap](FINISHING-PLAN.md) leads with desktop GLSL
-replacement during playback. Then review cue selection and visual joins on
+The [outstanding roadmap](FINISHING-PLAN.md) leads with choosing a named scene in the
+direct GLSL picker during playback. Studio’s active GLSL swap has passed. Then review cue selection and visual joins on
 a representative mix. The 14 November [promo](docs/PROMO-20261114.md) is
 available locally for creative review.
+
+## 14 November Studio startup repair and GLSL swap on 0.55.134
+
+Two isolated 0.55.133 Studio launches reproduced a Windows access-denied
+error while republishing `audio-port`. Studio entered Timeline mode and
+published the port while initialising, then immediately published the same
+port again while Alloy was polling it. Studio 0.1.34 starts the connection
+once, skips publication of an unchanged port and retries brief Windows
+sharing failures when the port changes.
+
+The single-worker build passed. Three focused Python checks and all 77
+native Studio workspace checks passed. The packaged desktop preview opened
+and rendered on the isolated two-track mix. **Swap GLSL** changed Scallop
+Snap to Grid 102 · Mixed while playback advanced from 3.04 to 16.90 seconds,
+with zero additional audio callback lock or source sample misses. Moving
+frames and the saved scene were inspected after reopen. The saved diff
+changed only the scene key and title, preserving clip identity, geometry,
+visual joins, audio placements and links. Later renders included the GLSL
+dissolve and the next scene.
+
+The direct replacement menu opened the bundled submenu and local file
+chooser. Desktop automation could not complete either selection, and the
+chooser prevented graceful close. After verifying the edited session was
+saved and clean, only the two owned test processes were stopped. Direct
+picker acceptance and artistic review on a representative show remain open.
+
+`out/Launch.cmd` selects `out/releases/0.55.134-47f43f1d4df1`. Visible Alloy
+version, Windows file and product versions show 0.55.134. Executable SHA-256
+is `47f43f1d4df13c759c7b2bec8fb164d3b1cb106ebda4ac9f5778edbd23ba85fe`.
+Rollback is `out/Launch.cmd.bak.version-0.55.134-20261114`. Source, payload
+hashes, focused checks and activation are under `.local/preview134`.
+Desktop evidence is in `.local/gl134/evidence`, with failures in
+`.local/gl133/evidence`. Session format 54 and analysis revision 11 are
+retained. Production data and sessions were untouched.
 
 ## 14 November Studio playback workflow checks on 0.55.133
 
